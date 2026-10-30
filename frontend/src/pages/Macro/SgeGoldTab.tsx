@@ -172,7 +172,7 @@ export default function SgeGoldTab() {
                 className="sge-gold__stale-alert"
                 type="warning"
                 showIcon
-                message="实时数据暂时不可用，当前展示最近一次历史快照"
+                title="实时数据暂时不可用，当前展示最近一次历史快照"
               />
             ) : null}
             {data.is_delisted ? (
@@ -180,7 +180,7 @@ export default function SgeGoldTab() {
                 className="sge-gold__stale-alert"
                 type="info"
                 showIcon
-                message={`${data.name} 已停止交易，仅供历史参考，不再更新行情`}
+                title={`${data.name} 已停止交易，仅供历史参考，不再更新行情`}
               />
             ) : null}
 

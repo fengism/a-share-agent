@@ -18,9 +18,9 @@
 .market-fund-flow__chart-card.ant-card {
   height: 100%;
   border-color: var(--c-border);
-  border-radius: var(--c-radius-lg);
+  border-radius: var(--c-radius-md);
   background: var(--c-card-bg);
-  box-shadow: var(--c-shadow-sm);
+  box-shadow: var(--c-card-shadow);
 }
 
 .market-fund-flow__metric-title {
@@ -62,7 +62,19 @@
   margin-bottom: 8px;
 }
 
-@media (max-width: 575px) {
+@media (max-width: 576px) {
+  .market-fund-flow__metrics .ant-card-body {
+    padding: 10px 12px !important;
+  }
+
+  .market-fund-flow__metric-title {
+    font-size: 11px !important;
+  }
+
+  .market-fund-flow__metrics .ant-statistic-content-value {
+    font-size: clamp(16px, 4.2vw, 22px) !important;
+  }
+
   .market-fund-flow__chart-card .ant-card-head {
     flex-wrap: wrap;
     padding-block: 12px;
@@ -75,5 +87,6 @@
   .market-fund-flow__chart {
     margin-inline: -10px;
     width: calc(100% + 20px) !important;
+    height: 280px !important;
   }
 }

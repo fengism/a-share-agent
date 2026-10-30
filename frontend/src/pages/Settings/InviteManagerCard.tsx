@@ -207,7 +207,7 @@ export default function InviteManagerCard() {
             </Button>
           </Popconfirm>
         ) : (
-          <span style={{ color: colors.textMuted, fontSize: "12px" }}>不可撤销</span>
+          <span style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)" }}>不可撤销</span>
         ),
     },
   ];
@@ -271,14 +271,14 @@ export default function InviteManagerCard() {
         <Col xs={12} sm={6}>
           <div
             style={{
-              padding: "8px 12px",
+              padding: "var(--c-pad-inset, 7px 12px)",
               background: colors.hoverBg,
               borderRadius: 6,
               border: `1px solid ${colors.border}`,
             }}
           >
-            <div style={{ fontSize: "11px", color: colors.textMuted }}>总邀请码</div>
-            <div style={{ fontSize: "18px", fontWeight: 700, color: colors.textPrimary }}>
+            <div style={{ fontSize: "var(--c-font-xs)", color: colors.textMuted }}>总邀请码</div>
+            <div style={{ fontSize: "var(--c-font-xl)", fontWeight: 700, color: colors.textPrimary }}>
               {stats.total}
             </div>
           </div>
@@ -286,14 +286,14 @@ export default function InviteManagerCard() {
         <Col xs={12} sm={6}>
           <div
             style={{
-              padding: "8px 12px",
+              padding: "var(--c-pad-inset, 7px 12px)",
               background: colors.hoverBg,
               borderRadius: 6,
               border: `1px solid ${colors.border}`,
             }}
           >
-            <div style={{ fontSize: "11px", color: colors.textMuted }}>有效未使用</div>
-            <div style={{ fontSize: "18px", fontWeight: 700, color: colors.success }}>
+            <div style={{ fontSize: "var(--c-font-xs)", color: colors.textMuted }}>有效未使用</div>
+            <div style={{ fontSize: "var(--c-font-xl)", fontWeight: 700, color: colors.success }}>
               {stats.unused}
             </div>
           </div>
@@ -301,14 +301,14 @@ export default function InviteManagerCard() {
         <Col xs={12} sm={6}>
           <div
             style={{
-              padding: "8px 12px",
+              padding: "var(--c-pad-inset, 7px 12px)",
               background: colors.hoverBg,
               borderRadius: 6,
               border: `1px solid ${colors.border}`,
             }}
           >
-            <div style={{ fontSize: "11px", color: colors.textMuted }}>已使用</div>
-            <div style={{ fontSize: "18px", fontWeight: 700, color: colors.primary }}>
+            <div style={{ fontSize: "var(--c-font-xs)", color: colors.textMuted }}>已使用</div>
+            <div style={{ fontSize: "var(--c-font-xl)", fontWeight: 700, color: colors.primary }}>
               {stats.used}
             </div>
           </div>
@@ -316,14 +316,14 @@ export default function InviteManagerCard() {
         <Col xs={12} sm={6}>
           <div
             style={{
-              padding: "8px 12px",
+              padding: "var(--c-pad-inset, 7px 12px)",
               background: colors.hoverBg,
               borderRadius: 6,
               border: `1px solid ${colors.border}`,
             }}
           >
-            <div style={{ fontSize: "11px", color: colors.textMuted }}>已过期</div>
-            <div style={{ fontSize: "18px", fontWeight: 700, color: colors.textMuted }}>
+            <div style={{ fontSize: "var(--c-font-xs)", color: colors.textMuted }}>已过期</div>
+            <div style={{ fontSize: "var(--c-font-xl)", fontWeight: 700, color: colors.textMuted }}>
               {stats.expired}
             </div>
           </div>

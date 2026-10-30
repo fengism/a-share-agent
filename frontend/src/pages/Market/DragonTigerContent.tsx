@@ -7,6 +7,7 @@ import { useDragonTigerDetail, useDragonTigerList } from "../../api/queries";
 import ChangeValue from "../../components/ChangeValue";
 import ResponsiveMetricGrid from "../../components/ResponsiveMetricGrid";
 import SectionDataState from "../../components/SectionDataState";
+import SectionToolbar from "../../components/SectionToolbar";
 import StockExternalLink from "../../components/StockExternalLink";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import type { DragonTigerDetail, DragonTigerItem } from "../../types/stock";
@@ -22,11 +23,11 @@ import { useColors, useTokens, semanticTagStyle } from "../../styles/ui";
 function renderBranchName(name: string) {
   let tag: ReactNode = null;
   if (name.includes("机构专用")) {
-    tag = <Tag color="purple" style={{ marginRight: 6, fontSize: "11px" }}>机构</Tag>;
+    tag = <Tag color="purple" style={{ marginRight: 6, fontSize: "var(--c-font-xs)" }}>机构</Tag>;
   } else if (name.includes("深股通") || name.includes("沪股通")) {
-    tag = <Tag color="cyan" style={{ marginRight: 6, fontSize: "11px" }}>外资</Tag>;
+    tag = <Tag color="cyan" style={{ marginRight: 6, fontSize: "var(--c-font-xs)" }}>外资</Tag>;
   } else if (name.includes("拉萨") || name.includes("东环路") || name.includes("团结路") || name.includes("金珠")) {
-    tag = <Tag color="orange" style={{ marginRight: 6, fontSize: "11px" }}>拉萨天团</Tag>;
+    tag = <Tag color="orange" style={{ marginRight: 6, fontSize: "var(--c-font-xs)" }}>拉萨天团</Tag>;
   }
   return (
     <span style={{ display: "inline-flex", alignItems: "center", maxWidth: "100%" }}>
@@ -123,7 +124,7 @@ function DetailModal({
   return (
     <Modal
       title={
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", paddingRight: 32 }}>
           <SwapRightOutlined style={{ transform: "rotate(90deg)", color: c.primary }} />
           <span>
             龙虎榜席位明细 — <StockExternalLink code={code} name={name}>{name}</StockExternalLink> ({code})
@@ -479,7 +480,7 @@ export function DragonTigerContent({ embedded = false }: { embedded?: boolean })
             <Card size="small" style={{ borderRadius: t.radius.md, boxShadow: t.shadow.xs }}>
               <Statistic
                 title={<span style={{ fontSize: t.font.sm, color: c.textSecondary }}>净买入总额 (万)</span>}
-                value={totalNet >= 0 ? `+${(totalNet / 1).toFixed(0)}` : (totalNet / 1).toFixed(0)}
+                value={totalNet >= 0 ? `+${formatNumber(totalNet, 0)}` : formatNumber(totalNet, 0)}
                 styles={{ content: { color: totalNet >= 0 ? c.up : c.down, fontWeight: Number(t.weight.bold) } }}
               />
             </Card>
@@ -488,7 +489,7 @@ export function DragonTigerContent({ embedded = false }: { embedded?: boolean })
             <Card size="small" style={{ borderRadius: t.radius.md, boxShadow: t.shadow.xs }}>
               <Statistic
                 title={<span style={{ fontSize: t.font.sm, color: c.textSecondary }}>总买入额 (万)</span>}
-                value={(totalBuy / 1).toFixed(0)}
+                value={formatNumber(totalBuy, 0)}
                 styles={{ content: { color: c.up, fontWeight: Number(t.weight.bold) } }}
               />
             </Card>
@@ -497,7 +498,7 @@ export function DragonTigerContent({ embedded = false }: { embedded?: boolean })
             <Card size="small" style={{ borderRadius: t.radius.md, boxShadow: t.shadow.xs }}>
               <Statistic
                 title={<span style={{ fontSize: t.font.sm, color: c.textSecondary }}>总卖出额 (万)</span>}
-                value={(totalSell / 1).toFixed(0)}
+                value={formatNumber(totalSell, 0)}
                 styles={{ content: { color: c.down, fontWeight: Number(t.weight.bold) } }}
               />
             </Card>
@@ -505,34 +506,26 @@ export function DragonTigerContent({ embedded = false }: { embedded?: boolean })
         </Row>
       </div>
 
-      <Card
-        size="small"
-        style={{
-          marginBottom: embedded ? t.space[3] : t.space[4],
-          borderRadius: t.radius.md,
-          border: `1px solid ${c.border}`,
-          boxShadow: t.shadow.xs,
-        }}
-        styles={{ body: { padding: isNarrow ? t.space[3] : `${t.space[3]} ${t.space[4]}` } }}
-      >
-        <Row justify="space-between" align="middle" gutter={[12, 8]}>
-          <Col xs={24} sm={12}>
-            <div style={{ display: "flex", alignItems: "center", gap: t.space[2] }}>
+      <div style={{ marginBottom: t.space[4] }}>
+        <SectionToolbar
+          ariaLabel="龙虎榜工具条"
+          meta={
+            <div style={{ display: "flex", alignItems: "center", gap: t.space[2], flexWrap: "wrap" }}>
               <span style={{ fontWeight: Number(t.weight.medium), whiteSpace: "nowrap" }}>报告日期：</span>
               <DatePicker
                 value={date}
                 onChange={(value) => value && setDate(value)}
                 allowClear={false}
                 format="YYYY-MM-DD"
-                style={{ width: isNarrow ? "100%" : undefined }}
+                style={{ width: isNarrow ? 140 : undefined }}
               />
               {dateWasResolved ? (
                 <Tag color="warning">实际数据日期：{actualReportDate}</Tag>
               ) : null}
             </div>
-          </Col>
-          <Col xs={24} sm={12} style={{ textAlign: isNarrow ? "left" : "right" }}>
-            <div style={{ display: "inline-flex", alignItems: "center", gap: t.space[2] }}>
+          }
+          actions={
+            <div style={{ display: "inline-flex", alignItems: "center", gap: t.space[2], flexWrap: "wrap" }}>
               {embedded && <Tag style={semanticTagStyle("primary")}>东方财富</Tag>}
               <span style={{ color: c.textSecondary, fontSize: t.font.sm }}>
                 {data ? `共 ${data.length} 只股票上榜` : "等待榜单数据"}
@@ -548,9 +541,9 @@ export function DragonTigerContent({ embedded = false }: { embedded?: boolean })
                 </Button>
               )}
             </div>
-          </Col>
-        </Row>
-      </Card>
+          }
+        />
+      </div>
 
       <Card
         size="small"
@@ -575,7 +568,7 @@ export function DragonTigerContent({ embedded = false }: { embedded?: boolean })
             dataSource={data || []}
             rowKey={(record) => `${record.code}-${record.trade_date}-${record.reason}`}
             size="middle"
-            pagination={{ pageSize: 20, showSizeChanger: false }}
+            pagination={{ pageSize: 20, showSizeChanger: false, simple: isNarrow }}
             expandable={isNarrow ? {
               expandedRowRender: renderExpandedRow,
               columnWidth: 38,

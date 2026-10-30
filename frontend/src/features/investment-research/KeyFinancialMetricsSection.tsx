@@ -71,15 +71,50 @@ export default function KeyFinancialMetricsSection({
         key,
         width: 150,
         align: "right" as const,
-        render: (_: unknown, row: KeyFinancialMetric) => (
-          <span
-            className="financial-statement-table__value"
-            title={row.values[periodIndex] === null ? "" : String(row.values[periodIndex])}
-            style={{ color: colors.textSecondary }}
-          >
-            {formatKeyFinancialMetricValue(row.values[periodIndex] ?? null, row.format)}
-          </span>
-        ),
+        render: (_: unknown, row: KeyFinancialMetric) => {
+          const val = row.values[periodIndex];
+          const prevVal = periodIndex > 0 ? row.values[periodIndex - 1] : null;
+          let trendText = "";
+          let isPositive = false;
+          let isNegative = false;
+          if (val != null && prevVal != null && prevVal !== 0) {
+            const diffPct = ((val - prevVal) / Math.abs(prevVal)) * 100;
+            trendText = `较上期 ${diffPct > 0 ? "+" : ""}${diffPct.toFixed(1)}%`;
+            isPositive = diffPct > 0;
+            isNegative = diffPct < 0;
+          }
+          const formatted = formatKeyFinancialMetricValue(val ?? null, row.format);
+          const fullTitle = [val === null ? "" : String(val), trendText].filter(Boolean).join(" · ");
+
+          return (
+            <span
+              className="financial-statement-table__value"
+              title={fullTitle}
+              style={{
+                color: colors.textSecondary,
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "flex-end",
+                gap: 4,
+              }}
+            >
+              <span>{formatted}</span>
+              {!isExportingPdf && trendText ? (
+                <span
+                  style={{
+                    fontSize: "10px",
+                    lineHeight: 1,
+                    opacity: 0.7,
+                    color: isPositive ? colors.up : isNegative ? colors.down : undefined,
+                  }}
+                  title={trendText}
+                >
+                  {isPositive ? "↑" : isNegative ? "↓" : ""}
+                </span>
+              ) : null}
+            </span>
+          );
+        },
       })),
     ];
     return (

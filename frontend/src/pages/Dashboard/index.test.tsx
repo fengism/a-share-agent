@@ -210,10 +210,8 @@ describe("Dashboard", () => {
       </MemoryRouter>,
     );
 
-    expect(container.querySelector(".dashboard-page")).toHaveStyle({
-      width: "100%",
-      maxWidth: "none",
-    });
+    // 看板页占满宽度由 PageShell 的 width="full" 类提供（不再写内联样式）
+    expect(container.querySelector(".dashboard-page")).toHaveClass("page-shell--full");
     const layout = container.querySelector(".dashboard-layout");
     const middle = screen.getByRole("region", { name: "首页中间内容" });
     const rail = screen.getByRole("complementary", { name: "首页热榜与自选栏" });
@@ -354,5 +352,25 @@ describe("Dashboard", () => {
     expect(within(section).getByRole("button", { name: /导出 CSV/ })).toBeInTheDocument();
     expect(within(section).getAllByRole("link", { name: "研报" })[0]).toHaveAttribute("href", "/analysis?code=600721");
     expect(within(section).getAllByRole("link", { name: "回测" })[0]).toHaveAttribute("href", "/quant?codes=600721");
+  });
+
+  it("switches mobile views using the responsive segmented bar", () => {
+    const { container } = render(
+      <MemoryRouter>
+        <Dashboard />
+      </MemoryRouter>,
+    );
+
+    const layout = container.querySelector(".dashboard-layout");
+    expect(layout).toHaveAttribute("data-mobile-view", "all");
+
+    // Ant Design Segmented renders input type="radio" or labels
+    const watchlistOption = screen.getByText("自选");
+    fireEvent.click(watchlistOption);
+    expect(layout).toHaveAttribute("data-mobile-view", "watchlist");
+
+    const mainlineOption = screen.getByText("主线");
+    fireEvent.click(mainlineOption);
+    expect(layout).toHaveAttribute("data-mobile-view", "mainline");
   });
 });

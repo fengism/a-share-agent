@@ -1,9 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import UserManagerCard from "./UserManagerCard";
 import { useAuthStore } from "../../store/authStore";
 
 const mocks = vi.hoisted(() => ({
+  isNarrow: false,
   refetch: vi.fn(),
   updateStatus: vi.fn(),
   updateRole: vi.fn(),
@@ -19,6 +20,10 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("../../api/auth", () => ({
   adminResetLinkApi: mocks.adminResetLink,
+}));
+
+vi.mock("../../hooks/useMediaQuery", () => ({
+  useMediaQuery: () => mocks.isNarrow,
 }));
 
 vi.mock("@tanstack/react-query", async (importOriginal) => {
@@ -102,6 +107,7 @@ describe("UserManagerCard", () => {
 
   afterEach(() => {
     vi.clearAllMocks();
+    mocks.isNarrow = false;
   });
 
   it("renders user table, statistics, and marks current logged-in account", () => {
@@ -173,5 +179,16 @@ describe("UserManagerCard", () => {
       { userId: 2, mustChangePassword: false },
       expect.any(Object),
     );
+  });
+
+  it("renders user cards with actions on narrow screens", () => {
+    mocks.isNarrow = true;
+    render(<UserManagerCard />);
+
+    const list = screen.getByRole("list", { name: "用户列表" });
+    expect(within(list).getAllByText("normal_user").length).toBeGreaterThan(0);
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    // 移动端卡片同样提供关键操作
+    expect(within(list).getAllByRole("button", { name: /禁\s*用/ }).length).toBeGreaterThan(0);
   });
 });

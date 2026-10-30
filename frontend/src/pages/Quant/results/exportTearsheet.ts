@@ -33,6 +33,22 @@ export function exportEquityCurveCsv(equityCurve: QuantBacktestResult["equity_cu
   downloadFile(csv, `量化每日净值序列_${marketDateStamp()}.csv`, "text/csv;charset=utf-8");
 }
 
+export function exportTradesCsv(trades: QuantBacktestResult["trades"]) {
+  if (!trades || trades.length === 0) return;
+  const headers = ["成交日期", "股票代码", "交易方向", "成交价格", "成交股数", "手续费", "已实现盈亏"];
+  const rows = trades.map((t) => [
+    `"${t.date}"`,
+    `\t${t.code}`,
+    t.side === "buy" ? "买入" : "卖出",
+    t.price.toFixed(2),
+    t.shares,
+    t.fee.toFixed(2),
+    t.realized_pnl != null ? t.realized_pnl.toFixed(2) : "",
+  ].join(","));
+  const csv = "\uFEFF" + [headers.join(","), ...rows].join("\n");
+  downloadFile(csv, `量化回测成交明细_${marketDateStamp()}.csv`, "text/csv;charset=utf-8");
+}
+
 export function exportBacktestTearsheetMarkdown(
   result: QuantBacktestResult,
   strategy?: QuantStrategyConfig,
@@ -120,6 +136,44 @@ export function exportBacktestTearsheetMarkdown(
     lines.push(`---`, ``, `## 5. 月度收益表现分布 (Monthly Returns Breakdown)`, `| 月份 | 收益率 |`, `| :--- | :--- |`);
     for (const mr of result.monthly_returns) {
       lines.push(`| ${mr.month} | ${formatPercent(mr.return_pct)} |`);
+    }
+    lines.push(``);
+  }
+
+  // Section 6: AI Tactical & Multi-Factor Attribution
+  lines.push(
+    `---`,
+    ``,
+    `## 6. AI 战术多因子归因与体检 (AI Tactical & Multi-Factor Attribution)`,
+    `- **换手率活跃度归因**: 回测年化换手率约 ${formatPercent(m.turnover_rate)}。${(m.turnover_rate ?? 0) > 200 ? "策略节奏较为进取，建议在个股放量突破初期（换手率 > 3%）介入以提升胜率，缩量阴跌期严格止损。" : "策略属于稳健波段跟踪，换手摩擦小，具备较好抗杂波能力。"}`,
+    `- **资金流向与主力博弈建议**: 实盘中建议将「主力资金连续净流入」或「超大单成交占比 > 10%」作为正向开仓置信度过滤，防范假突破。`,
+    `- **财报基本面与选股池安全垫**: 建议前置叠加「ROE ≥ 10% + 扣非净利润连续增长 + 估值处历史 50% 分位以内」构建底池，避免技术面择时误入暴雷股。`,
+    ``,
+  );
+
+  // Section 7: Constituent breakdown if multiple codes
+  if (result.codes.length > 1 && result.trades.length > 0) {
+    const pnlByCode: Record<string, { pnl: number; count: number; winCount: number; closed: number }> = {};
+    for (const t of result.trades) {
+      if (!pnlByCode[t.code]) pnlByCode[t.code] = { pnl: 0, count: 0, winCount: 0, closed: 0 };
+      pnlByCode[t.code].count++;
+      if (t.realized_pnl != null) {
+        pnlByCode[t.code].closed++;
+        pnlByCode[t.code].pnl += t.realized_pnl;
+        if (t.realized_pnl > 0) pnlByCode[t.code].winCount++;
+      }
+    }
+    lines.push(
+      `---`,
+      ``,
+      `## 7. 多标的盈亏贡献拆解 (Constituent Stock Performance Breakdown)`,
+      `| 标的代码 | 成交笔数 | 平仓笔数 | 胜率 | 累计已平仓盈亏 |`,
+      `| :--- | :--- | :--- | :--- | :--- |`,
+    );
+    for (const [code, stat] of Object.entries(pnlByCode)) {
+      const winRateStr = stat.closed > 0 ? `${((stat.winCount / stat.closed) * 100).toFixed(1)}%` : "-";
+      const pnlStr = stat.closed > 0 ? (stat.pnl > 0 ? `+${stat.pnl.toFixed(2)} 元` : `${stat.pnl.toFixed(2)} 元`) : "-";
+      lines.push(`| ${code} | ${stat.count} 笔 | ${stat.closed} 笔 | ${winRateStr} | ${pnlStr} |`);
     }
     lines.push(``);
   }

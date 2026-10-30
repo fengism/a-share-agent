@@ -14,12 +14,24 @@ const integerFormatter = new Intl.NumberFormat("zh-CN", {
   maximumFractionDigits: 0,
 });
 
-export function formatMoney(value: number | null | undefined) {
-  return value == null ? "-" : `¥${moneyFormatter.format(value)}`;
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  CNY: "¥",
+  HKD: "HK$",
+  USD: "US$",
+};
+
+/** 按币种返回金额前缀；未知币种直接显示代码，避免误标成人民币。 */
+export function currencySymbol(currency: string | null | undefined) {
+  if (!currency) return CURRENCY_SYMBOLS.CNY;
+  return CURRENCY_SYMBOLS[currency] ?? `${currency} `;
 }
 
-export function formatPrice(value: number | null | undefined) {
-  return value == null ? "-" : `¥${priceFormatter.format(value)}`;
+export function formatMoney(value: number | null | undefined, currency: string | null | undefined = "CNY") {
+  return value == null ? "-" : `${currencySymbol(currency)}${moneyFormatter.format(value)}`;
+}
+
+export function formatPrice(value: number | null | undefined, currency: string | null | undefined = "CNY") {
+  return value == null ? "-" : `${currencySymbol(currency)}${priceFormatter.format(value)}`;
 }
 
 export function formatInteger(value: number) {

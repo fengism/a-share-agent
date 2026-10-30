@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { CheckCircleOutlined, ClockCircleOutlined, ReloadOutlined } from "@ant-design/icons";
-import { Button, Card, Select, Space, Table, Tag, Tooltip } from "antd";
+import { Button, Card, Pagination, Select, Space, Table, Tag, Tooltip } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useMyLoginAuditLogs } from "../../api/queries";
 import SectionDataState from "../../components/SectionDataState";
@@ -9,6 +9,7 @@ import { formatMarketDateTime } from "../../utils/marketTime";
 import { semanticTagStyle, useColors, useStyles } from "../../styles/ui";
 import { LOGIN_STATUS_FILTERS, loginStatusMeta } from "./auditMeta";
 import { describeUserAgent } from "./sessionDevice";
+import SettingsMobileRecordList, { type MobileRecordField } from "./SettingsMobileRecordList";
 import type { LoginAuditLogItem } from "../../types/auth";
 
 const PAGE_SIZE = 10;
@@ -79,7 +80,7 @@ export default function LoginHistoryCard() {
       render: (ua: string) =>
         ua ? (
           <Tooltip title={ua}>
-            <span style={{ color: colors.textMuted, fontSize: "12px", cursor: "pointer" }}>
+            <span style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)", cursor: "pointer" }}>
               {describeUserAgent(ua).label}
             </span>
           </Tooltip>
@@ -88,6 +89,53 @@ export default function LoginHistoryCard() {
         ),
     },
   ];
+
+  const mobileFields: MobileRecordField<LoginAuditLogItem>[] = [
+    {
+      label: "时间",
+      primary: true,
+      render: (item) => formatMarketDateTime(item.created_at, "—"),
+    },
+    {
+      label: "结果",
+      render: (item) => {
+        const meta = loginStatusMeta(item.status);
+        return (
+          <Tag icon={meta.tone === "down" ? <CheckCircleOutlined /> : <ClockCircleOutlined />} style={semanticTagStyle(meta.tone)}>
+            {meta.label}
+          </Tag>
+        );
+      },
+    },
+    {
+      label: "来源 IP",
+      render: (item) => (
+        <code style={{ fontFamily: "var(--c-font-mono)", fontSize: "var(--c-font-sm)" }}>
+          {item.ip_address || "未知"}
+        </code>
+      ),
+    },
+    {
+      label: "设备",
+      fullWidth: true,
+      render: (item) =>
+        item.user_agent ? (
+          <Tooltip title={item.user_agent}>
+            <span style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)" }}>{describeUserAgent(item.user_agent).label}</span>
+          </Tooltip>
+        ) : (
+          <span style={{ color: colors.textMuted }}>—</span>
+        ),
+    },
+  ];
+
+  const pagination = {
+    current: page,
+    pageSize: PAGE_SIZE,
+    total,
+    showSizeChanger: false,
+    onChange: setPage,
+  };
 
   return (
     <Card
@@ -131,21 +179,30 @@ export default function LoginHistoryCard() {
         isEmpty={!isLoading && !error && items.length === 0}
         emptyText="暂无登录记录"
       >
-        <Table
-          size="small"
-          rowKey="id"
-          columns={columns}
-          dataSource={items}
-          pagination={{
-            current: page,
-            pageSize: PAGE_SIZE,
-            total,
-            showSizeChanger: false,
-            onChange: setPage,
-            size: "small",
-          }}
-          scroll={{ x: 640 }}
-        />
+        {isNarrow ? (
+          <>
+            <SettingsMobileRecordList
+              items={items}
+              rowKey={(item) => item.id}
+              fields={mobileFields}
+              ariaLabel="我的登录记录列表"
+            />
+            {total > PAGE_SIZE && (
+              <div className="settings-record-pagination">
+                <Pagination {...pagination} size="small" simple />
+              </div>
+            )}
+          </>
+        ) : (
+          <Table
+            size="small"
+            rowKey="id"
+            columns={columns}
+            dataSource={items}
+            pagination={{ ...pagination, size: "small" }}
+            scroll={{ x: 640 }}
+          />
+        )}
       </SectionDataState>
     </Card>
   );

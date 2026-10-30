@@ -127,6 +127,12 @@ function CNKlinePanel({
             <Switch aria-label="缠论" size="small" checked={chanlunEnabled} onChange={onChanlunChange} />
           </label>
         </Tooltip>
+        <div className="stock-kline-ma-legend" style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: "var(--c-font-xs)", fontFamily: "var(--c-font-mono)", opacity: 0.9 }}>
+          <span style={{ color: "#faad14" }}>● MA5</span>
+          <span style={{ color: "#13c2c2" }}>● MA10</span>
+          <span style={{ color: "#722ed1" }}>● MA20</span>
+          <span style={{ color: "#52c41a" }}>● MA60</span>
+        </div>
         <span className="stock-chart-hint" data-testid="kline-history-range">
           {historyLimitReached
             ? `已加载近 ${MAX_KLINE_HISTORY_YEARS} 年（上限）`
@@ -249,6 +255,12 @@ function HKKlinePanel({
           onChange={(value) => setAdjust(String(value))}
           size="small"
         />
+        <div className="stock-kline-ma-legend" style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: "var(--c-font-xs)", fontFamily: "var(--c-font-mono)", opacity: 0.9 }}>
+          <span style={{ color: "#faad14" }}>● MA5</span>
+          <span style={{ color: "#13c2c2" }}>● MA10</span>
+          <span style={{ color: "#722ed1" }}>● MA20</span>
+          <span style={{ color: "#52c41a" }}>● MA60</span>
+        </div>
         <span className="stock-chart-hint" data-testid="kline-history-range">
           {historyLimitReached
             ? `已加载近 ${MAX_KLINE_HISTORY_YEARS} 年（上限）`
@@ -312,7 +324,7 @@ function IntradayPanel({
   return (
     <>
       <div className="stock-chart-toolbar" style={{ justifyContent: "space-between" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, fontSize: "12px", color: "var(--c-text-secondary)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, fontSize: "var(--c-font-sm)", color: "var(--c-text-secondary)" }}>
           {latestTime && (
             <span>
               数据时间: <strong style={{ color: "var(--c-text-primary)", fontFamily: "var(--c-font-mono)" }}>{latestTime}</strong>
@@ -321,11 +333,11 @@ function IntradayPanel({
           {query.isFetching && <span style={{ color: "var(--c-primary)" }}>刷新中...</span>}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <label className="stock-chart-chanlun-toggle" style={{ cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, fontSize: "12px" }}>
+          <label className="stock-chart-chanlun-toggle" style={{ cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, fontSize: "var(--c-font-sm)" }}>
             均价线
             <Switch aria-label="均价线" size="small" checked={showAvgLine} onChange={setShowAvgLine} />
           </label>
-          <label className="stock-chart-chanlun-toggle" style={{ cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, fontSize: "12px" }}>
+          <label className="stock-chart-chanlun-toggle" style={{ cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, fontSize: "var(--c-font-sm)" }}>
             昨收线
             <Switch aria-label="昨收线" size="small" checked={showPrevClose} onChange={setShowPrevClose} />
           </label>

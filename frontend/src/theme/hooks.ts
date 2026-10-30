@@ -58,6 +58,9 @@ export function tokensToCssVars(meta: ThemeMeta): Record<string, string> {
     "--c-font-2xl": t.font["2xl"],
     "--c-font-3xl": t.font["3xl"],
     "--c-font-display": t.font.display,
+    // 内边距档位：卡片内区块（inset）与卡片本体（card）
+    "--c-pad-inset": `${t.space[3]} ${t.space[4]}`,
+    "--c-pad-card": `${t.space[5]} ${t.space[6]}`,
     // leading
     "--c-leading-tight": t.leading.tight,
     "--c-leading-normal": t.leading.normal,

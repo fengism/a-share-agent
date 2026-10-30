@@ -275,6 +275,26 @@
   font-size: var(--c-font-xs);
 }
 
+.stock-header-card__tape {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-top: 6px;
+  font-size: var(--c-font-xs);
+  font-family: var(--c-font-mono);
+  color: var(--c-text-secondary);
+}
+
+.stock-header-card__tape > span {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: var(--c-radius-sm);
+  background: var(--c-nested-bg, rgba(0, 0, 0, 0.03));
+  white-space: nowrap;
+}
+
 .stock-header-card__actions {
   max-width: 220px;
   justify-content: flex-end;

@@ -124,6 +124,8 @@ describe("WatchlistPanel", () => {
 
     expect(screen.getByRole("button", { name: "查看大唐发电研报" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "查看贵州茅台研报" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "回测大唐发电" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "回测贵州茅台" })).toBeInTheDocument();
 
     const sortButton = screen.getByRole("button", { name: "切换自选股排序" });
     expect(sortButton).toBeInTheDocument();
@@ -132,5 +134,8 @@ describe("WatchlistPanel", () => {
     const refreshButton = screen.getByRole("button", { name: "刷新自选股行情" });
     expect(refreshButton).toBeInTheDocument();
     fireEvent.click(refreshButton);
+
+    const aiButton = screen.getByRole("button", { name: "AI 诊断自选股" });
+    expect(aiButton).toBeInTheDocument();
   });
 });

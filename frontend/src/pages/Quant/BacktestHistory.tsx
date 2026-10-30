@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
-import { ClockCircleOutlined, DeleteOutlined, FilterOutlined, ReloadOutlined } from "@ant-design/icons";
-import { Button, Card, Input, Popconfirm, Select, Tag, Typography } from "antd";
+import { ClockCircleOutlined, DeleteOutlined, FilterOutlined, FundViewOutlined, ReloadOutlined } from "@ant-design/icons";
+import { Button, Card, Checkbox, Input, Popconfirm, Select, Tag, Typography } from "antd";
 import type { QuantBacktestRun } from "../../api/queries";
 import SectionDataState from "../../components/SectionDataState";
 import { useStyles, useColors, semanticTagStyle } from "../../styles/ui";
 import { formatMarketPattern } from "../../utils/marketTime";
 import { QUANT_RUN_STATUS_META, quantStrategyLabel, quantUniverseLabel } from "./quantRun";
+import BacktestRunsComparatorModal from "./BacktestRunsComparatorModal";
 
 const { Text } = Typography;
 type StatusFilter = "all" | QuantBacktestRun["status"];
@@ -49,6 +50,12 @@ export default function BacktestHistory({
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [strategyFilter, setStrategyFilter] = useState("all");
   const [isFiltersOpen, setIsFiltersOpen] = useState(() => runs.length > 8);
+  const [selectedForCompare, setSelectedForCompare] = useState<string[]>([]);
+  const [isCompareModalOpen, setIsCompareModalOpen] = useState(false);
+
+  const compareRuns = useMemo(() => {
+    return runs.filter((r) => selectedForCompare.includes(r.id));
+  }, [runs, selectedForCompare]);
   const strategyOptions = useMemo(() => {
     const labels = new Map<string, string>();
     runs.forEach((run) => {
@@ -120,6 +127,25 @@ export default function BacktestHistory({
           >
             筛选{activeFilterCount > 0 ? ` ${activeFilterCount}` : ""}
           </Button>
+          <Button
+            size="small"
+            type={selectedForCompare.length >= 2 ? "primary" : "default"}
+            icon={<FundViewOutlined />}
+            aria-label="横向对比已选回测"
+            disabled={selectedForCompare.length < 2}
+            onClick={() => setIsCompareModalOpen(true)}
+          >
+            横向对比{selectedForCompare.length > 0 ? ` (${selectedForCompare.length})` : ""}
+          </Button>
+          {selectedForCompare.length > 0 ? (
+            <Button
+              size="small"
+              type="text"
+              onClick={() => setSelectedForCompare([])}
+            >
+              清空对比
+            </Button>
+          ) : null}
           <Text type="secondary">{filteredRuns.length}/{runs.length} 条</Text>
           <Button size="small" icon={<ReloadOutlined />} loading={isFetching} onClick={onRefresh}>刷新</Button>
         </div>
@@ -142,6 +168,24 @@ export default function BacktestHistory({
             const strategy = quantStrategyLabel(run.request.strategy ?? { type: "ma_cross" });
             return (
               <li key={run.id} className={isSelected ? "quant-history-item is-selected" : "quant-history-item"}>
+                {metrics ? (
+                  <div
+                    className="quant-history-compare-checkbox"
+                    style={{ display: "flex", alignItems: "center", paddingLeft: 8, paddingRight: 2 }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Checkbox
+                      checked={selectedForCompare.includes(run.id)}
+                      aria-label={`选择对比 ${run.name}`}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setSelectedForCompare((prev) =>
+                          checked ? [...prev, run.id] : prev.filter((id) => id !== run.id)
+                        );
+                      }}
+                    />
+                  </div>
+                ) : null}
                 <button
                   type="button"
                   className="quant-history-summary"
@@ -221,6 +265,13 @@ export default function BacktestHistory({
           </div>
         ) : null}
       </SectionDataState>
+      <BacktestRunsComparatorModal
+        open={isCompareModalOpen}
+        runs={compareRuns}
+        onClose={() => setIsCompareModalOpen(false)}
+        onSelectRun={onSelect}
+        onRemoveRun={(runId) => setSelectedForCompare((prev) => prev.filter((id) => id !== runId))}
+      />
     </Card>
   );
 }

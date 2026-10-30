@@ -1,7 +1,8 @@
-import { DownloadOutlined } from "@ant-design/icons";
-import { Button, Empty, Table } from "antd";
+import { DownloadOutlined, SearchOutlined } from "@ant-design/icons";
+import { Button, Empty, Input, Space, Table } from "antd";
 import type { TableColumnsType } from "antd";
-import { memo, useMemo } from "react";
+import dayjs from "dayjs";
+import { memo, useMemo, useState } from "react";
 import type { PortfolioClosedPosition } from "../../types/portfolio";
 import { formatInteger, formatMoney, formatTime } from "./portfolioFormatters";
 import PortfolioTableCard from "./PortfolioTableCard";
@@ -12,13 +13,26 @@ import type { PortfolioTableRenderers } from "./portfolioTableRenderers";
 interface PortfolioClosedPositionTableProps {
   closedPositions: PortfolioClosedPosition[];
   renderers: PortfolioTableRenderers;
+  bare?: boolean;
 }
 
 function PortfolioClosedPositionTable({
   closedPositions,
   renderers,
+  bare = false,
 }: PortfolioClosedPositionTableProps) {
+  const [searchQuery, setSearchQuery] = useState("");
   const { isMobile, renderProfit, renderStock } = renderers;
+
+  const displayPositions = useMemo(() => {
+    if (!searchQuery.trim()) return closedPositions;
+    const q = searchQuery.trim().toLowerCase();
+    return closedPositions.filter(
+      (c) =>
+        c.stock_code.toLowerCase().includes(q) ||
+        c.stock_name.toLowerCase().includes(q),
+    );
+  }, [closedPositions, searchQuery]);
 
   const handleExportCsv = () => {
     const headers = [
@@ -84,6 +98,7 @@ function PortfolioClosedPositionTable({
       width: 110,
       align: "right",
       className: "financial-num",
+      sorter: (a, b) => a.total_shares - b.total_shares,
       render: formatInteger,
     },
     {
@@ -92,7 +107,8 @@ function PortfolioClosedPositionTable({
       width: 125,
       align: "right",
       className: "financial-num",
-      render: formatMoney,
+      sorter: (a, b) => (a.matched_cost ?? 0) - (b.matched_cost ?? 0),
+      render: (value) => formatMoney(value),
     },
     {
       title: "已实现盈亏",
@@ -100,6 +116,7 @@ function PortfolioClosedPositionTable({
       width: 135,
       align: "right",
       className: "financial-num",
+      sorter: (a, b) => (a.realized_profit_amount ?? 0) - (b.realized_profit_amount ?? 0),
       render: (_, record) => renderProfit(
         record.realized_profit_amount,
         record.realized_profit_pct,
@@ -115,6 +132,7 @@ function PortfolioClosedPositionTable({
       title: "清仓时间",
       dataIndex: "last_trade_time",
       width: 150,
+      sorter: (a, b) => dayjs(a.last_trade_time).valueOf() - dayjs(b.last_trade_time).valueOf(),
       render: formatTime,
     },
     {
@@ -123,6 +141,7 @@ function PortfolioClosedPositionTable({
       width: 100,
       align: "right",
       className: "financial-num",
+      sorter: (a, b) => a.holding_days - b.holding_days,
       render: (value: number) => `${value} 天`,
     },
   ], [isMobile, renderProfit, renderStock]);
@@ -130,19 +149,31 @@ function PortfolioClosedPositionTable({
   return (
     <PortfolioTableCard
       title="已清仓股票"
-      stacked
+      stacked={!bare}
+      bare={bare}
       extra={
         closedPositions.length > 0 ? (
-          <Button size="small" icon={<DownloadOutlined />} onClick={handleExportCsv}>
-            导出 CSV
-          </Button>
+          <Space size={8}>
+            <Input
+              size="small"
+              placeholder="搜索已清仓"
+              prefix={<SearchOutlined />}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              allowClear
+              style={{ width: 140 }}
+            />
+            <Button size="small" icon={<DownloadOutlined />} onClick={handleExportCsv}>
+              导出 CSV
+            </Button>
+          </Space>
         ) : null
       }
     >
       <Table<PortfolioClosedPosition>
         rowKey="stock_code"
         columns={columns}
-        dataSource={closedPositions}
+        dataSource={displayPositions}
         pagination={PORTFOLIO_TABLE_PAGINATION}
         size="middle"
         scroll={{ x: 1_040 }}

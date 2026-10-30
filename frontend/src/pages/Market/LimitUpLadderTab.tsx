@@ -1,12 +1,15 @@
-import { useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { Button, Card, Col, DatePicker, Row, Segmented, Space, Statistic, Table, Tag, Typography } from "antd";
 import { FireOutlined, ReloadOutlined, ThunderboltOutlined, TrophyOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import type { ColumnsType } from "antd/es/table";
 import { useMarketLimitUpLadder } from "../../api/queries";
 import RefreshBadge from "../../components/RefreshBadge";
+import ResponsiveMetricGrid from "../../components/ResponsiveMetricGrid";
 import SectionDataState from "../../components/SectionDataState";
+import SectionToolbar from "../../components/SectionToolbar";
 import StockExternalLink from "../../components/StockExternalLink";
+import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { useUrlSearchParam } from "../../hooks/useUrlSearchParam";
 import type { MarketLimitUpLadderStock } from "../../types/stock";
 import { normalizeIsoDate } from "../../utils/date";
@@ -15,7 +18,7 @@ import { formatMarketDateTime } from "../../utils/marketTime";
 import { useColors, useTokens, semanticTagStyle } from "../../styles/ui";
 import LimitHistoryPanel from "./LimitHistoryPanel";
 
-const { Text, Title } = Typography;
+const { Text } = Typography;
 
 function formatFetchedAt(value: string | undefined) {
   if (!value) return "-";
@@ -26,8 +29,8 @@ function getLadderTagStyle(boardCount: number, colors: ReturnType<typeof useColo
   if (boardCount >= 5) {
     return {
       background: "linear-gradient(135deg, rgba(200, 52, 31, 0.15), rgba(247, 144, 9, 0.15))",
-      color: colors.down,
-      borderColor: colors.down,
+      color: colors.up,
+      borderColor: colors.up,
       fontWeight: 700,
     };
   }
@@ -45,6 +48,7 @@ function getLadderTagStyle(boardCount: number, colors: ReturnType<typeof useColo
 function LimitUpLadderContent() {
   const colors = useColors();
   const t = useTokens();
+  const isMobile = useMediaQuery("(max-width: 768px)");
   const today = dayjs().format("YYYY-MM-DD");
   const [dateParam, setDate] = useUrlSearchParam("date", today, { replace: true });
   const normalizedDate = normalizeIsoDate(dateParam, today);
@@ -63,80 +67,151 @@ function LimitUpLadderContent() {
   const oneWordCount = stocks.filter((stock) => stock.one_word).length;
   const popularCount = stocks.filter((stock) => stock.popular).length;
 
-  const columns: ColumnsType<MarketLimitUpLadderStock> = useMemo(() => [
-    {
-      title: "股票",
-      key: "stock",
-      width: 150,
-      render: (_value: unknown, stock: MarketLimitUpLadderStock) => (
-        <StockExternalLink code={stock.code} name={stock.name} style={{ display: "inline-flex" }}>
-          <Space orientation="vertical" size={0}>
-            <Text strong style={{ fontSize: t.font.md }}>{stock.name}</Text>
-            <Text type="secondary" style={{ fontSize: t.font.xs, fontFamily: "var(--c-font-mono)" }}>{stock.code}</Text>
-          </Space>
-        </StockExternalLink>
-      ),
-    },
-    {
-      title: "连板高度",
-      dataIndex: "board_count",
-      width: 110,
-      align: "center",
-      defaultSortOrder: "descend",
-      sorter: (left, right) => left.board_count - right.board_count,
-      render: (value: number) => (
-        <Tag style={getLadderTagStyle(value, colors)}>
-          {value}连板
-        </Tag>
-      ),
-    },
-    {
-      title: "涨停时间",
-      dataIndex: "limit_up_time",
-      width: 100,
-      align: "center",
-      render: (value: string) => <span style={{ fontFamily: "var(--c-font-mono)" }}>{value || "-"}</span>,
-    },
-    {
-      title: "所属板块",
-      dataIndex: "sector_name",
-      width: 150,
-      ellipsis: true,
-      render: (value: string, stock) => (
-        <Space size={6}>
-          <span style={{ fontWeight: Number(t.weight.medium) }}>{value || "其他"}</span>
-          {stock.sector_limit_up_count > 0 ? (
-            <Tag style={{ borderRadius: 10, padding: "0 6px", fontSize: t.font.xs }}>
-              {stock.sector_limit_up_count}只
+  const renderExpandedRow = useCallback((stock: MarketLimitUpLadderStock) => (
+    <ResponsiveMetricGrid
+      items={[
+        {
+          key: "sector",
+          label: "所属板块",
+          value: `${stock.sector_name || "其他"}${stock.sector_limit_up_count > 0 ? ` (${stock.sector_limit_up_count}只)` : ""}`,
+        },
+        {
+          key: "features",
+          label: "特征",
+          value: (
+            <Space size={[4, 4]} wrap>
+              {stock.one_word ? <Tag style={semanticTagStyle("warning")}>大单一字</Tag> : null}
+              {stock.popular ? <Tag style={semanticTagStyle("primary")}>人气股</Tag> : null}
+              {!stock.one_word && !stock.popular ? "-" : null}
+            </Space>
+          ),
+        },
+        { key: "amount", label: "成交额", value: formatAmount(stock.amount) },
+        { key: "limit_up_time", label: "涨停时间", value: stock.limit_up_time || "-" },
+      ]}
+    />
+  ), []);
+
+  const columns: ColumnsType<MarketLimitUpLadderStock> = useMemo(() => {
+    if (isMobile) {
+      return [
+        {
+          title: "股票",
+          key: "stock",
+          width: 140,
+          render: (_value: unknown, stock: MarketLimitUpLadderStock) => (
+            <StockExternalLink code={stock.code} name={stock.name} style={{ display: "inline-flex" }}>
+              <Space orientation="vertical" size={0}>
+                <Text strong style={{ fontSize: t.font.md }}>{stock.name}</Text>
+                <Space size={4} wrap>
+                  <Text type="secondary" style={{ fontSize: t.font.xs, fontFamily: "var(--c-font-mono)" }}>{stock.code}</Text>
+                  {stock.sector_name && (
+                    <Text type="secondary" style={{ fontSize: t.font.xs }}>· {stock.sector_name}</Text>
+                  )}
+                </Space>
+              </Space>
+            </StockExternalLink>
+          ),
+        },
+        {
+          title: "连板高度",
+          dataIndex: "board_count",
+          width: 86,
+          align: "center",
+          defaultSortOrder: "descend",
+          sorter: (left, right) => left.board_count - right.board_count,
+          render: (value: number) => (
+            <Tag style={getLadderTagStyle(value, colors)}>
+              {value}连板
             </Tag>
-          ) : null}
-        </Space>
-      ),
-    },
-    {
-      title: "特征",
-      key: "tags",
-      width: 170,
-      render: (_value: unknown, stock: MarketLimitUpLadderStock) => (
-        <Space size={[4, 4]} wrap>
-          {stock.one_word ? <Tag style={semanticTagStyle("warning")}>大单一字</Tag> : null}
-          {stock.popular ? <Tag style={semanticTagStyle("primary")}>人气股</Tag> : null}
-          {!stock.one_word && !stock.popular ? <span style={{ color: colors.textMuted }}>-</span> : null}
-        </Space>
-      ),
-    },
-    {
-      title: "成交额",
-      dataIndex: "amount",
-      width: 110,
-      align: "right",
-      render: (value: number) => (
-        <span style={{ fontFamily: "var(--c-font-mono)", fontWeight: Number(t.weight.medium) }}>
-          {formatAmount(value)}
-        </span>
-      ),
-    },
-  ], [colors, t]);
+          ),
+        },
+        {
+          title: "涨停时间",
+          dataIndex: "limit_up_time",
+          width: 86,
+          align: "center",
+          render: (value: string) => <span style={{ fontFamily: "var(--c-font-mono)", fontSize: t.font.xs }}>{value || "-"}</span>,
+        },
+      ];
+    }
+
+    return [
+      {
+        title: "股票",
+        key: "stock",
+        width: 150,
+        fixed: "left",
+        render: (_value: unknown, stock: MarketLimitUpLadderStock) => (
+          <StockExternalLink code={stock.code} name={stock.name} style={{ display: "inline-flex" }}>
+            <Space orientation="vertical" size={0}>
+              <Text strong style={{ fontSize: t.font.md }}>{stock.name}</Text>
+              <Text type="secondary" style={{ fontSize: t.font.xs, fontFamily: "var(--c-font-mono)" }}>{stock.code}</Text>
+            </Space>
+          </StockExternalLink>
+        ),
+      },
+      {
+        title: "连板高度",
+        dataIndex: "board_count",
+        width: 110,
+        align: "center",
+        defaultSortOrder: "descend",
+        sorter: (left, right) => left.board_count - right.board_count,
+        render: (value: number) => (
+          <Tag style={getLadderTagStyle(value, colors)}>
+            {value}连板
+          </Tag>
+        ),
+      },
+      {
+        title: "涨停时间",
+        dataIndex: "limit_up_time",
+        width: 100,
+        align: "center",
+        render: (value: string) => <span style={{ fontFamily: "var(--c-font-mono)" }}>{value || "-"}</span>,
+      },
+      {
+        title: "所属板块",
+        dataIndex: "sector_name",
+        width: 150,
+        ellipsis: true,
+        render: (value: string, stock) => (
+          <Space size={6}>
+            <span style={{ fontWeight: Number(t.weight.medium) }}>{value || "其他"}</span>
+            {stock.sector_limit_up_count > 0 ? (
+              <Tag style={{ borderRadius: 10, padding: "0 6px", fontSize: t.font.xs }}>
+                {stock.sector_limit_up_count}只
+              </Tag>
+            ) : null}
+          </Space>
+        ),
+      },
+      {
+        title: "特征",
+        key: "tags",
+        width: 170,
+        render: (_value: unknown, stock: MarketLimitUpLadderStock) => (
+          <Space size={[4, 4]} wrap>
+            {stock.one_word ? <Tag style={semanticTagStyle("warning")}>大单一字</Tag> : null}
+            {stock.popular ? <Tag style={semanticTagStyle("primary")}>人气股</Tag> : null}
+            {!stock.one_word && !stock.popular ? <span style={{ color: colors.textMuted }}>-</span> : null}
+          </Space>
+        ),
+      },
+      {
+        title: "成交额",
+        dataIndex: "amount",
+        width: 110,
+        align: "right",
+        render: (value: number) => (
+          <span style={{ fontFamily: "var(--c-font-mono)", fontWeight: Number(t.weight.medium) }}>
+            {formatAmount(value)}
+          </span>
+        ),
+      },
+    ];
+  }, [colors, isMobile, t]);
 
   return (
     <SectionDataState
@@ -150,27 +225,34 @@ function LimitUpLadderContent() {
       skeletonRows={10}
     >
       <div>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: t.space[4], marginBottom: t.space[4], flexWrap: "wrap" }}>
-          <Space size={parseFloat(t.space[3])} wrap>
-            <Title level={4} style={{ margin: 0, display: "inline-flex", alignItems: "center", gap: 6 }}>
-              <FireOutlined style={{ color: colors.up }} /> 涨停板
-            </Title>
-            <Text type="secondary">数据日期：{query.data?.date || dateText}</Text>
-            <Text type="secondary">更新时间：{formatFetchedAt(query.data?.fetched_at)}</Text>
-            <RefreshBadge />
-          </Space>
-          <Space>
-            <DatePicker
-              aria-label="涨停板日期"
-              value={selectedDate}
-              allowClear={false}
-              disabledDate={(current) => current.isAfter(dayjs(), "day")}
-              onChange={(value) => value && setDate(value.format("YYYY-MM-DD"))}
-            />
-            <Button icon={<ReloadOutlined />} loading={query.isFetching} onClick={() => query.refetch()}>
-              刷新
-            </Button>
-          </Space>
+        <div style={{ marginBottom: t.space[4] }}>
+          <SectionToolbar
+            ariaLabel="涨停板工具条"
+            meta={
+              <Space size={parseFloat(t.space[3])} wrap>
+                <span style={{ fontWeight: Number(t.weight.semibold), color: colors.textPrimary, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                  <FireOutlined style={{ color: colors.up }} /> 涨停板
+                </span>
+                <Text type="secondary">数据日期：{query.data?.date || dateText}</Text>
+                <Text type="secondary">更新时间：{formatFetchedAt(query.data?.fetched_at)}</Text>
+                <RefreshBadge />
+              </Space>
+            }
+            actions={
+              <Space wrap>
+                <DatePicker
+                  aria-label="涨停板日期"
+                  value={selectedDate}
+                  allowClear={false}
+                  disabledDate={(current) => current.isAfter(dayjs(), "day")}
+                  onChange={(value) => value && setDate(value.format("YYYY-MM-DD"))}
+                />
+                <Button icon={<ReloadOutlined />} loading={query.isFetching} onClick={() => query.refetch()}>
+                  刷新
+                </Button>
+              </Space>
+            }
+          />
         </div>
 
         <Row gutter={[16, 16]} style={{ marginBottom: t.space[4] }}>
@@ -258,8 +340,12 @@ function LimitUpLadderContent() {
             rowKey="code"
             columns={columns}
             dataSource={stocks}
-            pagination={{ pageSize: 20, showSizeChanger: false }}
-            scroll={{ x: 780 }}
+            pagination={{ pageSize: 20, showSizeChanger: !isMobile, simple: isMobile }}
+            expandable={isMobile ? {
+              expandedRowRender: renderExpandedRow,
+              columnWidth: 38,
+            } : undefined}
+            scroll={isMobile ? undefined : { x: 780 }}
             size="middle"
           />
         </Card>

@@ -558,6 +558,7 @@ class NationalTeamEtfPoint(BaseModel):
     shares_change_100m: float | None = None
     shares_change_pct: float | None = None
     close: float | None = None
+    amount_100m: float | None = None
     estimated_net_flow_100m: float | None = None
 
 
@@ -568,11 +569,15 @@ class NationalTeamEtfSeries(BaseModel):
     exchange: Literal["SH", "SZ"]
     index_key: str
     index_name: str
+    category: str = "core_broad"
     latest_date: str | None = None
     latest_shares_100m: float | None = None
     latest_change_1d_100m: float | None = None
     change_5d_100m: float | None = None
     change_20d_100m: float | None = None
+    latest_amount_100m: float | None = None
+    volume_ratio: float | None = None
+    is_abnormal_volume: bool = False
     points: list[NationalTeamEtfPoint] = Field(default_factory=list)
 
 
@@ -589,6 +594,7 @@ class NationalTeamIndexSeries(BaseModel):
     index_key: str
     index_name: str
     index_code: str
+    category: str = "core_broad"
     etf_codes: list[str] = Field(default_factory=list)
     covered_etf_codes: list[str] = Field(default_factory=list)
     latest_date: str | None = None
@@ -619,6 +625,79 @@ class NationalTeamShareObservation(BaseModel):
     verification_status: Literal["provisional"] = "provisional"
 
 
+class NationalTeamDailyFlow(BaseModel):
+    date: str
+    total_flow_100m: float | None = None
+    total_shares_change_100m: float | None = None
+    flows_by_index: dict[str, float] = Field(default_factory=dict)
+    flows_by_category: dict[str, float] = Field(default_factory=dict)
+
+
+class NationalTeamSupportScore(BaseModel):
+    score: float = 50.0
+    status: Literal["neutral", "moderate", "active", "strong"] = "neutral"
+    label: str = "市场自发"
+    description: str = ""
+    net_flow_factor: float = 0.0
+    breadth_factor: float = 0.0
+    divergence_factor: float = 0.0
+
+
+class NationalTeamSupportZoneItem(BaseModel):
+    range_label: str
+    net_flow_100m: float
+    share_pct: float
+
+
+class NationalTeamSupportZone(BaseModel):
+    index_key: str
+    index_name: str
+    current_price: float | None = None
+    weighted_avg_cost: float | None = None
+    cost_buffer_pct: float | None = None
+    zones: list[NationalTeamSupportZoneItem] = Field(default_factory=list)
+
+
+class NationalTeamMilestone(BaseModel):
+    date: str
+    title: str
+    type: Literal["statement", "intervention", "policy", "liquidity"] = "policy"
+    description: str
+    index_points: dict[str, float] = Field(default_factory=dict)
+
+
+class NationalTeamHolderEntity(BaseModel):
+    name: str
+    short_name: str
+    role: str
+    estimated_aum_trillion: float
+    focus: str
+
+
+class NationalTeamIndustryAllocation(BaseModel):
+    industry: str
+    weight_pct: float
+    market_value_100m: float
+    representative_stocks: list[str] = Field(default_factory=list)
+
+
+class NationalTeamTopHolding(BaseModel):
+    code: str
+    name: str
+    holder_name: str
+    shareholding_ratio_pct: float
+    market_value_100m: float
+    industry: str
+
+
+class NationalTeamPortrait(BaseModel):
+    entities: list[NationalTeamHolderEntity] = Field(default_factory=list)
+    industry_allocations: list[NationalTeamIndustryAllocation] = Field(default_factory=list)
+    top_holdings: list[NationalTeamTopHolding] = Field(default_factory=list)
+    reporting_period: str = "2024Q3 / 2024年报"
+    total_market_value_trillion: float = 3.85
+
+
 class NationalTeamResponse(BaseModel):
     source: str = "上交所/深交所/东方财富"
     fetched_at: str
@@ -635,10 +714,15 @@ class NationalTeamResponse(BaseModel):
     missing_price_etfs: list[str] = Field(default_factory=list)
     missing_indices: list[str] = Field(default_factory=list)
     covered_etf_count: int = 0
-    total_etf_count: int = 12
+    total_etf_count: int = 22
     methodology: str
     disclaimer: str
     summary: NationalTeamSummary = Field(default_factory=NationalTeamSummary)
+    daily_flows: list[NationalTeamDailyFlow] = Field(default_factory=list)
+    support_score: NationalTeamSupportScore = Field(default_factory=NationalTeamSupportScore)
+    support_zones: list[NationalTeamSupportZone] = Field(default_factory=list)
+    milestones: list[NationalTeamMilestone] = Field(default_factory=list)
+    portrait: NationalTeamPortrait = Field(default_factory=NationalTeamPortrait)
     indices: list[NationalTeamIndexSeries] = Field(default_factory=list)
     etfs: list[NationalTeamEtfSeries] = Field(default_factory=list)
 
@@ -649,10 +733,16 @@ class NationalTeamResponse(BaseModel):
 
 
 class ConceptSummaryItem(BaseModel):
-    """概念列表中的单条摘要（名称 + 成分股只数）。"""
+    """概念列表中的单条摘要（名称 + 成分股只数 + 最近交易日等权涨跌）。"""
 
     name: str
     stock_count: int
+    change_pct: float | None = None
+    change_date: str | None = None
+    up_count: int | None = None
+    down_count: int | None = None
+    limit_up_count: int | None = None
+    sample_count: int | None = None
 
 
 class ConceptListResponse(BaseModel):
@@ -673,6 +763,10 @@ class ConceptConstituentItem(BaseModel):
     change_pct: float | None = None
     amount: int | None = None
     quote_source: str | None = None
+    related_concepts: list[str] = Field(
+        default_factory=list,
+        description="该股票所属的其他概念（最具体的几个，不含当前概念），用于概念间联动",
+    )
 
 
 class RelatedConceptItem(BaseModel):

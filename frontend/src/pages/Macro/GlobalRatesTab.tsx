@@ -911,15 +911,15 @@ export default function GlobalRatesTab() {
         <Col xs={24} lg={12}>
           <Card title="全球主要央行政策基准利率与传导" size="small">
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              <div style={{ padding: "10px 14px", background: c.nestedBg, borderRadius: 6, borderLeft: `3px solid ${c.primary}` }}>
+              <div style={{ padding: "var(--c-pad-inset, 7px 12px)", background: c.nestedBg, borderRadius: 6, borderLeft: `3px solid ${c.primary}` }}>
                 <div style={{ fontSize: 12, color: c.textSecondary }}>中国人民银行 · 1年期 LPR</div>
                 <div style={{ fontSize: 16, fontWeight: 600, marginTop: 2 }}>{policy?.china_lpr_1y ?? RATE_PLACEHOLDER}</div>
               </div>
-              <div style={{ padding: "10px 14px", background: c.nestedBg, borderRadius: 6, borderLeft: `3px solid ${c.accent}` }}>
+              <div style={{ padding: "var(--c-pad-inset, 7px 12px)", background: c.nestedBg, borderRadius: 6, borderLeft: `3px solid ${c.accent}` }}>
                 <div style={{ fontSize: 12, color: c.textSecondary }}>中国人民银行 · 5年期以上 LPR (房贷基准)</div>
                 <div style={{ fontSize: 16, fontWeight: 600, marginTop: 2 }}>{policy?.china_lpr_5y ?? RATE_PLACEHOLDER}</div>
               </div>
-              <div style={{ padding: "10px 14px", background: c.nestedBg, borderRadius: 6, borderLeft: `3px solid #722ed1` }}>
+              <div style={{ padding: "var(--c-pad-inset, 7px 12px)", background: c.nestedBg, borderRadius: 6, borderLeft: `3px solid #722ed1` }}>
                 <div style={{ fontSize: 12, color: c.textSecondary }}>美联储 · 联邦基金目标利率 (Fed Funds Rate)</div>
                 <div style={{ fontSize: 16, fontWeight: 600, marginTop: 2 }}>{policy?.us_fed_funds_rate ?? RATE_PLACEHOLDER}</div>
               </div>

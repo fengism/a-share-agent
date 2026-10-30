@@ -135,3 +135,85 @@
   }
 }
 
+/* 标签徽标与多表聚合 Tab 样式 */
+.portfolio-tab-badge {
+  font-size: 11px;
+  color: var(--c-text-muted, #8c8c8c);
+  font-weight: 500;
+  margin-left: 2px;
+}
+
+.portfolio-tables-card .ant-tabs-nav {
+  margin-bottom: 8px !important;
+}
+
+.portfolio-bare-table-container {
+  padding-top: 4px;
+}
+
+/* Hero 看板增强与响应式 */
+.portfolio-hero-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.portfolio-hero-pnl-strip {
+  transition: background-color 0.2s ease;
+}
+
+@media (max-width: 768px) {
+  .portfolio-hero-stat .ant-statistic-content {
+    font-size: 22px !important;
+  }
+
+  .portfolio-hero-pnl-strip {
+    padding: 8px !important;
+  }
+
+  .portfolio-hero-pnl-strip .ant-statistic-content {
+    font-size: 13px !important;
+  }
+
+  .portfolio-position-bar-container {
+    margin: 8px 0 12px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .portfolio-hero-stat .ant-statistic-content {
+    font-size: 19px !important;
+  }
+
+  .portfolio-hero-pnl-strip .ant-col-xs-8 {
+    padding-inline: 4px !important;
+  }
+
+  .portfolio-hero-pnl-strip .ant-statistic-content {
+    font-size: 12px !important;
+  }
+
+  .portfolio-hero-pnl-strip .portfolio-summary-subtext {
+    font-size: 9.5px !important;
+  }
+}
+
+/* 持仓卡片视图与过渡效果 */
+.portfolio-stock-cards-container {
+  padding-top: 6px;
+}
+
+.portfolio-stock-card-item {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.portfolio-stock-card-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.portfolio-trade-snapshot-ribbon {
+  transition: background-color 0.2s ease;
+}
+
+
+

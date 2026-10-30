@@ -259,7 +259,7 @@ export default function HKIndustryComparisonSection({ code }: { code: string }) 
           >
             <div
               style={{
-                padding: "8px 12px",
+                padding: "var(--c-pad-inset, 7px 12px)",
                 background: colors.nestedBg,
                 borderRadius: 8,
                 borderLeft: `3px solid ${colors.primary}`,
@@ -284,7 +284,7 @@ export default function HKIndustryComparisonSection({ code }: { code: string }) 
 
             <div
               style={{
-                padding: "8px 12px",
+                padding: "var(--c-pad-inset, 7px 12px)",
                 background: colors.nestedBg,
                 borderRadius: 8,
                 borderLeft: `3px solid ${colors.info}`,
@@ -304,7 +304,7 @@ export default function HKIndustryComparisonSection({ code }: { code: string }) 
 
             <div
               style={{
-                padding: "8px 12px",
+                padding: "var(--c-pad-inset, 7px 12px)",
                 background: colors.nestedBg,
                 borderRadius: 8,
                 borderLeft: `3px solid ${colors.accent}`,
@@ -324,7 +324,7 @@ export default function HKIndustryComparisonSection({ code }: { code: string }) 
 
             <div
               style={{
-                padding: "8px 12px",
+                padding: "var(--c-pad-inset, 7px 12px)",
                 background: colors.nestedBg,
                 borderRadius: 8,
                 borderLeft: `3px solid ${colors.warning}`,
@@ -346,7 +346,7 @@ export default function HKIndustryComparisonSection({ code }: { code: string }) 
 
             <div
               style={{
-                padding: "8px 12px",
+                padding: "var(--c-pad-inset, 7px 12px)",
                 background: colors.nestedBg,
                 borderRadius: 8,
                 borderLeft: `3px solid ${colors.success}`,

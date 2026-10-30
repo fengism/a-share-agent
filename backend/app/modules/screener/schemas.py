@@ -23,6 +23,12 @@ class ScreenerFilter(BaseModel):
     # 题材/量价异动指标：日内振幅 (%)
     amplitude_min: float | None = None
     amplitude_max: float | None = None
+    # 题材/动量指标：量比
+    volume_ratio_min: float | None = None
+    volume_ratio_max: float | None = None
+    # 动量指标：近60日涨跌幅 (%)
+    change_pct_60d_min: float | None = None
+    change_pct_60d_max: float | None = None
     # 深度价值指标：是否仅筛选破净股 (0 < 市净率 PB <= 1.0)
     is_broken_net: bool = False
     industries: list[str] | None = None
@@ -50,7 +56,7 @@ class ScreenerFilter(BaseModel):
     sort_by: str = "market_cap"
     sort_order: str = "desc"
     page: int = Field(default=1, ge=1)
-    page_size: int = Field(default=50, ge=1, le=200)
+    page_size: int = Field(default=50, ge=1, le=1000)
 
 
 class ScreenerItem(BaseModel):
@@ -66,6 +72,9 @@ class ScreenerItem(BaseModel):
     turnover_pct: float | None = None
     volume: float | None = None
     amplitude: float | None = None
+    volume_ratio: float | None = None
+    change_pct_60d: float | None = None
+    composite_score: float | None = None
     is_broken_net: bool = False
     exchange: str | None = None
     board: str | None = None

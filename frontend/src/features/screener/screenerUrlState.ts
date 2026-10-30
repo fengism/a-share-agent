@@ -29,6 +29,10 @@ const NUMBER_FILTER_KEYS = [
   "turnover_pct_max",
   "amplitude_min",
   "amplitude_max",
+  "volume_ratio_min",
+  "volume_ratio_max",
+  "change_pct_60d_min",
+  "change_pct_60d_max",
   "min_amount_yi",
   "min_listing_days",
 ] as const;
@@ -42,6 +46,9 @@ const SORT_FIELDS: ReadonlySet<string> = new Set([
   "turnover_pct",
   "amplitude",
   "volume",
+  "volume_ratio",
+  "change_pct_60d",
+  "composite_score",
 ]);
 
 function parseNumber(value: string | null): number | undefined {

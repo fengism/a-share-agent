@@ -8,12 +8,13 @@ import {
   SearchOutlined,
   StopOutlined,
 } from "@ant-design/icons";
-import { Button, Card, Input, Select, Space, Table, Tabs, Tag, Tooltip } from "antd";
+import { Button, Card, Input, Pagination, Select, Space, Table, Tabs, Tag, Tooltip } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useAdminAuditActions, useLoginAuditLogs } from "../../api/queries";
 import SectionDataState from "../../components/SectionDataState";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { semanticTagStyle, useColors, useStyles } from "../../styles/ui";
+import SettingsMobileRecordList, { type MobileRecordField } from "./SettingsMobileRecordList";
 import {
   ACTION_FILTERS,
   ACTION_LABELS,
@@ -86,7 +87,7 @@ function LoginAuditSection() {
         <Space size={4}>
           <span style={{ fontWeight: 600, color: colors.textPrimary }}>{val}</span>
           {record.user_id && (
-            <Tag style={{ fontSize: "10px", lineHeight: "16px", padding: "0 4px" }}>
+            <Tag style={{ fontSize: "var(--c-font-xs, 11px)", lineHeight: "16px", padding: "0 4px" }}>
               #{record.user_id}
             </Tag>
           )}
@@ -119,7 +120,7 @@ function LoginAuditSection() {
       render: (ua: string) =>
         ua ? (
           <Tooltip title={ua}>
-            <span style={{ color: colors.textMuted, fontSize: "12px", cursor: "pointer" }}>
+            <span style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)", cursor: "pointer" }}>
               {ua.length > 50 ? `${ua.slice(0, 50)}...` : ua}
             </span>
           </Tooltip>
@@ -136,6 +137,47 @@ function LoginAuditSection() {
       render: (val: string) => val || "—",
     },
   ];
+
+  const mobileFields: MobileRecordField<LoginAuditLogItem>[] = [
+    { label: "时间", primary: true, render: (item) => item.created_at || "—" },
+    {
+      label: "账号",
+      primary: true,
+      render: (item) => (
+        <span>
+          {item.username}
+          {item.user_id ? <Tag style={{ marginLeft: 4, fontSize: "var(--c-font-xs, 11px)", lineHeight: "16px", padding: "0 4px" }}>#{item.user_id}</Tag> : null}
+        </span>
+      ),
+    },
+    { label: "结果", render: (item) => statusTag(item.status) },
+    {
+      label: "来源 IP",
+      render: (item) => (
+        <code style={{ fontFamily: "var(--c-font-mono)", fontSize: "var(--c-font-sm)" }}>{item.ip_address || "未知"}</code>
+      ),
+    },
+    {
+      label: "客户端",
+      fullWidth: true,
+      render: (item) => (
+        <span style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)", wordBreak: "break-all" }}>{item.user_agent || "—"}</span>
+      ),
+    },
+    { label: "详情", fullWidth: true, render: (item) => item.details || "—" },
+  ];
+
+  const pagination = {
+    current: page,
+    pageSize,
+    total,
+    showSizeChanger: true,
+    pageSizeOptions: ["10", "20", "50", "100"],
+    onChange: (p: number, ps: number) => {
+      setPage(p);
+      setPageSize(ps);
+    },
+  };
 
   return (
     <>
@@ -199,25 +241,30 @@ function LoginAuditSection() {
         errorTitle="安全日志加载失败"
         minHeight={140}
       >
-        <Table<LoginAuditLogItem>
-          rowKey="id"
-          columns={columns}
-          dataSource={items}
-          pagination={{
-            current: page,
-            pageSize,
-            total,
-            showSizeChanger: true,
-            pageSizeOptions: ["10", "20", "50", "100"],
-            size: "small",
-            onChange: (p, ps) => {
-              setPage(p);
-              setPageSize(ps);
-            },
-          }}
-          size="small"
-          scroll={{ x: 750 }}
-        />
+        {isNarrow ? (
+          <>
+            <SettingsMobileRecordList
+              items={items}
+              rowKey={(item) => item.id}
+              fields={mobileFields}
+              ariaLabel="登录审计记录列表"
+            />
+            {total > pageSize && (
+              <div className="settings-record-pagination">
+                <Pagination {...pagination} size="small" simple />
+              </div>
+            )}
+          </>
+        ) : (
+          <Table<LoginAuditLogItem>
+            rowKey="id"
+            columns={columns}
+            dataSource={items}
+            pagination={{ ...pagination, size: "small" }}
+            size="small"
+            scroll={{ x: 750 }}
+          />
+        )}
       </SectionDataState>
     </>
   );
@@ -259,7 +306,7 @@ function AdminActionSection() {
         <Space size={4}>
           <span style={{ fontWeight: 600, color: colors.textPrimary }}>{val || "系统"}</span>
           {record.actor_id ? (
-            <Tag style={{ fontSize: "10px", lineHeight: "16px", padding: "0 4px" }}>
+            <Tag style={{ fontSize: "var(--c-font-xs, 11px)", lineHeight: "16px", padding: "0 4px" }}>
               #{record.actor_id}
             </Tag>
           ) : null}
@@ -284,7 +331,7 @@ function AdminActionSection() {
           <span>
             {record.target_label}
             {record.target_type ? (
-              <span style={{ color: colors.textMuted, fontSize: "11px" }}>（{record.target_type}）</span>
+              <span style={{ color: colors.textMuted, fontSize: "var(--c-font-xs)" }}>（{record.target_type}）</span>
             ) : null}
           </span>
         ) : (
@@ -302,7 +349,7 @@ function AdminActionSection() {
           <span style={{ color: colors.textMuted }}>—</span>
         ) : (
           <Tooltip title={details}>
-            <span style={{ fontSize: "12px" }}>{summary}</span>
+            <span style={{ fontSize: "var(--c-font-sm)" }}>{summary}</span>
           </Tooltip>
         );
       },
@@ -319,6 +366,59 @@ function AdminActionSection() {
       ),
     },
   ];
+
+  const mobileFields: MobileRecordField<AdminAuditActionItem>[] = [
+    { label: "时间", primary: true, render: (item) => item.created_at || "—" },
+    {
+      label: "操作者",
+      primary: true,
+      render: (item) => (
+        <span>
+          {item.actor_username || "系统"}
+          {item.actor_id ? <Tag style={{ marginLeft: 4, fontSize: "var(--c-font-xs, 11px)", lineHeight: "16px", padding: "0 4px" }}>#{item.actor_id}</Tag> : null}
+        </span>
+      ),
+    },
+    { label: "操作", render: (item) => <Tag color="blue">{ACTION_LABELS[item.action] ?? item.action}</Tag> },
+    {
+      label: "对象",
+      render: (item) =>
+        item.target_label ? (
+          <span>
+            {item.target_label}
+            {item.target_type ? <span style={{ color: colors.textMuted, fontSize: "var(--c-font-xs)" }}>（{item.target_type}）</span> : null}
+          </span>
+        ) : (
+          <span style={{ color: colors.textMuted }}>{item.target_id || "—"}</span>
+        ),
+    },
+    {
+      label: "变更内容",
+      fullWidth: true,
+      render: (item) => {
+        const summary = summarizeDetails(item.details);
+        return summary === "—" ? <span style={{ color: colors.textMuted }}>—</span> : <span style={{ fontSize: "var(--c-font-sm)" }}>{summary}</span>;
+      },
+    },
+    {
+      label: "来源 IP",
+      render: (item) => (
+        <code style={{ fontFamily: "var(--c-font-mono)", fontSize: "var(--c-font-sm)" }}>{item.actor_ip || "未知"}</code>
+      ),
+    },
+  ];
+
+  const pagination = {
+    current: page,
+    pageSize,
+    total,
+    showSizeChanger: true,
+    pageSizeOptions: ["10", "20", "50", "100"],
+    onChange: (p: number, ps: number) => {
+      setPage(p);
+      setPageSize(ps);
+    },
+  };
 
   return (
     <>
@@ -383,25 +483,30 @@ function AdminActionSection() {
         errorTitle="管理员操作记录加载失败"
         minHeight={140}
       >
-        <Table<AdminAuditActionItem>
-          rowKey="id"
-          columns={columns}
-          dataSource={items}
-          pagination={{
-            current: page,
-            pageSize,
-            total,
-            showSizeChanger: true,
-            pageSizeOptions: ["10", "20", "50", "100"],
-            size: "small",
-            onChange: (p, ps) => {
-              setPage(p);
-              setPageSize(ps);
-            },
-          }}
-          size="small"
-          scroll={{ x: 820 }}
-        />
+        {isNarrow ? (
+          <>
+            <SettingsMobileRecordList
+              items={items}
+              rowKey={(item) => item.id}
+              fields={mobileFields}
+              ariaLabel="管理员操作记录列表"
+            />
+            {total > pageSize && (
+              <div className="settings-record-pagination">
+                <Pagination {...pagination} size="small" simple />
+              </div>
+            )}
+          </>
+        ) : (
+          <Table<AdminAuditActionItem>
+            rowKey="id"
+            columns={columns}
+            dataSource={items}
+            pagination={{ ...pagination, size: "small" }}
+            size="small"
+            scroll={{ x: 820 }}
+          />
+        )}
       </SectionDataState>
     </>
   );

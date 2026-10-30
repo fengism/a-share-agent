@@ -1,0 +1,436 @@
+/* 设置页统一样式：目录条、卡片分组与移动端触控规范 */
+
+.settings-directory {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 2px 0 12px;
+  margin-bottom: 4px;
+  scrollbar-width: thin;
+  scroll-snap-type: x proximity;
+}
+
+.settings-directory::-webkit-scrollbar {
+  height: 4px;
+}
+
+.settings-directory::-webkit-scrollbar-thumb {
+  background: var(--c-border, rgba(148, 163, 184, 0.4));
+  border-radius: 2px;
+}
+
+.settings-directory__chip {
+  flex: 0 0 auto;
+  min-height: 32px;
+  padding: 5px 12px;
+  border: 1px solid var(--c-border);
+  border-radius: 999px;
+  background: var(--c-card-bg);
+  color: var(--c-text-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--c-font-xs, 12px);
+  line-height: 1.4;
+  white-space: nowrap;
+  scroll-snap-align: start;
+  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+.settings-directory__chip:hover {
+  color: var(--c-text-primary);
+  border-color: var(--c-primary);
+  background: var(--c-muted-soft);
+}
+
+.settings-directory__chip[aria-current="true"] {
+  color: var(--c-primary);
+  border-color: var(--c-primary);
+  background: var(--c-primary-soft);
+  font-weight: var(--c-weight-bold);
+}
+
+.settings-directory__chip:focus-visible {
+  outline: 2px solid var(--c-focus-ring);
+  outline-offset: 2px;
+}
+
+/* 卡片分组：锚点 + 组标题，滚动定位时留出吸顶头部空间 */
+.settings-group {
+  scroll-margin-top: 96px;
+}
+
+.settings-group + .settings-group {
+  margin-top: 24px;
+}
+
+.settings-group__title {
+  margin: 0 0 4px;
+  color: var(--c-text-secondary);
+  font-size: var(--c-font-sm, 13px);
+  font-weight: var(--c-weight-bold);
+  letter-spacing: 0.02em;
+}
+
+.settings-group__hint {
+  margin: 0 0 12px;
+  color: var(--c-text-muted);
+  font-size: var(--c-font-xs, 12px);
+  line-height: 1.6;
+}
+
+@media (max-width: 767px) {
+  .settings-directory {
+    gap: 6px;
+    padding-bottom: 10px;
+  }
+
+  .settings-directory__chip {
+    min-height: 36px;
+    padding: 7px 14px;
+  }
+
+  .settings-group + .settings-group {
+    margin-top: 20px;
+  }
+}
+
+/* 顶部未保存变更操作区 */
+.settings-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+.settings-dirty-trigger {
+  border-color: var(--c-warning, #faad14);
+  color: var(--c-warning, #faad14);
+}
+
+/* 未保存变更汇总面板 */
+.settings-dirty-panel {
+  width: 320px;
+  max-width: 78vw;
+}
+
+.settings-dirty-panel__hint {
+  margin: 0 0 10px;
+  color: var(--c-text-muted);
+  font-size: var(--c-font-xs, 12px);
+  line-height: 1.6;
+}
+
+.settings-dirty-panel__list {
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.settings-dirty-panel__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  min-height: 34px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--c-text-primary);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.settings-dirty-panel__item:hover {
+  background: var(--c-muted-soft);
+}
+
+.settings-dirty-panel__item:focus-visible {
+  outline: 2px solid var(--c-focus-ring);
+  outline-offset: 1px;
+}
+
+.settings-dirty-panel__item-label {
+  font-size: var(--c-font-sm, 13px);
+}
+
+.settings-dirty-panel__item-section {
+  color: var(--c-text-muted);
+  font-size: var(--c-font-xs, 12px);
+  white-space: nowrap;
+}
+
+.settings-dirty-panel__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 767px) {
+  .settings-header-actions {
+    width: 100%;
+  }
+
+  .settings-dirty-panel {
+    width: min(84vw, 320px);
+  }
+
+  .settings-dirty-panel__item {
+    min-height: 44px;
+  }
+
+  .settings-dirty-panel__actions .ant-btn {
+    min-height: 40px;
+  }
+}
+
+/* ── 统一卡片外壳 ─────────────────────────────── */
+.settings-card .ant-card-head {
+  min-height: 46px;
+  padding: 0 16px;
+}
+
+.settings-card__head {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.settings-card__icon {
+  display: inline-flex;
+  color: var(--c-text-muted);
+}
+
+.settings-card__title {
+  font-size: var(--c-font-sm, 13px);
+  font-weight: var(--c-weight-bold);
+  color: var(--c-text-primary);
+}
+
+.settings-card__status {
+  flex: 0 0 auto;
+  padding: 1px 8px;
+  border: 1px solid var(--c-warning, #faad14);
+  border-radius: 999px;
+  color: var(--c-warning, #faad14);
+  font-size: 11px;
+  font-weight: var(--c-weight-semibold);
+  line-height: 18px;
+}
+
+.settings-card[data-dirty="true"] {
+  border-color: color-mix(in srgb, var(--c-warning, #faad14) 45%, var(--c-border));
+}
+
+.settings-card__footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.settings-card__dirty-hint {
+  color: var(--c-warning, #faad14);
+  font-size: var(--c-font-xs, 12px);
+}
+
+/* 危险操作区：与主保存按钮分离，统一红色描边弱化误触 */
+.settings-card__danger,
+.settings-danger {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--c-down, #f04438) 35%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--c-down, #f04438) 6%, transparent);
+}
+
+.settings-card__danger .ant-typography,
+.settings-danger .ant-typography {
+  color: var(--c-text-secondary);
+}
+
+@media (max-width: 767px) {
+  .settings-card__footer {
+    gap: 10px;
+  }
+
+  .settings-card__footer .ant-btn {
+    min-height: 44px;
+    flex: 1 1 auto;
+  }
+
+  .settings-card__footer .ant-btn-primary {
+    flex: 1 1 100%;
+  }
+}
+
+/* ── 移动端吸底保存栏 ───────────────────────────── */
+.settings-save-bar-spacer {
+  height: calc(72px + env(safe-area-inset-bottom, 0px));
+}
+
+.settings-save-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px calc(10px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--c-border);
+  background: var(--c-card-bg);
+  box-shadow: 0 -6px 18px rgba(15, 23, 42, 0.12);
+}
+
+.settings-save-bar__count {
+  color: var(--c-warning, #faad14);
+  font-size: var(--c-font-sm, 13px);
+  font-weight: var(--c-weight-bold);
+  white-space: nowrap;
+}
+
+.settings-save-bar__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.settings-save-bar__actions .ant-btn {
+  min-height: 40px;
+}
+
+/* ── 移动端触控尺寸与表单可读性 ─────────────────── */
+@media (max-width: 767px) {
+  .settings-card .ant-input,
+  .settings-card .ant-input-affix-wrapper,
+  .settings-card .ant-input-number,
+  .settings-card .ant-select-selector,
+  .settings-card .ant-picker {
+    min-height: 44px;
+  }
+
+  .settings-card .ant-switch {
+    min-width: 44px;
+    height: 26px;
+  }
+
+  .settings-card .ant-form-item-label > label {
+    font-size: var(--c-font-sm, 13px);
+  }
+
+  /* 管理员页签在窄屏横向滚动，避免标签被压缩成两字缩写 */
+  .settings-admin-tabs .ant-segmented-group {
+    flex-wrap: nowrap;
+  }
+
+  .settings-admin-tabs {
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .settings-admin-tabs::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* ── 窄屏记录卡片流（替代宽表格横向滚动）─────────── */
+.settings-record-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 10px;
+}
+
+.settings-record-card {
+  padding: 12px 14px;
+  border: 1px solid var(--c-border);
+  border-radius: 10px;
+  background: var(--c-card-bg);
+}
+
+.settings-record-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.settings-record-card__primary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  color: var(--c-text-primary);
+  font-size: var(--c-font-md, 14px);
+  font-weight: var(--c-weight-semibold);
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.settings-record-card__trailing {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.settings-record-card__details {
+  margin: 10px 0 0;
+  display: grid;
+  gap: 6px;
+}
+
+.settings-record-card__row {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+}
+
+.settings-record-card__row--full {
+  grid-template-columns: 76px minmax(0, 1fr);
+}
+
+.settings-record-card__row dt {
+  color: var(--c-text-muted);
+  font-size: var(--c-font-xs, 12px);
+  line-height: 1.6;
+}
+
+.settings-record-card__row dd {
+  margin: 0;
+  min-width: 0;
+  color: var(--c-text-secondary);
+  font-size: var(--c-font-sm, 13px);
+  line-height: 1.6;
+  word-break: break-word;
+}
+
+.settings-record-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--c-border);
+}
+
+.settings-record-card__actions .ant-btn {
+  min-height: 40px;
+}
+
+.settings-record-list + .settings-record-pagination {
+  margin-top: 12px;
+  display: flex;
+  justify-content: center;
+}

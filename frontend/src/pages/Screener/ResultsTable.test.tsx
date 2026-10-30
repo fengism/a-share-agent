@@ -296,4 +296,112 @@ describe("ResultsTable", () => {
     fireEvent.click(amplitudeHeader);
     expect(onSortChange).toHaveBeenCalledWith("amplitude", "asc");
   });
+
+  it("renders anomaly tags and triggers quick actions like add watchlist and AI check", async () => {
+    mocks.isNarrow = false;
+    const onAddWatchlist = vi.fn().mockResolvedValue(undefined);
+    render(
+      <MemoryRouter>
+        <ResultsTable
+          data={{
+            items: [{
+              code: "000001",
+              name: "平安银行",
+              price: 12.5,
+              change_pct: 10.0,
+              pe_ttm: 6.0,
+              pb: 0.65,
+              turnover_pct: 9.5,
+              volume_ratio: 2.5,
+              amplitude: 10.5,
+              is_broken_net: true,
+              market_cap: 2400,
+              volume: 3000000,
+              second_industry: null,
+            }],
+            total: 1,
+            page: 1,
+            page_size: 50,
+          }}
+          isLoading={false}
+          percentileMap={new Map()}
+          showPercentile={false}
+          onPageChange={vi.fn()}
+          filters={DEFAULT_SCREENER_FILTERS}
+          onSortChange={vi.fn()}
+          selectedCodes={[]}
+          onSelectedCodesChange={vi.fn()}
+          onAddWatchlist={onAddWatchlist}
+        />
+      </MemoryRouter>,
+    );
+
+    // 异动标签验证：涨停、高换手、放量、破净
+    expect(screen.getByText("涨停")).toBeInTheDocument();
+    expect(screen.getByText("高换手")).toBeInTheDocument();
+    expect(screen.getByText("放量")).toBeInTheDocument();
+
+    // 快捷加自选
+    const addBtn = screen.getByRole("button", { name: "加自选-000001" });
+    fireEvent.click(addBtn);
+    await waitFor(() => {
+      expect(onAddWatchlist).toHaveBeenCalledWith(
+        expect.objectContaining({ code: "000001", name: "平安银行" })
+      );
+    });
+
+    // AI 体检按钮
+    const aiBtn = screen.getByRole("button", { name: "AI体检-000001" });
+    expect(aiBtn).toBeInTheDocument();
+  });
+
+  it("supports switching column perspective between all, valuation, and momentum", () => {
+    mocks.isNarrow = false;
+    render(
+      <MemoryRouter>
+        <ResultsTable
+          data={{
+            items: [{
+              code: "600519",
+              name: "贵州茅台",
+              price: 1800,
+              change_pct: 1.5,
+              pe_ttm: 28,
+              pb: 8.5,
+              amplitude: 2.1,
+              market_cap: 22000,
+              turnover_pct: 0.8,
+              volume: 50000,
+              second_industry: null,
+            }],
+            total: 1,
+            page: 1,
+            page_size: 50,
+          }}
+          isLoading={false}
+          percentileMap={new Map()}
+          showPercentile={false}
+          onPageChange={vi.fn()}
+          filters={DEFAULT_SCREENER_FILTERS}
+          onSortChange={vi.fn()}
+          selectedCodes={[]}
+          onSelectedCodesChange={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("全部指标")).toBeInTheDocument();
+    expect(screen.getByText("估值核心")).toBeInTheDocument();
+    expect(screen.getByText("量价动量")).toBeInTheDocument();
+
+    // 切换至估值核心
+    fireEvent.click(screen.getByRole("button", { name: "估值核心" }));
+    expect(screen.getAllByText("PE(TTM)").length).toBeGreaterThan(0);
+    expect(screen.queryByText("换手率")).not.toBeInTheDocument();
+
+    // 切换至量价动量
+    fireEvent.click(screen.getByRole("button", { name: "量价动量" }));
+    expect(screen.getAllByText("换手率")).toBeDefined();
+    expect(screen.queryByText("PE(TTM)")).not.toBeInTheDocument();
+  });
 });

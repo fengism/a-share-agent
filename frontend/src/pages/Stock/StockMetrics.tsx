@@ -61,6 +61,13 @@ export default function StockMetrics({ info, market = "cn", hkQuote }: StockMetr
   const { cardStyle } = useStyles();
   const isHK = market === "hk";
 
+  const getPriceColor = (price: number | null | undefined, preClose: number | null | undefined) => {
+    if (price == null || preClose == null) return undefined;
+    if (price > preClose) return colors.up;
+    if (price < preClose) return colors.down;
+    return undefined;
+  };
+
   if (isHK) {
     const amplitude =
       hkQuote?.high != null && hkQuote?.low != null && hkQuote?.pre_close != null && hkQuote.pre_close > 0
@@ -77,7 +84,9 @@ export default function StockMetrics({ info, market = "cn", hkQuote }: StockMetr
         <dl className="stock-metrics-grid" aria-busy={hkQuote ? undefined : true}>
           <div className="stock-metric stock-metric--featured">
             <dt>今开盘</dt>
-            <dd>{hkQuote ? formatNumberWithSeparators(hkQuote.open) : <Skeleton.Button active block size="small" />}</dd>
+            <dd style={{ color: getPriceColor(hkQuote?.open, hkQuote?.pre_close) }}>
+              {hkQuote ? formatNumberWithSeparators(hkQuote.open) : <Skeleton.Button active block size="small" />}
+            </dd>
           </div>
           <div className="stock-metric stock-metric--featured">
             <dt>昨收盘</dt>
@@ -85,11 +94,15 @@ export default function StockMetrics({ info, market = "cn", hkQuote }: StockMetr
           </div>
           <div className="stock-metric">
             <dt>最高价</dt>
-            <dd style={{ color: colors.up }}>{hkQuote ? formatNumberWithSeparators(hkQuote.high) : <Skeleton.Button active block size="small" />}</dd>
+            <dd style={{ color: getPriceColor(hkQuote?.high, hkQuote?.pre_close) }}>
+              {hkQuote ? formatNumberWithSeparators(hkQuote.high) : <Skeleton.Button active block size="small" />}
+            </dd>
           </div>
           <div className="stock-metric">
             <dt>最低价</dt>
-            <dd style={{ color: colors.down }}>{hkQuote ? formatNumberWithSeparators(hkQuote.low) : <Skeleton.Button active block size="small" />}</dd>
+            <dd style={{ color: getPriceColor(hkQuote?.low, hkQuote?.pre_close) }}>
+              {hkQuote ? formatNumberWithSeparators(hkQuote.low) : <Skeleton.Button active block size="small" />}
+            </dd>
           </div>
           <div className="stock-metric">
             <dt>振幅</dt>
@@ -121,7 +134,21 @@ export default function StockMetrics({ info, market = "cn", hkQuote }: StockMetr
           </div>
           <div className="stock-metric">
             <dt>买一价 / 卖一价</dt>
-            <dd>{hkQuote ? `${formatNumberWithSeparators(hkQuote.bid)} / ${formatNumberWithSeparators(hkQuote.ask)}` : <Skeleton.Button active block size="small" />}</dd>
+            <dd>
+              {hkQuote ? (
+                <>
+                  <span style={{ color: getPriceColor(hkQuote.bid, hkQuote.pre_close) }}>
+                    {formatNumberWithSeparators(hkQuote.bid)}
+                  </span>
+                  {" / "}
+                  <span style={{ color: getPriceColor(hkQuote.ask, hkQuote.pre_close) }}>
+                    {formatNumberWithSeparators(hkQuote.ask)}
+                  </span>
+                </>
+              ) : (
+                <Skeleton.Button active block size="small" />
+              )}
+            </dd>
           </div>
           <div className="stock-metric">
             <dt>数据更新时间</dt>

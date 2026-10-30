@@ -45,9 +45,9 @@ describe("exportCsv", () => {
 
     const lines = csv.replace("\uFEFF", "").split("\r\n");
     expect(lines.length).toBe(3); // header + 2 items
-    expect(lines[0]).toBe("代码,名称,市场,现价,涨跌幅(%),PE(TTM),PB,总市值(亿),换手率(%),成交量,申万行业,概念题材,交易所行业");
+    expect(lines[0]).toBe("代码,名称,市场,综合评分,现价,涨跌幅(%),PE(TTM),PB,总市值(亿),换手率(%),振幅(%),量比,60日涨幅(%),成交量,申万行业,概念题材,交易所行业");
 
-    expect(lines[1]).toContain("600519,贵州茅台,主板,1500.50,1.25,25.40,8.60,18000.00,0.50,1000000,食品饮料 / 白酒Ⅱ,消费白马 · MSCI中国,制造业");
+    expect(lines[1]).toContain("600519,贵州茅台,主板,,1500.50,1.25,25.40,8.60,18000.00,0.50,,,,1000000,食品饮料 / 白酒Ⅱ,消费白马 · MSCI中国,制造业");
     // Quotes and commas escaping
     expect(lines[2]).toContain('"平安""银行"');
     expect(lines[2]).toContain('"金融科技,跨境支付"');

@@ -14,6 +14,8 @@ from app.modules.portfolio.accounting import (
     LedgerReplay,
     replay_transactions,
 )
+from app.modules.portfolio.availability import is_t_plus_one, resolve_portfolio_as_of_date
+from app.modules.portfolio.fx import fetch_fx_rates
 from app.modules.portfolio.quotes import fetch_quote_batch, fetch_quotes
 from app.modules.portfolio.schemas import (
     PortfolioResponse,
@@ -42,10 +44,12 @@ async def _build_projected_portfolio(
     target_stock_code = str(candidate["stock_code"])
     if target_stock_code not in industry_stock_codes:
         industry_stock_codes.append(target_stock_code)
-    quote_batch, settings, industries = await asyncio.gather(
+    quote_batch, settings, industries, fx_rates, as_of_date = await asyncio.gather(
         fetch_quote_batch(quote_stock_codes),
         call_blocking(portfolio_store.get_account_settings, int(candidate["user_id"]), semaphore=database_semaphore),
         call_blocking(get_records_by_stock_codes, industry_stock_codes, semaphore=database_semaphore),
+        fetch_fx_rates(industry_stock_codes),
+        resolve_portfolio_as_of_date(quote_stock_codes),
     )
     target_industry = industries.get(target_stock_code) or industries.get(target_stock_code.split(".", 1)[0]) or {}
     target_sector_name = str(target_industry.get("sw_level1_name") or "").strip() or None
@@ -57,6 +61,8 @@ async def _build_projected_portfolio(
         quote_stale=quote_batch.stale,
         settings=settings,
         industries=industries,
+        as_of_date=as_of_date,
+        fx_rates=fx_rates,
     )
     return portfolio, target_sector_name
 
@@ -144,7 +150,8 @@ async def create_transaction(
         return None
     row, _, replay = created
     transaction = next(item for item in replay.transactions if item.id == row["id"])
-    return portfolio_builder.transaction_from_replay(transaction)
+    fx_rates = await fetch_fx_rates([transaction.stock_code])
+    return portfolio_builder.transaction_from_replay(transaction, fx_rates)
 
 
 async def preview_transaction(
@@ -175,7 +182,11 @@ async def preview_transaction(
         "note": request.note,
         "created_at": trade_time,
     }
-    preview = portfolio_accounting.preview_transaction(rows, candidate)
+    preview = portfolio_accounting.preview_transaction(
+        rows,
+        candidate,
+        t_plus_one=is_t_plus_one(request.stock_code),
+    )
     projected, target_sector_name = await _build_projected_portfolio(rows, candidate)
     return portfolio_builder.preview_from_replay(
         request,
@@ -223,7 +234,11 @@ async def preview_transaction_update(
         "note": request.note,
         "created_at": str(existing.get("created_at") or trade_time),
     }
-    preview = portfolio_accounting.preview_transaction(rows_without_existing, candidate)
+    preview = portfolio_accounting.preview_transaction(
+        rows_without_existing,
+        candidate,
+        t_plus_one=is_t_plus_one(request.stock_code),
+    )
     projected, target_sector_name = await _build_projected_portfolio(rows_without_existing, candidate)
     return portfolio_builder.preview_from_replay(
         request,
@@ -295,7 +310,8 @@ async def update_transaction(
         raise PortfolioTransactionNotFoundError
     row, replay = updated
     transaction = next(item for item in replay.transactions if item.id == row["id"])
-    return portfolio_builder.transaction_from_replay(transaction)
+    fx_rates = await fetch_fx_rates([transaction.stock_code])
+    return portfolio_builder.transaction_from_replay(transaction, fx_rates)
 
 
 async def delete_transaction(transaction_id: int, user_id: int) -> bool:

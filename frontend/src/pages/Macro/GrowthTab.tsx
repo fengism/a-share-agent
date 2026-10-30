@@ -1,5 +1,11 @@
-import { useState } from "react";
-import { Row, Col, Segmented } from "antd";
+import { useState, useMemo } from "react";
+import { Row, Col, Segmented, Card, Statistic, Tag } from "antd";
+import {
+  BarChartOutlined,
+  ShoppingOutlined,
+  FundProjectionScreenOutlined,
+  TeamOutlined,
+} from "@ant-design/icons";
 import { useMacroAllData } from "../../api/queries";
 import SectionDataState from "../../components/SectionDataState";
 import MacroIndicatorCard from "./MacroIndicatorCard";
@@ -55,6 +61,32 @@ export default function GrowthTab() {
   const realEstate = data?.growth?.real_estate;
   const employment = data?.growth?.employment;
 
+  const gdpYoY = gdp?.latest?.GDP_SAME != null ? Number(gdp.latest.GDP_SAME) : null;
+  const indYoY = industrialProduction?.latest?.VALUE_ADDED_YOY != null ? Number(industrialProduction.latest.VALUE_ADDED_YOY) : null;
+  const indAccYoY = industrialProduction?.latest?.VALUE_ADDED_ACCUMULATE_YOY != null ? Number(industrialProduction.latest.VALUE_ADDED_ACCUMULATE_YOY) : null;
+  const retailYoY = retailSales?.latest?.RETAIL_YOY != null ? Number(retailSales.latest.RETAIL_YOY) : null;
+  const retailAccYoY = retailSales?.latest?.RETAIL_ACCUMULATE_YOY != null ? Number(retailSales.latest.RETAIL_ACCUMULATE_YOY) : null;
+  const faiYoY = fixedAssetInvestment?.latest?.INVESTMENT_ACCUMULATE_YOY != null ? Number(fixedAssetInvestment.latest.INVESTMENT_ACCUMULATE_YOY) : null;
+  const unemployment = employment?.latest?.URBAN_SURVEYED_UNEMPLOYMENT != null ? Number(employment.latest.URBAN_SURVEYED_UNEMPLOYMENT) : null;
+  const reInvestYoY = realEstate?.latest?.DEVELOPMENT_INVESTMENT_YOY != null ? Number(realEstate.latest.DEVELOPMENT_INVESTMENT_YOY) : null;
+
+  // 研判实体经济供需基调
+  const growthAssessment = useMemo(() => {
+    let tag = "实体修复与结构调整期";
+    let tagColor = "blue";
+    if (indYoY != null && indYoY >= 5.5 && retailYoY != null && retailYoY >= 4.5) {
+      tag = "供需协同加速扩张";
+      tagColor = "green";
+    } else if (indYoY != null && indYoY >= 5.0) {
+      tag = "生产供给强于内需，先进制造韧性突出";
+      tagColor = "cyan";
+    } else if (reInvestYoY != null && reInvestYoY < -5.0) {
+      tag = "地产链仍处筑底期，政策加力托底需求";
+      tagColor = "orange";
+    }
+    return { tag, tagColor };
+  }, [indYoY, retailYoY, reInvestYoY]);
+
   const showOutput = category === "all" || category === "output";
   const showDemand = category === "all" || category === "demand";
   const showFocus = category === "all" || category === "focus";
@@ -69,6 +101,82 @@ export default function GrowthTab() {
       errorTitle="经济增长数据加载失败"
       minHeight={280}
     >
+      {/* 实体增长宏观研判横幅 */}
+      <div className="macro-insight-banner">
+        <div className="macro-insight-banner__title">
+          <span>💡 宏观增长动能与供需基本盘研判</span>
+          <Tag color={growthAssessment.tagColor}>{growthAssessment.tag}</Tag>
+        </div>
+        <div className="macro-insight-banner__body">
+          {gdpYoY != null ? <>最新 GDP 同比增速 <strong>{gdpYoY.toFixed(1)}%</strong>；</> : null}
+          规上工业增加值当月同比 <strong>{indYoY != null ? `${indYoY > 0 ? "+" : ""}${indYoY.toFixed(1)}%` : "-"}</strong>
+          {indAccYoY != null ? <>（累计同比 <strong>{indAccYoY > 0 ? `+${indAccYoY.toFixed(1)}` : indAccYoY.toFixed(1)}%</strong>）</> : null}
+          ，社零当月同比 <strong>{retailYoY != null ? `${retailYoY > 0 ? "+" : ""}${retailYoY.toFixed(1)}%` : "-"}</strong>
+          ，固定资产投资累计同比 <strong>{faiYoY != null ? `${faiYoY > 0 ? "+" : ""}${faiYoY.toFixed(1)}%` : "-"}</strong>。
+          全国城镇调查失业率 <strong>{unemployment != null ? `${unemployment.toFixed(1)}%` : "-"}</strong>。
+          当前实体经济呈现“供给生产韧性强于终端消费、制造业与出海链支撑大盘、地产筑底拖累减弱”的结构特征。
+        </div>
+      </div>
+
+      {/* 4 大核心增长动能风向标速览 */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 14, marginBottom: 16 }}>
+        <Card size="small" className="macro-kpi-card" variant="borderless">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: 12, color: c.textSecondary }}>规上工业增加值 (月同比)</span>
+            <Tag color="blue" icon={<BarChartOutlined />}>供给底座</Tag>
+          </div>
+          <Statistic
+            value={indYoY != null ? `${indYoY > 0 ? "+" : ""}${indYoY.toFixed(1)}%` : "-"}
+            styles={{ content: { fontSize: 20, fontWeight: 700, color: (indYoY ?? 0) >= 5 ? c.up : c.primary, marginTop: 4 } }}
+          />
+          <div className="macro-kpi-subtext">
+            累计同比: {indAccYoY != null ? `${indAccYoY > 0 ? "+" : ""}${indAccYoY.toFixed(1)}%` : "-"}
+          </div>
+        </Card>
+
+        <Card size="small" className="macro-kpi-card" variant="borderless">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: 12, color: c.textSecondary }}>社会消费品零售 (月同比)</span>
+            <Tag color="cyan" icon={<ShoppingOutlined />}>内需晴雨表</Tag>
+          </div>
+          <Statistic
+            value={retailYoY != null ? `${retailYoY > 0 ? "+" : ""}${retailYoY.toFixed(1)}%` : "-"}
+            styles={{ content: { fontSize: 20, fontWeight: 700, color: (retailYoY ?? 0) >= 4 ? c.up : c.accent, marginTop: 4 } }}
+          />
+          <div className="macro-kpi-subtext">
+            累计同比: {retailAccYoY != null ? `${retailAccYoY > 0 ? "+" : ""}${retailAccYoY.toFixed(1)}%` : "-"}
+          </div>
+        </Card>
+
+        <Card size="small" className="macro-kpi-card" variant="borderless">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: 12, color: c.textSecondary }}>固定资产投资 (累计同比)</span>
+            <Tag color="purple" icon={<FundProjectionScreenOutlined />}>投资动能</Tag>
+          </div>
+          <Statistic
+            value={faiYoY != null ? `${faiYoY > 0 ? "+" : ""}${faiYoY.toFixed(1)}%` : "-"}
+            styles={{ content: { fontSize: 20, fontWeight: 700, color: (faiYoY ?? 0) >= 3 ? c.up : c.textPrimary, marginTop: 4 } }}
+          />
+          <div className="macro-kpi-subtext">
+            制造业与基建双轮托底
+          </div>
+        </Card>
+
+        <Card size="small" className="macro-kpi-card" variant="borderless">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: 12, color: c.textSecondary }}>全国城镇失业率</span>
+            <Tag color="gold" icon={<TeamOutlined />}>民生底线</Tag>
+          </div>
+          <Statistic
+            value={unemployment != null ? `${unemployment.toFixed(1)}%` : "-"}
+            styles={{ content: { fontSize: 20, fontWeight: 700, color: (unemployment ?? 5.5) <= 5.2 ? c.up : c.warning, marginTop: 4 } }}
+          />
+          <div className="macro-kpi-subtext">
+            {(unemployment ?? 6) <= 5.2 ? "处于充分就业平稳区间" : "民生稳就业仍需政策呵护"}
+          </div>
+        </Card>
+      </div>
+
       <div className="macro-category-toolbar">
         <Segmented
           options={[

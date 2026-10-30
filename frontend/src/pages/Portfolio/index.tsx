@@ -1,8 +1,9 @@
-import { useCallback, useRef } from "react";
-import { ReloadOutlined } from "@ant-design/icons";
-import { Alert, Button, Card, Skeleton, Space, Typography, message } from "antd";
+import { useCallback, useRef, useState } from "react";
+import { PlusOutlined, ReloadOutlined, SettingOutlined } from "@ant-design/icons";
+import { Alert, Button, Card, Drawer, Modal, Skeleton, Space, message } from "antd";
 import { usePortfolio } from "../../api/queries";
 import DataRefreshIndicator from "../../components/DataRefreshIndicator";
+import PageShell, { PageHeader } from "../../components/page/PageShell";
 import QueryErrorState from "../../components/QueryErrorState";
 import { useStyles } from "../../styles/ui";
 import PortfolioSummaryCards from "./PortfolioSummaryCards";
@@ -13,15 +14,17 @@ import PortfolioRiskPanel from "./PortfolioRiskPanel";
 import PortfolioEquityCurve from "./PortfolioEquityCurve";
 import PortfolioSettingsCard from "./PortfolioSettingsCard";
 import TransactionEntryCard, { type TransactionEntryCardHandle } from "./TransactionEntryCard";
-import type { PortfolioStockSummary } from "../../types/portfolio";
+import type { PortfolioStockSummary, PortfolioTrimSuggestion } from "../../types/portfolio";
 import { errorMessage, formatTime } from "./portfolioFormatters";
 import "./portfolio.css";
 
-const { Paragraph, Title } = Typography;
-
 export default function PortfolioPage() {
   const transactionEntryRef = useRef<TransactionEntryCardHandle>(null);
-  const { cardStyle, pageContainerStyle, pageDescriptionStyle, pageTitleStyle } = useStyles();
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isTransactionDrawerOpen, setIsTransactionDrawerOpen] = useState(false);
+  const [klineStockCode, setKlineStockCode] = useState<string | undefined>(undefined);
+  const { cardStyle } = useStyles();
+
   const {
     data,
     error,
@@ -37,28 +40,38 @@ export default function PortfolioPage() {
   };
 
   const quotedAt = data?.quoted_at ? formatTime(data.quoted_at) : "尚未获取";
+
   const handleSell = useCallback((stock: PortfolioStockSummary) => {
-    transactionEntryRef.current?.startSell(stock);
+    setIsTransactionDrawerOpen(true);
+    setTimeout(() => {
+      transactionEntryRef.current?.startSell(stock);
+    }, 0);
   }, []);
 
+  const handleViewKline = useCallback((stockCode: string) => {
+    setKlineStockCode(stockCode);
+    const el = document.getElementById("portfolio-trade-kline");
+    el?.scrollIntoView({ behavior: "smooth" });
+  }, []);
+
+  const handleTrimSuggestion = useCallback((suggestion: PortfolioTrimSuggestion) => {
+    const stock = data?.stocks.find((item) => item.stock_code === suggestion.stock_code);
+    if (!stock) {
+      message.warning("未找到对应持仓，请刷新后重试");
+      return;
+    }
+    setIsTransactionDrawerOpen(true);
+    setTimeout(() => {
+      transactionEntryRef.current?.startSell(stock, suggestion.suggested_shares);
+    }, 0);
+  }, [data?.stocks]);
+
   return (
-    <div style={pageContainerStyle}>
-      <div style={{
-        display: "flex",
-        alignItems: "flex-start",
-        justifyContent: "space-between",
-        flexWrap: "wrap",
-        gap: 12,
-        marginBottom: 20,
-      }}>
-        <div>
-          <div className="u-page-title u-page-title--compact">
-            <Title level={3} style={pageTitleStyle}>仓位管理</Title>
-          </div>
-          <Paragraph style={{ ...pageDescriptionStyle, marginBottom: 0 }}>
-            记录买卖交易，按 FIFO 成本自动计算当前持仓、已实现盈亏与综合收益。
-          </Paragraph>
-        </div>
+    <PageShell>
+      <PageHeader
+        title="仓位管理"
+        description="记录买卖交易，按 FIFO 成本自动计算当前持仓、已实现盈亏与综合收益。"
+        actions={(
         <Space wrap>
           <PortfolioQuoteStatus
             quotedAt={quotedAt}
@@ -67,6 +80,19 @@ export default function PortfolioPage() {
           />
           <DataRefreshIndicator active={isFetching && !isLoading} label="刷新行情" />
           <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={() => setIsTransactionDrawerOpen(true)}
+          >
+            记录交易
+          </Button>
+          <Button
+            icon={<SettingOutlined />}
+            onClick={() => setIsSettingsOpen(true)}
+          >
+            账户设置
+          </Button>
+          <Button
             icon={<ReloadOutlined />}
             loading={isFetching}
             onClick={handleRefresh}
@@ -74,7 +100,8 @@ export default function PortfolioPage() {
             刷新
           </Button>
         </Space>
-      </div>
+        )}
+      />
 
       {isError && !data ? (
         <Card style={{ ...cardStyle, marginBottom: 16 }}>
@@ -98,23 +125,61 @@ export default function PortfolioPage() {
         </Card>
       ) : data ? (
         <>
-          <PortfolioSettingsCard settings={data.settings} />
-          <PortfolioSummaryCards summary={data.summary} />
+          <PortfolioSummaryCards
+            summary={data.summary}
+            stocks={data.stocks}
+            onOpenSettings={() => setIsSettingsOpen(true)}
+          />
           <PortfolioEquityCurve />
-          <PortfolioRiskPanel risk={data.risk} />
-          <TransactionEntryCard ref={transactionEntryRef} stocks={data.stocks} />
-          <PortfolioTradeKline stocks={data.stocks} transactions={data.transactions} />
+          <PortfolioRiskPanel risk={data.risk} onUseSuggestion={handleTrimSuggestion} />
           <PortfolioTables
             positions={data.positions}
             stocks={data.stocks}
             transactions={data.transactions}
             closedPositions={data.closed_positions}
             onSell={handleSell}
+            onViewKline={handleViewKline}
+          />
+          <PortfolioTradeKline
+            stocks={data.stocks}
+            transactions={data.transactions}
+            selectedStockCode={klineStockCode}
           />
         </>
-      ) : (
-        <TransactionEntryCard ref={transactionEntryRef} stocks={[]} />
-      )}
-    </div>
+      ) : null}
+
+      {/* 记录交易流水抽屉（适配移动端与桌面端） */}
+      <Drawer
+        title="记录交易流水"
+        open={isTransactionDrawerOpen}
+        onClose={() => setIsTransactionDrawerOpen(false)}
+        width={560}
+        destroyOnClose={false}
+      >
+        <TransactionEntryCard
+          ref={transactionEntryRef}
+          stocks={data?.stocks ?? []}
+          isDrawer
+          onSuccess={() => setIsTransactionDrawerOpen(false)}
+        />
+      </Drawer>
+
+      {/* 账户与风控设置弹窗 */}
+      {data?.settings ? (
+        <Modal
+          title={<span><SettingOutlined style={{ marginRight: 6 }} />账户与风控设置</span>}
+          open={isSettingsOpen}
+          onCancel={() => setIsSettingsOpen(false)}
+          footer={null}
+          destroyOnClose={false}
+        >
+          <PortfolioSettingsCard
+            settings={data.settings}
+            isModal
+            onSaved={() => setIsSettingsOpen(false)}
+          />
+        </Modal>
+      ) : null}
+    </PageShell>
   );
 }

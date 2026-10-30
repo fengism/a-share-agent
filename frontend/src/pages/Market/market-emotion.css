@@ -3,20 +3,11 @@
   gap: 16px;
 }
 
-.emotion-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  color: var(--c-text-secondary);
-  font-size: var(--c-font-md);
-}
-
 .emotion-hero {
   --emotion-accent: var(--c-primary);
   overflow: hidden;
   border: 1px solid var(--c-border);
-  border-radius: 14px;
+  border-radius: var(--c-radius-lg);
   background:
     radial-gradient(circle at 86% 8%, color-mix(in srgb, var(--emotion-accent) 18%, transparent), transparent 34%),
     linear-gradient(145deg, var(--c-card-bg), var(--c-nested-bg));
@@ -153,7 +144,7 @@
 
 .emotion-section-card.ant-card {
   border-color: var(--c-border);
-  border-radius: 12px;
+  border-radius: var(--c-radius-md);
   background: var(--c-card-bg);
   box-shadow: var(--c-shadow-sm);
 }
@@ -186,7 +177,7 @@
   height: 34px;
   place-items: center;
   border: 1px solid var(--c-primary-2);
-  border-radius: 10px;
+  border-radius: var(--c-radius-md);
   color: var(--c-primary);
   background: var(--c-primary-soft);
 }
@@ -228,7 +219,7 @@
   overflow: hidden;
   padding: 16px;
   border: 1px solid var(--c-border);
-  border-radius: 10px;
+  border-radius: var(--c-radius-md);
   background: var(--c-nested-bg);
 }
 
@@ -273,7 +264,7 @@
 .emotion-breadth {
   padding: 16px;
   border: 1px solid var(--c-border);
-  border-radius: 10px;
+  border-radius: var(--c-radius-md);
   background: var(--c-nested-bg);
 }
 
@@ -305,7 +296,7 @@
   height: 12px;
   overflow: hidden;
   margin: 12px 0 8px;
-  border-radius: 999px;
+  border-radius: var(--c-radius-pill);
   background: var(--c-border);
 }
 
@@ -334,7 +325,7 @@
   gap: 6px;
   padding: 9px 8px;
   border: 1px solid var(--c-border);
-  border-radius: 8px;
+  border-radius: var(--c-radius-sm);
 }
 
 .emotion-market-status small {
@@ -389,7 +380,7 @@
   width: 100%;
   height: 11px;
   overflow: hidden;
-  border-radius: 999px;
+  border-radius: var(--c-radius-pill);
   background: var(--c-nested-bg);
 }
 
@@ -425,7 +416,7 @@
   gap: 12px;
   padding: 13px 14px;
   border: 1px solid var(--c-border);
-  border-radius: 10px;
+  border-radius: var(--c-radius-md);
   background: var(--c-nested-bg);
 }
 
@@ -434,7 +425,7 @@
   width: 32px;
   height: 32px;
   place-items: center;
-  border-radius: 9px;
+  border-radius: var(--c-radius-md);
   color: var(--c-up);
   font-size: var(--c-font-md);
   font-weight: var(--c-weight-bold);
@@ -483,11 +474,7 @@
   }
 }
 
-@media (max-width: 575px) {
-  .emotion-toolbar {
-    align-items: flex-start;
-  }
-
+@media (max-width: 576px) {
   .emotion-hero__summary {
     padding: 22px 20px;
   }

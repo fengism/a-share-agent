@@ -3,8 +3,10 @@ import {
   BellOutlined,
   DeleteOutlined,
   FileSearchOutlined,
+  LineChartOutlined,
   PlusOutlined,
   ReloadOutlined,
+  RobotOutlined,
   SortAscendingOutlined,
   SortDescendingOutlined,
 } from "@ant-design/icons";
@@ -23,8 +25,9 @@ import { useStyles } from "../../styles/ui";
 import type { WatchlistAlertCondition, WatchlistItem } from "../../types/watchlist";
 import ChangeValue from "../../components/ChangeValue";
 import PreloadLink from "../../components/PreloadLink";
-import { buildWatchlistStockUrl } from "../../utils/stockLinks";
+import { buildWatchlistStockUrl, buildStockAnalysisUrl } from "../../utils/stockLinks";
 import { formatMarketClock } from "../../utils/marketTime";
+import { PriceRangeBar } from "../../components/PriceRangeBar";
 
 const { Text } = Typography;
 const CONDITION_LABELS: Record<WatchlistAlertCondition, string> = {
@@ -153,6 +156,27 @@ export default function WatchlistPanel() {
               onClick={() => void watchlist.refetch()}
             />
           </Tooltip>
+          {(watchlist.data?.items.length ?? 0) > 0 && (
+            <Tooltip title="AI 深度诊断自选股组合">
+              <Button
+                size="small"
+                type="text"
+                aria-label="AI 诊断自选股"
+                icon={<RobotOutlined style={{ color: "var(--c-primary)" }} />}
+                onClick={() => {
+                  const topCodes = (watchlist.data?.items ?? [])
+                    .slice(0, 5)
+                    .map((i) => `${i.stock_name}(${i.stock_code})`)
+                    .join("、");
+                  navigate(
+                    `/chat?prompt=${encodeURIComponent(
+                      `请对我的自选股组合（${topCodes}）进行今日全景体检，分析各标的资金进出与估值安全边际`,
+                    )}`,
+                  );
+                }}
+              />
+            </Tooltip>
+          )}
           <span className="dashboard-watchlist__count">{watchlist.data?.items.length ?? 0} 只</span>
           <PreloadLink className="dashboard-watchlist__view-all" to="/watchlist">查看全部</PreloadLink>
         </div>
@@ -187,66 +211,110 @@ export default function WatchlistPanel() {
       >
         <div className="dashboard-watchlist__scroll">
           <ul className="dashboard-watchlist">
-            {displayItems.map((item) => (
-              <li className={`dashboard-watchlist__item${(item.change_pct ?? 0) > 0 ? " is-up" : (item.change_pct ?? 0) < 0 ? " is-down" : " is-flat"}`} key={item.id}>
-                <div className="dashboard-watchlist__row">
-                  <PreloadLink className="dashboard-watchlist__identity" to={buildWatchlistStockUrl(item.stock_code, item.market)}>
-                    <strong>{item.stock_name}</strong>
-                    <Text type="secondary" className="financial-num">{item.stock_code}</Text>
-                    {item.market === "hk" ? <Tag color="blue">港股</Tag> : null}
-                  </PreloadLink>
-                  <div className="dashboard-watchlist__quote-cluster">
-                    <strong className="financial-num">{item.current_price?.toFixed(2) ?? "-"}</strong>
-                    <ChangeValue value={item.change_pct} />
+            {displayItems.map((item) => {
+              const isLimitUp = (item.change_pct ?? 0) >= 9.8;
+              const isLimitDown = (item.change_pct ?? 0) <= -9.8;
+              const isHighTurnover = (item.turnover_pct ?? 0) >= 10;
+
+              return (
+                <li className={`dashboard-watchlist__item${(item.change_pct ?? 0) > 0 ? " is-up" : (item.change_pct ?? 0) < 0 ? " is-down" : " is-flat"}`} key={item.id}>
+                  <div className="dashboard-watchlist__row">
+                    <PreloadLink className="dashboard-watchlist__identity" to={buildWatchlistStockUrl(item.stock_code, item.market)}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                        <strong>{item.stock_name}</strong>
+                        {item.market === "hk" ? <Tag color="blue" style={{ margin: 0, padding: "0 2px", fontSize: 10 }}>港股</Tag> : null}
+                        {isLimitUp ? <Tag color="red" style={{ margin: 0, padding: "0 2px", fontSize: 10 }}>涨停</Tag> : null}
+                        {isLimitDown ? <Tag color="green" style={{ margin: 0, padding: "0 2px", fontSize: 10 }}>跌停</Tag> : null}
+                        {isHighTurnover ? <Tag color="orange" style={{ margin: 0, padding: "0 2px", fontSize: 10 }}>高换手</Tag> : null}
+                      </div>
+                      <Text type="secondary" className="financial-num">{item.stock_code}</Text>
+                    </PreloadLink>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <div style={{ width: 60 }}>
+                        <PriceRangeBar
+                          low={item.low_price}
+                          high={item.high_price}
+                          current={item.current_price}
+                        />
+                      </div>
+                      <div className="dashboard-watchlist__quote-cluster">
+                        <strong className="financial-num">{item.current_price?.toFixed(2) ?? "-"}</strong>
+                        <ChangeValue value={item.change_pct} />
+                      </div>
+                    </div>
                   </div>
-                </div>
-                {item.alerts.length > 0 ? (
-                  <div className="dashboard-watchlist__alerts">
-                      {item.alerts.map((alert) => (
-                        <Tag
-                          key={alert.id}
-                          color={alert.triggered ? "red" : "default"}
-                          closable
-                          onClose={(event) => {
-                            event.preventDefault();
-                            deleteAlert.mutateAsync(alert.id);
-                          }}
-                        >
-                          {alert.triggered ? "已触发 · " : ""}{CONDITION_LABELS[alert.condition]} {alert.threshold}
-                        </Tag>
-                      ))}
+                  {item.alerts.length > 0 ? (
+                    <div className="dashboard-watchlist__alerts">
+                        {item.alerts.map((alert) => (
+                          <Tag
+                            key={alert.id}
+                            color={alert.triggered ? "red" : "default"}
+                            closable
+                            onClose={(event) => {
+                              event.preventDefault();
+                              deleteAlert.mutateAsync(alert.id);
+                            }}
+                          >
+                            {alert.triggered ? "已触发 · " : ""}{CONDITION_LABELS[alert.condition]} {alert.threshold}
+                          </Tag>
+                        ))}
+                    </div>
+                  ) : null}
+                  <div className="dashboard-watchlist__actions dashboard-watchlist__actions--overlay">
+                    <Tooltip title="AI 深度体检">
+                      <Button
+                        size="small"
+                        type="text"
+                        aria-label={`AI体检${item.stock_name}`}
+                        icon={<RobotOutlined style={{ color: "var(--c-primary)" }} />}
+                        onClick={() =>
+                          navigate(
+                            `/chat?prompt=${encodeURIComponent(
+                              `请全面深度诊断【${item.stock_name}(${item.stock_code})】的投资价值、核心驱动力、估值水平与主要风险点`,
+                            )}`,
+                          )
+                        }
+                      />
+                    </Tooltip>
+                    <Tooltip title="查看个股研报">
+                      <Button
+                        size="small"
+                        type="text"
+                        aria-label={`查看${item.stock_name}研报`}
+                        icon={<FileSearchOutlined />}
+                        onClick={() => navigate(buildStockAnalysisUrl(item.stock_code))}
+                      />
+                    </Tooltip>
+                    <Tooltip title="量化回测">
+                      <Button
+                        size="small"
+                        type="text"
+                        aria-label={`回测${item.stock_name}`}
+                        icon={<LineChartOutlined />}
+                        onClick={() => navigate(`/quant?codes=${item.stock_code}`)}
+                      />
+                    </Tooltip>
+                    <Tooltip title="设置提醒">
+                      <Button size="small" type="text" aria-label={`设置${item.stock_name}提醒`} icon={<BellOutlined />} onClick={() => setAlertStock(item)} />
+                    </Tooltip>
+                    <Tooltip title="移除自选">
+                      <Button
+                        size="small"
+                        type="text"
+                        danger
+                        aria-label={`移除${item.stock_name}`}
+                        icon={<DeleteOutlined />}
+                        onClick={() => deleteItem.mutateAsync(
+                          item.market === "hk"
+                            ? { stockCode: item.stock_code, market: "hk" }
+                            : item.stock_code,
+                        )}
+                      />
+                    </Tooltip>
                   </div>
-                ) : null}
-                <div className="dashboard-watchlist__actions dashboard-watchlist__actions--overlay">
-                  <Tooltip title="查看个股研报">
-                    <Button
-                      size="small"
-                      type="text"
-                      aria-label={`查看${item.stock_name}研报`}
-                      icon={<FileSearchOutlined />}
-                      onClick={() => navigate(`/analysis?code=${item.stock_code}`)}
-                    />
-                  </Tooltip>
-                  <Tooltip title="设置提醒">
-                    <Button size="small" type="text" aria-label={`设置${item.stock_name}提醒`} icon={<BellOutlined />} onClick={() => setAlertStock(item)} />
-                  </Tooltip>
-                  <Tooltip title="移除自选">
-                    <Button
-                      size="small"
-                      type="text"
-                      danger
-                      aria-label={`移除${item.stock_name}`}
-                      icon={<DeleteOutlined />}
-                      onClick={() => deleteItem.mutateAsync(
-                        item.market === "hk"
-                          ? { stockCode: item.stock_code, market: "hk" }
-                          : item.stock_code,
-                      )}
-                    />
-                  </Tooltip>
-                </div>
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ul>
         </div>
       </SectionDataState>

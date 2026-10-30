@@ -163,7 +163,7 @@ function RecordEditor({
       <Alert
         type="info"
         showIcon
-        message="手工维护的记录会被锁定，自动更新不会覆盖。Excel 导入仅在开启强制覆盖时可替换。"
+        title="手工维护的记录会被锁定，自动更新不会覆盖。Excel 导入仅在开启强制覆盖时可替换。"
         className="industry-editor-alert"
       />
       <Form form={form} layout="vertical" requiredMark="optional">
@@ -294,7 +294,7 @@ function ImportDrawer({
       <Alert
         showIcon
         type="info"
-        message="文件格式要求"
+        title="文件格式要求"
         description="支持 CSV 或 Excel 格式。必须包含【股票代码】和【一级行业】/【所属行业】列（如申万发布表格或同花顺行情表）。"
       />
       <div className="industry-import-fields">
@@ -359,7 +359,7 @@ function ImportDrawer({
             <Alert
               type="warning"
               showIcon
-              message={`预检提示（${preview.warnings.length}）`}
+              title={`预检提示（${preview.warnings.length}）`}
               description={<ul>{preview.warnings.slice(0, 8).map((warning) => <li key={warning}>{warning}</li>)}</ul>}
             />
           )}
@@ -608,7 +608,7 @@ export default function IndustryClassificationPage() {
             </Space>
           )}
         </div>
-        {refresh?.last_error && <Alert className="industry-refresh-error" type="warning" showIcon message={refresh.last_error} />}
+        {refresh?.last_error && <Alert className="industry-refresh-error" type="warning" showIcon title={refresh.last_error} />}
       </Card>
 
       <Card className="industry-table-card">

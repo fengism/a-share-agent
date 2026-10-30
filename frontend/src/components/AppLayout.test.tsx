@@ -27,6 +27,7 @@ vi.mock("./AppSidebar", () => ({
     </aside>
   ),
 }));
+vi.mock("./GlobalChatCopilot", () => ({ default: () => null }));
 vi.mock("./ChatSessionSyncBridge", () => ({ default: () => null }));
 vi.mock("./WorkflowRuntimeBridge", () => ({ default: () => null }));
 vi.mock("./UpdateBanner", () => ({ default: () => null }));

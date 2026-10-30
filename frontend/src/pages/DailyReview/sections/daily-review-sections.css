@@ -1,0 +1,153 @@
+/* 每日复盘：分区卡片、自检对照表、周期时间轴 */
+
+/* ── 自检卡 ─────────────────────────────── */
+.daily-review-check-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.daily-review-check-card__meta {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.daily-review-check-card__percent {
+  font-family: var(--c-font-mono);
+  font-size: 13px;
+  font-weight: var(--c-weight-bold);
+  color: var(--c-text-primary);
+}
+
+.daily-review-check-card__table-wrap {
+  overflow-x: auto;
+}
+
+.daily-review-check-card__table {
+  width: 100%;
+  min-width: 420px;
+  border-collapse: collapse;
+  font-size: var(--c-font-sm, 13px);
+}
+
+.daily-review-check-card__caption {
+  caption-side: top;
+  padding-bottom: 6px;
+  color: var(--c-text-muted);
+  font-size: var(--c-font-xs, 12px);
+  text-align: left;
+}
+
+.daily-review-check-card__table th,
+.daily-review-check-card__table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--c-border);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.daily-review-check-card__table thead th {
+  color: var(--c-text-muted);
+  font-size: var(--c-font-xs, 12px);
+  font-weight: var(--c-weight-bold);
+}
+
+.daily-review-check-card__name {
+  color: var(--c-text-primary);
+  font-weight: var(--c-weight-semibold);
+}
+
+.daily-review-check-card__table tbody tr[data-verdict="miss"] {
+  background: color-mix(in srgb, var(--c-warning) 7%, transparent);
+}
+
+.daily-review-check-card__indices {
+  display: grid;
+  gap: 4px;
+  margin-top: 10px;
+}
+
+.daily-review-check-card__note {
+  margin: 10px 0 0;
+}
+
+/* ── 情绪周期时间轴 ─────────────────────── */
+.daily-review-trend-card__note {
+  margin-top: 0;
+}
+
+.daily-review-trend {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 2px 10px;
+  scrollbar-width: thin;
+  scroll-snap-type: x proximity;
+}
+
+.daily-review-trend__node {
+  flex: 0 0 auto;
+  min-width: 104px;
+  padding: 10px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius-md, 8px);
+  background: var(--c-nested-bg, color-mix(in srgb, var(--c-border) 24%, transparent));
+  scroll-snap-align: start;
+  text-align: center;
+}
+
+.daily-review-trend__stage {
+  padding: 2px 8px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: var(--c-font-xs, 12px);
+  font-weight: var(--c-weight-bold);
+  white-space: nowrap;
+}
+
+.daily-review-trend__transition {
+  margin: 6px 0 4px;
+  color: var(--c-text-muted);
+  font-size: 11px;
+}
+
+.daily-review-trend__transition[data-transition="升级"] {
+  color: var(--c-up);
+}
+
+.daily-review-trend__transition[data-transition="降级"] {
+  color: var(--c-down);
+}
+
+.daily-review-trend__metric {
+  color: var(--c-text-secondary);
+  font-size: 11px;
+  line-height: 1.7;
+  white-space: nowrap;
+}
+
+.daily-review-trend__date {
+  margin-top: 4px;
+  color: var(--c-text-muted);
+  font-size: 11px;
+}
+
+.daily-review-trend__stats {
+  display: grid;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+@media (max-width: 767px) {
+  .daily-review-check-card__table {
+    min-width: 360px;
+  }
+
+  .daily-review-trend__node {
+    min-width: 96px;
+  }
+}

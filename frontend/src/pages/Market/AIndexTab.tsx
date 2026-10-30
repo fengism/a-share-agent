@@ -7,6 +7,7 @@ import ChangeValue from "../../components/ChangeValue";
 import IndexIntradayCard from "../../components/IndexIntradayCard";
 import SectionDataState from "../../components/SectionDataState";
 import { useFullscreenChartHeight } from "../../hooks/useFullscreenChartHeight";
+import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { useUrlSearchParam } from "../../hooks/useUrlSearchParam";
 import { useColors, useTokens } from "../../styles/ui";
 import { MAX_KLINE_HISTORY_YEARS, yearsAgoDate } from "../../utils/date";
@@ -16,11 +17,13 @@ import MarketVolumeCard from "./MarketVolumeCard";
 
 const { Text } = Typography;
 const DEFAULT_INDEX_CODE = "000001";
-const KLINE_PERIODS = ["daily", "weekly", "monthly"] as const;
+const KLINE_PERIODS = ["daily", "weekly", "monthly", "annual"] as const;
 
 export default function AIndexTab() {
   const c = useColors();
   const t = useTokens();
+  const isMobile = useMediaQuery("(max-width: 768px)");
+  const chartHeight = isMobile ? 280 : 380;
   const [klineExpanded, setKlineExpanded] = useState(false);
   const fullscreenHeight = useFullscreenChartHeight();
   const [activeSymbol, setActiveSymbol] = useUrlSearchParam("index", DEFAULT_INDEX_CODE, {
@@ -102,7 +105,7 @@ export default function AIndexTab() {
             {mainIndices.map((idx) => {
               const isActive = idx.code === activeSymbol;
               return (
-                <Col xs={12} sm={8} lg={desktopSpan} key={idx.code}>
+                <Col xs={12} sm={12} md={desktopSpan} lg={desktopSpan} key={idx.code}>
                   <button
                     type="button"
                     onClick={() => setActiveSymbol(idx.code)}
@@ -112,6 +115,7 @@ export default function AIndexTab() {
                       border: 0,
                       padding: 0,
                       width: "100%",
+                      height: "100%",
                       background: "transparent",
                       textAlign: "left",
                       outline: "none",
@@ -121,6 +125,7 @@ export default function AIndexTab() {
                       hoverable
                       className="market-index-card"
                       style={{
+                        height: "100%",
                         borderRadius: t.radius.md,
                         border: `1px solid ${isActive ? c.primary : c.border}`,
                         borderTop: isActive ? `3px solid ${c.primary}` : `1px solid ${c.border}`,
@@ -192,13 +197,14 @@ export default function AIndexTab() {
               price={activeIndex.price}
               changePct={activeIndex.change_pct}
               preClose={activeIndex.pre_close}
-              height={380}
+              height={chartHeight}
             />
           )}
         </Col>
         <Col xs={24} xl={12}>
           <Card
             size="small"
+            className="market-kline-card"
             title={
               <span style={{ fontWeight: Number(t.weight.semibold) }}>
                 {activeIndex?.name || "大盘指数"} · K线趋势
@@ -227,7 +233,7 @@ export default function AIndexTab() {
               </div>
             }
             style={{ borderRadius: t.radius.md, border: `1px solid ${c.border}`, boxShadow: t.shadow.xs, height: "100%" }}
-            styles={{ body: { padding: "12px 14px" } }}
+            styles={{ body: { padding: "var(--c-pad-card, 16px 18px)" } }}
           >
             <SectionDataState
               isLoading={klineLoading && !hasKlineData}
@@ -236,11 +242,11 @@ export default function AIndexTab() {
               isEmpty={!hasKlineData}
               emptyText="暂无指数 K 线数据"
               errorTitle="指数 K 线加载失败"
-              minHeight={380}
+              minHeight={chartHeight}
             >
               <LazyKlineChart
                 data={klineItems}
-                height={380}
+                height={chartHeight}
                 viewKey={`${activeSymbol}-${period}`}
                 onReachLeftEdge={historyLimitReached ? undefined : handleReachLeftEdge}
                 historyLimitReached={historyLimitReached}

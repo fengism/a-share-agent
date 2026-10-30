@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import { openApiGet } from "../openapiClient";
 import { QUERY_CACHE_POLICIES } from "../cachePolicies";
 import { queryKeys } from "../queryKeys";
@@ -11,13 +11,16 @@ export type ConceptConstituentResult = components["schemas"]["ConceptConstituent
 export type ConceptIndexPoint = components["schemas"]["ConceptIndexPoint"];
 export type ConceptIndexResult = components["schemas"]["ConceptIndexResponse"];
 
-/** 概念选择器列表。概念有 1100+ 个，一次拉全量后前端本地搜索，避免每次输入都打接口。 */
-export function useConceptList(limit = 1200) {
+/** 概念选择器列表。概念有 1100+ 个，一次拉全量后前端本地搜索，避免每次输入都打接口。
+ *
+ * ``order="change"`` 时后端附带最近交易日等权涨跌聚合（按交易日缓存），用于涨幅排序与标签展示。
+ */
+export function useConceptList(limit = 1200, order: "size" | "change" = "size") {
   return useQuery({
-    queryKey: queryKeys.market.concepts(limit),
+    queryKey: queryKeys.market.concepts(limit, order),
     queryFn: () =>
       openApiGet("/api/market/concepts", {
-        query: { limit },
+        query: { limit, order },
       }),
     staleTime: QUERY_CACHE_POLICIES.marketRealtime.staleMs,
   });
@@ -62,5 +65,25 @@ export function useConceptIndex(concept: string, days: number) {
     // 切换区间/概念时保留上一批数据：长区间首次合成本身要几秒，
     // 若让 data 变undefined 会把图表换成骨架屏，视觉上像"白屏重载"。
     placeholderData: (previous) => previous,
+  });
+}
+
+/**
+ * 概念对比：并行拉取多个概念的合成指数（复用同一缓存键与缓存策略，
+ * 与单个 useConceptIndex 共享缓存，主概念不会重复请求）。
+ */
+export function useConceptIndexSeries(concepts: string[], days: number) {
+  return useQueries({
+    queries: concepts.map((name) => ({
+      queryKey: queryKeys.market.conceptIndex(name, days),
+      queryFn: () =>
+        openApiGet("/api/market/concept/{concept}/index", {
+          path: { concept: name },
+          query: { days },
+        }),
+      enabled: Boolean(name),
+      staleTime: QUERY_CACHE_POLICIES.conceptIndex.staleMs,
+      placeholderData: (previous: ConceptIndexResult | undefined) => previous,
+    })),
   });
 }

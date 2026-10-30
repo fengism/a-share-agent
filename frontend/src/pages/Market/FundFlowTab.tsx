@@ -36,12 +36,12 @@ export default function FundFlowTab() {
     () => ({
       tooltip: {
         trigger: "axis",
-        backgroundColor: "rgba(255, 255, 255, 0.96)",
-        borderColor: "rgba(0, 0, 0, 0.08)",
+        backgroundColor: c.cardBg,
+        borderColor: c.border,
         borderWidth: 1,
         padding: [10, 14],
-        textStyle: { color: "#1f2937", fontSize: 12 },
-        extraCssText: "box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12); border-radius: 8px;",
+        textStyle: { color: c.textPrimary, fontSize: 12 },
+        extraCssText: "box-shadow: var(--c-shadow-md); border-radius: 8px;",
         formatter: (params: Array<{ axisValue: string; color: string; seriesName: string; value: number | null }>) => {
           if (!params || params.length === 0) return "";
           const header = `<div style="font-weight: 600; margin-bottom: 6px; color: ${c.textPrimary};">${params[0].axisValue}</div>`;
@@ -175,12 +175,12 @@ export default function FundFlowTab() {
     () => ({
       tooltip: {
         trigger: "axis",
-        backgroundColor: "rgba(255, 255, 255, 0.96)",
-        borderColor: "rgba(0, 0, 0, 0.08)",
+        backgroundColor: c.cardBg,
+        borderColor: c.border,
         borderWidth: 1,
         padding: [10, 14],
-        textStyle: { color: "#1f2937", fontSize: 12 },
-        extraCssText: "box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12); border-radius: 8px;",
+        textStyle: { color: c.textPrimary, fontSize: 12 },
+        extraCssText: "box-shadow: var(--c-shadow-md); border-radius: 8px;",
         formatter: (params: Array<{ axisValue: string; color: string; seriesName: string; value: number | null }>) => {
           if (!params || params.length === 0) return "";
           const header = `<div style="font-weight: 600; margin-bottom: 6px; color: ${c.textPrimary};">${params[0].axisValue}</div>`;
@@ -188,8 +188,8 @@ export default function FundFlowTab() {
             const value = item.value == null ? "-" : Number(item.value).toFixed(2);
             const unit = item.seriesName === "北向成交总额" ? historyQuery.data?.unit || "亿元" : "点";
             return `<div style="display: flex; justify-content: space-between; gap: 16px; margin: 3px 0;">
-              <span><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${item.color};margin-right:6px;"></i>${item.seriesName}</span>
-              <strong style="font-family:monospace;">${value} ${unit}</strong>
+              <span><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${item.color};margin-right:6px;"></i><span style="color:${c.textSecondary};">${item.seriesName}</span></span>
+              <strong style="font-family:var(--c-font-mono);color:${c.textPrimary};">${value} ${unit}</strong>
             </div>`;
           });
           return header + rows.join("");
@@ -243,7 +243,15 @@ export default function FundFlowTab() {
       ],
       dataZoom: [
         { type: "inside", start: Math.max(0, 100 - (120 / Math.max(historyItems.length, 1)) * 100), end: 100 },
-        { type: "slider", height: 18, bottom: 8, start: Math.max(0, 100 - (120 / Math.max(historyItems.length, 1)) * 100), end: 100 },
+        {
+          type: "slider",
+          height: 18,
+          bottom: 8,
+          start: Math.max(0, 100 - (120 / Math.max(historyItems.length, 1)) * 100),
+          end: 100,
+          borderColor: "transparent",
+          textStyle: { color: c.textSecondary },
+        },
       ],
       series: [
         {
@@ -284,7 +292,7 @@ export default function FundFlowTab() {
       >
         <div className="market-fund-flow__section">
           <Row gutter={[16, 16]} className="market-fund-flow__metrics">
-            <Col xs={24} md={8}>
+            <Col xs={24} sm={8}>
               <Card data-testid="northbound-total">
                 <Statistic
                   title={<span className="market-fund-flow__metric-title"><i style={{ backgroundColor: northboundColor }} />北向合计净流入（数据商口径）</span>}
@@ -294,7 +302,7 @@ export default function FundFlowTab() {
                 />
               </Card>
             </Col>
-            <Col xs={24} md={8}>
+            <Col xs={12} sm={8}>
               <Card data-testid="northbound-shanghai">
                 <Statistic
                   title={<span className="market-fund-flow__metric-title"><i style={{ backgroundColor: shanghaiColor }} />沪股通净流入</span>}
@@ -304,7 +312,7 @@ export default function FundFlowTab() {
                 />
               </Card>
             </Col>
-            <Col xs={24} md={8}>
+            <Col xs={12} sm={8}>
               <Card data-testid="northbound-shenzhen">
                 <Statistic
                   title={<span className="market-fund-flow__metric-title"><i style={{ backgroundColor: shenzhenColor }} />深股通净流入</span>}

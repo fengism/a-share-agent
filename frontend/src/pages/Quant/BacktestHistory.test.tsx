@@ -190,4 +190,54 @@ describe("BacktestHistory", () => {
     );
     expect(screen.queryByRole("button", { name: "加载更多" })).not.toBeInTheDocument();
   });
+
+  it("supports multi-selection and opens backtest runs comparator modal", async () => {
+    const run1 = makeRun({
+      id: "run-1",
+      name: "策略1",
+      summary_metrics: {
+        total_return: 10,
+        annualized_return: 12,
+        annualized_volatility: 15,
+        max_drawdown: -5,
+        trade_count: 5,
+        turnover_rate: 50,
+      },
+    });
+    const run2 = makeRun({
+      id: "run-2",
+      name: "策略2",
+      summary_metrics: {
+        total_return: 20,
+        annualized_return: 25,
+        annualized_volatility: 18,
+        max_drawdown: -8,
+        trade_count: 10,
+        turnover_rate: 80,
+      },
+    });
+
+    render(<BacktestHistory {...baseProps} runs={[run1, run2]} />);
+
+    const compareBtn = screen.getByRole("button", { name: "横向对比已选回测" });
+    expect(compareBtn).toBeDisabled();
+
+    // 勾选两个回测
+    const checkbox1 = screen.getByRole("checkbox", { name: "选择对比 策略1" });
+    const checkbox2 = screen.getByRole("checkbox", { name: "选择对比 策略2" });
+    fireEvent.click(checkbox1);
+    fireEvent.click(checkbox2);
+
+    expect(compareBtn).toBeEnabled();
+    expect(screen.getByText("横向对比 (2)")).toBeInTheDocument();
+
+    // 点击横向对比打开弹窗
+    fireEvent.click(compareBtn);
+    expect(await screen.findByText("策略回测多维横向对比")).toBeInTheDocument();
+    expect(screen.getByText("2 个回测样本")).toBeInTheDocument();
+
+    // 点击清空对比
+    fireEvent.click(screen.getByRole("button", { name: "清空对比" }));
+    expect(screen.getByRole("button", { name: "横向对比已选回测" })).toBeDisabled();
+  });
 });

@@ -3,6 +3,7 @@ import { Button, Card, Modal } from "antd";
 import { FullscreenOutlined } from "@ant-design/icons";
 import { useMarketIndexIntraday } from "../api/queries";
 import IntradayChart from "../charts/IntradayChart";
+import { useFullscreenChartHeight } from "../hooks/useFullscreenChartHeight";
 import ChangeValue from "./ChangeValue";
 import SectionDataState from "./SectionDataState";
 import { useColors, useTokens } from "../styles/ui";
@@ -29,6 +30,7 @@ export default function IndexIntradayCard({
   const c = useColors();
   const t = useTokens();
   const [expanded, setExpanded] = useState(false);
+  const fullscreenHeight = useFullscreenChartHeight();
   const query = useMarketIndexIntraday(symbol);
   const items = query.data?.items ?? [];
   const hasData = items.length > 0;
@@ -119,7 +121,7 @@ export default function IndexIntradayCard({
           <IntradayChart
             data={items}
             prevClose={referenceClose}
-            height={580}
+            height={fullscreenHeight}
             viewKey={`index-modal:${symbol}`}
           />
         </div>

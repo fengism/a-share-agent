@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { RobotOutlined } from "@ant-design/icons";
 import { semanticTagStyle, useStyles } from "../../styles/ui";
@@ -18,7 +18,15 @@ import "./chat.css";
 
 export default function ChatPage() {
   const [searchParams] = useSearchParams();
-  const [inputValue, setInputValue] = useState(() => searchParams.get("prompt")?.trim() || "");
+  const promptParam = searchParams.get("prompt")?.trim() || "";
+  const [inputValue, setInputValue] = useState(promptParam);
+
+  // 当外部导航携带 prompt 参数变化时，同步更新输入框
+  useEffect(() => {
+    if (promptParam) {
+      setInputValue(promptParam);
+    }
+  }, [promptParam]);
   const resultActions = useChatResultActionController();
   const chat = useChatController({ inputValue, setInputValue });
   const syncStatus = useChatStore((state) => state.syncStatus);
@@ -60,12 +68,11 @@ export default function ChatPage() {
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <div>
                 <h2 style={pageTitleStyle}>
-                  <RobotOutlined style={{ marginRight: 8 }} />
-                  AI 选股助手 {syncTag}
+                  <RobotOutlined style={{ marginRight: 8, color: "var(--c-primary)" }} />
+                  AI 智能投研与选股工作台 {syncTag}
                 </h2>
                 <p style={pageDescriptionStyle}>
-                  自由对话，智能选股。输入股票名称、筛选条件或市场问题，AI
-                  助手将调用工具获取实时数据并分析。
+                  支持自然语言多因子选股、财务三张表排雷、量价形态诊断与大盘复盘。输入 <strong>/</strong> 唤起投研指令，输入 <strong>$</strong> 联想股票代码。
                 </p>
               </div>
               <ChatClearButton onClear={chat.handleClear} />

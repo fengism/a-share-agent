@@ -5,6 +5,11 @@ import { summarizeDetails } from "./auditMeta";
 
 const mocks = vi.hoisted(() => ({
   refetch: vi.fn(),
+  isNarrow: false,
+}));
+
+vi.mock("../../hooks/useMediaQuery", () => ({
+  useMediaQuery: () => mocks.isNarrow,
 }));
 
 vi.mock("@tanstack/react-query", async (importOriginal) => {
@@ -178,5 +183,14 @@ describe("summarizeDetails", () => {
     expect(summarizeDetails("")).toBe("—");
     expect(summarizeDetails("not-json")).toBe("not-json");
     expect(summarizeDetails("[1,2]")).toBe("[1,2]");
+  });
+
+  it("renders the audit records as cards on narrow screens", () => {
+    mocks.isNarrow = true;
+    render(<SecurityAuditCard />);
+
+    expect(screen.getByRole("list", { name: "登录审计记录列表" })).toBeInTheDocument();
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    mocks.isNarrow = false;
   });
 });

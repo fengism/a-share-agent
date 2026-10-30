@@ -1,5 +1,6 @@
 import { Alert, Space, Typography } from "antd";
 import type { PortfolioTransactionPreview } from "../../types/portfolio";
+import { isHkStockCode } from "../../utils/stockLinks";
 import { formatInteger, formatMoney, formatPrice, formatTime } from "./portfolioFormatters";
 
 const { Text } = Typography;
@@ -16,6 +17,7 @@ function formatPct(value: number | null | undefined) {
 export default function TransactionPreviewAlert({ preview, title }: TransactionPreviewAlertProps) {
   const isSell = preview.side === "sell";
   const hasWarnings = Boolean(preview.warnings?.length);
+  const isTPlusOneBuy = !isSell && !isHkStockCode(preview.stock_code);
 
   return (
     <Alert
@@ -27,9 +29,16 @@ export default function TransactionPreviewAlert({ preview, title }: TransactionP
       description={(
         <Space orientation="vertical" size={6} style={{ width: "100%" }}>
           <span>
-            {isSell ? "卖出" : "买入"}金额 {formatMoney(preview.trade_amount)}，
+            {isSell ? "卖出" : "买入"}金额 {formatMoney(preview.trade_amount)}（人民币），
             手续费 {formatMoney(preview.fee)}。
           </span>
+          {preview.currency !== "CNY" ? (
+            <span>
+              原币成交额 {formatMoney(preview.trade_amount_native, preview.currency)}，
+              原币手续费 {formatMoney(preview.fee_native, preview.currency)}，
+              折算汇率 1 {preview.currency} = {preview.fx_rate_to_cny} CNY。
+            </span>
+          ) : null}
           <span>
             交易后现金 {formatMoney(preview.cash_balance_after)}，
             预计总资产 {formatMoney(preview.estimated_total_assets_after)}，
@@ -41,6 +50,18 @@ export default function TransactionPreviewAlert({ preview, title }: TransactionP
               ? `，${preview.sector_name}行业仓位 ${formatPct(preview.sector_position_pct_after)}。`
               : "，暂未获取行业归属。"}
           </span>
+          {preview.sellable_shares != null ? (
+            <span>
+              当前可卖 {formatInteger(preview.sellable_shares)} 股，
+              冻结 {formatInteger(preview.frozen_shares ?? 0)} 股
+              {preview.sellable_after_trade != null
+                ? `，交易后预计可卖 ${formatInteger(preview.sellable_after_trade)} 股。`
+                : "。"}
+            </span>
+          ) : null}
+          {isTPlusOneBuy ? (
+            <span>A 股 T+1：本次买入的股份当日不可卖出，次一交易日可卖。</span>
+          ) : null}
           {isSell ? (
             <>
               <span>
@@ -55,7 +76,7 @@ export default function TransactionPreviewAlert({ preview, title }: TransactionP
               {(preview.matches ?? []).map((match) => (
                 <span key={`${match.buy_transaction_id}-${match.buy_time}`}>
                   匹配买入 #{match.buy_transaction_id}（{formatTime(match.buy_time)}，
-                  {formatPrice(match.buy_price)} × {formatInteger(match.shares)} 股，
+                  {formatPrice(match.buy_price, preview.currency)} × {formatInteger(match.shares)} 股，
                   成本 {formatMoney(match.matched_cost)}）
                 </span>
               ))}

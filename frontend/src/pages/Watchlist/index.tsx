@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
+  AppstoreOutlined,
   BellOutlined,
   CaretDownOutlined,
   CaretRightOutlined,
@@ -8,14 +9,19 @@ import {
   DownloadOutlined,
   ExperimentOutlined,
   FallOutlined,
+  FileSearchOutlined,
+  ImportOutlined,
   MinusCircleOutlined,
   PlusOutlined,
   ReloadOutlined,
   RiseOutlined,
+  RobotOutlined,
   SearchOutlined,
+  SlidersOutlined,
   SortAscendingOutlined,
   SortDescendingOutlined,
   StarOutlined,
+  TableOutlined,
   TagsOutlined,
 } from "@ant-design/icons";
 import {
@@ -53,8 +59,13 @@ import type {
   WatchlistConcept,
   WatchlistItem,
 } from "../../types/watchlist";
-import { buildWatchlistStockUrl } from "../../utils/stockLinks";
+import { buildWatchlistStockUrl, buildStockAnalysisUrl } from "../../utils/stockLinks";
 import { formatMarketDate, formatMarketMonthDayClock, marketDateStamp } from "../../utils/marketTime";
+import { PriceRangeBar } from "../../components/PriceRangeBar";
+import { WatchlistAllocationBar } from "./components/WatchlistAllocationBar";
+import { WatchlistCardList } from "./components/WatchlistCardList";
+import { WatchlistNoteCell } from "./components/WatchlistNoteCell";
+import { WatchlistQuickImportModal } from "./components/WatchlistQuickImportModal";
 import "./watchlist.css";
 
 const { Paragraph, Text, Title } = Typography;
@@ -353,6 +364,8 @@ export default function WatchlistPage() {
   const [alertStock, setAlertStock] = useState<WatchlistItem | null>(null);
   const [condition, setCondition] = useState<WatchlistAlertCondition>("price_above");
   const [threshold, setThreshold] = useState<number | null>(null);
+  const [layoutMode, setLayoutMode] = useState<"table" | "cards">("table");
+  const [quickImportOpen, setQuickImportOpen] = useState(false);
 
   const selectedStockCodes = useMemo(() => {
     const allItems = watchlist.data?.items ?? [];
@@ -362,6 +375,16 @@ export default function WatchlistPage() {
       if (match) codeSet.add(match.stock_code);
     }
     return Array.from(codeSet);
+  }, [selectedIds, watchlist.data?.items]);
+
+  const selectedStockNames = useMemo(() => {
+    const allItems = watchlist.data?.items ?? [];
+    const names: string[] = [];
+    for (const id of selectedIds) {
+      const match = allItems.find((item) => item.id === id);
+      if (match) names.push(`${match.stock_name}(${match.stock_code})`);
+    }
+    return names;
   }, [selectedIds, watchlist.data?.items]);
 
   const addOptions = useMemo(() => stockSearch.currentResults.slice(0, 8).map((stock) => ({
@@ -432,6 +455,16 @@ export default function WatchlistPage() {
       message.success("已加入自选");
     } catch (error) {
       message.error(error instanceof Error ? error.message : "添加自选失败");
+    }
+  };
+
+  const handleUpdateNote = async (stockCode: string, note: string, market?: "cn" | "hk") => {
+    await addItem.mutateAsync({ stock_code: stockCode, note, market });
+  };
+
+  const handleBatchImport = async (stocks: Array<{ code: string; market?: "cn" | "hk" }>) => {
+    for (const stock of stocks) {
+      await addItem.mutateAsync({ stock_code: stock.code, note: "", market: stock.market });
     }
   };
 
@@ -518,14 +551,24 @@ export default function WatchlistPage() {
       title: "股票",
       key: "stock",
       fixed: "left",
-      width: isMobile ? 120 : 142,
-      render: (_, item) => (
-        <PreloadLink className="watchlist-page__stock" to={buildWatchlistStockUrl(item.stock_code, item.market)}>
-          <strong>{item.stock_name}</strong>
-          <span>{item.stock_code}</span>
-          {item.market === "hk" ? <Tag color="blue">港股</Tag> : null}
-        </PreloadLink>
-      ),
+      width: isMobile ? 120 : 156,
+      render: (_, item) => {
+        const isLimitUp = (item.change_pct ?? 0) >= 9.8;
+        const isLimitDown = (item.change_pct ?? 0) <= -9.8;
+        const isHighTurnover = (item.turnover_pct ?? 0) >= 10;
+        return (
+          <PreloadLink className="watchlist-page__stock" to={buildWatchlistStockUrl(item.stock_code, item.market)}>
+            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <strong>{item.stock_name}</strong>
+              {item.market === "hk" ? <Tag color="blue" style={{ margin: 0, padding: "0 3px", fontSize: 10 }}>港股</Tag> : null}
+              {isLimitUp ? <Tag color="red" style={{ margin: 0, padding: "0 3px", fontSize: 10, lineHeight: "16px" }}>涨停</Tag> : null}
+              {isLimitDown ? <Tag color="green" style={{ margin: 0, padding: "0 3px", fontSize: 10, lineHeight: "16px" }}>跌停</Tag> : null}
+              {isHighTurnover ? <Tag color="orange" style={{ margin: 0, padding: "0 3px", fontSize: 10, lineHeight: "16px" }}>高换手</Tag> : null}
+            </div>
+            <span>{item.stock_code}</span>
+          </PreloadLink>
+        );
+      },
     },
     {
       title: "最新价",
@@ -546,6 +589,19 @@ export default function WatchlistPage() {
       fixed: isMobile ? undefined : "left",
       align: "right",
       render: (value: number | null) => <ChangeValue value={value} />,
+    },
+    {
+      title: "日内区间",
+      key: "price_range",
+      width: isMobile ? 84 : 96,
+      align: "center",
+      render: (_, item) => (
+        <PriceRangeBar
+          low={item.low_price}
+          high={item.high_price}
+          current={item.current_price}
+        />
+      ),
     },
     {
       title: "今开",
@@ -640,8 +696,9 @@ export default function WatchlistPage() {
       title: "备注",
       dataIndex: "note",
       width: isMobile ? 120 : 150,
-      ellipsis: true,
-      render: (value: string) => value || <span className="watchlist-page__empty-value">-</span>,
+      render: (_, item) => (
+        <WatchlistNoteCell item={item} onUpdateNote={handleUpdateNote} />
+      ),
     },
     {
       title: "加入时间",
@@ -653,20 +710,46 @@ export default function WatchlistPage() {
       title: "操作",
       key: "actions",
       fixed: "right",
-      width: isMobile ? 64 : 78,
+      width: isMobile ? 90 : 112,
       align: "center",
       render: (_, item) => (
-        <Tooltip title="移除自选">
-          <Button
-            type="text"
-            danger
-            size="small"
-            aria-label={`移除${item.stock_name}`}
-            icon={<DeleteOutlined />}
-            loading={deleteItem.isPending}
-            onClick={() => void handleDelete(item)}
-          />
-        </Tooltip>
+        <Space size={2}>
+          <Tooltip title="AI 深度体检">
+            <Button
+              type="text"
+              size="small"
+              aria-label={`AI体检${item.stock_name}`}
+              icon={<RobotOutlined style={{ color: "var(--c-primary)" }} />}
+              onClick={() =>
+                navigate(
+                  `/chat?prompt=${encodeURIComponent(
+                    `请深度诊断【${item.stock_name}(${item.stock_code})】的投资价值、核心驱动力、估值水平与主要风险点`,
+                  )}`,
+                )
+              }
+            />
+          </Tooltip>
+          <Tooltip title="查看研报">
+            <Button
+              type="text"
+              size="small"
+              aria-label={`研报${item.stock_name}`}
+              icon={<FileSearchOutlined />}
+              onClick={() => navigate(buildStockAnalysisUrl(item.stock_code))}
+            />
+          </Tooltip>
+          <Tooltip title="移除自选">
+            <Button
+              type="text"
+              danger
+              size="small"
+              aria-label={`移除${item.stock_name}`}
+              icon={<DeleteOutlined />}
+              loading={deleteItem.isPending}
+              onClick={() => void handleDelete(item)}
+            />
+          </Tooltip>
+        </Space>
       ),
     },
   ];
@@ -676,6 +759,34 @@ export default function WatchlistPage() {
       {selectedStockCodes.length > 0 && (
         <div className="watchlist-page__batch-bar">
           <Tag color="blue" style={{ margin: 0 }}>已选 {selectedStockCodes.length} 只</Tag>
+          <Button
+            size="small"
+            aria-label="AI 对比"
+            icon={<SlidersOutlined />}
+            onClick={() =>
+              navigate(
+                `/chat?prompt=${encodeURIComponent(
+                  `请深度横向对比以下 ${selectedStockCodes.length} 只股票的投资价值、核心逻辑、估值水平与催化剂优劣：\n${selectedStockNames.join("、")}`,
+                )}`,
+              )
+            }
+          >
+            AI 对比
+          </Button>
+          <Button
+            size="small"
+            aria-label="AI 组合诊断"
+            icon={<RobotOutlined />}
+            onClick={() =>
+              navigate(
+                `/chat?prompt=${encodeURIComponent(
+                  `请对以下 ${selectedStockCodes.length} 只自选股组成的观察组合进行行业集中度、主线协同与潜在风险敞口诊断：\n${selectedStockNames.join("、")}`,
+                )}`,
+              )
+            }
+          >
+            AI 组合诊断
+          </Button>
           <Button
             size="small"
             aria-label="批量回测"
@@ -706,6 +817,74 @@ export default function WatchlistPage() {
     </div>
   );
 
+  const handleToggleSelect = (id: number) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
+    );
+  };
+
+  const renderItemsView = (items: WatchlistItem[], labelledBy?: string) => {
+    if (layoutMode === "cards") {
+      return (
+        <div role="region" aria-labelledby={labelledBy}>
+          {selectedStockCodes.length > 0 && (
+            <div className="watchlist-page__batch-bar" style={{ marginBottom: 12 }}>
+              <Tag color="blue" style={{ margin: 0 }}>已选 {selectedStockCodes.length} 只</Tag>
+              <Button
+                size="small"
+                aria-label="AI 对比"
+                icon={<SlidersOutlined />}
+                onClick={() =>
+                  navigate(
+                    `/chat?prompt=${encodeURIComponent(
+                      `请深度横向对比以下 ${selectedStockCodes.length} 只股票的投资价值、核心逻辑、估值水平与催化剂优劣：\n${selectedStockNames.join("、")}`,
+                    )}`,
+                  )
+                }
+              >
+                AI 对比
+              </Button>
+              <Button
+                size="small"
+                aria-label="AI 组合诊断"
+                icon={<RobotOutlined />}
+                onClick={() =>
+                  navigate(
+                    `/chat?prompt=${encodeURIComponent(
+                      `请对以下 ${selectedStockCodes.length} 只自选股组成的观察组合进行行业集中度、主线协同与潜在风险敞口诊断：\n${selectedStockNames.join("、")}`,
+                    )}`,
+                  )
+                }
+              >
+                AI 组合诊断
+              </Button>
+              <Button
+                size="small"
+                aria-label="批量回测"
+                icon={<ExperimentOutlined />}
+                onClick={() => navigate(`/quant?codes=${encodeURIComponent(selectedStockCodes.join(","))}`)}
+              >
+                批量回测
+              </Button>
+              <Button size="small" type="link" onClick={() => setSelectedIds([])} style={{ padding: "0 4px" }}>
+                清空选择
+              </Button>
+            </div>
+          )}
+          <WatchlistCardList
+            items={items}
+            selectedIds={selectedIds}
+            onToggleSelect={handleToggleSelect}
+            onSetAlert={setAlertStock}
+            onDelete={(item) => void handleDelete(item)}
+            onSelectConcept={focusConceptGroup}
+          />
+        </div>
+      );
+    }
+    return renderTable(items, labelledBy);
+  };
+
   const totalCount = marketSummary.total;
   const hasFilter = Boolean(filterText.trim())
     || marketFilter !== "all"
@@ -730,6 +909,25 @@ export default function WatchlistPage() {
         <div className="watchlist-page__status">
           <span>行情来源 · {sourceLabel(watchlist.data?.source)}</span>
           <span>更新于 {formatQuotedTime(watchlist.data?.quoted_at)}</span>
+          <Button
+            type="primary"
+            icon={<RobotOutlined />}
+            disabled={!watchlist.data?.items?.length}
+            onClick={() => {
+              const allItems = filteredItems.length > 0 ? filteredItems : (watchlist.data?.items ?? []);
+              const stockListStr = allItems
+                .slice(0, 15)
+                .map((i) => `${i.stock_name}(${i.stock_code})`)
+                .join("、");
+              navigate(
+                `/chat?prompt=${encodeURIComponent(
+                  `请全面深度诊断我的自选股组合，分析各标的今日盘面走势、板块主线归属、估值分位及近期需要注意的风险点与潜在机会。\n当前自选标的：${stockListStr}${allItems.length > 15 ? ` 等共 ${allItems.length} 只` : ""}`,
+                )}`,
+              );
+            }}
+          >
+            AI 诊断自选池
+          </Button>
           <Button
             icon={<DownloadOutlined />}
             onClick={() => {
@@ -785,10 +983,27 @@ export default function WatchlistPage() {
         />
       </div>
 
+      <WatchlistAllocationBar
+        items={watchlist.data?.items ?? []}
+        activeConcept={activeConcept}
+        onSelectConcept={focusConceptGroup}
+      />
+
       <Card className="watchlist-page__toolbar-card" style={cardStyle}>
         <div className="watchlist-page__toolbar">
           <div className="watchlist-page__add">
-            <span className="watchlist-page__field-label">添加自选</span>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span className="watchlist-page__field-label">添加自选</span>
+              <Button
+                type="link"
+                size="small"
+                icon={<ImportOutlined />}
+                onClick={() => setQuickImportOpen(true)}
+                style={{ padding: 0, fontSize: 12, height: "auto" }}
+              >
+                快速导入
+              </Button>
+            </div>
             <AutoComplete
               aria-label="搜索并添加自选股"
               value={stockSearch.inputValue}
@@ -894,6 +1109,16 @@ export default function WatchlistPage() {
             {hasFilter ? (
               <Button type="link" size="small" onClick={resetFilters}>重置筛选</Button>
             ) : null}
+            <Segmented
+              aria-label="视图布局"
+              size="small"
+              value={layoutMode}
+              onChange={(val) => setLayoutMode(val as "table" | "cards")}
+              options={[
+                { value: "table", icon: <TableOutlined />, label: "表格" },
+                { value: "cards", icon: <AppstoreOutlined />, label: "卡片" },
+              ]}
+            />
             <span className="watchlist-page__visible-count">当前显示 {visibleItemCount} 只</span>
           </div>
         </div>
@@ -907,7 +1132,7 @@ export default function WatchlistPage() {
           skeletonRows={5}
           minHeight={320}
         >
-          {viewMode === "all" ? renderTable(filteredItems) : (
+          {viewMode === "all" ? renderItemsView(filteredItems) : (
             <div className="watchlist-page__groups">
               {visibleConceptGroups.map((group, index) => {
                 const isCollapsed = collapsedGroups.has(group.name);
@@ -937,7 +1162,7 @@ export default function WatchlistPage() {
                     </button>
                     {!isCollapsed ? (
                       <div id={panelId} aria-labelledby={titleId}>
-                        {renderTable(group.items, titleId)}
+                        {renderItemsView(group.items, titleId)}
                       </div>
                     ) : null}
                   </section>
@@ -974,6 +1199,13 @@ export default function WatchlistPage() {
           />
         </Space>
       </Modal>
+
+      <WatchlistQuickImportModal
+        open={quickImportOpen}
+        onClose={() => setQuickImportOpen(false)}
+        existingCodes={(watchlist.data?.items ?? []).map((i) => i.stock_code)}
+        onImport={handleBatchImport}
+      />
     </div>
   );
 }

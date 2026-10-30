@@ -1,4 +1,4 @@
-import { Card, Typography } from "antd";
+import { Card, Progress, Typography } from "antd";
 import { useRetailSentiment } from "../../api/queries";
 import SectionDataState from "../../components/SectionDataState";
 import type { DesignTokens } from "../../theme/themes";
@@ -29,6 +29,10 @@ export default function StockRetailCommentsPanel({ code }: { code: string }) {
   const t = useTokens();
   const { cardStyle, tagStyle } = useStyles();
   const tileColors = { textSecondary: c.textSecondary, textPrimary: c.textPrimary, hoverBg: c.hoverBg, border: c.border };
+  const bullishRatio = retailSentiment?.bullish_ratio;
+  const bullishPct = bullishRatio != null ? Math.round(bullishRatio * 100) : null;
+  const bearishPct = bullishPct != null ? 100 - bullishPct : null;
+
   return (
     <SectionDataState
       isLoading={query.isLoading}
@@ -40,11 +44,26 @@ export default function StockRetailCommentsPanel({ code }: { code: string }) {
       minHeight={260}
     >
       <Card size="small" title={`散户评论（${retailSentiment?.guba_post_count ?? 0}条）`} extra={<Text type="secondary">股吧帖子聚合</Text>} style={{ ...cardStyle, marginBottom: t.space[4] }} styles={{ body: { padding: t.space[4] } }}>
-        <div className="metric-grid cols-3" style={{ gap: t.space[3], marginBottom: t.space[4] }}>
+        <div className="metric-grid cols-3" style={{ gap: t.space[3], marginBottom: t.space[3] }}>
           <Indicator label="情绪评分" value={retailSentiment?.score != null ? String(retailSentiment.score) : "-"} colors={tileColors} t={t} />
           <Indicator label="讨论帖数" value={`${retailSentiment?.post_count ?? 0}条`} colors={tileColors} t={t} />
-          <Indicator label="看多占比" value={retailSentiment?.bullish_ratio != null ? `${(retailSentiment.bullish_ratio * 100).toFixed(1)}%` : "-"} colors={tileColors} t={t} />
+          <Indicator label="看多占比" value={bullishRatio != null ? `${(bullishRatio * 100).toFixed(1)}%` : "-"} colors={tileColors} t={t} />
         </div>
+        {bullishPct != null && bearishPct != null ? (
+          <div style={{ marginBottom: t.space[4] }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: t.font.xs, marginBottom: 4 }}>
+              <span style={{ color: c.up, fontWeight: 600 }}>看多 {bullishPct}%</span>
+              <span style={{ color: c.down, fontWeight: 600 }}>看空 {bearishPct}%</span>
+            </div>
+            <Progress
+              percent={bullishPct}
+              strokeColor={c.up}
+              railColor={c.down}
+              showInfo={false}
+              size="small"
+            />
+          </div>
+        ) : null}
         <div style={tagStyle}>
           <Text strong style={{ color: c.primary }}>情绪摘要：</Text>
         </div>

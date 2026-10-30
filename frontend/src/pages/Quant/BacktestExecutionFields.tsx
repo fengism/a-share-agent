@@ -1,6 +1,6 @@
 import { InfoCircleOutlined, PlayCircleOutlined } from "@ant-design/icons";
-import { AutoComplete, Button, Col, Collapse, DatePicker, Form, InputNumber, Row, Typography } from "antd";
-import dayjs from "dayjs";
+import { AutoComplete, Button, Col, Collapse, DatePicker, Form, InputNumber, Row, Tag, Typography } from "antd";
+import dayjs, { type Dayjs } from "dayjs";
 import BacktestAdvancedFields from "./BacktestAdvancedFields";
 import { FormSectionHeader } from "./BacktestFormSections";
 import { dateRangeValidationError, type QuantFormValues } from "./quantForm";
@@ -16,13 +16,38 @@ const BENCHMARK_OPTIONS = [
   { value: "000001", label: "000001 · 上证指数 (综合大盘)" },
 ];
 
+const DATE_RANGE_PRESETS: Array<{ label: string; value: [Dayjs, Dayjs] }> = [
+  { label: "近1年", value: [dayjs().subtract(1, "year"), dayjs()] },
+  { label: "近3年", value: [dayjs().subtract(3, "year"), dayjs()] },
+  { label: "今年(YTD)", value: [dayjs().startOf("year"), dayjs()] },
+  { label: "近5年", value: [dayjs().subtract(5, "year"), dayjs()] },
+];
+
+const QUICK_BENCHMARKS = [
+  { label: "沪深300", code: "000300" },
+  { label: "中证500", code: "000905" },
+  { label: "中证1000", code: "000852" },
+  { label: "创业板指", code: "399006" },
+  { label: "上证指数", code: "000001" },
+];
+
 export default function BacktestExecutionFields({ isSubmitting }: { isSubmitting: boolean }) {
+  const form = Form.useFormInstance<QuantFormValues>();
+
+  const handleSelectDatePreset = (range: [Dayjs, Dayjs]) => {
+    form.setFieldValue("dateRange", range);
+  };
+
+  const handleSelectBenchmark = (code: string) => {
+    form.setFieldValue("benchmark", code);
+  };
+
   return (
     <section className="quant-form-section quant-form-section-last" aria-labelledby="quant-execution-title">
       <div id="quant-execution-title">
         <FormSectionHeader title="3. 执行设置" description="确定回测区间、比较基准和资金假设" />
       </div>
-      <Row gutter={[14, 0]} align="bottom" className="quant-basic-execution-fields">
+      <Row gutter={[14, 0]} align="top" className="quant-basic-execution-fields">
         <Col xs={24} md={8}>
           <Form.Item
             name="dateRange"
@@ -33,8 +58,21 @@ export default function BacktestExecutionFields({ isSubmitting }: { isSubmitting
                 if (error) throw new Error(error);
               },
             }]}
+            extra={(
+              <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginTop: "4px" }}>
+                {DATE_RANGE_PRESETS.map((p) => (
+                  <Tag
+                    key={p.label}
+                    style={{ cursor: "pointer", fontSize: "var(--c-font-xs)", marginInlineEnd: 0 }}
+                    onClick={() => handleSelectDatePreset(p.value)}
+                  >
+                    {p.label}
+                  </Tag>
+                ))}
+              </div>
+            )}
           >
-            <RangePicker maxDate={dayjs()} style={{ width: "100%" }} />
+            <RangePicker presets={DATE_RANGE_PRESETS} maxDate={dayjs()} style={{ width: "100%" }} />
           </Form.Item>
         </Col>
         <Col xs={12} sm={8} md={4}>
@@ -46,6 +84,19 @@ export default function BacktestExecutionFields({ isSubmitting }: { isSubmitting
                 if (!/^\d{6}$/.test(value?.trim() ?? "")) throw new Error("基准指数代码必须为 6 位数字");
               },
             }]}
+            extra={(
+              <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", marginTop: "4px" }}>
+                {QUICK_BENCHMARKS.map((b) => (
+                  <Tag
+                    key={b.code}
+                    style={{ cursor: "pointer", fontSize: "var(--c-font-xs)", marginInlineEnd: 0 }}
+                    onClick={() => handleSelectBenchmark(b.code)}
+                  >
+                    {b.label}
+                  </Tag>
+                ))}
+              </div>
+            )}
           >
             <AutoComplete
               options={BENCHMARK_OPTIONS}

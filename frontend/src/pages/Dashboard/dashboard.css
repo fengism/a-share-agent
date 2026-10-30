@@ -1,0 +1,282 @@
+/* ==========================================================================
+   Dashboard Page - Deep Optimization Styles (Web & Mobile)
+   ========================================================================== */
+
+/* ── 移动端分段视图选择器 (Mobile Segmented Navigation) ── */
+.dashboard-mobile-nav {
+  display: none;
+  width: 100%;
+  margin-bottom: var(--c-space-3);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding: 2px 0 4px;
+}
+
+.dashboard-mobile-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.dashboard-mobile-nav .ant-segmented {
+  width: 100%;
+  background: var(--c-nested-bg);
+  padding: 4px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius-md);
+  font-weight: var(--c-weight-medium);
+  font-size: var(--c-font-sm);
+}
+
+.dashboard-mobile-nav .ant-segmented-item {
+  border-radius: var(--c-radius-sm);
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dashboard-mobile-nav .ant-segmented-item-selected {
+  background: var(--c-card-bg);
+  color: var(--c-primary) !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+}
+
+@media (max-width: 900px) {
+  .dashboard-mobile-nav {
+    display: flex;
+  }
+
+  /* 移动端视图按需过滤/突出显示 */
+  .dashboard-layout[data-mobile-view="market"] .dashboard-market-board {
+    display: block !important;
+  }
+  .dashboard-layout[data-mobile-view="market"] section[aria-label="市场风向"],
+  .dashboard-layout[data-mobile-view="market"] section[aria-label="今日主线"],
+  .dashboard-layout[data-mobile-view="market"] .dashboard-sidebar {
+    display: none !important;
+  }
+
+  .dashboard-layout[data-mobile-view="mainline"] section[aria-label="市场风向"],
+  .dashboard-layout[data-mobile-view="mainline"] section[aria-label="今日主线"] {
+    display: block !important;
+  }
+  .dashboard-layout[data-mobile-view="mainline"] .dashboard-market-board,
+  .dashboard-layout[data-mobile-view="mainline"] .dashboard-sidebar {
+    display: none !important;
+  }
+
+  .dashboard-layout[data-mobile-view="watchlist"] .dashboard-main,
+  .dashboard-layout[data-mobile-view="watchlist"] .dashboard-sidebar section[aria-label="热榜"] {
+    display: none !important;
+  }
+  .dashboard-layout[data-mobile-view="watchlist"] .dashboard-sidebar {
+    display: block !important;
+  }
+
+  .dashboard-layout[data-mobile-view="hotrank"] .dashboard-main,
+  .dashboard-layout[data-mobile-view="hotrank"] .dashboard-sidebar [data-testid="watchlist-panel"],
+  .dashboard-layout[data-mobile-view="hotrank"] .dashboard-sidebar .dashboard-watchlist-card {
+    display: none !important;
+  }
+  .dashboard-layout[data-mobile-view="hotrank"] .dashboard-sidebar {
+    display: block !important;
+  }
+}
+
+/* ── 移动端龙头股卡片流 (Mobile Faucet & Style Cards) ── */
+.dashboard-faucet-desktop-table {
+  display: block;
+}
+
+.dashboard-faucet-mobile-cards {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .dashboard-faucet-desktop-table {
+    display: none;
+  }
+
+  .dashboard-faucet-mobile-cards {
+    display: grid;
+    gap: 10px;
+    margin-top: 4px;
+  }
+
+  .dashboard-faucet-card-item {
+    padding: 12px;
+    border-radius: var(--c-radius-md);
+    background: var(--c-nested-bg);
+    border: 1px solid var(--c-border);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    transition: all 0.2s ease;
+  }
+
+  .dashboard-faucet-card-item:hover {
+    border-color: var(--c-primary);
+  }
+
+  .dashboard-faucet-card-item__top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .dashboard-faucet-card-item__name {
+    font-size: var(--c-font-base);
+    font-weight: 600;
+    color: var(--c-text-primary);
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+  }
+
+  .dashboard-faucet-card-item__code {
+    font-size: var(--c-font-xs);
+    color: var(--c-text-secondary);
+    font-family: var(--c-font-mono);
+  }
+
+  .dashboard-faucet-card-item__meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    font-size: var(--c-font-xs);
+  }
+
+  .dashboard-faucet-card-item__reason {
+    font-size: var(--c-font-xs);
+    color: var(--c-text-secondary);
+    line-height: var(--c-leading-normal);
+    background: rgba(0, 0, 0, 0.03);
+    padding: 6px 8px;
+    border-radius: var(--c-radius-sm);
+  }
+
+  [data-theme="stellar-blue"] .dashboard-faucet-card-item__reason {
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  .dashboard-faucet-card-item__actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    padding-top: 4px;
+    border-top: 1px dashed var(--c-border);
+  }
+}
+
+/* ── 脉冲小圆点与视觉微动效 (Phase 3 Polish) ── */
+@keyframes pulseDotGlow {
+  0% {
+    box-shadow: 0 0 0 0 rgba(18, 183, 106, 0.6);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(18, 183, 106, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(18, 183, 106, 0);
+  }
+}
+
+.dashboard-hero__pulse-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--c-success, #12b76a);
+  animation: pulseDotGlow 2s infinite ease-in-out;
+}
+
+/* ── 顶部 Hero 玻璃拟态与极简精致化 ── */
+.dashboard-hero {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  margin-bottom: var(--c-space-4);
+  transition: all 0.2s ease;
+}
+
+.dashboard-hero__shortcut-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  font-weight: 500 !important;
+  transition: transform 0.15s ease, border-color 0.15s ease !important;
+}
+
+.dashboard-hero__shortcut-btn:hover {
+  transform: translateY(-1px);
+}
+
+.dashboard-hero__shortcut-btn:active {
+  transform: scale(0.97);
+}
+
+/* ── 主线机会卡片现代微拟物 ── */
+.dashboard-mainline-card {
+  border-radius: var(--c-radius-md) !important;
+}
+
+.dashboard-mainline-card .ant-card-head {
+  padding: 10px 14px !important;
+  min-height: 42px !important;
+}
+
+.dashboard-mainline-card .ant-card-body {
+  padding: 12px 14px !important;
+}
+
+.dashboard-mainline-plate {
+  position: relative;
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: var(--c-radius-sm);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dashboard-mainline-plate:hover {
+  transform: translateX(2px);
+}
+
+/* ── 移动端快捷金刚区横滑优化 ── */
+@media (max-width: 560px) {
+  .dashboard-hero__shortcuts {
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+  .dashboard-hero__shortcuts::-webkit-scrollbar {
+    display: none;
+  }
+  .dashboard-hero__shortcut-btn {
+    flex-shrink: 0;
+  }
+}
+
+/* ── 触屏/移动端自选股快捷操作栏常驻展示 ── */
+@media (hover: none), (max-width: 768px) {
+  .dashboard-sidebar .dashboard-watchlist__item {
+    padding-bottom: 36px;
+  }
+  .dashboard-sidebar .dashboard-watchlist__actions--overlay {
+    opacity: 0.9 !important;
+    transform: none !important;
+    pointer-events: auto !important;
+  }
+}
+
+/* ── 列表/卡片数值平滑过渡 ── */
+.financial-num {
+  transition: color 0.18s ease;
+}
+
+/* ── 移动端卡片微调与圆角规范 ── */
+@media (max-width: 900px) {
+  .dashboard-main > section,
+  .dashboard-market-board,
+  .dashboard-mainline-card,
+  .dashboard-watchlist-card {
+    border-radius: var(--c-radius-md) !important;
+  }
+}

@@ -60,12 +60,14 @@ for (const target of [
 
     await page.goto("/market?tab=limit-up&mode=history&historyDate=2026-08-20");
 
-    await expect(page.getByRole("heading", { name: "历史涨停", exact: true })).toBeVisible();
+    // 标题已并入 SectionToolbar 的普通文本（不再是大纲级 heading）
+    await expect(page.getByText("历史涨停", { exact: true }).first()).toBeVisible();
     await expect(page.getByText("亿嘉和", { exact: true })).toBeVisible();
-    await expect(page.getByText("涨停原因", { exact: true }).first()).toBeVisible();
     await expect.poll(() => requestedCategories).toContain("limit_up");
 
-    const controlCard = page.locator(".ant-card").filter({ hasText: "数据来源：开盘红" }).first();
+    // 工具条与明细卡片不再拆成"数据来源卡片 + 明细卡片"两张卡，改为
+    // SectionToolbar（工具条）+ 单张「{类别}明细」卡片，这里校验两者上下不重叠。
+    const controlCard = page.getByRole("group", { name: "历史榜单工具条" });
     const detailCard = page.locator(".ant-card").filter({ hasText: "历史涨停明细" }).first();
     const [controlBox, detailBox] = await Promise.all([controlCard.boundingBox(), detailCard.boundingBox()]);
     expect(controlBox).not.toBeNull();
@@ -74,7 +76,7 @@ for (const target of [
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
 
     await page.getByText("历史跌停", { exact: true }).click();
-    await expect(page.getByRole("heading", { name: "历史跌停", exact: true })).toBeVisible();
+    await expect(page.getByText("历史跌停明细", { exact: true })).toBeVisible();
     await expect(page.getByText("首开股份", { exact: true })).toBeVisible();
     await expect(page.getByText("跌停时间", { exact: true }).first()).toBeVisible();
     await expect(page.getByText("涨停原因", { exact: true })).toHaveCount(0);
@@ -82,8 +84,12 @@ for (const target of [
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
 
     await page.getByText("风向标", { exact: true }).click();
-    await expect(page.getByRole("heading", { name: "风向标", exact: true })).toBeVisible();
+    await expect(page.getByText("风向标明细", { exact: true })).toBeVisible();
     await expect(page.getByText("亿嘉和", { exact: true })).toBeVisible();
+    // 窄屏把「涨停原因」等字段收进展开行，需先展开该行才可见
+    if (target.width < 768) {
+      await page.getByRole("button", { name: /展开行/ }).first().click();
+    }
     await expect(page.getByText("涨停原因", { exact: true }).first()).toBeVisible();
     await expect.poll(() => requestedCategories).toContain("wind_vane");
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);

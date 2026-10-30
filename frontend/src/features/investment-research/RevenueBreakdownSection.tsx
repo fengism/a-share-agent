@@ -108,9 +108,37 @@ export default function RevenueBreakdownSection({
       title: "营收占比",
       dataIndex: "revenue_share_pct",
       key: "revenue_share_pct",
-      width: 110,
+      width: 130,
       align: "right" as const,
-      render: (value: number | null) => <span className="financial-data-table__number">{formatPercentage(value)}</span>,
+      render: (value: number | null) => {
+        if (value == null) return <span className="financial-data-table__number">-</span>;
+        const clamped = Math.max(0, Math.min(100, value));
+        return (
+          <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "flex-end", gap: 6, width: "100%" }}>
+            <div
+              style={{
+                width: 32,
+                height: 4,
+                background: "var(--c-border)",
+                borderRadius: 2,
+                overflow: "hidden",
+                position: "relative",
+                flexShrink: 0,
+              }}
+            >
+              <div
+                style={{
+                  width: `${clamped}%`,
+                  height: "100%",
+                  background: c.primary,
+                  borderRadius: 2,
+                }}
+              />
+            </div>
+            <span className="financial-data-table__number">{formatPercentage(value)}</span>
+          </div>
+        );
+      },
     };
     if (!hasAmounts) return [nameColumn, shareColumn];
     return [

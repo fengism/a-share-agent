@@ -1,6 +1,7 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useState } from "react";
 import { RobotOutlined, UndoOutlined } from "@ant-design/icons";
 import { Button, message, Popconfirm, Tag } from "antd";
+import { useInRouterContext } from "react-router-dom";
 import { useConfig, useTestOutboundProxy } from "../../api/queries";
 import ChangePasswordCard from "../../components/ChangePasswordCard";
 import SessionManagerCard from "./SessionManagerCard";
@@ -11,6 +12,13 @@ import { useAuthStore } from "../../store/authStore";
 import { useColors, useStyles, semanticTagStyle } from "../../styles/ui";
 import type { ProxyTestResponse } from "../../types/settings";
 import SystemUpdateCard from "./SystemUpdateCard";
+import SettingsDirtySummary from "./SettingsDirtySummary";
+import SettingsLeaveBlocker from "./SettingsLeaveBlocker";
+import SettingsMobileSaveBar from "./SettingsMobileSaveBar";
+import SettingsSectionUrlSync from "./SettingsSectionUrlSync";
+import { CARD_KEYS } from "./cardSpecs";
+import { DEFAULT_SETTINGS_SECTION, SETTINGS_SCROLL_OFFSET, type SettingsSectionKey } from "./settingsSections";
+import "./settings.css";
 import { useConfigSectionSave } from "./useConfigSectionSave";
 import { useSettingsForm } from "./useSettingsForm";
 
@@ -53,7 +61,42 @@ export default function SettingsPage() {
     handleProviderChange,
   } = useSettingsForm(config, saveConfig, isSaving);
 
-  const [activeSection, setActiveSection] = useState("account");
+  const [activeSection, setActiveSection] = useState<SettingsSectionKey>(DEFAULT_SETTINGS_SECTION);
+  const inRouter = useInRouterContext();
+  const dirtyCardCount = CARD_KEYS.filter((key) => Boolean(cards.dirty[key])).length;
+
+  const handleSectionChange = useCallback((key: string) => {
+    setActiveSection(key as SettingsSectionKey);
+    // 切换分区后回到顶部，避免停留在上一分区的长滚动位置
+    try {
+      window.scrollTo({ top: 0, behavior: "auto" });
+    } catch {
+      // 测试环境（jsdom）未实现 scrollTo，忽略即可
+    }
+  }, []);
+
+  const handleJumpToCard = useCallback((section: SettingsSectionKey, anchorId?: string) => {
+    setActiveSection(section);
+    if (!anchorId) {
+      try {
+        window.scrollTo({ top: 0, behavior: "auto" });
+      } catch {
+        // jsdom 未实现 scrollTo
+      }
+      return;
+    }
+    // 等目标分区渲染出锚点后再滚动
+    window.setTimeout(() => {
+      const target = document.getElementById(anchorId);
+      if (!target) return;
+      const top = target.getBoundingClientRect().top + window.scrollY - SETTINGS_SCROLL_OFFSET;
+      try {
+        window.scrollTo({ top, behavior: "smooth" });
+      } catch {
+        // jsdom 未实现 scrollTo
+      }
+    }, 0);
+  }, []);
 
   const handleTestOutboundProxy = useCallback(() => {
     testOutboundProxyMutate(undefined, {
@@ -68,18 +111,6 @@ export default function SettingsPage() {
       onError: (error: Error) => message.error(`连通性测试失败: ${error.message}`),
     });
   }, [testOutboundProxyMutate]);
-
-  useEffect(() => {
-    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      if (!dirtyFlags.hasUnsavedChanges) return;
-      event.preventDefault();
-      event.returnValue = "";
-    };
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => {
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-    };
-  }, [dirtyFlags.hasUnsavedChanges]);
 
   if (!config) {
     return (
@@ -129,19 +160,8 @@ export default function SettingsPage() {
           </div>
 
           {dirtyFlags.hasUnsavedChanges && (
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 4 }}>
-              <Tag color="warning" style={{ padding: "4px 10px", fontSize: "var(--c-font-sm)", display: "inline-flex", alignItems: "center", gap: 6, margin: 0 }}>
-                <span
-                  style={{
-                    display: "inline-block",
-                    width: 7,
-                    height: 7,
-                    borderRadius: "50%",
-                    backgroundColor: "currentColor",
-                  }}
-                />
-                检测到未保存配置变更
-              </Tag>
+            <div className="settings-header-actions">
+              <SettingsDirtySummary cards={cards} onJumpToCard={handleJumpToCard} />
               <Popconfirm
                 title="撤销未保存的全部修改？"
                 description="将还原至上次保存的配置值，当前未保存的输入将被清空。"
@@ -316,10 +336,20 @@ export default function SettingsPage() {
           ] : []),
         ]}
         activeKey={activeSection}
-        onChange={setActiveSection}
+        onChange={handleSectionChange}
         ariaLabel="系统配置分类"
         desktopMode="rail"
+        preserveVisited
+        mobileMode="chips"
       />
+      <SettingsMobileSaveBar cards={cards} onResetAll={handleResetAllUnsaved} />
+      {inRouter && <SettingsSectionUrlSync section={activeSection} onChange={setActiveSection} />}
+      {inRouter && (
+        <SettingsLeaveBlocker
+          hasUnsavedChanges={dirtyFlags.hasUnsavedChanges}
+          dirtyCardCount={dirtyCardCount}
+        />
+      )}
     </div>
   );
 }

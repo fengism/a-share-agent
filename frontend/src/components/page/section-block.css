@@ -1,0 +1,62 @@
+/* 卡片内小节块：用标题 + 分隔线替代"卡中卡" */
+
+.section-block {
+  padding-top: var(--c-space-4, 16px);
+  border-top: 1px solid var(--c-border);
+}
+
+.section-block--first {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.section-block__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.section-block__title {
+  margin: 0;
+  color: var(--c-text-primary);
+  font-size: var(--c-font-sm, 12px);
+  font-weight: var(--c-weight-bold);
+  letter-spacing: 0.01em;
+}
+
+.section-block__extra {
+  color: var(--c-text-muted);
+  font-size: var(--c-font-xs, 11px);
+}
+
+.section-block__description {
+  margin: 0 0 10px;
+  color: var(--c-text-muted);
+  font-size: var(--c-font-xs, 11px);
+  line-height: 1.6;
+}
+
+.section-block__body {
+  min-width: 0;
+}
+
+/* 小节块内不再叠加卡片边框 */
+.section-block__body > .ant-card {
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+.section-block__body > .ant-card > .ant-card-head {
+  padding-inline: 0;
+  border-bottom: 0;
+}
+
+@media (max-width: 767px) {
+  .section-block {
+    padding-top: var(--c-space-3, 12px);
+  }
+}

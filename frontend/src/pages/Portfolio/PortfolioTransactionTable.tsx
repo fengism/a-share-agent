@@ -1,6 +1,7 @@
-import { DeleteOutlined, DownloadOutlined, EditOutlined } from "@ant-design/icons";
-import { Button, Empty, Popconfirm, Space, Table, Tag, message } from "antd";
+import { DeleteOutlined, DownloadOutlined, EditOutlined, SearchOutlined } from "@ant-design/icons";
+import { Button, Empty, Input, Popconfirm, Space, Table, Tag, Tooltip, message } from "antd";
 import type { TableColumnsType } from "antd";
+import dayjs from "dayjs";
 import { memo, useCallback, useMemo, useState } from "react";
 import { useDeletePortfolioTransaction } from "../../api/queries";
 import { semanticTagStyle } from "../../styles/ui";
@@ -21,9 +22,15 @@ import type { PortfolioTableRenderers } from "./portfolioTableRenderers";
 interface PortfolioTransactionTableProps {
   transactions: PortfolioTransaction[];
   renderers: PortfolioTableRenderers;
+  bare?: boolean;
 }
 
-function PortfolioTransactionTable({ transactions, renderers }: PortfolioTransactionTableProps) {
+function PortfolioTransactionTable({
+  transactions,
+  renderers,
+  bare = false,
+}: PortfolioTransactionTableProps) {
+  const [searchQuery, setSearchQuery] = useState("");
   const { isMobile, renderProfit, renderStock } = renderers;
   const {
     mutateAsync: deleteTransaction,
@@ -32,16 +39,30 @@ function PortfolioTransactionTable({ transactions, renderers }: PortfolioTransac
   } = useDeletePortfolioTransaction();
   const [editingTransaction, setEditingTransaction] = useState<PortfolioTransaction | null>(null);
 
+  const displayTransactions = useMemo(() => {
+    if (!searchQuery.trim()) return transactions;
+    const q = searchQuery.trim().toLowerCase();
+    return transactions.filter(
+      (t) =>
+        t.stock_code.toLowerCase().includes(q) ||
+        t.stock_name.toLowerCase().includes(q) ||
+        (t.note && t.note.toLowerCase().includes(q)),
+    );
+  }, [searchQuery, transactions]);
+
   const handleExportCsv = () => {
     const headers = [
       "流水ID",
       "交易方向",
       "股票代码",
       "股票名称",
-      "成交价",
+      "币种",
+      "汇率(CNY)",
+      "成交价(原币)",
       "成交股数",
-      "成交金额",
-      "手续费",
+      "成交金额(CNY)",
+      "成交金额(原币)",
+      "手续费(CNY)",
       "FIFO成本",
       "已实现盈亏",
       "交易时间",
@@ -52,9 +73,12 @@ function PortfolioTransactionTable({ transactions, renderers }: PortfolioTransac
       t.side === "buy" ? "买入" : "卖出",
       `\t${t.stock_code}`,
       `"${t.stock_name.replace(/"/g, '""')}"`,
+      t.currency,
+      t.fx_rate_to_cny,
       t.trade_price.toFixed(2),
       t.shares,
-      (t.trade_price * t.shares).toFixed(2),
+      t.trade_amount.toFixed(2),
+      t.trade_amount_native.toFixed(2),
       t.fee.toFixed(2),
       t.matched_cost != null ? t.matched_cost.toFixed(2) : "",
       t.realized_profit_amount != null ? t.realized_profit_amount.toFixed(2) : "",
@@ -98,7 +122,7 @@ function PortfolioTransactionTable({ transactions, renderers }: PortfolioTransac
       dataIndex: "buy_price",
       width: 105,
       align: "right",
-      render: formatPrice,
+      render: (value: number, record) => formatPrice(value, record.currency),
     },
     {
       title: "匹配股数",
@@ -112,14 +136,14 @@ function PortfolioTransactionTable({ transactions, renderers }: PortfolioTransac
       dataIndex: "unit_cost",
       width: 125,
       align: "right",
-      render: formatPrice,
+      render: (value: number, record) => formatPrice(value, record.currency),
     },
     {
-      title: "匹配成本",
+      title: "匹配成本(CNY)",
       dataIndex: "matched_cost",
       width: 120,
       align: "right",
-      render: formatMoney,
+      render: (value) => formatMoney(value),
     },
   ], []);
   const columns = useMemo<TableColumnsType<PortfolioTransaction>>(() => [
@@ -128,6 +152,7 @@ function PortfolioTransactionTable({ transactions, renderers }: PortfolioTransac
       dataIndex: "side",
       width: 75,
       fixed: isMobile ? undefined : "left",
+      sorter: (a, b) => a.side.localeCompare(b.side),
       render: (side: PortfolioTransaction["side"]) => (
         <Tag style={semanticTagStyle(side === "buy" ? "up" : "down")}>
           {side === "buy" ? "买入" : "卖出"}
@@ -144,15 +169,17 @@ function PortfolioTransactionTable({ transactions, renderers }: PortfolioTransac
       title: "成交时间",
       dataIndex: "trade_time",
       width: 150,
+      sorter: (a, b) => dayjs(a.trade_time).valueOf() - dayjs(b.trade_time).valueOf(),
       render: formatTime,
     },
     {
-      title: "成交价",
+      title: <Tooltip title="按标的原币显示成交价">成交价</Tooltip>,
       dataIndex: "trade_price",
       width: 105,
       align: "right",
       className: "financial-num",
-      render: formatPrice,
+      sorter: (a, b) => a.trade_price - b.trade_price,
+      render: (value: number, record) => formatPrice(value, record.currency),
     },
     {
       title: "股数",
@@ -160,23 +187,26 @@ function PortfolioTransactionTable({ transactions, renderers }: PortfolioTransac
       width: 100,
       align: "right",
       className: "financial-num",
+      sorter: (a, b) => a.shares - b.shares,
       render: formatInteger,
     },
     {
-      title: "成交额",
+      title: "成交额(CNY)",
       key: "turnover",
       width: 125,
       align: "right",
       className: "financial-num",
-      render: (_, record) => formatMoney(record.trade_price * record.shares),
+      sorter: (a, b) => a.trade_amount - b.trade_amount,
+      render: (_, record) => formatMoney(record.trade_amount),
     },
     {
-      title: "手续费",
+      title: "手续费(CNY)",
       dataIndex: "fee",
       width: 105,
       align: "right",
       className: "financial-num",
-      render: formatMoney,
+      sorter: (a, b) => a.fee - b.fee,
+      render: (value) => formatMoney(value),
     },
     {
       title: "FIFO 成本",
@@ -184,7 +214,8 @@ function PortfolioTransactionTable({ transactions, renderers }: PortfolioTransac
       width: 125,
       align: "right",
       className: "financial-num",
-      render: formatMoney,
+      sorter: (a, b) => (a.matched_cost ?? 0) - (b.matched_cost ?? 0),
+      render: (value) => formatMoney(value),
     },
     {
       title: "已实现盈亏",
@@ -192,6 +223,7 @@ function PortfolioTransactionTable({ transactions, renderers }: PortfolioTransac
       width: 130,
       align: "right",
       className: "financial-num",
+      sorter: (a, b) => (a.realized_profit_amount ?? 0) - (b.realized_profit_amount ?? 0),
       render: (value: number | null) => value == null ? "-" : renderProfit(value),
     },
     {
@@ -254,18 +286,31 @@ function PortfolioTransactionTable({ transactions, renderers }: PortfolioTransac
     <>
       <PortfolioTableCard
         title="交易流水"
+        stacked={!bare}
+        bare={bare}
         extra={
           transactions.length > 0 ? (
-            <Button size="small" icon={<DownloadOutlined />} onClick={handleExportCsv}>
-              导出 CSV
-            </Button>
+            <Space size={8}>
+              <Input
+                size="small"
+                placeholder="搜索交易流水"
+                prefix={<SearchOutlined />}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                allowClear
+                style={{ width: 140 }}
+              />
+              <Button size="small" icon={<DownloadOutlined />} onClick={handleExportCsv}>
+                导出 CSV
+              </Button>
+            </Space>
           ) : null
         }
       >
         <Table<PortfolioTransaction>
           rowKey="id"
           columns={columns}
-          dataSource={transactions}
+          dataSource={displayTransactions}
           pagination={PORTFOLIO_TABLE_PAGINATION}
           size="middle"
           scroll={{ x: 1_355 }}

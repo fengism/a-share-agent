@@ -102,4 +102,21 @@ describe("MarketVolumeCard", () => {
     const optionAll = JSON.parse(chartMock.getAttribute("data-option") || "{}");
     expect(optionAll.xAxis.data).toHaveLength(70);
   });
+
+  it("displays calculating hint when volume ratio is unavailable", () => {
+    const mockItems = [
+      { date: "2026-08-01", amount: 0, volume: 0 },
+    ];
+
+    mockUseMarketVolume.mockReturnValue({
+      data: { items: mockItems },
+      isLoading: false,
+      isFetching: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    render(<MarketVolumeCard />);
+    expect(screen.getByText(/量比 - · 计算中/)).toBeInTheDocument();
+  });
 });

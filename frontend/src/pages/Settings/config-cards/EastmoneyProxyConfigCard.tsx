@@ -57,7 +57,7 @@ export default function OutboundProxyConfigCard({
               color={opt.tagColor}
               style={{
                 marginLeft: 6,
-                fontSize: "11px",
+                fontSize: "var(--c-font-xs)",
                 lineHeight: "18px",
                 padding: "0 4px",
                 borderRadius: 2,

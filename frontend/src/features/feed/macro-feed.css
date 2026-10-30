@@ -163,17 +163,24 @@ a.macro-timeline__title:hover {
 /* ── 利率 ── */
 .macro-rates {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(136px, 1fr));
+  gap: 12px;
 }
 
 .macro-rate {
   display: grid;
-  gap: 2px;
-  padding: 10px 12px;
+  gap: 3px;
+  padding: 10px 14px;
   border: 1px solid var(--c-border);
   border-radius: 10px;
   background: var(--c-nested-bg);
+  transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.macro-rate:hover {
+  border-color: var(--c-primary);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.05);
 }
 
 .macro-rate__label {
@@ -319,7 +326,7 @@ a.macro-timeline__title:hover {
   }
 
   .macro-rates {
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
   }
 

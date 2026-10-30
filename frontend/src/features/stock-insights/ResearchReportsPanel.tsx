@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { Card, Table, Tag, Typography } from "antd";
 import type { TableProps } from "antd";
 import { useStockReports } from "../../api/queries";
@@ -64,6 +65,16 @@ export default function ResearchReportsPanel({ code }: Props) {
   const data = reportsQuery.data;
   const items = data?.items ?? [];
 
+  const consensus = useMemo(() => {
+    if (items.length === 0) return null;
+    const buyCount = items.filter((r) => POSITIVE_RATINGS.some((w) => r.rating?.includes(w))).length;
+    const buyRatio = (buyCount / items.length) * 100;
+    const targetPrices = items.map((r) => r.goal_price).filter((p): p is number => p != null && p > 0);
+    const avgTargetPrice = targetPrices.length > 0 ? targetPrices.reduce((a, b) => a + b, 0) / targetPrices.length : null;
+    const uniqueOrgs = new Set(items.map((r) => r.org).filter(Boolean));
+    return { buyCount, buyRatio, avgTargetPrice, orgCount: uniqueOrgs.size };
+  }, [items]);
+
   return (
     <SectionDataState
       isLoading={reportsQuery.isLoading}
@@ -89,6 +100,36 @@ export default function ResearchReportsPanel({ code }: Props) {
           style={{ ...cardStyle }}
           styles={{ body: { padding: t.space[4] } }}
         >
+          {consensus ? (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 12,
+                flexWrap: "wrap",
+                padding: "8px 12px",
+                marginBottom: t.space[3],
+                background: c.hoverBg,
+                borderRadius: t.radius.md,
+                border: `1px solid ${c.border}`,
+                fontSize: t.font.sm,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <Text strong>机构共识：</Text>
+                <Tag style={semanticTagStyle(consensus.buyRatio >= 70 ? "up" : "info")}>
+                  {consensus.buyRatio >= 70 ? "积极看多" : "中性平稳"} ({consensus.buyRatio.toFixed(0)}% 买入/增持)
+                </Tag>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 16, fontFamily: "var(--c-font-mono)" }}>
+                <span>覆盖机构: <strong>{consensus.orgCount} 家</strong></span>
+                {consensus.avgTargetPrice != null ? (
+                  <span>平均目标价: <strong style={{ color: c.primary }}>¥{consensus.avgTargetPrice.toFixed(2)}</strong></span>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
           <Table<StockResearchReport>
             size="small"
             rowKey="id"

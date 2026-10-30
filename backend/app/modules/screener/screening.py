@@ -79,6 +79,44 @@ def _build_industry_concept(name: str | None) -> StockConcept | None:
     return StockConcept(code="", name=text)
 
 
+def _compute_composite_scores(df: pd.DataFrame) -> pd.Series:
+    """计算多因子综合得分 (0~100): 40% 估值安全度 + 40% 动量活跃度 + 20% 流动性稳定性。"""
+    n = len(df)
+    if n == 0:
+        return pd.Series(dtype=float, index=df.index)
+    if n == 1:
+        return pd.Series([75.0], index=df.index)
+
+    # 1. 估值得分 (越低越好，<=0 视为亏损/异常打底分)
+    pe = pd.to_numeric(df.get("pe_num"), errors="coerce")
+    pb = pd.to_numeric(df.get("pb_num"), errors="coerce")
+    valid_pe = pe.where(pe > 0)
+    pe_rank = (1.0 - valid_pe.rank(pct=True, ascending=True)).fillna(0.2) * 100
+    valid_pb = pb.where(pb > 0)
+    pb_rank = (1.0 - valid_pb.rank(pct=True, ascending=True)).fillna(0.2) * 100
+    value_score = 0.5 * pe_rank + 0.5 * pb_rank
+
+    # 2. 动量得分 (60日涨幅 + 日内涨跌幅 + 量比)
+    chg_60d = pd.to_numeric(df.get("change_pct_60d_num"), errors="coerce")
+    chg_daily = pd.to_numeric(df.get("change_pct_num"), errors="coerce")
+    vol_ratio = pd.to_numeric(df.get("volume_ratio_num"), errors="coerce")
+    m60_rank = chg_60d.rank(pct=True, ascending=True).fillna(0.5) * 100
+    daily_rank = chg_daily.rank(pct=True, ascending=True).fillna(0.5) * 100
+    vr_rank = vol_ratio.rank(pct=True, ascending=True).fillna(0.5) * 100
+    momentum_score = 0.4 * m60_rank + 0.3 * daily_rank + 0.3 * vr_rank
+
+    # 3. 流动性与市值规模得分 (中大市值与适度换手)
+    cap = pd.to_numeric(df.get("market_cap_yi"), errors="coerce")
+    turnover = pd.to_numeric(df.get("turnover_pct_num"), errors="coerce")
+    cap_rank = cap.rank(pct=True, ascending=True).fillna(0.5) * 100
+    to_dist = (turnover - 6.0).abs()
+    to_rank = (1.0 - to_dist.rank(pct=True, ascending=True)).fillna(0.5) * 100
+    quality_score = 0.5 * cap_rank + 0.5 * to_rank
+
+    raw_composite = 0.4 * value_score + 0.4 * momentum_score + 0.2 * quality_score
+    return raw_composite.round(1)
+
+
 def _screen_dataframe(
     df: pd.DataFrame,
     second_industry_map: dict[str, str] | dict[str, dict[str, str]],
@@ -127,6 +165,8 @@ def _screen_dataframe(
         "市盈率-动态": "pe_num",
         "市净率": "pb_num",
         "总市值": "market_cap_raw_num",
+        "量比": "volume_ratio_num",
+        "60日涨跌幅": "change_pct_60d_num",
     }
     for source_col, numeric_col in numeric_col_map.items():
         if source_col in df.columns:
@@ -179,6 +219,14 @@ def _screen_dataframe(
         mask &= df["amplitude_num"].notna() & (df["amplitude_num"] >= filters.amplitude_min)
     if filters.amplitude_max is not None:
         mask &= df["amplitude_num"].notna() & (df["amplitude_num"] <= filters.amplitude_max)
+    if filters.volume_ratio_min is not None:
+        mask &= df["volume_ratio_num"].notna() & (df["volume_ratio_num"] >= filters.volume_ratio_min)
+    if filters.volume_ratio_max is not None:
+        mask &= df["volume_ratio_num"].notna() & (df["volume_ratio_num"] <= filters.volume_ratio_max)
+    if filters.change_pct_60d_min is not None:
+        mask &= df["change_pct_60d_num"].notna() & (df["change_pct_60d_num"] >= filters.change_pct_60d_min)
+    if filters.change_pct_60d_max is not None:
+        mask &= df["change_pct_60d_num"].notna() & (df["change_pct_60d_num"] <= filters.change_pct_60d_max)
     if filters.industries:
         target_industries = set(filters.industries)
         industry_match = (
@@ -225,6 +273,7 @@ def _screen_dataframe(
 
     filtered = df[mask].copy()
     filtered["second_industry"] = filtered["second_industry"].map(safe_string)
+    filtered["composite_score_num"] = _compute_composite_scores(filtered)
 
     sort_col_map = {
         "market_cap": "market_cap_yi",
@@ -235,6 +284,9 @@ def _screen_dataframe(
         "turnover_pct": "turnover_pct_num",
         "volume": "volume_num",
         "amplitude": "amplitude_num",
+        "volume_ratio": "volume_ratio_num",
+        "change_pct_60d": "change_pct_60d_num",
+        "composite_score": "composite_score_num",
     }
     sort_col = sort_col_map.get(filters.sort_by, "market_cap_yi")
     ascending = filters.sort_order == "asc"
@@ -259,6 +311,12 @@ def _screen_dataframe(
         is_broken = pb_val is not None and 0 < pb_val <= 1.0
         amp_raw = safe_float(row.get("amplitude_num"))
         amp_val = round(amp_raw, 2) if amp_raw is not None else None
+        vol_ratio_raw = safe_float(row.get("volume_ratio_num"))
+        vol_ratio_val = round(vol_ratio_raw, 2) if vol_ratio_raw is not None else None
+        chg_60d_raw = safe_float(row.get("change_pct_60d_num"))
+        chg_60d_val = round(chg_60d_raw, 2) if chg_60d_raw is not None else None
+        comp_score_raw = safe_float(row.get("composite_score_num"))
+        comp_score_val = round(comp_score_raw, 1) if comp_score_raw is not None else None
 
         items.append(
             ScreenerItem(
@@ -272,6 +330,9 @@ def _screen_dataframe(
                 turnover_pct=safe_float(row.get("换手率")),
                 volume=safe_float(row.get("成交量")),
                 amplitude=amp_val,
+                volume_ratio=vol_ratio_val,
+                change_pct_60d=chg_60d_val,
+                composite_score=comp_score_val,
                 is_broken_net=is_broken,
                 exchange=safe_string(row.get("exchange")),
                 board=safe_string(row.get("board")),

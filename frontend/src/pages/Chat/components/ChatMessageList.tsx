@@ -158,6 +158,7 @@ export const ChatMessageList = React.memo(function ChatMessageList({
                   onPush={onPush}
                   onRegenerate={message.id === regeneratableMessageId ? onRegenerate : undefined}
                   onResultAction={onResultAction}
+                  onSelectPrompt={onSelectPrompt}
                 />
               )}
             </div>

@@ -53,10 +53,16 @@ export function useScreenerBatchController() {
     }
   }, [selectedCodes]);
 
+  const handleAddSingleToWatchlist = useCallback(async (stock: { code: string; name?: string }) => {
+    await addWatchlistItem.mutateAsync({ stock_code: stock.code, note: "" });
+    message.success(`已将 ${stock.name || stock.code} 加入自选`);
+  }, [addWatchlistItem]);
+
   return {
     analysisProgress,
     clearSelection: () => setSelectedCodes([]),
     handleAddSelectedToWatchlist,
+    handleAddSingleToWatchlist,
     handleBatchAnalyze,
     isAddingWatchlist,
     isBatchAnalyzing,

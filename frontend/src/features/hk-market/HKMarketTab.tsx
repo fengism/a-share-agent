@@ -35,6 +35,7 @@ import {
 import { useAddWatchlistItem } from "../../api/queryHooks/watchlist";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useFullscreenChartHeight } from "../../hooks/useFullscreenChartHeight";
+import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { useNavigate } from "react-router-dom";
 import LazyKlineChart from "../../charts/LazyKlineChart";
 import ChangeValue from "../../components/ChangeValue";
@@ -130,6 +131,8 @@ export default function HKMarketTab({
   const [sortOption, setSortOption] = useState<SortOption>("default");
   const [indexChartExpanded, setIndexChartExpanded] = useState(false);
   const [stockChartExpanded, setStockChartExpanded] = useState(false);
+  const isMobile = useMediaQuery("(max-width: 768px)");
+  const chartHeight = isMobile ? 280 : 360;
   const fullscreenHeight = useFullscreenChartHeight();
   const indexPeriodControl = (
     <Segmented
@@ -184,8 +187,10 @@ export default function HKMarketTab({
     if (defaultStockCode && defaultStockCode !== activeStock?.code) {
       const match = stocksQuery.data?.items.find((item) => item.code === defaultStockCode);
       setActiveStock(match ?? { code: defaultStockCode, name: defaultStockCode });
+    } else if (embedded && !defaultStockCode && activeStock) {
+      setActiveStock(null);
     }
-  }, [activeStock?.code, defaultStockCode, stocksQuery.data?.items]);
+  }, [activeStock, defaultStockCode, embedded, stocksQuery.data?.items]);
 
   useEffect(() => {
     if (activeStock && activeStock.name === activeStock.code && stocksQuery.data?.items) {
@@ -465,27 +470,45 @@ export default function HKMarketTab({
 
   return (
     <div style={embedded ? undefined : pageContainerStyle} className="hk-market-page">
-      <div style={embedded ? { marginBottom: 12 } : pageHeaderStyle} className="hk-market-header">
-        <div>
-          <div className="u-page-title u-page-title--compact">
-            <Title level={embedded ? 4 : 3} style={pageTitleStyle}>港股行情</Title>
-            <Tag color="green" className="hk-live-tag">
-              <span className="hk-live-dot" />
-              Sina 实时
-            </Tag>
+      {embedded ? (
+        <div style={{ marginBottom: 12 }} className="hk-market-header hk-market-header--embedded">
+          <Tag color="green" className="hk-live-tag">
+            <span className="hk-live-dot" />
+            Sina 实时
+          </Tag>
+          <div className="hk-market-header-actions">
+            <Button
+              icon={<ReloadOutlined spin={isRefreshing} />}
+              loading={isRefreshing}
+              onClick={() => void handleRefreshAll()}
+            >
+              刷新行情
+            </Button>
           </div>
-          <Paragraph style={pageDescriptionStyle}>港股核心指数与个股的实时行情、历史 K 线及复权走势。</Paragraph>
         </div>
-        <div className="hk-market-header-actions">
-          <Button
-            icon={<ReloadOutlined spin={isRefreshing} />}
-            loading={isRefreshing}
-            onClick={() => void handleRefreshAll()}
-          >
-            刷新行情
-          </Button>
+      ) : (
+        <div style={pageHeaderStyle} className="hk-market-header">
+          <div>
+            <div className="u-page-title u-page-title--compact">
+              <Title level={3} style={pageTitleStyle}>港股行情</Title>
+              <Tag color="green" className="hk-live-tag">
+                <span className="hk-live-dot" />
+                Sina 实时
+              </Tag>
+            </div>
+            <Paragraph style={pageDescriptionStyle}>港股核心指数与个股的实时行情、历史 K 线及复权走势。</Paragraph>
+          </div>
+          <div className="hk-market-header-actions">
+            <Button
+              icon={<ReloadOutlined spin={isRefreshing} />}
+              loading={isRefreshing}
+              onClick={() => void handleRefreshAll()}
+            >
+              刷新行情
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
 
       <SectionDataState
         isLoading={indicesQuery.isLoading && indices.length === 0}
@@ -570,11 +593,11 @@ export default function HKMarketTab({
           onRetry={() => indexHistoryQuery.refetch()}
           isEmpty={!indexHistoryQuery.data?.items.length}
           emptyText="暂无指数历史行情"
-          minHeight={360}
+          minHeight={chartHeight}
         >
           <LazyKlineChart
             data={chartItems(indexHistoryQuery.data?.items)}
-            height={360}
+            height={chartHeight}
             viewKey={`hk-index-${activeIndex}-${indexPeriod}`}
             landscapeToolbar={indexPeriodControl}
           />
@@ -673,11 +696,11 @@ export default function HKMarketTab({
             onRetry={() => stockHistoryQuery.refetch()}
             isEmpty={!stockHistoryQuery.data?.items.length}
             emptyText="暂无个股历史行情"
-            minHeight={380}
+            minHeight={chartHeight}
           >
             <LazyKlineChart
               data={chartItems(stockHistoryQuery.data?.items)}
-              height={380}
+              height={chartHeight}
               viewKey={`hk-stock-${activeStock.code}-${stockPeriod}-${adjust}`}
               landscapeToolbar={stockLandscapeToolbar}
             />
@@ -810,6 +833,7 @@ export default function HKMarketTab({
               showSizeChanger={false}
               onChange={setPage}
               className="hk-pagination"
+              simple={isMobile}
             />
           )}
         </SectionDataState>

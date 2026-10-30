@@ -29,13 +29,29 @@ function bulletinTypeColor(type: string): SemanticTagColor {
   return "info";
 }
 
+function detectBulletinCategory(title: string): { label: string; color: SemanticTagColor } | null {
+  if (/(年报|半年报|季报|定期报告|年度报告|财务报告)/.test(title)) return { label: "定期财报", color: "primary" };
+  if (/(分红|分派|派息|转增|分配预案)/.test(title)) return { label: "权益分红", color: "up" };
+  if (/(增持|回购|员工持股)/.test(title)) return { label: "增持回购", color: "up" };
+  if (/(减持|质押|解质押)/.test(title)) return { label: "减持质押", color: "down" };
+  if (/(重组|收购|并购|投资|对外投资)/.test(title)) return { label: "重组并购", color: "warning" };
+  if (/(合同|中标|日常经营)/.test(title)) return { label: "经营中标", color: "primary" };
+  return null;
+}
+
 function BulletinItem({ item }: { item: StockBulletin }) {
   const c = useColors();
   const t = useTokens();
   const metaParts = [item.date, item.origin].filter(Boolean).join(" | ");
+  const category = detectBulletinCategory(item.title);
   return (
     <li className="analysis-detail-list__item">
       <span className="analysis-detail-list__title">
+        {category && (
+          <Tag style={{ ...semanticTagStyle(category.color), marginInlineEnd: t.space[2], fontSize: 11, padding: "0 5px", verticalAlign: "middle" }}>
+            {category.label}
+          </Tag>
+        )}
         {item.url ? (
           <a href={item.url} target="_blank" rel="noreferrer" style={{ color: c.textPrimary }}>
             {item.title}

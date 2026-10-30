@@ -426,6 +426,30 @@
   border-radius: 4px;
 }
 
+.national-team-section-heading__controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.national-team-stacked-flow-card,
+.national-team-support-radar-card,
+.national-team-milestone-card,
+.national-team-support-zones-card {
+  border-radius: 10px;
+  border: 1px solid var(--c-border);
+  background: var(--c-card-bg);
+  box-shadow: var(--shadow-xs, 0 1px 3px rgba(0, 0, 0, 0.04));
+}
+
+.national-team-factor-item {
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--c-bg-subtle, rgba(128, 128, 128, 0.04));
+  border: 1px solid var(--c-border);
+}
+
 /* ── 6. Chart Grid & Index Dual Axis Card ────────────────────────────────── */
 .national-team-chart-grid {
   display: grid;
@@ -915,4 +939,31 @@
   .national-team-summary .ant-statistic-content {
     font-size: 16px;
   }
+}
+
+/* ── Phase 3: Strategic Institutional Portrait ─────────────────────────── */
+.national-team-view-switcher {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  margin-bottom: 12px;
+}
+
+.national-team-entity-card {
+  border-radius: 8px;
+  height: 100%;
+  border: 1px solid var(--c-border);
+  background: var(--c-bg-card);
+  transition: box-shadow 0.2s ease;
+}
+
+.national-team-entity-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.national-team-industry-card,
+.national-team-top-holdings-card {
+  border-radius: 8px;
+  border: 1px solid var(--c-border);
+  background: var(--c-bg-card);
 }

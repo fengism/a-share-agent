@@ -1,0 +1,41 @@
+/* 统一数据页工具条：左右对齐，窄屏堆叠，与卡片栅格间距一致 */
+.section-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  color: var(--c-text-secondary);
+  font-size: var(--c-font-md);
+}
+
+.section-toolbar__meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.section-toolbar__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 576px) {
+  .section-toolbar {
+    align-items: stretch;
+  }
+
+  .section-toolbar__meta,
+  .section-toolbar__actions {
+    width: 100%;
+  }
+
+  .section-toolbar__actions {
+    justify-content: space-between;
+  }
+}

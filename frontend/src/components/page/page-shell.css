@@ -1,0 +1,102 @@
+/* 页面骨架：统一头部、主体与导航区的间距与排版 */
+
+.page-shell {
+  box-sizing: border-box;
+}
+
+/* 看板类页面占满可用宽度（此前是 Dashboard 的单点特例） */
+.page-shell--full {
+  max-width: none !important;
+  width: 100% !important;
+}
+
+.page-shell__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--c-space-4, 16px);
+  flex-wrap: wrap;
+  margin-bottom: var(--c-space-5, 20px);
+}
+
+.page-shell__heading {
+  min-width: 0;
+  flex: 1 1 320px;
+}
+
+.page-shell__eyebrow {
+  margin-bottom: 4px;
+  color: var(--c-text-muted);
+  font-size: var(--c-font-xs, 12px);
+  letter-spacing: 0.04em;
+}
+
+.page-shell__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--c-text-primary);
+  font-size: var(--c-font-lg, 17px);
+  font-weight: var(--c-weight-bold);
+  line-height: 1.35;
+}
+
+.page-shell__title-icon {
+  display: inline-flex;
+  color: var(--c-primary);
+}
+
+.page-shell__title-badge {
+  display: inline-flex;
+  align-items: center;
+}
+
+.page-shell__description {
+  margin: 6px 0 0;
+  max-width: 72ch;
+  color: var(--c-text-secondary);
+  font-size: var(--c-font-sm, 13px);
+  line-height: 1.7;
+}
+
+.page-shell__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex: 0 1 auto;
+  max-width: 100%;
+}
+
+.page-shell__nav {
+  margin-bottom: var(--c-space-4, 16px);
+}
+
+.page-shell__body {
+  min-width: 0;
+}
+
+@media (max-width: 767px) {
+  .page-shell__header {
+    gap: 10px;
+    margin-bottom: var(--c-space-4, 16px);
+  }
+
+  .page-shell__title {
+    font-size: var(--c-font-md, 15px);
+  }
+
+  .page-shell__description {
+    font-size: var(--c-font-xs, 12px);
+    line-height: 1.6;
+  }
+
+  .page-shell__actions {
+    width: 100%;
+  }
+
+  .page-shell__actions > * {
+    flex: 0 1 auto;
+  }
+}

@@ -7,6 +7,7 @@ import ChangeValue from "../../components/ChangeValue";
 import DataRefreshIndicator from "../../components/DataRefreshIndicator";
 import ResponsiveMetricGrid from "../../components/ResponsiveMetricGrid";
 import SectionDataState from "../../components/SectionDataState";
+import SectionToolbar from "../../components/SectionToolbar";
 import StockExternalLink from "../../components/StockExternalLink";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { useUrlSearchParam } from "../../hooks/useUrlSearchParam";
@@ -168,7 +169,7 @@ function SectorStocksDrawer({
     <Drawer
       open={Boolean(sector)}
       onClose={onClose}
-      width={isNarrow ? "100%" : "min(860px, 100vw)"}
+      size={isNarrow ? "100%" : "min(860px, 100vw)"}
       title={`${sector?.name ?? ""} 成分股 · ${dateText}`}
       destroyOnHidden
     >
@@ -204,7 +205,7 @@ function SectorStocksDrawer({
           rowKey="code"
           columns={columns}
           dataSource={items}
-          pagination={{ pageSize: 20, showSizeChanger: false }}
+          pagination={{ pageSize: 20, showSizeChanger: false, simple: isNarrow }}
           expandable={isNarrow && historyDetailsAvailable ? {
             expandedRowRender: renderExpandedRow,
             columnWidth: 36,
@@ -376,32 +377,37 @@ export default function IndustryRankTab() {
         style={{
           padding: `${t.space[3]} ${t.space[4]}`,
           borderBottom: `1px solid ${c.border}`,
-          display: "flex",
-          alignItems: "center",
-          gap: t.space[2],
-          flexWrap: "wrap",
         }}
       >
-        <AppstoreOutlined style={{ color: c.primary }} />
-        <span style={{ color: c.textPrimary, fontWeight: Number(t.weight.medium) }}>
-          行业资金与涨跌排行
-        </span>
-        <Tag>{source}</Tag>
-        {!data?.fund_data_available ? <Tag color="warning">资金数据降级</Tag> : null}
-        {dateWasResolved ? <Tag color="warning">已回退至最近交易日</Tag> : null}
-        <span style={{ color: c.textSecondary, fontSize: t.font.sm }}>
-          数据日期：{actualDate}
-        </span>
-        <Space wrap style={{ marginLeft: "auto" }}>
-          <DatePicker
-            aria-label="行业排行日期"
-            value={selectedDate}
-            allowClear={false}
-            disabledDate={(current) => current.isAfter(dayjs(), "day")}
-            onChange={(value) => value && setDate(value.format("YYYY-MM-DD"))}
-          />
-          <DataRefreshIndicator active={isFetching && !isLoading} />
-        </Space>
+        <SectionToolbar
+          ariaLabel="行业资金与涨跌排行工具条"
+          meta={
+            <div style={{ display: "flex", alignItems: "center", gap: t.space[2], flexWrap: "wrap" }}>
+              <AppstoreOutlined style={{ color: c.primary }} />
+              <span style={{ color: c.textPrimary, fontWeight: Number(t.weight.medium) }}>
+                行业资金与涨跌排行
+              </span>
+              <Tag>{source}</Tag>
+              {!data?.fund_data_available ? <Tag color="warning">资金数据降级</Tag> : null}
+              {dateWasResolved ? <Tag color="warning">已回退至最近交易日</Tag> : null}
+              <span style={{ color: c.textSecondary, fontSize: t.font.sm }}>
+                数据日期：{actualDate}
+              </span>
+            </div>
+          }
+          actions={
+            <Space wrap>
+              <DatePicker
+                aria-label="行业排行日期"
+                value={selectedDate}
+                allowClear={false}
+                disabledDate={(current) => current.isAfter(dayjs(), "day")}
+                onChange={(value) => value && setDate(value.format("YYYY-MM-DD"))}
+              />
+              <DataRefreshIndicator active={isFetching && !isLoading} />
+            </Space>
+          }
+        />
       </div>
       <SectionDataState
         isLoading={isLoading && !hasData}
@@ -417,7 +423,7 @@ export default function IndustryRankTab() {
           dataSource={sectors}
           rowKey="code"
           pagination={false}
-          virtual
+          virtual={!isNarrow}
           expandable={isNarrow ? {
             expandedRowRender: renderExpandedRow,
             columnWidth: 36,

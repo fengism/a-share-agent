@@ -1,7 +1,37 @@
-import { DeleteOutlined, HistoryOutlined, ReloadOutlined, SaveOutlined, SettingOutlined } from "@ant-design/icons";
-import { Button, Col, Form, Input, InputNumber, Popconfirm, Row, Select, Switch, Tag, Tooltip, Typography } from "antd";
-import { useState } from "react";
 import {
+  DeleteOutlined,
+  HistoryOutlined,
+  ReloadOutlined,
+  SaveOutlined,
+  SearchOutlined,
+  SettingOutlined,
+  StarOutlined,
+} from "@ant-design/icons";
+import {
+  AutoComplete,
+  Button,
+  Col,
+  Form,
+  Input,
+  InputNumber,
+  Popconfirm,
+  Row,
+  Select,
+  Switch,
+  Tag,
+  Tooltip,
+  Typography,
+  message,
+} from "antd";
+import { useEffect, useMemo, useState } from "react";
+import { useWatchlist } from "../../api/queries";
+import { useStockSearchController } from "../../hooks/useStockSearchController";
+import {
+  getStockName,
+  parseStockCodes,
+  registerStockInfo,
+  resolveStockNameOrCode,
+  splitInputSearch,
   stockCodesValidationError,
   strategyConstraintDependencies,
   strategyConstraintValidationError,
@@ -139,10 +169,69 @@ const THEMATIC_UNIVERSE_PRESETS = [
     codes: "600276, 603259, 688235, 300760, 600436",
     color: "green",
   },
+  {
+    name: "半导体芯片",
+    desc: "中芯国际 / 北方华创 / 中微公司 / 海光信息 / 韦尔股份 / 澜起科技",
+    codes: "688981, 002371, 688012, 688041, 603501, 688008",
+    color: "volcano",
+  },
+  {
+    name: "新能源锂电",
+    desc: "宁德时代 / 比亚迪 / 亿纬锂能 / 阳光电源 / 天齐锂业 / 赣锋锂业",
+    codes: "300750, 002594, 300014, 300274, 002466, 002460",
+    color: "lime",
+  },
+  {
+    name: "白酒消费",
+    desc: "贵州茅台 / 五粮液 / 泸州老窖 / 山西汾酒 / 伊利股份 / 海天味业",
+    codes: "600519, 000858, 000568, 600809, 600887, 603288",
+    color: "magenta",
+  },
+  {
+    name: "高换手量价活跃",
+    desc: "宗申动力 / 胜宏科技 / 润和软件 / 常山北明 / 软通动力 / 中科曙光",
+    codes: "001696, 300476, 300339, 000158, 301236, 603019",
+    color: "volcano",
+  },
+  {
+    name: "财报绩优成长",
+    desc: "立讯精密 / 中际旭创 / 传音控股 / 沪电股份 / 恒立液压 / 拓普集团",
+    codes: "002475, 300308, 688036, 002463, 601100, 601689",
+    color: "cyan",
+  },
 ];
 
 export function UniverseFields({ source }: { source: QuantFormValues["source"] }) {
   const form = Form.useFormInstance<QuantFormValues>();
+  const formCodes = Form.useWatch("codes", form) ?? "";
+  const stockSearch = useStockSearchController({ debounceMs: 200 });
+  const watchlist = useWatchlist();
+  const watchlistItems = watchlist.data?.items ?? [];
+
+  const handleImportWatchlist = () => {
+    if (watchlistItems.length === 0) {
+      message.info("自选股列表为空，可在自选页面添加关注标的");
+      return;
+    }
+    const codesToImport = watchlistItems.slice(0, 30);
+    codesToImport.forEach((item) => {
+      registerStockInfo(item.stock_code, item.stock_name);
+    });
+    const codesStr = codesToImport.map((i) => i.stock_code).join(", ");
+    form.setFieldsValue({
+      source: "custom",
+      codes: codesStr,
+    });
+    message.success(`已成功导入 ${codesToImport.length} 只自选股`);
+  };
+
+  useEffect(() => {
+    stockSearch.currentResults.forEach((item) => {
+      registerStockInfo(item.code, item.name);
+    });
+  }, [stockSearch.currentResults]);
+
+  const parsedCodes = useMemo(() => parseStockCodes(formCodes), [formCodes]);
 
   const handleQuickCode = (code: string) => {
     const current = (form.getFieldValue("codes") || "").trim();
@@ -150,10 +239,16 @@ export function UniverseFields({ source }: { source: QuantFormValues["source"] }
       form.setFieldValue("codes", code);
       return;
     }
-    const list = current.split(/[,\s，]+/).map((s: string) => s.trim()).filter(Boolean);
+    const list = parseStockCodes(current);
     if (!list.includes(code) && list.length < 30) {
       form.setFieldValue("codes", `${current}, ${code}`);
     }
+  };
+
+  const handleRemoveCode = (codeToRemove: string) => {
+    const current = form.getFieldValue("codes") || "";
+    const list = parseStockCodes(current).filter((c) => c !== codeToRemove);
+    form.setFieldValue("codes", list.join(", "));
   };
 
   const handleThematicPreset = (codes: string) => {
@@ -162,6 +257,89 @@ export function UniverseFields({ source }: { source: QuantFormValues["source"] }
       codes,
     });
   };
+
+  const { searchTerm: activeSearchTerm } = useMemo(
+    () => splitInputSearch(formCodes),
+    [formCodes],
+  );
+
+  const handleInputChange = (val: string) => {
+    form.setFieldValue("codes", val);
+    const { searchTerm } = splitInputSearch(val);
+    stockSearch.setInputValue(searchTerm);
+  };
+
+  const handleSelectOption = (selectedCode: string) => {
+    const current = (form.getFieldValue("codes") || "").trim();
+    const { prefix } = splitInputSearch(current);
+    let nextCodes: string;
+    if (prefix) {
+      const existingList = parseStockCodes(prefix);
+      if (!existingList.includes(selectedCode)) {
+        existingList.push(selectedCode);
+      }
+      nextCodes = existingList.join(", ");
+    } else {
+      nextCodes = selectedCode;
+    }
+    form.setFieldValue("codes", nextCodes);
+    stockSearch.setInputValue("");
+  };
+
+  const handleBlurOrNormalize = () => {
+    const current = (form.getFieldValue("codes") || "").trim();
+    if (!current) return;
+    const tokens = current.split(/[,\s，]+/).map((s: string) => s.trim()).filter(Boolean);
+    if (tokens.length === 0) return;
+    const resolved = tokens.map((token: string) => {
+      const code = resolveStockNameOrCode(token);
+      if (code) return code;
+      if (
+        stockSearch.currentResults.length > 0 &&
+        (stockSearch.currentResults[0].name === token || stockSearch.currentResults[0].code === token)
+      ) {
+        return stockSearch.currentResults[0].code;
+      }
+      return token;
+    });
+    const unique = Array.from(new Set(resolved));
+    const nextValue = unique.join(", ");
+    if (nextValue !== current) {
+      form.setFieldValue("codes", nextValue);
+    }
+  };
+
+  const searchOptions = useMemo(() => {
+    if (!activeSearchTerm && !stockSearch.inputValue) return [];
+    return stockSearch.currentResults.map((item) => {
+      const isHk = item.market === "hk" || /^\d{5}$/.test(item.code);
+      return {
+        value: item.code,
+        label: (
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+              {isHk ? (
+                <Tag color="blue" style={{ fontSize: 10, lineHeight: "16px", padding: "0 4px", margin: 0 }}>
+                  港股
+                </Tag>
+              ) : (
+                <Tag color="cyan" style={{ fontSize: 10, lineHeight: "16px", padding: "0 4px", margin: 0 }}>
+                  A股
+                </Tag>
+              )}
+              <strong style={{ fontFamily: "monospace" }}>{item.code}</strong>
+              <span>{item.name}</span>
+            </span>
+            {typeof item.price === "number" && (
+              <span style={{ color: "var(--c-text-muted)", fontSize: "var(--c-font-xs)" }}>
+                {isHk ? "HK$" : "¥"}{item.price.toFixed(2)}
+              </span>
+            )}
+          </div>
+        ),
+      };
+    });
+  }, [activeSearchTerm, stockSearch.currentResults, stockSearch.inputValue]);
 
   return (
     <section className="quant-form-section" aria-labelledby="quant-universe-title">
@@ -192,12 +370,72 @@ export function UniverseFields({ source }: { source: QuantFormValues["source"] }
                 if (error) throw new Error(error);
               },
             }]}
-            extra={source === "portfolio" ? "运行时读取当前持仓股票，最多 10 只" : "支持空格或逗号分隔，最多 30 只"}
+            extra={source === "portfolio" ? "运行时读取当前持仓股票，最多 10 只" : "支持代码或名称搜索关联，逗号/空格分隔，最多 30 只"}
           >
-            <Input disabled={source === "portfolio"} placeholder="600519, 000001" />
+            <AutoComplete
+              disabled={source === "portfolio"}
+              options={searchOptions}
+              onSelect={handleSelectOption}
+              onChange={handleInputChange}
+              filterOption={false}
+              style={{ width: "100%" }}
+            >
+              <Input
+                aria-label="股票代码"
+                disabled={source === "portfolio"}
+                placeholder="600519, 000001"
+                prefix={<SearchOutlined style={{ color: "var(--c-text-muted)" }} />}
+                allowClear
+                onBlur={handleBlurOrNormalize}
+                onPressEnter={handleBlurOrNormalize}
+              />
+            </AutoComplete>
           </Form.Item>
           {source === "custom" ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginTop: "-12px", marginBottom: "12px" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "-10px", marginBottom: "14px" }}>
+              {parsedCodes.length > 0 && parsedCodes[0] && (
+                <div className="quant-selected-stocks" style={{ display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center" }}>
+                  <span style={{ fontSize: "var(--c-font-xs)", color: "var(--c-text-muted)" }}>
+                    已选股票 ({parsedCodes.length}/30):
+                  </span>
+                  {parsedCodes.map((code) => {
+                    const name = getStockName(code);
+                    return (
+                      <Tag
+                        key={code}
+                        closable
+                        onClose={(e) => {
+                          e.preventDefault();
+                          handleRemoveCode(code);
+                        }}
+                        color="blue"
+                        style={{
+                          fontSize: "var(--c-font-xs)",
+                          marginInlineEnd: 0,
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 4,
+                        }}
+                      >
+                        <strong>{code}</strong>
+                        {name ? <span style={{ opacity: 0.85 }}>{name}</span> : null}
+                      </Tag>
+                    );
+                  })}
+                </div>
+              )}
+              <div className="quant-quick-stocks" style={{ display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center" }}>
+                <span style={{ fontSize: "var(--c-font-xs)", color: "var(--c-text-muted)" }}>快速导入:</span>
+                <Button
+                  size="small"
+                  type="dashed"
+                  icon={<StarOutlined />}
+                  onClick={handleImportWatchlist}
+                  style={{ fontSize: "var(--c-font-xs)", height: "24px", lineHeight: "22px", padding: "0 8px" }}
+                >
+                  导入自选股 ({watchlistItems.length})
+                </Button>
+              </div>
               <div className="quant-quick-stocks" style={{ display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center" }}>
                 <span style={{ fontSize: "var(--c-font-xs)", color: "var(--c-text-muted)" }}>精选主题池:</span>
                 {THEMATIC_UNIVERSE_PRESETS.map((preset) => (

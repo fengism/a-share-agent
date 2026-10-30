@@ -16,6 +16,8 @@ describe("TransactionPreviewAlert", () => {
     const preview: PortfolioTransactionPreview = {
       stock_code: "600519",
       side: "buy",
+      currency: "CNY",
+      fx_rate_to_cny: 1,
       trade_time: "2026-09-19T10:00:00",
       available_shares: 0,
       shares_after_trade: 100,
@@ -24,7 +26,9 @@ describe("TransactionPreviewAlert", () => {
       realized_profit_amount: null,
       matches: [],
       trade_amount: 1000,
+      trade_amount_native: 1000,
       fee: 5,
+      fee_native: 5,
       cash_balance_after: 8995,
       estimated_total_assets_after: 9995,
       total_position_pct_after: 10.01,
@@ -37,9 +41,10 @@ describe("TransactionPreviewAlert", () => {
     render(<TransactionPreviewAlert preview={preview} title="买入预演" />);
 
     expect(screen.getByText("买入预演")).toBeInTheDocument();
-    expectSpanText("买入金额 ¥1,000.00，手续费 ¥5.00");
+    expectSpanText("买入金额 ¥1,000.00（人民币），手续费 ¥5.00");
     expectSpanText("交易后现金 ¥8,995.00，预计总资产 ¥9,995.00，总仓位 10.01%");
     expectSpanText("单股仓位 10.01%，食品饮料行业仓位 10.01%");
+    expectSpanText("A 股 T+1：本次买入的股份当日不可卖出，次一交易日可卖。");
     expectSpanText("风险提示：总仓位超过上限。");
   });
 
@@ -47,6 +52,8 @@ describe("TransactionPreviewAlert", () => {
     const preview: PortfolioTransactionPreview = {
       stock_code: "600519",
       side: "sell",
+      currency: "CNY",
+      fx_rate_to_cny: 1,
       trade_time: "2026-09-19T10:00:00",
       available_shares: 100,
       shares_after_trade: 60,
@@ -55,6 +62,7 @@ describe("TransactionPreviewAlert", () => {
       realized_profit_amount: 74,
       matches: [{
         buy_transaction_id: 7,
+        currency: "CNY",
         buy_time: "2026-09-01T09:30:00",
         buy_price: 10,
         shares: 40,
@@ -62,7 +70,9 @@ describe("TransactionPreviewAlert", () => {
         matched_cost: 404,
       }],
       trade_amount: 480,
+      trade_amount_native: 480,
       fee: 2,
+      fee_native: 2,
       cash_balance_after: 9478,
       estimated_total_assets_after: 10078,
       total_position_pct_after: 5.95,
@@ -83,6 +93,8 @@ describe("TransactionPreviewAlert", () => {
     const preview: PortfolioTransactionPreview = {
       stock_code: "600519",
       side: "sell",
+      currency: "CNY",
+      fx_rate_to_cny: 1,
       trade_time: "2026-09-19T10:00:00",
       available_shares: 100,
       shares_after_trade: 0,
@@ -91,7 +103,9 @@ describe("TransactionPreviewAlert", () => {
       realized_profit_amount: 0,
       matches: [],
       trade_amount: 1000,
+      trade_amount_native: 1000,
       fee: 0,
+      fee_native: 0,
       cash_balance_after: 9000,
       estimated_total_assets_after: 10000,
       total_position_pct_after: 10,

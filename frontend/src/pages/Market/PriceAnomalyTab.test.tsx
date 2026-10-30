@@ -180,4 +180,15 @@ describe("PriceAnomalyTab", () => {
     expect(screen.getByText("数据日触发")).toBeInTheDocument();
     expect(screen.getByText("已回退至最近数据日")).toBeInTheDocument();
   });
+
+  it("activates count view directly when view=count is in URL", () => {
+    render(
+      <MemoryRouter initialEntries={["/market?tab=price-anomaly&view=count"]}>
+        <PriceAnomalyTab />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("浦发银行")).toBeInTheDocument();
+    expect(mocks.useMarketPriceAnomalyCount).toHaveBeenLastCalledWith(1, 50, "", "", true);
+  });
 });

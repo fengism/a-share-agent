@@ -1,13 +1,24 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Segmented, Table, Tag, Tooltip } from "antd";
+import { useMemo, useState } from "react";
+import { Button, Input, Progress, Segmented, Table, Tag, Tooltip } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { RiseOutlined } from "@ant-design/icons";
+import { FundOutlined, SearchOutlined, StarFilled, StarOutlined } from "@ant-design/icons";
+import { Link } from "react-router-dom";
+import dayjs from "dayjs";
 import ChangeValue from "../../components/ChangeValue";
 import SectionDataState from "../../components/SectionDataState";
 import StockExternalLink from "../../components/StockExternalLink";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { useColors, semanticTagStyle } from "../../styles/ui";
-import type { ConceptConstituent, RelatedConcept } from "../../api/queryHooks/concept";
+import {
+  useAddWatchlistItem,
+  useDeleteWatchlistItem,
+  useWatchlist,
+} from "../../api/queryHooks/watchlist";
+import { isHkStockCode } from "../../utils/stockLinks";
+import { buildStockAnalysisUrl } from "../../utils/stockLinks";
+import type { ConceptConstituent } from "../../api/queryHooks/concept";
+import BreadthBar from "./BreadthBar";
+import { limitUpBadge } from "./conceptSelection";
 import { closeSourceDate } from "./quoteSource";
 
 type SortKey = "change_pct" | "amount" | "code";
@@ -15,27 +26,21 @@ type SortKey = "change_pct" | "amount" | "code";
 interface Props {
   concept: string;
   items: ConceptConstituent[] | undefined;
-  related: RelatedConcept[];
   total: number;
   isLoading: boolean;
   error: unknown;
   onRetry: () => void;
-  quoteSource: string | null;
   /** 已请求过行情的代码数量（0 = 尚未请求，走纯本地身份列表） */
   quoteRequested: number;
   /** 行情请求进行中 */
   quotePending: boolean;
-  /** 请求行情：传全部代码则补齐，传部分则只补该窗口 */
-  onRequestQuotes: (codes: string[]) => void;
-  /** 点击相关概念 → 切换左侧概念，实现概念间联动 */
+  /** 上游行情不可用且无本地兜底：停止自动补齐时置位 */
+  quoteUnavailable: boolean;
+  /** 行情快照时间（全量补齐后展示，帮助判断数据新鲜度） */
+  quotedAt?: string | null;
+  /** 点击行内「其他概念」标签 → 切换到该概念 */
   onSelectConcept: (concept: string) => void;
 }
-
-/** 首屏按需加载的行情窗口（约两屏），够用户看清前几十行 */
-const INITIAL_QUOTE_WINDOW = 80;
-
-/** 每次滚动触底追加的行情窗口 */
-const QUOTE_WINDOW_STEP = 120;
 
 function formatAmount(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value)) return "-";
@@ -47,24 +52,47 @@ function formatAmount(value: number | null | undefined): string {
 export default function ConceptConstituentPanel({
   concept,
   items,
-  related,
   total,
   isLoading,
   error,
   onRetry,
-  quoteSource,
   quoteRequested,
   quotePending,
-  onRequestQuotes,
+  quoteUnavailable,
+  quotedAt,
   onSelectConcept,
 }: Props) {
   const c = useColors();
   const isNarrow = useMediaQuery("(max-width: 768px)");
-  const [sortKey, setSortKey] = useState<SortKey>("code");
+  // 默认按涨跌幅：用户打开概念页最关心"谁在领涨"；缺失行情沉底（见排序器）
+  const [sortKey, setSortKey] = useState<SortKey>("change_pct");
   const [descending, setDescending] = useState(true);
+  const [pendingWatchCode, setPendingWatchCode] = useState<string | null>(null);
+  // 本地筛选：方向/涨停 + 名称/代码关键字，全部纯前端即时计算
+  const [directionFilter, setDirectionFilter] = useState<"all" | "up" | "down" | "limit">("all");
+  const [filterText, setFilterText] = useState("");
+
+  const maxAbsChange = useMemo(() => {
+    let max = 1;
+    for (const item of items ?? []) {
+      if (item.change_pct != null && Math.abs(item.change_pct) > max) max = Math.abs(item.change_pct);
+    }
+    return max;
+  }, [items]);
+
+  const filteredItems = useMemo(() => {
+    const text = filterText.trim().toLowerCase();
+    return (items ?? []).filter((item) => {
+      if (directionFilter === "up" && !(item.change_pct != null && item.change_pct > 0)) return false;
+      if (directionFilter === "down" && !(item.change_pct != null && item.change_pct < 0)) return false;
+      if (directionFilter === "limit" && !limitUpBadge(item.code, item.change_pct)) return false;
+      if (text && !item.name.toLowerCase().includes(text) && !item.code.includes(text)) return false;
+      return true;
+    });
+  }, [items, directionFilter, filterText]);
 
   const sorted = useMemo(() => {
-    const rows = [...(items ?? [])];
+    const rows = [...filteredItems];
     rows.sort((a, b) => {
       if (sortKey === "code") return a.code.localeCompare(b.code);
       const left = sortKey === "change_pct" ? a.change_pct : a.amount;
@@ -76,74 +104,59 @@ export default function ConceptConstituentPanel({
       return descending ? right - left : left - right;
     });
     return rows;
-  }, [items, sortKey, descending]);
+  }, [filteredItems, sortKey, descending]);
 
   /**
-   * 涨跌家数与涨幅/成交额排序都依赖全量行情，而全量行情在上游故障时
-   * 要几十秒（上游按 80 只一批串行）。这里只在用户主动点这两个排序时
-   * 才补齐全量行情，否则 breadth 只统计已加载的部分并标注覆盖率。
+   * 涨跌家数来自已加载行情：自动补齐完成后即与全样本一致。
+   * 加载进度在表头展示（行情 x/y），不再需要用户手动触发全量。
    */
   const breadth = useMemo(() => {
     let up = 0;
     let down = 0;
     let flat = 0;
-    let quoted = 0;
     for (const item of items ?? []) {
       if (item.change_pct == null) continue;
-      quoted += 1;
       if (item.change_pct > 0) up += 1;
       else if (item.change_pct < 0) down += 1;
       else flat += 1;
     }
-    return { up, down, flat, quoted };
+    return { up, down, flat };
   }, [items]);
 
   const totalCount = total ?? 0;
-  const quotedCount = breadth.quoted;
-  const partial = quotedCount > 0 && quotedCount < totalCount;
+  const quoteComplete = totalCount > 0 && quoteRequested >= totalCount;
 
-  const loadedWindow = useRef(0);
-  const inFlight = useRef(false);
+  // ── 自选快捷操作 ──
+  const watchlistQuery = useWatchlist();
+  const addWatchlist = useAddWatchlistItem();
+  const removeWatchlist = useDeleteWatchlistItem();
+  const watchedCodes = useMemo(() => {
+    const set = new Set<string>();
+    for (const item of watchlistQuery.data?.items ?? []) {
+      if (!isHkStockCode(item.stock_code)) set.add(item.stock_code);
+    }
+    return set;
+  }, [watchlistQuery.data]);
 
-  const allCodes = useMemo(() => (items ?? []).map((item) => item.code), [items]);
+  const toggleWatch = (record: ConceptConstituent) => {
+    const code = record.code;
+    setPendingWatchCode(code);
+    const settle = () => setPendingWatchCode(null);
+    if (watchedCodes.has(code)) {
+      removeWatchlist.mutate(code, { onSettled: settle });
+    } else {
+      addWatchlist.mutate(
+        { stock_code: code, note: "" },
+        { onSettled: settle },
+      );
+    }
+  };
 
-  /** 按需加载：首屏先取一小段，滚动到底再追加一段 */
-  const loadMore = useCallback(() => {
-    if (inFlight.current || !allCodes.length) return;
-    const start = loadedWindow.current;
-    if (start >= allCodes.length) return;
-    const next = allCodes.slice(start, start + QUOTE_WINDOW_STEP);
-    inFlight.current = true;
-    loadedWindow.current = start + next.length;
-    onRequestQuotes([...allCodes.slice(0, loadedWindow.current)]);
-  }, [allCodes, onRequestQuotes]);
-
-  // 首屏：身份列表到齐后自动拉一小段行情
-  useEffect(() => {
-    if (!allCodes.length || quoteRequested > 0) return;
-    const next = allCodes.slice(0, INITIAL_QUOTE_WINDOW);
-    loadedWindow.current = next.length;
-    onRequestQuotes(next);
-    // 只在首次拿到列表时触发
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allCodes.length]);
-
-  useEffect(() => {
-    inFlight.current = false;
-  }, [quotePending]);
-
-  // 补齐全量：用户点了依赖全量行情的排序/涨跌家数时才做
-  const requestFullQuotes = useCallback(() => {
-    loadedWindow.current = allCodes.length;
-    onRequestQuotes(allCodes);
-  }, [allCodes, onRequestQuotes]);
-
-  const columns: ColumnsType<ConceptConstituent> = useMemo(
-    () => [
+  const columns: ColumnsType<ConceptConstituent> = [
       {
         title: "代码",
         dataIndex: "code",
-        width: isNarrow ? 80 : 96,
+        width: isNarrow ? 80 : 92,
         fixed: "left",
         render: (code: string, record) => (
           <StockExternalLink
@@ -159,7 +172,7 @@ export default function ConceptConstituentPanel({
       {
         title: "名称",
         dataIndex: "name",
-        width: isNarrow ? 90 : 108,
+        width: isNarrow ? 92 : 104,
         ellipsis: true,
         render: (name: string, record) => (
           <StockExternalLink code={record.code} name={name} style={{ color: c.textPrimary }}>
@@ -177,9 +190,7 @@ export default function ConceptConstituentPanel({
           // 否则用户会把收盘价误读成盘中实时价。
           const closeDate = closeSourceDate(record.quote_source);
           return (
-            <Tooltip
-              title={closeDate ? `收盘价（${closeDate}）` : undefined}
-            >
+            <Tooltip title={closeDate ? `收盘价（${closeDate}）` : undefined}>
               <span
                 className="financial-num"
                 style={{
@@ -196,10 +207,42 @@ export default function ConceptConstituentPanel({
       {
         title: "涨跌幅",
         dataIndex: "change_pct",
-        width: isNarrow ? 80 : 92,
+        width: isNarrow ? 104 : 124,
         align: "right",
         sorter: true,
-        render: (value: number | null) => <ChangeValue value={value} fontWeight={600} />,
+        render: (value: number | null, record) => {
+          const badge = limitUpBadge(record.code, value);
+          // 涨跌幅背景条：以面板内最大波动为满格，红绿随方向，一眼扫出极端个股
+          const strength = value == null ? 0 : Math.min(Math.abs(value) / maxAbsChange, 1);
+          const barColor = value == null || value === 0 ? "transparent" : value > 0 ? c.up : c.down;
+          return (
+            <span
+              className="concept-change-cell financial-num"
+              style={{
+                background:
+                  strength > 0
+                    ? `linear-gradient(to left, ${barColor}2e ${strength * 100}%, transparent ${strength * 100}%)`
+                    : undefined,
+              }}
+            >
+              <ChangeValue value={value} fontWeight={600} />
+              {badge ? (
+                <Tag
+                  className="concept-change-cell__badge"
+                  style={{
+                    ...semanticTagStyle(badge),
+                    fontSize: 10,
+                    lineHeight: "16px",
+                    paddingInline: 4,
+                    marginInlineEnd: 0,
+                  }}
+                >
+                  {badge === "up" ? "涨停" : "跌停"}
+                </Tag>
+              ) : null}
+            </span>
+          );
+        },
       },
       {
         title: "成交额",
@@ -213,9 +256,84 @@ export default function ConceptConstituentPanel({
           </span>
         ),
       },
-    ],
-    [c, isNarrow],
-  );
+      // 其他概念标签：只占宽屏空间，窄屏优先保证行情列可读
+      ...(isNarrow
+        ? []
+        : [
+            {
+              title: "其他概念",
+              key: "related_concepts",
+              width: 190,
+              render: (_: unknown, record: ConceptConstituent) => {
+                const tags = record.related_concepts ?? [];
+                if (!tags.length) return <span style={{ color: c.textMuted }}>-</span>;
+                const [first, second, ...rest] = tags;
+                return (
+                  <span className="concept-other-tags">
+                    {[first, second].filter(Boolean).map((name) => (
+                      <Tooltip key={name} title={`查看「${name}」概念详情`}>
+                        <Tag
+                          className="concept-other-tags__tag"
+                          style={{ ...semanticTagStyle("primary"), cursor: "pointer", marginInlineEnd: 0 }}
+                          onClick={() => onSelectConcept(name)}
+                        >
+                          {name}
+                        </Tag>
+                      </Tooltip>
+                    ))}
+                    {rest.length ? (
+                      <Tooltip title={rest.join("、")}>
+                        <Tag
+                          className="concept-other-tags__tag"
+                          style={{ marginInlineEnd: 0, cursor: "help" }}
+                        >
+                          +{rest.length}
+                        </Tag>
+                      </Tooltip>
+                    ) : null}
+                  </span>
+                );
+              },
+            },
+          ]),
+      // 自选/分析快捷操作只占宽屏空间，窄屏以行点击进详情为主
+      ...(isNarrow
+        ? []
+        : [
+            {
+              title: "",
+              key: "actions",
+              width: 88,
+              align: "right" as const,
+              render: (_: unknown, record: ConceptConstituent) => {
+                const watched = watchedCodes.has(record.code);
+                return (
+                  <span className="concept-row-actions">
+                    <Tooltip title={watched ? "移出自选" : "加入自选"}>
+                      <Button
+                        type="text"
+                        size="small"
+                        aria-label={`${watched ? "移出自选" : "加入自选"}-${record.name || record.code}`}
+                        icon={
+                          watched ? <StarFilled style={{ color: c.warning }} /> : <StarOutlined />
+                        }
+                        loading={pendingWatchCode === record.code}
+                        onClick={() => toggleWatch(record)}
+                      />
+                    </Tooltip>
+                    <Tooltip title="个股深度分析">
+                      <Link to={buildStockAnalysisUrl(record.code)} aria-label={`个股分析-${record.name || record.code}`}>
+                        <Button type="text" size="small" icon={<FundOutlined />} />
+                      </Link>
+                    </Tooltip>
+                  </span>
+                );
+              },
+            },
+          ]),
+  ];
+
+  const quoteProgress = quoteRequested > 0 && !quoteComplete;
 
   return (
     <div className="concept-constituent-panel" style={{ display: "flex", flexDirection: "column", gap: isNarrow ? 8 : 10, minWidth: 0 }}>
@@ -223,25 +341,58 @@ export default function ConceptConstituentPanel({
         <div className="concept-constituent-info">
           <strong style={{ fontSize: 15, color: c.textPrimary }}>成分股</strong>
           <span style={{ fontSize: 12, color: c.textMuted }}>
-            {total} 只
-            {quotedCount > 0
-              ? partial
-                ? ` · 上涨 ${breadth.up} / 下跌 ${breadth.down}（已加载 ${quotedCount} 只）`
-                : ` · 上涨 ${breadth.up} / 下跌 ${breadth.down}`
-              : ""}
-            {quoteSource ? ` · 行情 ${quoteSource}` : ""}
-            {partial ? (
-              <a
-                role="button"
-                onClick={requestFullQuotes}
-                style={{ marginInlineStart: 6, color: c.primary, cursor: quotePending ? "wait" : "pointer" }}
-              >
-                {quotePending ? "加载中…" : "加载全部行情"}
-              </a>
-            ) : null}
+            {totalCount} 只
+            {filteredItems.length !== totalCount ? ` · 筛出 ${filteredItems.length}` : ""}
           </span>
+          <BreadthBar up={breadth.up} flat={breadth.flat} down={breadth.down} />
+          {quoteProgress ? (
+            <Tooltip title="行情按批次自动补齐，完成后涨跌家数与排序即为全量结果">
+              <span className="concept-quote-progress">
+                <Progress
+                  percent={Math.round((quoteRequested / Math.max(totalCount, 1)) * 100)}
+                  size="small"
+                  showInfo={false}
+                  style={{ width: 72, marginInlineEnd: 6 }}
+                  strokeColor={c.primary}
+                />
+                <span className="financial-num" style={{ color: c.textMuted, fontSize: 12 }}>
+                  {quotePending ? `行情 ${quoteRequested}/${totalCount}…` : `行情 ${quoteRequested}/${totalCount}`}
+                </span>
+              </span>
+            </Tooltip>
+          ) : null}
+          {quoteUnavailable ? (
+            <span style={{ fontSize: 12, color: c.textMuted }}>实时行情暂不可用，已展示可获得的最新价格</span>
+          ) : null}
+          {quotedAt ? (
+            <Tooltip title="当前行情的快照时间，随每次补齐更新">
+              <span className="financial-num" style={{ fontSize: 12, color: c.textMuted }}>
+                行情 {dayjs(quotedAt).format("HH:mm:ss")}
+              </span>
+            </Tooltip>
+          ) : null}
         </div>
         <div className="concept-constituent-sort">
+          <Segmented
+            size="small"
+            value={directionFilter}
+            options={[
+              { label: "全部", value: "all" },
+              { label: "上涨", value: "up" },
+              { label: "下跌", value: "down" },
+              { label: "涨停", value: "limit" },
+            ]}
+            onChange={(value) => setDirectionFilter(value as typeof directionFilter)}
+          />
+          <Input
+            size="small"
+            allowClear
+            value={filterText}
+            onChange={(event) => setFilterText(event.target.value)}
+            placeholder="搜名称/代码"
+            prefix={<SearchOutlined style={{ color: c.textMuted }} />}
+            style={{ width: isNarrow ? "100%" : 150 }}
+          />
           <Segmented
             size="small"
             value={sortKey}
@@ -255,30 +406,10 @@ export default function ConceptConstituentPanel({
               setSortKey(next);
               // 代码按字典序升序更自然，其余默认从高到低
               setDescending(next !== "code");
-              // 涨幅/成交额排序与涨跌家数依赖全量行情，未补齐时结果会误导
-              if (next !== "code" && partial) requestFullQuotes();
             }}
           />
         </div>
       </div>
-
-      {related.length ? (
-        <div className="concept-related-tags">
-          <span style={{ fontSize: 12, color: c.textMuted, flexShrink: 0 }}>
-            <RiseOutlined /> 重叠概念
-          </span>
-          {related.map((item) => (
-            <Tooltip key={item.name} title={`${item.overlap} 只成分股同时属于该概念`}>
-              <Tag
-                style={{ ...semanticTagStyle("primary"), cursor: "pointer", marginInlineEnd: 0, flexShrink: 0 }}
-                onClick={() => onSelectConcept(item.name)}
-              >
-                {item.name} {item.overlap}
-              </Tag>
-            </Tooltip>
-          ))}
-        </div>
-      ) : null}
 
       <SectionDataState
         isLoading={isLoading && !items?.length}
@@ -287,7 +418,7 @@ export default function ConceptConstituentPanel({
         isEmpty={!isLoading && !error && !items?.length}
         emptyText={`暂无「${concept}」的成分股数据`}
         errorTitle="成分股加载失败"
-        minHeight={isNarrow ? 300 : 360}
+        minHeight={isNarrow ? 300 : 380}
       >
         <Table
           size="small"
@@ -296,33 +427,23 @@ export default function ConceptConstituentPanel({
           dataSource={sorted}
           pagination={false}
           virtual
-          scroll={{ x: isNarrow ? 406 : 472, y: isNarrow ? 320 : 360 }}
-          onScroll={(event) => {
-            // 触底前 120px 时预取下一段，避免滚到底出现空白
-            const el = event.currentTarget as HTMLElement;
-            if (el.scrollTop + el.clientHeight >= el.scrollHeight - 120) loadMore();
-          }}
+          scroll={{ x: isNarrow ? 432 : 774, y: isNarrow ? 320 : 400 }}
           onChange={(_pagination, _filters, sorter) => {
             const target = Array.isArray(sorter) ? sorter[0] : sorter;
             if (target?.field === "change_pct") {
               setSortKey("change_pct");
               setDescending(target.order !== "ascend");
-              if (partial) requestFullQuotes();
             } else if (target?.field === "amount") {
               setSortKey("amount");
               setDescending(target.order !== "ascend");
-              if (partial) requestFullQuotes();
             }
           }}
         />
       </SectionDataState>
 
-      <p style={{ margin: 0, fontSize: 11, lineHeight: 1.6, color: c.textMuted }}>
-        成分股取自本地概念映射表（同花顺全A 口径），点「重叠概念」可跳到关联概念，
-        点个股代码或名称进入个股详情。行情按可见区逐段加载（上游按 80 只一批串行，
-        一次拉全部上千只在上游故障时会等几十秒）；按涨幅/成交额排序会先补齐全量。
+      <p className="concept-index-note" style={{ color: c.textMuted }}>
+        点名称或代码进入个股详情，星标加入自选。灰色价格表示当日收盘价（实时行情暂缺时的兜底值）。
       </p>
     </div>
   );
 }
-

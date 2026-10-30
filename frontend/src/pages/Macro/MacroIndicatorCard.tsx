@@ -86,7 +86,8 @@ export default function MacroIndicatorCard({
     // 全部字段都是 % 时（如劳动参与率 + 平均时薪环比），左轴同样需要 % 标注
     const primaryAxisName = levelAxisName ?? (hasRateSeries ? "%" : undefined);
 
-    const series = chartFields.map((f) => ({
+    const isPmiChart = title.includes("PMI");
+    const series = chartFields.map((f, seriesIndex) => ({
       name: f.label,
       type: chartType,
       smooth: chartType === "line",
@@ -104,6 +105,15 @@ export default function MacroIndicatorCard({
       lineStyle: { width: 2, color: f.color || c.primary },
       itemStyle: { color: f.color || c.primary },
       emphasis: { focus: "series" },
+      markLine: isPmiChart && seriesIndex === 0 ? {
+        symbol: ["none", "none"],
+        silent: true,
+        data: [{
+          yAxis: 50,
+          label: { formatter: "50 荣枯线", position: "insideEndTop", color: c.textMuted, fontSize: 10 },
+          lineStyle: { color: c.warning, type: "dashed", width: 1.5 },
+        }],
+      } : undefined,
     }));
 
     const valueAxis = {
@@ -154,7 +164,7 @@ export default function MacroIndicatorCard({
         : { ...valueAxis, name: hasRateSeries ? "%" : levelAxisName },
       series,
     };
-  }, [trend, fields, dateKey, chartType, c]);
+  }, [trend, fields, dateKey, chartType, c, title]);
 
   if (!latest || fields.length === 0) {
     return (

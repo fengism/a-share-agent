@@ -15,6 +15,10 @@ export interface ScreenerFilter {
   turnover_pct_max?: number | null;
   amplitude_min?: number | null;
   amplitude_max?: number | null;
+  volume_ratio_min?: number | null;
+  volume_ratio_max?: number | null;
+  change_pct_60d_min?: number | null;
+  change_pct_60d_max?: number | null;
   is_broken_net?: boolean;
   exclude_st?: boolean;
   min_listing_days?: number | null;
@@ -39,6 +43,9 @@ export interface ScreenerItem {
   turnover_pct: number | null;
   volume: number | null;
   amplitude?: number | null;
+  volume_ratio?: number | null;
+  change_pct_60d?: number | null;
+  composite_score?: number | null;
   is_broken_net?: boolean;
   exchange?: string | null;
   board?: string | null;

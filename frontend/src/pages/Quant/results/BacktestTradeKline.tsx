@@ -33,6 +33,14 @@ export default function BacktestTradeKline({ codes, equityCurve, trades, marketS
     () => buildBacktestTradeMarkers(trades, selectedCode),
     [selectedCode, trades],
   );
+  const selectedTrades = useMemo(
+    () => trades.filter((t) => t.code === selectedCode),
+    [selectedCode, trades],
+  );
+  const selectedPnl = useMemo(
+    () => selectedTrades.reduce((sum, t) => sum + (t.realized_pnl ?? 0), 0),
+    [selectedTrades],
+  );
   const marketSnapshot = marketSnapshots.find((snapshot) => snapshot.code === selectedCode);
   const snapshotItems = useMemo<KlineItem[]>(
     () => (marketSnapshot?.items ?? [])
@@ -84,6 +92,11 @@ export default function BacktestTradeKline({ codes, equityCurve, trades, marketS
           />
           <Tag style={semanticTagStyle("up")}>↑ 买入</Tag>
           <Tag style={semanticTagStyle("down")}>↓ 卖出</Tag>
+          {selectedTrades.length > 0 ? (
+            <Tag color={selectedPnl > 0 ? "success" : selectedPnl < 0 ? "volcano" : "default"}>
+              {selectedTrades.length}笔交易{selectedTrades.some((t) => t.realized_pnl != null) ? ` · 平仓盈亏 ${selectedPnl > 0 ? `+${selectedPnl.toFixed(2)}` : selectedPnl.toFixed(2)}元` : ""}
+            </Tag>
+          ) : null}
           {chartSource ? <Tag>{chartSource}</Tag> : null}
         </Space>
       ) : null}

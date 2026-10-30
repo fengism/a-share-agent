@@ -74,7 +74,7 @@ export function AtlasLayerBand({
               border: `1px solid ${colors.border}`,
               borderRadius: 10,
               background: colors.nestedBg,
-              padding: "10px 12px",
+              padding: "var(--c-pad-inset, 7px 12px)",
             }}
           >
             <div
@@ -121,7 +121,7 @@ export function AtlasLayerBand({
                     <span
                       className="atlas-company-chip__market-tag"
                       style={{
-                        fontSize: "10px",
+                        fontSize: "var(--c-font-xs, 11px)",
                         padding: "1px 4px",
                         borderRadius: 4,
                         background: "rgba(14, 165, 233, 0.12)",

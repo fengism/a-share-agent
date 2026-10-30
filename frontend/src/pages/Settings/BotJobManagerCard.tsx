@@ -64,7 +64,7 @@ export default function BotJobManagerCard() {
                 justifyContent: "space-between",
                 flexWrap: "wrap",
                 gap: 12,
-                padding: "10px 12px",
+                padding: "var(--c-pad-inset, 7px 12px)",
                 borderRadius: 8,
                 border: `1px solid ${colors.border}`,
                 background: colors.hoverBg,

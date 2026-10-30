@@ -69,6 +69,8 @@ vi.mock("../../api/queries", () => ({
   useSaveQuantStrategy: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDeleteQuantStrategy: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useCreateQuantBacktest: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useStockSearch: () => ({ data: [], isFetching: false, isError: false, error: null, refetch: vi.fn() }),
+  useWatchlist: () => ({ data: { items: [] }, isLoading: false }),
   useQuantBacktests: () => ({
     data: { pages: [{ items: [run, secondRun] }] },
     hasNextPage: false,

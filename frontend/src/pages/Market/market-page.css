@@ -1,3 +1,14 @@
+/*
+ * 市场页布局与响应式样式。
+ *
+ * 断点约定（与全局保持一致，避免各文件各写一套）：
+ *   max-width: 480px  —— 超窄手机兜底
+ *   max-width: 576px  —— 手机
+ *   max-width: 768px  —— 平板/手机分界（导航折叠、标题缩紧）
+ *   max-width: 991px  —— 对齐 antd lg 栅格临界，hero 列堆叠
+ *   max-width: 1100px —— 指标网格降列
+ * 卡片圆角/阴影统一走 --c-radius-* / --c-card-shadow token。
+ */
 .market-page {
   display: flex;
   flex-direction: column;
@@ -55,6 +66,26 @@
   box-shadow: none !important;
 }
 
+/* ── 市场页双层导航分层：外层主 Tab（大、醒目），内层次级 Tab（小、弱化） ── */
+.market-page .responsive-section-nav__tabs > .ant-tabs-nav {
+  margin-bottom: 12px;
+}
+
+.market-page .responsive-section-nav__tabs .ant-tabs-tab {
+  padding: 4px 12px;
+  font-size: 13px;
+  border-radius: var(--c-radius-sm);
+}
+
+/* 次级 Tab 统一为下划线指示，去掉背景块，避免与主 Tab 抢视觉焦点 */
+.market-page .responsive-section-nav__tabs .ant-tabs-tab-active {
+  background: transparent !important;
+}
+
+.market-page .responsive-section-nav__tabs .ant-tabs-tab:hover {
+  background: transparent;
+}
+
 /* ── 大盘核心指数卡片响应式适配 ── */
 .market-index-card {
   min-width: 0;
@@ -86,15 +117,6 @@
   display: block;
 }
 
-@media (max-width: 576px) {
-  .market-index-card .ant-card-body {
-    padding: 8px 10px !important;
-  }
-  .market-index-card .ant-statistic-title {
-    margin-bottom: 2px;
-  }
-}
-
 @media (max-width: 768px) {
   .market-page-header {
     margin-bottom: 8px;
@@ -102,6 +124,10 @@
   .market-page-header .ant-typography {
     font-size: 13px !important;
     line-height: 1.5;
+  }
+  /* 窄屏首屏精简：隐藏长描述，避免标题与导航被推到首屏之外 */
+  .market-page__description {
+    display: none;
   }
   .market-top-tabs > .ant-tabs-nav {
     margin-bottom: 12px;
@@ -115,8 +141,30 @@
   }
 }
 
-/* 手机端两融、市场宽度、全市场成交额指标卡紧凑排版 */
+/* 手机端指数、两融、市场宽度、全市场成交额指标卡紧凑排版及图表自适应 */
 @media (max-width: 576px) {
+  .market-index-card .ant-card-body {
+    padding: 8px 10px !important;
+  }
+  .market-index-card .ant-statistic-title {
+    margin-bottom: 2px;
+  }
+
+  .market-kline-card .ant-card-head,
+  .market-volume-card .ant-card-head,
+  .market-margin__chart-card .ant-card-head,
+  .market-breadth__chart-card .ant-card-head {
+    flex-wrap: wrap;
+    padding-block: 8px;
+    gap: 6px;
+  }
+  .market-kline-card .ant-card-extra,
+  .market-volume-card .ant-card-extra,
+  .market-margin__chart-card .ant-card-extra,
+  .market-breadth__chart-card .ant-card-extra {
+    margin-inline-start: 0;
+  }
+
   .market-margin__metrics .ant-card-body,
   .market-breadth__metrics .ant-card-body {
     padding: 10px 10px !important;
@@ -130,10 +178,22 @@
   .market-breadth__metrics .ant-statistic-content-value {
     font-size: clamp(15px, 3.8vw, 20px) !important;
   }
+  .market-margin__chart {
+    height: 280px !important;
+  }
+  .market-breadth__chart {
+    height: 340px !important;
+  }
+  .market-volume__chart {
+    height: 240px !important;
+  }
 }
 
 /* 情绪榜分布图手机端极窄屏兜底 */
 @media (max-width: 480px) {
+  .market-volume-card__subtitle {
+    display: none;
+  }
   .emotion-distribution {
     padding: 10px 4px !important;
   }

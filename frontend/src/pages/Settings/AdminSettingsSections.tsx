@@ -19,6 +19,8 @@ import {
   TwitterConfigCard,
 } from "./ConfigCards";
 import BotJobManagerCard from "./BotJobManagerCard";
+import SettingsSectionDirectory from "./SettingsSectionDirectory";
+import { SETTINGS_ANCHORS, type SettingsDirectoryItem } from "./settingsSections";
 import InviteManagerCard from "./InviteManagerCard";
 import SecurityAuditCard from "./SecurityAuditCard";
 import UserManagerCard from "./UserManagerCard";
@@ -50,15 +52,26 @@ export function DataSourcesSettingsSection({
   cards,
 }: DataSourcesSettingsSectionProps) {
   const cardProps = { form, onChange, isSaving };
+  const directoryItems: SettingsDirectoryItem[] = isAdmin
+    ? [
+      { id: SETTINGS_ANCHORS.iwencai, label: "智能选股" },
+      { id: SETTINGS_ANCHORS.marketSources, label: "行情与舆情数据" },
+      { id: SETTINGS_ANCHORS.network, label: "网络与限流" },
+    ]
+    : [{ id: SETTINGS_ANCHORS.iwencai, label: "智能选股" }];
+
   return (
     <section aria-labelledby="data-source-settings-title">
       <h3 id="data-source-settings-title" style={sectionTitleStyle}>数据源管理</h3>
-      <p style={{ color: "var(--c-text-muted)", marginTop: -4, marginBottom: 16 }}>
+      <p style={{ color: "var(--c-text-muted)", marginTop: -4, marginBottom: 12 }}>
         配置系统获取市场行情、财务指标、宏观经济与新闻资讯的数据输入源。问财为个人专属配置，其余为全局系统共享数据源。
       </p>
+      <SettingsSectionDirectory items={directoryItems} ariaLabel="数据源管理目录" />
 
       {/* 智能选股与自然语言数据源（个人独立配置） */}
-      <div style={{ marginBottom: 20 }}>
+      <div className="settings-group" id={SETTINGS_ANCHORS.iwencai}>
+        <h4 className="settings-group__title">智能选股</h4>
+        <p className="settings-group__hint">自然语言选股与问财接口凭据，仅对当前账号生效。</p>
         <IwencaiConfigCard
           {...cardProps}
           onSave={() => cards.save("iwencai")}
@@ -69,76 +82,89 @@ export function DataSourcesSettingsSection({
 
       {/* 全局公共数据源（宏观、舆情、搜索与备用源） */}
       {isAdmin && (
-        <Row gutter={[16, 16]}>
-          <Col xs={24} lg={12} style={{ display: "flex" }}>
-            <FredConfigCard
-              stretch
-              {...cardProps}
-              onSave={() => cards.save("fred")}
-              isDirty={cards.dirty.fred}
-              onReset={() => cards.reset("fred")}
-            />
-          </Col>
-          <Col xs={24} lg={12} style={{ display: "flex" }}>
-            <TwitterConfigCard
-              stretch
-              {...cardProps}
-              onSave={() => cards.save("twitter")}
-              isDirty={cards.dirty.twitter}
-              onReset={() => cards.reset("twitter")}
-            />
-          </Col>
-          <Col xs={24} lg={12} style={{ display: "flex" }}>
-            <AnySearchConfigCard
-              stretch
-              {...cardProps}
-              configured={anySearchConfigured}
-              onSave={() => cards.save("anysearch")}
-              isDirty={cards.dirty.anysearch}
-              onReset={() => cards.reset("anysearch")}
-            />
-          </Col>
-          <Col xs={24} lg={12} style={{ display: "flex" }}>
-            <DataSourceCredentialsCard
-              stretch
-              {...cardProps}
-              fuyaoConfigured={fuyaoConfigured}
-              onSave={() => cards.save("fuyao")}
-              isDirty={cards.dirty.fuyao}
-              onReset={() => cards.reset("fuyao")}
-            />
-          </Col>
-          <Col xs={24} style={{ display: "flex" }}>
-            <DataSourceCookiesCard
-              stretch
-              {...cardProps}
-              onSave={() => cards.save("dataSourceCookies")}
-              isDirty={cards.dirty.dataSourceCookies}
-              onReset={() => cards.reset("dataSourceCookies")}
-            />
-          </Col>
-          <Col xs={24} lg={12} style={{ display: "flex" }}>
-            <EastmoneyProxyConfigCard
-              stretch
-              {...cardProps}
-              onSave={() => cards.save("outboundProxy")}
-              isDirty={cards.dirty.outboundProxy}
-              onReset={() => cards.reset("outboundProxy")}
-              onTest={onTestOutboundProxy}
-              isTesting={isTestingOutboundProxy}
-              testResult={outboundProxyTestResult}
-            />
-          </Col>
-          <Col xs={24} style={{ display: "flex" }}>
-            <EastmoneyRateLimitConfigCard
-              stretch
-              {...cardProps}
-              onSave={() => cards.save("eastmoneyRateLimit")}
-              isDirty={cards.dirty.eastmoneyRateLimit}
-              onReset={() => cards.reset("eastmoneyRateLimit")}
-            />
-          </Col>
-        </Row>
+        <>
+          <div className="settings-group" id={SETTINGS_ANCHORS.marketSources}>
+            <h4 className="settings-group__title">行情与舆情数据</h4>
+            <p className="settings-group__hint">宏观经济、舆情抓取、搜索增强与备用行情源，全局共享。</p>
+            <Row gutter={[16, 16]}>
+              <Col xs={24} lg={12} style={{ display: "flex" }}>
+                <FredConfigCard
+                  stretch
+                  {...cardProps}
+                  onSave={() => cards.save("fred")}
+                  isDirty={cards.dirty.fred}
+                  onReset={() => cards.reset("fred")}
+                />
+              </Col>
+              <Col xs={24} lg={12} style={{ display: "flex" }}>
+                <TwitterConfigCard
+                  stretch
+                  {...cardProps}
+                  onSave={() => cards.save("twitter")}
+                  isDirty={cards.dirty.twitter}
+                  onReset={() => cards.reset("twitter")}
+                />
+              </Col>
+              <Col xs={24} lg={12} style={{ display: "flex" }}>
+                <AnySearchConfigCard
+                  stretch
+                  {...cardProps}
+                  configured={anySearchConfigured}
+                  onSave={() => cards.save("anysearch")}
+                  isDirty={cards.dirty.anysearch}
+                  onReset={() => cards.reset("anysearch")}
+                />
+              </Col>
+              <Col xs={24} lg={12} style={{ display: "flex" }}>
+                <DataSourceCredentialsCard
+                  stretch
+                  {...cardProps}
+                  fuyaoConfigured={fuyaoConfigured}
+                  onSave={() => cards.save("fuyao")}
+                  isDirty={cards.dirty.fuyao}
+                  onReset={() => cards.reset("fuyao")}
+                />
+              </Col>
+              <Col xs={24} style={{ display: "flex" }}>
+                <DataSourceCookiesCard
+                  stretch
+                  {...cardProps}
+                  onSave={() => cards.save("dataSourceCookies")}
+                  isDirty={cards.dirty.dataSourceCookies}
+                  onReset={() => cards.reset("dataSourceCookies")}
+                />
+              </Col>
+            </Row>
+          </div>
+
+          <div className="settings-group" id={SETTINGS_ANCHORS.network}>
+            <h4 className="settings-group__title">网络与限流</h4>
+            <p className="settings-group__hint">出站代理与东财接口限流，避免触发数据源风控。</p>
+            <Row gutter={[16, 16]}>
+              <Col xs={24} lg={12} style={{ display: "flex" }}>
+                <EastmoneyProxyConfigCard
+                  stretch
+                  {...cardProps}
+                  onSave={() => cards.save("outboundProxy")}
+                  isDirty={cards.dirty.outboundProxy}
+                  onReset={() => cards.reset("outboundProxy")}
+                  onTest={onTestOutboundProxy}
+                  isTesting={isTestingOutboundProxy}
+                  testResult={outboundProxyTestResult}
+                />
+              </Col>
+              <Col xs={24} style={{ display: "flex" }}>
+                <EastmoneyRateLimitConfigCard
+                  stretch
+                  {...cardProps}
+                  onSave={() => cards.save("eastmoneyRateLimit")}
+                  isDirty={cards.dirty.eastmoneyRateLimit}
+                  onReset={() => cards.reset("eastmoneyRateLimit")}
+                />
+              </Col>
+            </Row>
+          </div>
+        </>
       )}
     </section>
   );
@@ -157,7 +183,6 @@ export function AdminSettingsSection({
 }: AdminSettingsSectionProps) {
   const [activeTab, setActiveTab] = useState<"ops" | "bot" | "user">("ops");
   const isNarrow = useMediaQuery("(max-width: 640px)");
-  const isMobile = useMediaQuery("(max-width: 480px)");
   const opsDirty =
     cards.dirty.backup ||
     cards.dirty.marketDaily ||
@@ -173,6 +198,7 @@ export function AdminSettingsSection({
 
       <div style={{ marginBottom: 20 }}>
         <Segmented
+          className="settings-admin-tabs"
           value={activeTab}
           onChange={(val) => setActiveTab(val as "ops" | "bot" | "user")}
           block={isNarrow}
@@ -182,7 +208,7 @@ export function AdminSettingsSection({
               value: "ops",
               label: (
                 <span style={{ padding: isNarrow ? "0 2px" : "0 8px", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
-                  <DatabaseOutlined /> {isNarrow ? (isMobile ? "运维" : "系统运维") : "系统运维与数据维护"}
+                  <DatabaseOutlined /> "系统运维与数据维护"
                   {opsDirty && (
                     <span
                       style={{
@@ -202,7 +228,7 @@ export function AdminSettingsSection({
               value: "bot",
               label: (
                 <span style={{ padding: isNarrow ? "0 2px" : "0 8px", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
-                  <RobotOutlined /> {isNarrow ? (isMobile ? "推送" : "自动化推送") : "自动化与推送机器人"}
+                  <RobotOutlined /> "自动化与推送机器人"
                   {cards.dirty.bot && (
                     <span
                       style={{
@@ -222,7 +248,7 @@ export function AdminSettingsSection({
               value: "user",
               label: (
                 <span style={{ padding: isNarrow ? "0 2px" : "0 8px", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
-                  <UserOutlined /> {isNarrow ? (isMobile ? "用户" : "用户安全") : "用户与权限安全"}
+                  <UserOutlined /> "用户与权限安全"
                 </span>
               ),
             },
@@ -299,7 +325,9 @@ export function AdminSettingsSection({
           <UserManagerCard />
           <InviteManagerCard />
           <SecurityAuditCard />
-          <AdminResetCard />
+          <div className="settings-danger">
+            <AdminResetCard />
+          </div>
         </div>
       )}
     </section>

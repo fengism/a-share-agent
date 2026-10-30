@@ -1,10 +1,18 @@
 import { useState, useMemo } from "react";
-import { Table, Tag, Input, Radio, Card, Space } from "antd";
-import { SearchOutlined, FireOutlined } from "@ant-design/icons";
+import { Table, Tag, Input, Radio, Card, Space, Statistic } from "antd";
+import { SearchOutlined, FireOutlined, ArrowUpOutlined, ArrowDownOutlined } from "@ant-design/icons";
 import { useCommoditySpotPrices } from "../../api/queries";
 import SectionDataState from "../../components/SectionDataState";
 import { useColors } from "../../styles/ui";
 import type { CommodityItem } from "../../types/stock";
+
+const BAROMETER_DEFS = [
+  { key: "cu", match: ["铜", "CU"], label: "沪铜主力", role: "工业铜博士", tagColor: "orange", mapping: "电网·电子·高端制造" },
+  { key: "lc", match: ["碳酸锂", "LC"], label: "碳酸锂主力", role: "动力电池之锚", tagColor: "green", mapping: "锂电池·储能·新能源汽车" },
+  { key: "au", match: ["黄金", "AU"], label: "沪金主力", role: "避险抗通胀", tagColor: "gold", mapping: "贵金属·去美元化风向标" },
+  { key: "sc", match: ["原油", "SC"], label: "原油主连", role: "基础能源之母", tagColor: "volcano", mapping: "石油石化·能化原料成本" },
+  { key: "rb", match: ["螺纹", "RB", "铁矿"], label: "螺纹钢主力", role: "基建实物开工", tagColor: "blue", mapping: "建筑建材·地产链实物需求" },
+];
 
 export default function CommoditiesTab() {
   const c = useColors();
@@ -20,6 +28,21 @@ export default function CommoditiesTab() {
       if (item.category) set.add(item.category);
     });
     return Array.from(set);
+  }, [items]);
+
+  // 先导风向标匹配项
+  const barometers = useMemo(() => {
+    return BAROMETER_DEFS.map((def) => {
+      const found = items.find((it) =>
+        def.match.some(
+          (m) =>
+            it.symbol.toUpperCase().includes(m) ||
+            it.name.includes(m) ||
+            it.contract.toUpperCase().includes(m),
+        ),
+      );
+      return { def, item: found ?? null };
+    });
   }, [items]);
 
   const filteredItems = useMemo(() => {
@@ -153,6 +176,59 @@ export default function CommoditiesTab() {
         <div className="macro-insight-banner__body">
           跟踪新浪期货连续 / 主力合约最近报价，不是现货采购价，也不提供现货基差。不能直接用于估算企业采购成本或毛利；静态产业映射仅供研究参考。报价时间以各行日期为准。
         </div>
+      </div>
+
+      {/* 5 大核心先导大宗风向标 */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 12, marginBottom: 16 }}>
+        {barometers.map(({ def, item }) => {
+          const pct = item?.change_pct ?? null;
+          const isUp = pct != null && pct > 0;
+          const isDown = pct != null && pct < 0;
+          const pctColor = isUp ? c.up : isDown ? c.down : c.textSecondary;
+          const isSelected = keyword && item && (item.symbol === keyword || item.name.includes(keyword));
+
+          return (
+            <Card
+              key={def.key}
+              size="small"
+              className="macro-kpi-card"
+              variant="borderless"
+              style={{
+                cursor: item ? "pointer" : "default",
+                borderColor: isSelected ? c.primary : undefined,
+                background: isSelected ? "var(--c-selected-bg, rgba(22, 119, 255, 0.05))" : undefined,
+              }}
+              onClick={() => {
+                if (item) {
+                  setKeyword((prev) => (prev === item.symbol ? "" : item.symbol));
+                }
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: 13, fontWeight: 600 }}>{def.label}</span>
+                <Tag color={def.tagColor} style={{ fontSize: 11, margin: 0 }}>{def.role}</Tag>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 6 }}>
+                <Statistic
+                  value={item?.latest_price != null ? item.latest_price.toLocaleString() : "-"}
+                  styles={{ content: { fontSize: 18, fontWeight: 700 } }}
+                  suffix={<span style={{ fontSize: 11, color: c.textMuted }}>{item?.unit ?? ""}</span>}
+                />
+                {pct != null ? (
+                  <span style={{ color: pctColor, fontSize: 12, fontWeight: 600 }}>
+                    {isUp ? <ArrowUpOutlined /> : isDown ? <ArrowDownOutlined /> : null}
+                    {isUp ? `+${pct.toFixed(2)}` : pct.toFixed(2)}%
+                  </span>
+                ) : (
+                  <span style={{ color: c.textMuted, fontSize: 12 }}>-</span>
+                )}
+              </div>
+              <div className="macro-kpi-subtext" title={def.mapping}>
+                映射: {def.mapping}
+              </div>
+            </Card>
+          );
+        })}
       </div>
 
       <Card size="small" variant="borderless" style={{ marginBottom: 16 }}>

@@ -1,7 +1,7 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { message } from "antd";
 import { useLocation } from "react-router-dom";
-import { useHKStockQuote } from "../../api/queryHooks/hk";
+import { useHKStockHistory, useHKStockQuote } from "../../api/queryHooks/hk";
 import {
   useAddWatchlistItem,
   useDeleteWatchlistItem,
@@ -10,12 +10,13 @@ import {
 import SectionDataState from "../../components/SectionDataState";
 import StockWorkspaceNav from "../../features/stock-navigation/StockWorkspaceNav";
 import { useStyles } from "../../styles/ui";
+import { yearsAgoDate } from "../../utils/date";
 import DeferredStockSection from "./DeferredStockSection";
 import HKTradingRulesCard from "./HKTradingRulesCard";
 import StockBusinessIntro from "./StockBusinessIntro";
 import StockCharts from "./StockCharts";
 import StockDetailTabs from "./StockDetailTabs";
-import StockHeaderCard from "./StockHeaderCard";
+import StockHeaderCard, { type StockHeaderTapeData } from "./StockHeaderCard";
 import StockMetrics from "./StockMetrics";
 
 export default function HKStockPageContent({ code }: { code: string }) {
@@ -66,6 +67,38 @@ export default function HKStockPageContent({ code }: { code: string }) {
     current_price: quote?.price ?? null,
   };
 
+  const oneYearAgoStr = useMemo(() => yearsAgoDate(1), []);
+  const hkHistory1y = useHKStockHistory(code, "daily", "qfq", oneYearAgoStr);
+  const fiftyTwoWeekRange = useMemo(() => {
+    const items = hkHistory1y.data?.items;
+    if (!items || items.length === 0) return null;
+    let min = Infinity;
+    let max = -Infinity;
+    for (const it of items) {
+      if (it.low != null && it.low < min) min = it.low;
+      if (it.high != null && it.high > max) max = it.high;
+    }
+    return min < Infinity && max > -Infinity ? { low: min, high: max } : null;
+  }, [hkHistory1y.data?.items]);
+
+  const hkTapeData = useMemo<StockHeaderTapeData | null>(() => {
+    if (!quote && !fiftyTwoWeekRange) return null;
+    const amplitude = (quote?.high != null && quote?.low != null && quote?.pre_close != null && quote.pre_close > 0)
+      ? ((quote.high - quote.low) / quote.pre_close) * 100
+      : null;
+    return {
+      open: quote?.open,
+      prevClose: quote?.pre_close,
+      high: quote?.high,
+      low: quote?.low,
+      volume: quote?.volume,
+      amount: quote?.amount,
+      amplitude,
+      fiftyTwoWeekHigh: fiftyTwoWeekRange?.high ?? null,
+      fiftyTwoWeekLow: fiftyTwoWeekRange?.low ?? null,
+    };
+  }, [quote, fiftyTwoWeekRange]);
+
   return (
     <main className="stock-page" style={pageContainerStyle}>
       {contextHolder}
@@ -93,6 +126,7 @@ export default function HKStockPageContent({ code }: { code: string }) {
             englishName={quote.english_name}
             market="hk"
             showAnalysisButton={false}
+            tape={hkTapeData}
           />
         ) : null}
       </SectionDataState>

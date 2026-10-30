@@ -256,3 +256,8 @@
   .daily-review-event-grid { grid-template-columns: minmax(0, 1fr); }
   .daily-review-event-card__header { flex-direction: column; }
 }
+
+/* 折叠区内的内容块：不再叠加卡片边框/标题（避免与折叠头重复） */
+.daily-review-block {
+  min-width: 0;
+}

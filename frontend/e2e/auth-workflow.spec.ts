@@ -372,6 +372,7 @@ test("places the Dashboard watchlist in a responsive right rail", async ({ page 
 
   await page.setViewportSize({ width: 390, height: 844 });
   await expectStackedVertically(main, rail);
-  await expect(firstActions).toHaveCSS("opacity", "1");
+  // 触屏/窄屏下操作层常显为半透明（见 dashboard.css 的 hover:none 分支），不再要求完全不透明
+  await expect(firstActions).toHaveCSS("opacity", "0.9");
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
 });

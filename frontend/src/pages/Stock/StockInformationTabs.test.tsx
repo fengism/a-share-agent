@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import StockInformationTabs from "./StockInformationTabs";
 
@@ -28,5 +29,16 @@ describe("StockInformationTabs", () => {
     expect(screen.getByText("研报内容")).toBeInTheDocument();
     expect(mounts.reports).toHaveBeenCalled();
     expect(mounts.fundFlow).not.toHaveBeenCalled();
+  });
+
+  it("activates the tab designated by url query infoTab", () => {
+    render(
+      <MemoryRouter initialEntries={["/stock/600519?infoTab=reports"]}>
+        <StockInformationTabs code="600519" />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("研报内容")).toBeInTheDocument();
+    expect(mounts.reports).toHaveBeenCalled();
   });
 });

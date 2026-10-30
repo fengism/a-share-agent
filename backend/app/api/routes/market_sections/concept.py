@@ -23,11 +23,28 @@ router = APIRouter()
 def list_concepts(
     query: str = Query(default="", max_length=64, description="概念名称模糊搜索"),
     limit: int = Query(default=200, ge=1, le=2000),
+    order: str = Query(
+        default="size",
+        pattern="^(size|change)$",
+        description="排序：size=按成分股只数（默认），change=按最近交易日等权涨幅",
+    ),
 ):
-    """获取概念列表，按成分股只数降序，用于概念选择器。"""
-    items = list_concepts_service(query=query, limit=limit)
+    """获取概念列表，用于概念选择器；order=change 时附带最近交易日涨跌聚合。"""
+    items = list_concepts_service(query=query, limit=limit, order=order)
     return ConceptListResponse(
-        items=[ConceptSummaryItem(name=item.name, stock_count=item.stock_count) for item in items],
+        items=[
+            ConceptSummaryItem(
+                name=item.name,
+                stock_count=item.stock_count,
+                change_pct=item.change_pct,
+                change_date=item.change_date,
+                up_count=item.up_count,
+                down_count=item.down_count,
+                limit_up_count=item.limit_up_count,
+                sample_count=item.sample_count,
+            )
+            for item in items
+        ],
         total=len(items),
     )
 

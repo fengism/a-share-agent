@@ -7,8 +7,10 @@ import {
   useMarketPriceAnomalyCount,
 } from "../../api/queries";
 import SectionDataState from "../../components/SectionDataState";
+import SectionToolbar from "../../components/SectionToolbar";
 import StockExternalLink from "../../components/StockExternalLink";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
+import { useUrlSearchParam } from "../../hooks/useUrlSearchParam";
 import { useColors, useTokens } from "../../styles/ui";
 import type {
   MarketPriceAnomalyCountItem,
@@ -77,7 +79,9 @@ export default function PriceAnomalyTab() {
   const c = useColors();
   const t = useTokens();
   const isMobile = useMediaQuery("(max-width: 768px)");
-  const [view, setView] = useState<AnomalyView>("detail");
+  const [view, setView] = useUrlSearchParam<AnomalyView>("view", "detail", {
+    allowedValues: ["detail", "count"],
+  });
   const [detailPage, setDetailPage] = useState(1);
   const [countPage, setCountPage] = useState(1);
   const detailQuery = useMarketPriceAnomaly(detailPage, 200, view === "detail");
@@ -205,32 +209,37 @@ export default function PriceAnomalyTab() {
 
   return (
     <div className="market-price-anomaly">
-      <div className="market-price-anomaly__toolbar">
-        <Segmented<AnomalyView>
-          value={view}
-          options={[
-            { label: "异动明细", value: "detail" },
-            { label: "异动统计", value: "count" },
-          ]}
-          onChange={setView}
-        />
-        <div className="market-price-anomaly__actions">
-          <Text type="secondary">数据日期：{dataDate}</Text>
-          {fallbackHint ? <Tag color="warning">{fallbackHint}</Tag> : null}
-          {query.isFetching ? <Tag color="processing">更新中</Tag> : null}
-          <Button icon={<ReloadOutlined />} onClick={() => query.refetch()} loading={query.isFetching}>
-            刷新
-          </Button>
-        </div>
-      </div>
+      <SectionToolbar
+        ariaLabel="交易所异动工具条"
+        meta={
+          <Segmented<AnomalyView>
+            value={view}
+            options={[
+              { label: "异动明细", value: "detail" },
+              { label: "异动统计", value: "count" },
+            ]}
+            onChange={setView}
+          />
+        }
+        actions={
+          <>
+            <Text type="secondary">数据日期：{dataDate}</Text>
+            {fallbackHint ? <Tag color="warning">{fallbackHint}</Tag> : null}
+            {query.isFetching ? <Tag color="processing">更新中</Tag> : null}
+            <Button icon={<ReloadOutlined />} onClick={() => query.refetch()} loading={query.isFetching}>
+              刷新
+            </Button>
+          </>
+        }
+      />
 
       <Row gutter={[12, 12]} className="market-price-anomaly__metrics">
-        <Col xs={12} md={8}>
+        <Col xs={12} sm={8}>
           <Card size="small" style={{ borderRadius: t.radius?.md || 8, boxShadow: t.shadow?.xs }}>
             <Statistic title={isDetail ? "本页异动记录" : "本页异动股票"} value={items.length} styles={{ content: { fontFamily: "var(--c-font-mono)" } }} />
           </Card>
         </Col>
-        <Col xs={12} md={8}>
+        <Col xs={12} sm={8}>
           <Card size="small" style={{ borderRadius: t.radius?.md || 8, boxShadow: t.shadow?.xs }}>
             <Statistic
               title={isDetail ? (isCurrentDataDate ? "今日触发" : "数据日触发") : "本页异动次数"}
@@ -239,7 +248,7 @@ export default function PriceAnomalyTab() {
             />
           </Card>
         </Col>
-        <Col xs={24} md={8}>
+        <Col xs={24} sm={8}>
           <Card size="small" style={{ borderRadius: t.radius?.md || 8, boxShadow: t.shadow?.xs }}>
             <Statistic title="数据来源" value={data?.source ?? "东方财富"} />
           </Card>
@@ -284,8 +293,9 @@ export default function PriceAnomalyTab() {
               total={paginationTotal}
               showSizeChanger={false}
               showLessItems
+              simple={isMobile}
               onChange={isDetail ? setDetailPage : setCountPage}
-              style={{ padding: 12, justifyContent: "flex-end" }}
+              style={{ padding: 12 }}
             />
           ) : null}
         </Card>

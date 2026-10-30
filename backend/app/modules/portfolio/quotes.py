@@ -28,19 +28,11 @@ async def fetch_quote_batch(codes: list[str]) -> QuoteBatch:
             quote_sources={},
         )
 
-    normalized_codes = list(
-        dict.fromkeys(
-            normalize_portfolio_stock_code(c) for c in codes if str(c).strip()
-        )
-    )
+    normalized_codes = list(dict.fromkeys(normalize_portfolio_stock_code(c) for c in codes if str(c).strip()))
     cn_codes = [c for c in normalized_codes if not is_hk_stock_code(c)]
     hk_codes = [c for c in normalized_codes if is_hk_stock_code(c)]
 
-    cn_quote_task = (
-        fetch_realtime_quote_set(cn_codes)
-        if cn_codes
-        else None
-    )
+    cn_quote_task = fetch_realtime_quote_set(cn_codes) if cn_codes else None
     hk_quote_task = (
         hk_market_service.get_stock_quotes(
             codes=hk_codes,
@@ -55,9 +47,7 @@ async def fetch_quote_batch(codes: list[str]) -> QuoteBatch:
     hk_quote_page: HKStockQuotePage | None = None
 
     if cn_quote_task is not None and hk_quote_task is not None:
-        cn_res, hk_res = await asyncio.gather(
-            cn_quote_task, hk_quote_task, return_exceptions=True
-        )
+        cn_res, hk_res = await asyncio.gather(cn_quote_task, hk_quote_task, return_exceptions=True)
         if isinstance(cn_res, BaseException):
             logger.warning("获取 A 股实时行情失败: %s", cn_res)
         else:

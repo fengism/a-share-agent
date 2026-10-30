@@ -109,6 +109,10 @@ describe("AIndexTab", () => {
     fireEvent.click(screen.getByText("月K"));
     await waitFor(() => expect(mocks.kline).toHaveBeenCalledWith("000001", "monthly", { startDate: expect.any(String), liveRefresh: false }));
     expect(screen.getByTestId("location-search")).toHaveTextContent("period=monthly");
+
+    fireEvent.click(screen.getByText("年K"));
+    await waitFor(() => expect(mocks.kline).toHaveBeenCalledWith("000001", "annual", { startDate: expect.any(String), liveRefresh: false }));
+    expect(screen.getByTestId("location-search")).toHaveTextContent("period=annual");
   });
 
   it("renders four returned indices as a full row and resets a missing selection", async () => {

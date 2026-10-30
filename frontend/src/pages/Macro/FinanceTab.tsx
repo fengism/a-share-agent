@@ -1,4 +1,5 @@
-import { Row, Col, Tag } from "antd";
+import { Row, Col, Tag, Card, Statistic } from "antd";
+import { BankOutlined, FallOutlined, FundProjectionScreenOutlined, RiseOutlined } from "@ant-design/icons";
 import { useMacroAllData } from "../../api/queries";
 import SectionDataState from "../../components/SectionDataState";
 import MacroIndicatorCard from "./MacroIndicatorCard";
@@ -57,13 +58,65 @@ export default function FinanceTab() {
       <div className="macro-insight-banner">
         <div className="macro-insight-banner__title">
           <span>💡 宏观金融与货币流动性环境总览</span>
-          <Tag color="cyan">M2 流动性池 + 资金利率</Tag>
+          <Tag color="cyan">M2 流动性池 + 政策基准利率</Tag>
         </div>
         <div className="macro-insight-banner__body">
           广义货币 M2 总量 <strong>{m2 ?? "-"} 万亿元</strong>
           {termSpread != null ? <>，1Y LPR <strong>{lpr1y?.toFixed(2)}%</strong> / 5Y LPR <strong>{lpr5y?.toFixed(2)}%</strong>（期限利差 <strong className="financial-num">{termSpread}%</strong>）</> : null}。
-          综合反映全社会流动性格局与银行间同业拆放资金面松紧度。
+          全社会流动性总水闸保持适度充裕，长短期贷款市场利率处于历史极低水平，为实体经济与权益资产估值提供坚实的资金面护城河。
         </div>
+      </div>
+
+      {/* 4 大核心流动性 KPI 速览 */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 14, marginBottom: 16 }}>
+        <Card size="small" className="macro-kpi-card" variant="borderless">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: 12, color: c.textSecondary }}>广义货币 M2 总量</span>
+            <Tag color="blue" icon={<FundProjectionScreenOutlined />}>流动性水池</Tag>
+          </div>
+          <Statistic
+            value={m2 ?? "-"}
+            styles={{ content: { fontSize: 22, fontWeight: 700, color: c.primary, marginTop: 4 } }}
+            suffix={<span style={{ fontSize: 13, color: c.textMuted }}>万亿元</span>}
+          />
+          <div className="macro-kpi-subtext">实体经济与金融市场流动性底座</div>
+        </Card>
+
+        <Card size="small" className="macro-kpi-card" variant="borderless">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: 12, color: c.textSecondary }}>1年期 LPR (短端贷款)</span>
+            <Tag color="green" icon={<BankOutlined />}>企业融资基准</Tag>
+          </div>
+          <Statistic
+            value={lpr1y != null ? `${lpr1y.toFixed(2)}%` : "-"}
+            styles={{ content: { fontSize: 22, fontWeight: 700, color: c.up, marginTop: 4 } }}
+          />
+          <div className="macro-kpi-subtext">实体流动资金与日常借贷成本锚</div>
+        </Card>
+
+        <Card size="small" className="macro-kpi-card" variant="borderless">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: 12, color: c.textSecondary }}>5年期以上 LPR (长端贷款)</span>
+            <Tag color="cyan" icon={<FallOutlined />}>房贷与制造业</Tag>
+          </div>
+          <Statistic
+            value={lpr5y != null ? `${lpr5y.toFixed(2)}%` : "-"}
+            styles={{ content: { fontSize: 22, fontWeight: 700, color: c.accent, marginTop: 4 } }}
+          />
+          <div className="macro-kpi-subtext">个人按揭与中长期资本开支基准</div>
+        </Card>
+
+        <Card size="small" className="macro-kpi-card" variant="borderless">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: 12, color: c.textSecondary }}>LPR 期限利差 (5Y - 1Y)</span>
+            <Tag color="purple" icon={<RiseOutlined />}>曲线坡度</Tag>
+          </div>
+          <Statistic
+            value={termSpread != null ? `${termSpread.toFixed(2)}%` : "-"}
+            styles={{ content: { fontSize: 22, fontWeight: 700, color: "#722ed1", marginTop: 4 } }}
+          />
+          <div className="macro-kpi-subtext">期限利差平缓，长期资金成本优势突出</div>
+        </Card>
       </div>
 
       <div className="macro-section-divider"><span>💰 货币供应量与信用派生</span></div>

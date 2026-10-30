@@ -36,11 +36,11 @@ export default function MarginTab() {
       tooltip: {
         trigger: "axis",
         axisPointer: { type: "cross" },
-        backgroundColor: "rgba(255, 255, 255, 0.95)",
+        backgroundColor: c.cardBg,
         borderColor: c.border,
         borderWidth: 1,
         textStyle: { color: c.textPrimary, fontSize: 12 },
-        extraCssText: "box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08); border-radius: 8px;",
+        extraCssText: "box-shadow: var(--c-shadow-md); border-radius: 8px;",
         formatter: (params: Array<{ seriesName: string; value: number; marker: string }>) => {
           if (!params || params.length === 0) return "";
           const dateStr = (params[0] as unknown as { axisValueLabel: string }).axisValueLabel;
@@ -153,7 +153,7 @@ export default function MarginTab() {
         },
       ],
     }),
-    [items, c.primary, c.accent, c.warning, c.up, c.down, c.textPrimary, c.textSecondary, c.border],
+    [items, c.primary, c.accent, c.warning, c.up, c.down, c.textPrimary, c.textSecondary, c.border, c.cardBg],
   );
 
   return (
@@ -174,7 +174,7 @@ export default function MarginTab() {
               <Statistic
                 title={<span style={{ color: c.textSecondary, fontSize: t.font.sm }}>两融余额 (亿元)</span>}
                 value={formatValue(latest?.rzrqye)}
-                styles={{ content: { color: c.primary, fontWeight: Number(t.weight.bold) } }}
+                styles={{ content: { color: c.primary, fontWeight: Number(t.weight.bold), fontFamily: "var(--c-font-mono)" } }}
               />
             </Card>
           </Col>
@@ -183,7 +183,7 @@ export default function MarginTab() {
               <Statistic
                 title={<span style={{ color: c.textSecondary, fontSize: t.font.sm }}>融资余额 (亿元)</span>}
                 value={formatValue(latest?.rzye)}
-                styles={{ content: { color: c.accent, fontWeight: Number(t.weight.bold) } }}
+                styles={{ content: { color: c.accent, fontWeight: Number(t.weight.bold), fontFamily: "var(--c-font-mono)" } }}
               />
             </Card>
           </Col>
@@ -192,7 +192,7 @@ export default function MarginTab() {
               <Statistic
                 title={<span style={{ color: c.textSecondary, fontSize: t.font.sm }}>融券余额 (亿元)</span>}
                 value={formatValue(latest?.rqye)}
-                styles={{ content: { color: c.warning, fontWeight: Number(t.weight.bold) } }}
+                styles={{ content: { color: c.warning, fontWeight: Number(t.weight.bold), fontFamily: "var(--c-font-mono)" } }}
               />
             </Card>
           </Col>
@@ -201,7 +201,7 @@ export default function MarginTab() {
               <Statistic
                 title={<span style={{ color: c.textSecondary, fontSize: t.font.sm }}>两融日变动 (亿元)</span>}
                 value={formatSigned(balanceChange)}
-                styles={{ content: { color: (balanceChange ?? 0) >= 0 ? c.up : c.down, fontWeight: Number(t.weight.bold) } }}
+                styles={{ content: { color: (balanceChange ?? 0) >= 0 ? c.up : c.down, fontWeight: Number(t.weight.bold), fontFamily: "var(--c-font-mono)" } }}
               />
             </Card>
           </Col>

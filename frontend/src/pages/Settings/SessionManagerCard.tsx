@@ -101,7 +101,7 @@ export default function SessionManagerCard() {
       render: (ua: string) =>
         ua ? (
           <Tooltip title={ua}>
-            <span style={{ color: colors.textMuted, fontSize: "12px", cursor: "pointer" }}>
+            <span style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)", cursor: "pointer" }}>
               {ua.length > 44 ? `${ua.slice(0, 44)}...` : ua}
             </span>
           </Tooltip>

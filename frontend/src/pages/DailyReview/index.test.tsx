@@ -208,20 +208,44 @@ describe("DailyReviewPage", () => {
       </QueryClientProvider>,
     );
 
+  /** 打开「导出」下拉并点选指定项 */
+  async function clickExportItem(label: string | RegExp) {
+    fireEvent.click(screen.getByRole("button", { name: /导出/ }));
+    const matcher = typeof label === "string" ? new RegExp(label) : label;
+    const item = await screen.findByRole("menuitem", { name: matcher });
+    fireEvent.click(item);
+  }
+
+  /** 章节默认折叠，断言内容前先按标题展开 */
+  function expandSection(title: string | RegExp) {
+    // 目录 chips 与折叠头重名，用 aria-expanded 锁定折叠触发器
+    // （折叠头可访问名还包含右侧摘要，如「政策与事件传导 3 条」）
+    const matcher = typeof title === "string" ? new RegExp(title) : title;
+    const trigger = screen
+      .getAllByRole("button", { name: matcher })
+      .find((element) => element.hasAttribute("aria-expanded"));
+    if (!trigger) throw new Error(`未找到章节折叠按钮：${String(title)}`);
+    if (trigger.getAttribute("aria-expanded") !== "true") {
+      fireEvent.click(trigger);
+    }
+  }
+
   it("renders daily review details with export actions and snapshot metrics", () => {
     renderPage();
 
     expect(screen.getByRole("heading", { name: /每日复盘/, level: 3 })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "生成复盘" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /重新生成|生成复盘/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /导出/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /复制/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "更多操作" })).toBeInTheDocument();
 
     expect(screen.getByText("A股市场每日复盘 - 2026-08-25")).toBeInTheDocument();
     expect(screen.getByText(/今日A股主要指数多数收涨/)).toBeInTheDocument();
-    expect(screen.getByText(/指数 1/)).toBeInTheDocument();
-    expect(screen.getByText(/热股 1/)).toBeInTheDocument();
-    expect(screen.getByText(/概念 1/)).toBeInTheDocument();
-    expect(screen.getAllByText("新闻政策与影响传导").length).toBeGreaterThan(0);
+    // Hero 区展示核心结论指标（涨停家数 / 炸板率 / 指数涨跌 / 情绪阶段）
+    expect(screen.getByText("涨停家数")).toBeInTheDocument();
+    expect(screen.getByText("炸板率")).toBeInTheDocument();
+    expandSection(/政策与事件传导/);
+    // 折叠头已承载分区标题，卡片标题不再重复渲染
+    expect(screen.getByText(/流动性释放/)).toBeInTheDocument();
     expect(screen.getByText(/银行板块放量领涨/)).toBeInTheDocument();
     expect(screen.getByText("流动性释放 → 风险偏好改善 → 金融权重获得增量资金关注")).toBeInTheDocument();
     expect(screen.getByText(/银行与券商成交额放大/)).toBeInTheDocument();
@@ -229,7 +253,7 @@ describe("DailyReviewPage", () => {
     expect(screen.getByText(/仅用于事后验证，不作为当日交易依据/)).toBeInTheDocument();
   });
 
-  it("supports copying review to clipboard and exporting via dropdown", () => {
+  it("supports copying review to clipboard and exporting via dropdown", async () => {
     const writeTextSpy = vi.fn().mockResolvedValue(undefined);
     Object.assign(navigator, {
       clipboard: {
@@ -242,16 +266,11 @@ describe("DailyReviewPage", () => {
 
     renderPage();
 
-    const copyBtn = screen.getByRole("button", { name: /复制/ });
-    fireEvent.click(copyBtn);
+    await clickExportItem("复制复盘内容");
     expect(writeTextSpy).toHaveBeenCalledWith(expect.stringContaining("A股市场每日复盘 - 2026-08-25"));
 
     // Open export dropdown and select Markdown
-    const exportBtn = screen.getByRole("button", { name: /导出/ });
-    fireEvent.click(exportBtn);
-
-    const exportMdItem = screen.getByText("导出为 Markdown (.md)");
-    fireEvent.click(exportMdItem);
+    await clickExportItem("导出为 Markdown");
     expect(window.URL.createObjectURL).toHaveBeenCalled();
     expect(clickSpy).toHaveBeenCalled();
     clickSpy.mockRestore();
@@ -268,7 +287,7 @@ describe("DailyReviewPage", () => {
     mockReview.notes = [];
   });
 
-  it("exports source status and warnings into the markdown", () => {
+  it("exports source status and warnings into the markdown", async () => {
     const writeTextSpy = vi.fn().mockResolvedValue(undefined);
     Object.assign(navigator, { clipboard: { writeText: writeTextSpy } });
     mockReview.warnings = ["核心复盘数据缺失：market_volume"];
@@ -277,7 +296,7 @@ describe("DailyReviewPage", () => {
     };
     renderPage();
 
-    fireEvent.click(screen.getByRole("button", { name: /复制/ }));
+    await clickExportItem("复制复盘内容");
 
     const exported = writeTextSpy.mock.calls[0][0] as string;
     expect(exported).toContain("## 数据核验警告");
@@ -289,7 +308,7 @@ describe("DailyReviewPage", () => {
     mockReview.data_snapshot.source_status = undefined;
   });
 
-  it("renders deep review cards and exports them to markdown", () => {
+  it("renders deep review cards and exports them to markdown", async () => {
     const writeTextSpy = vi.fn().mockResolvedValue(undefined);
     Object.assign(navigator, { clipboard: { writeText: writeTextSpy } });
     mockReview.sentiment_cycle = {
@@ -308,13 +327,17 @@ describe("DailyReviewPage", () => {
     mockReview.key_levels = ["上证 3250 支撑；压力 3350"];
     renderPage();
 
-    expect(screen.getByText("情绪周期定位")).toBeInTheDocument();
-    expect(screen.getByText("修复回暖")).toBeInTheDocument();
-    expect(screen.getByText("明日三情景预案")).toBeInTheDocument();
-    expect(screen.getByText("次日观察锚点")).toBeInTheDocument();
-    expect(screen.getByText("关键点位与量能阈值")).toBeInTheDocument();
+    // 章节标题始终可见（目录与折叠头），内容需展开后断言
+    expect(screen.getAllByRole("button", { name: /情绪周期定位/ }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("button", { name: /明日三情景预案/ }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("button", { name: /次日观察锚点/ }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("button", { name: /关键点位与量能阈值/ }).length).toBeGreaterThan(0);
 
-    fireEvent.click(screen.getByRole("button", { name: /复制/ }));
+    expandSection(/情绪周期定位/);
+    // Hero 的情绪阶段徽标与章节内容都会展示阶段名
+    expect(screen.getAllByText("修复回暖").length).toBeGreaterThan(0);
+
+    await clickExportItem("复制复盘内容");
 
     const exported = writeTextSpy.mock.calls[0][0] as string;
     expect(exported).toContain("## 情绪周期定位：修复回暖");
@@ -330,7 +353,7 @@ describe("DailyReviewPage", () => {
     mockReview.key_levels = undefined;
   });
 
-  it("renders the previous review self-check and cycle trend", () => {
+  it("renders the previous review self-check and cycle trend", async () => {
     const writeTextSpy = vi.fn().mockResolvedValue(undefined);
     Object.assign(navigator, { clipboard: { writeText: writeTextSpy } });
     mockReview.previous_review_check = {
@@ -359,12 +382,15 @@ describe("DailyReviewPage", () => {
     };
     renderPage();
 
-    expect(screen.getByText("上一交易日复盘自检")).toBeInTheDocument();
+    expandSection(/昨日复盘自检/);
+    expect(screen.getByText("观察锚点逐项对照")).toBeInTheDocument();
     expect(screen.getByText("命中 1/2")).toBeInTheDocument();
-    expect(screen.getByText("情绪周期历史趋势")).toBeInTheDocument();
-    expect(screen.getByText("修复回暖：出现 2 次，次日指数上涨比例 50%，平均次日 -0.42%")).toBeInTheDocument();
+    expandSection(/情绪周期历史趋势/);
+    expect(screen.getByRole("list", { name: "情绪周期时间轴" })).toBeInTheDocument();
+    expect(screen.getByText(/出现 2 次/)).toBeInTheDocument();
+    expect(screen.getByText(/次日指数上涨/)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /复制/ }));
+    await clickExportItem("复制复盘内容");
 
     const exported = writeTextSpy.mock.calls[0][0] as string;
     expect(exported).toContain("## 上一交易日复盘自检（2026-08-24 → 2026-08-25）");
@@ -389,7 +415,8 @@ describe("DailyReviewPage", () => {
     });
     renderPage();
 
-    fireEvent.click(screen.getByRole("button", { name: "生成复盘" }));
+    fireEvent.click(screen.getByRole("button", { name: /重新生成|生成复盘/ }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: /重新生成复盘|生成复盘/ }));
 
     expect(await screen.findByText("正在采集行情、资金、新闻与宏观数据…")).toBeInTheDocument();
   });

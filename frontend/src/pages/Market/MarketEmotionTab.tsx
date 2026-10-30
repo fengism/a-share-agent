@@ -11,6 +11,7 @@ import {
 import { useMarketEmotion } from "../../api/queries";
 import RefreshBadge from "../../components/RefreshBadge";
 import SectionDataState from "../../components/SectionDataState";
+import SectionToolbar from "../../components/SectionToolbar";
 import { useColors, semanticTagStyle } from "../../styles/ui";
 import type { ThemeColors } from "../../styles/ui";
 import type { MarketEmotionDistribution } from "../../types/stock";
@@ -105,14 +106,14 @@ function SectionHeading({
 
 function DistributionChart({ distribution }: { distribution: MarketEmotionDistribution }) {
   const rows = [
-    { label: "8%以上", down: distribution.down_10, up: distribution.up_10 },
-    { label: "6%～8%", down: distribution.down_8, up: distribution.up_8 },
-    { label: "4%～6%", down: distribution.down_6, up: distribution.up_6 },
-    { label: "2%～4%", down: distribution.down_4, up: distribution.up_4 },
-    { label: "0%～2%", down: distribution.down_2, up: distribution.up_2 },
+    { label: "8%以上", down: distribution.down_10 ?? 0, up: distribution.up_10 ?? 0 },
+    { label: "6%～8%", down: distribution.down_8 ?? 0, up: distribution.up_8 ?? 0 },
+    { label: "4%～6%", down: distribution.down_6 ?? 0, up: distribution.up_6 ?? 0 },
+    { label: "2%～4%", down: distribution.down_4 ?? 0, up: distribution.up_4 ?? 0 },
+    { label: "0%～2%", down: distribution.down_2 ?? 0, up: distribution.up_2 ?? 0 },
   ];
   const maxValue = Math.max(1, ...rows.flatMap((row) => [row.down, row.up]));
-  const barWidth = (value: number) => value === 0 ? 0 : Math.max(3, (value / maxValue) * 100);
+  const barWidth = (value: number) => value <= 0 ? 0 : Math.max(3, (value / maxValue) * 100);
 
   return (
     <div className="emotion-distribution" aria-label="涨跌幅区间分布">
@@ -189,15 +190,20 @@ export default function MarketEmotionTab() {
       skeletonRows={10}
     >
       <div className="market-emotion">
-        <div className="emotion-toolbar">
-          <Space size={12} wrap>
-            <span>更新时间：{formatFetchedAt(data?.fetched_at)}</span>
-            <RefreshBadge />
-          </Space>
-          <Button icon={<ReloadOutlined />} loading={isFetching} onClick={() => refetch()}>
-            刷新
-          </Button>
-        </div>
+        <SectionToolbar
+          ariaLabel="市场情绪工具条"
+          meta={
+            <Space size={12} wrap>
+              <span>更新时间：{formatFetchedAt(data?.fetched_at)}</span>
+              <RefreshBadge />
+            </Space>
+          }
+          actions={
+            <Button icon={<ReloadOutlined />} loading={isFetching} onClick={() => refetch()}>
+              刷新
+            </Button>
+          }
+        />
 
         <section className={`emotion-hero emotion-hero--${emotionTone(degree)}`}>
           <Row align="stretch">

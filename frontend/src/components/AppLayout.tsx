@@ -8,6 +8,7 @@ import WorkflowRuntimeBridge from "./WorkflowRuntimeBridge";
 import AppSidebar from "./AppSidebar";
 import RouteLoadingFallback from "./RouteLoadingFallback";
 import UpdateBanner from "./UpdateBanner";
+import GlobalChatCopilot from "./GlobalChatCopilot";
 import { getActiveNavKey } from "./navConfig";
 
 const SIDEBAR_COLLAPSED_KEY = "trade_agent_sidebar_collapsed";
@@ -124,6 +125,7 @@ export default function AppLayout() {
           </main>
         </div>
       </div>
+      <GlobalChatCopilot />
     </>
   );
 }

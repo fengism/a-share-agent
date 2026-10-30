@@ -29,6 +29,8 @@ import {
   Typography,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
+import { useMediaQuery } from "../../hooks/useMediaQuery";
+import SettingsMobileRecordList, { type MobileRecordField } from "./SettingsMobileRecordList";
 import { adminResetLinkApi } from "../../api/auth";
 import {
   useAdminUsers,
@@ -47,6 +49,7 @@ import type { AdminUserItem } from "../../types/auth";
 const { Text } = Typography;
 
 export default function UserManagerCard() {
+  const isNarrow = useMediaQuery("(max-width: 767px)");
   const { cardStyle, sectionCardBodyStyle } = useStyles();
   const colors = useColors();
   const queryClient = useQueryClient();
@@ -194,6 +197,75 @@ export default function UserManagerCard() {
     }
   };
 
+  const renderActions = (record: AdminUserItem) => {
+    const isSelf = record.id === currentUser?.id;
+    return (
+      <Space size="small" wrap>
+        {record.is_active ? (
+          <Popconfirm
+            title="确定禁用该用户？"
+            description="禁用后该用户将立即断开所有会话并无法登录。"
+            onConfirm={() => handleToggleStatus(record)}
+            disabled={isSelf}
+          >
+            <Button size="small" danger disabled={isSelf}>
+              禁用
+            </Button>
+          </Popconfirm>
+        ) : (
+          <Button size="small" onClick={() => handleToggleStatus(record)}>
+            启用
+          </Button>
+        )}
+
+        <Popconfirm
+          title={record.is_admin ? "取消该用户的管理员权限？" : "设为管理员？"}
+          onConfirm={() => handleToggleRole(record)}
+          disabled={isSelf}
+        >
+          <Button size="small" disabled={isSelf}>
+            {record.is_admin ? "降为普通" : "设为管理"}
+          </Button>
+        </Popconfirm>
+
+        <Tooltip title={record.must_change_password ? "取消下次改密要求" : "要求该用户下次登录时必须修改密码"}>
+          <Button
+            size="small"
+            style={record.must_change_password ? { color: colors.warning } : undefined}
+            onClick={() => handleToggleMustChangePassword(record)}
+          >
+            {record.must_change_password ? "取消改密" : "要求改密"}
+          </Button>
+        </Tooltip>
+
+        <Tooltip title="生成一次性密码重置链接">
+          <Button
+            size="small"
+            icon={<KeyOutlined />}
+            onClick={() => openResetModal(record)}
+          />
+        </Tooltip>
+
+        <Tooltip title="强制注销该用户的所有在线会话设备">
+          <Button
+            size="small"
+            icon={<DisconnectOutlined />}
+            onClick={() => handleRevokeSessions(record)}
+          />
+        </Tooltip>
+
+        <Popconfirm
+          title="确定删除该用户？"
+          description="删除后该用户的所有配置、重置记录和登录凭证将被永久清空。"
+          onConfirm={() => handleDelete(record)}
+          disabled={isSelf}
+        >
+          <Button size="small" type="text" danger icon={<DeleteOutlined />} disabled={isSelf} />
+        </Popconfirm>
+      </Space>
+    );
+  };
+
   const columns: ColumnsType<AdminUserItem> = [
     {
       title: "ID",
@@ -208,7 +280,7 @@ export default function UserManagerCard() {
           <UserOutlined style={{ color: colors.textMuted }} />
           <span style={{ fontWeight: 500 }}>{name}</span>
           {record.id === currentUser?.id && (
-            <Tag color="blue" style={{ fontSize: "11px", padding: "0 4px", lineHeight: "18px" }}>
+            <Tag color="blue" style={{ fontSize: "var(--c-font-xs)", padding: "0 4px", lineHeight: "18px" }}>
               当前账号
             </Tag>
           )}
@@ -260,75 +332,57 @@ export default function UserManagerCard() {
       title: "操作",
       key: "actions",
       width: 250,
-      render: (_, record) => {
-        const isSelf = record.id === currentUser?.id;
-        return (
-          <Space size="small" wrap>
-            {record.is_active ? (
-              <Popconfirm
-                title="确定禁用该用户？"
-                description="禁用后该用户将立即断开所有会话并无法登录。"
-                onConfirm={() => handleToggleStatus(record)}
-                disabled={isSelf}
-              >
-                <Button size="small" danger disabled={isSelf}>
-                  禁用
-                </Button>
-              </Popconfirm>
-            ) : (
-              <Button size="small" onClick={() => handleToggleStatus(record)}>
-                启用
-              </Button>
-            )}
-
-            <Popconfirm
-              title={record.is_admin ? "取消该用户的管理员权限？" : "设为管理员？"}
-              onConfirm={() => handleToggleRole(record)}
-              disabled={isSelf}
-            >
-              <Button size="small" disabled={isSelf}>
-                {record.is_admin ? "降为普通" : "设为管理"}
-              </Button>
-            </Popconfirm>
-
-            <Tooltip title={record.must_change_password ? "取消下次改密要求" : "要求该用户下次登录时必须修改密码"}>
-              <Button
-                size="small"
-                style={record.must_change_password ? { color: colors.warning } : undefined}
-                onClick={() => handleToggleMustChangePassword(record)}
-              >
-                {record.must_change_password ? "取消改密" : "要求改密"}
-              </Button>
-            </Tooltip>
-
-            <Tooltip title="生成一次性密码重置链接">
-              <Button
-                size="small"
-                icon={<KeyOutlined />}
-                onClick={() => openResetModal(record)}
-              />
-            </Tooltip>
-
-            <Tooltip title="强制注销该用户的所有在线会话设备">
-              <Button
-                size="small"
-                icon={<DisconnectOutlined />}
-                onClick={() => handleRevokeSessions(record)}
-              />
-            </Tooltip>
-
-            <Popconfirm
-              title="确定删除该用户？"
-              description="删除后该用户的所有配置、重置记录和登录凭证将被永久清空。"
-              onConfirm={() => handleDelete(record)}
-              disabled={isSelf}
-            >
-              <Button size="small" type="text" danger icon={<DeleteOutlined />} disabled={isSelf} />
-            </Popconfirm>
-          </Space>
-        );
-      },
+      render: (_, record) => renderActions(record),
     },
+  ];
+
+
+  const mobileFields: MobileRecordField<AdminUserItem>[] = [
+    {
+      label: "用户",
+      primary: true,
+      render: (record) => (
+        <span>
+          {record.username}
+          {record.id === currentUser?.id && (
+            <Tag color="blue" style={{ marginLeft: 6, fontSize: "var(--c-font-xs)", padding: "0 4px", lineHeight: "18px" }}>
+              当前账号
+            </Tag>
+          )}
+        </span>
+      ),
+    },
+    {
+      label: "角色",
+      render: (record) =>
+        record.is_admin ? (
+          <Tag color="purple" icon={<CrownOutlined />}>
+            管理员
+          </Tag>
+        ) : (
+          <Tag>普通用户</Tag>
+        ),
+    },
+    {
+      label: "状态",
+      render: (record) =>
+        record.is_active ? (
+          <Tag style={semanticTagStyle("down")}>正常</Tag>
+        ) : (
+          <Tag style={semanticTagStyle("up")}>已禁用</Tag>
+        ),
+    },
+    {
+      label: "改密",
+      render: (record) =>
+        record.must_change_password ? (
+          <Tag style={semanticTagStyle("warning")}>待改密</Tag>
+        ) : (
+          <Tag>已改密</Tag>
+        ),
+    },
+    { label: "ID", render: (record) => `#${record.id}` },
+    { label: "注册时间", render: (record) => record.created_at || "—" },
   ];
 
   return (
@@ -355,33 +409,33 @@ export default function UserManagerCard() {
         {/* User statistics banner */}
         <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
           <Col xs={12} sm={6}>
-            <div style={{ padding: "8px 12px", background: colors.hoverBg, borderRadius: 6 }}>
-              <div style={{ fontSize: "12px", color: colors.textMuted }}>总用户数</div>
-              <div style={{ fontSize: "18px", fontWeight: 600, color: colors.textPrimary }}>
+            <div style={{ padding: "var(--c-pad-inset, 7px 12px)", background: colors.hoverBg, borderRadius: 6 }}>
+              <div style={{ fontSize: "var(--c-font-sm)", color: colors.textMuted }}>总用户数</div>
+              <div style={{ fontSize: "var(--c-font-xl)", fontWeight: 600, color: colors.textPrimary }}>
                 {stats.total}
               </div>
             </div>
           </Col>
           <Col xs={12} sm={6}>
-            <div style={{ padding: "8px 12px", background: colors.hoverBg, borderRadius: 6 }}>
-              <div style={{ fontSize: "12px", color: colors.textMuted }}>正常运行</div>
-              <div style={{ fontSize: "18px", fontWeight: 600, color: colors.down }}>
+            <div style={{ padding: "var(--c-pad-inset, 7px 12px)", background: colors.hoverBg, borderRadius: 6 }}>
+              <div style={{ fontSize: "var(--c-font-sm)", color: colors.textMuted }}>正常运行</div>
+              <div style={{ fontSize: "var(--c-font-xl)", fontWeight: 600, color: colors.down }}>
                 {stats.active}
               </div>
             </div>
           </Col>
           <Col xs={12} sm={6}>
-            <div style={{ padding: "8px 12px", background: colors.hoverBg, borderRadius: 6 }}>
-              <div style={{ fontSize: "12px", color: colors.textMuted }}>已禁用</div>
-              <div style={{ fontSize: "18px", fontWeight: 600, color: stats.disabled > 0 ? colors.up : colors.textMuted }}>
+            <div style={{ padding: "var(--c-pad-inset, 7px 12px)", background: colors.hoverBg, borderRadius: 6 }}>
+              <div style={{ fontSize: "var(--c-font-sm)", color: colors.textMuted }}>已禁用</div>
+              <div style={{ fontSize: "var(--c-font-xl)", fontWeight: 600, color: stats.disabled > 0 ? colors.up : colors.textMuted }}>
                 {stats.disabled}
               </div>
             </div>
           </Col>
           <Col xs={12} sm={6}>
-            <div style={{ padding: "8px 12px", background: colors.hoverBg, borderRadius: 6 }}>
-              <div style={{ fontSize: "12px", color: colors.textMuted }}>管理员</div>
-              <div style={{ fontSize: "18px", fontWeight: 600, color: "#722ed1" }}>
+            <div style={{ padding: "var(--c-pad-inset, 7px 12px)", background: colors.hoverBg, borderRadius: 6 }}>
+              <div style={{ fontSize: "var(--c-font-sm)", color: colors.textMuted }}>管理员</div>
+              <div style={{ fontSize: "var(--c-font-xl)", fontWeight: 600, color: "#722ed1" }}>
                 {stats.admins}
               </div>
             </div>
@@ -435,14 +489,24 @@ export default function UserManagerCard() {
           isEmpty={filteredUsers.length === 0}
           emptyText={users.length > 0 ? "未找到符合筛选条件的用户" : "暂无用户记录"}
         >
-          <Table
-            rowKey="id"
-            dataSource={filteredUsers}
-            columns={columns}
-            pagination={{ pageSize: 10, hideOnSinglePage: true }}
-            size="middle"
-            scroll={{ x: 760 }}
-          />
+          {isNarrow ? (
+            <SettingsMobileRecordList
+              items={filteredUsers}
+              rowKey={(record) => record.id}
+              fields={mobileFields}
+              ariaLabel="用户列表"
+              actions={(record) => renderActions(record)}
+            />
+          ) : (
+            <Table
+              rowKey="id"
+              dataSource={filteredUsers}
+              columns={columns}
+              pagination={{ pageSize: 10, hideOnSinglePage: true }}
+              size="middle"
+              scroll={{ x: 760 }}
+            />
+          )}
         </SectionDataState>
       </Card>
 
@@ -484,7 +548,7 @@ export default function UserManagerCard() {
         {!resetResult ? (
           <Space orientation="vertical" style={{ width: "100%" }} size="middle">
             <div>
-              <span style={{ fontSize: "13px", color: colors.textPrimary, marginRight: 8 }}>有效期：</span>
+              <span style={{ fontSize: "var(--c-font-md)", color: colors.textPrimary, marginRight: 8 }}>有效期：</span>
               <Select
                 value={resetHours}
                 onChange={setResetHours}

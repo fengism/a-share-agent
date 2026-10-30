@@ -1,16 +1,22 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   AimOutlined,
   ApartmentOutlined,
+  AppstoreOutlined,
   AuditOutlined,
   CalendarOutlined,
+  CompassOutlined,
+  DashboardOutlined,
   DownloadOutlined,
+  FireOutlined,
   LineChartOutlined,
   ReloadOutlined,
   RobotOutlined,
+  StarOutlined,
   ThunderboltOutlined,
 } from "@ant-design/icons";
-import { Button, Card, Table, Tag, Typography } from "antd";
+import { Button, Card, FloatButton, Segmented, Table, Tag, Typography } from "antd";
+import PageShell from "../../components/page/PageShell";
 import type { ColumnsType } from "antd/es/table";
 import { useNavigate } from "react-router-dom";
 import { useMarketMainline } from "../../api/queries";
@@ -20,7 +26,7 @@ import RefreshBadge from "../../components/RefreshBadge";
 import SectionDataState from "../../components/SectionDataState";
 import StockExternalLink from "../../components/StockExternalLink";
 import { useAStockTradingSession } from "../../hooks/useAStockTradingSession";
-import { useColors, useStyles, useTokens, semanticTagStyle } from "../../styles/ui";
+import { useColors, useTokens, semanticTagStyle } from "../../styles/ui";
 import type {
   MarketMainlineChance,
   MarketMainlineStyle,
@@ -31,8 +37,19 @@ import MarketOverviewBoard from "../../components/MarketOverviewBoard";
 import MarketWindBoard from "../../components/MarketWindBoard";
 import { marketDateStamp } from "../../utils/marketTime";
 import WatchlistPanel from "./WatchlistPanel";
+import "./dashboard.css";
 
 const { Text } = Typography;
+
+type MobileDashboardView = "all" | "market" | "mainline" | "watchlist" | "hotrank";
+
+const MOBILE_VIEW_OPTIONS = [
+  { label: "全景", value: "all", icon: <AppstoreOutlined /> },
+  { label: "大盘", value: "market", icon: <DashboardOutlined /> },
+  { label: "主线", value: "mainline", icon: <CompassOutlined /> },
+  { label: "自选", value: "watchlist", icon: <StarOutlined /> },
+  { label: "热榜", value: "hotrank", icon: <FireOutlined /> },
+];
 
 interface MainlineFaucetRow {
   key: string;
@@ -183,8 +200,9 @@ function MainlineFaucetTableCard({ rows }: { rows: MainlineFaucetRow[] }) {
       title: "涨跌幅",
       dataIndex: "change_pct",
       key: "change_pct",
-      width: 85,
+      width: 95,
       align: "right",
+      sorter: (a, b) => (a.change_pct ?? -Infinity) - (b.change_pct ?? -Infinity),
       render: (value: number | null) => <ChangeValue value={value} />,
     },
     {
@@ -197,9 +215,14 @@ function MainlineFaucetTableCard({ rows }: { rows: MainlineFaucetRow[] }) {
     {
       title: "快速下钻",
       key: "actions",
-      width: 95,
+      width: 135,
       render: (_value, row) => (
         <span style={{ display: "inline-flex", gap: 4 }}>
+          <PreloadLink to={`/chat?prompt=${encodeURIComponent(`分析 ${row.name}(${row.code}) 的主线逻辑、资金流向与近期估值`)}`}>
+            <Button size="small" type="link" style={{ padding: "0 2px", fontSize: 12 }}>
+              问AI
+            </Button>
+          </PreloadLink>
           <PreloadLink to={`/analysis?code=${row.code}`}>
             <Button size="small" type="link" style={{ padding: "0 2px", fontSize: 12 }}>
               研报
@@ -229,14 +252,51 @@ function MainlineFaucetTableCard({ rows }: { rows: MainlineFaucetRow[] }) {
       }
       style={{ borderRadius: t.radius.md, boxShadow: t.shadow.xs }}
     >
-      <Table<MainlineFaucetRow>
-        size="small"
-        rowKey="key"
-        columns={columns}
-        dataSource={rows}
-        pagination={{ pageSize: 10, size: "small", showSizeChanger: false, hideOnSinglePage: true }}
-        scroll={{ x: 500 }}
-      />
+      <div className="dashboard-faucet-desktop-table">
+        <Table<MainlineFaucetRow>
+          size="small"
+          rowKey="key"
+          columns={columns}
+          dataSource={rows}
+          pagination={{ pageSize: 10, size: "small", showSizeChanger: false, hideOnSinglePage: true }}
+          scroll={{ x: 500 }}
+        />
+      </div>
+      <div className="dashboard-faucet-mobile-cards">
+        {rows.map((row) => (
+          <div key={row.key} className="dashboard-faucet-card-item">
+            <div className="dashboard-faucet-card-item__top">
+              <span className="dashboard-faucet-card-item__name">
+                <StockExternalLink code={row.code} name={row.name}>
+                  <strong>{row.name}</strong>
+                </StockExternalLink>
+                <span className="dashboard-faucet-card-item__code financial-num">{row.code}</span>
+              </span>
+              <ChangeValue value={row.change_pct} />
+            </div>
+            <div className="dashboard-faucet-card-item__meta">
+              <Tag color="blue" style={{ marginInlineEnd: 0, fontSize: 11 }}>{row.origin}</Tag>
+            </div>
+            {row.reason ? (
+              <div className="dashboard-faucet-card-item__reason">
+                {row.reason}
+              </div>
+            ) : null}
+            <div className="dashboard-faucet-card-item__actions">
+              <PreloadLink to={`/analysis?code=${row.code}`}>
+                <Button size="small" type="link" style={{ padding: "0 4px", fontSize: 12 }}>
+                  研报
+                </Button>
+              </PreloadLink>
+              <PreloadLink to={`/quant?codes=${row.code}`}>
+                <Button size="small" type="link" style={{ padding: "0 4px", fontSize: 12 }}>
+                  回测
+                </Button>
+              </PreloadLink>
+            </div>
+          </div>
+        ))}
+      </div>
     </Card>
   );
 }
@@ -258,6 +318,7 @@ function MainlineStyleTableCard({ style }: { style: MarketMainlineStyle }) {
       key: "change_30d",
       width: 120,
       align: "right",
+      sorter: (a, b) => (a.change_30d ?? -Infinity) - (b.change_30d ?? -Infinity),
       render: (value: number | null) => <ChangeValue value={value} />,
     },
   ], []);
@@ -281,6 +342,7 @@ function MainlineStyleTableCard({ style }: { style: MarketMainlineStyle }) {
       key: "change_30d",
       width: 100,
       align: "right",
+      sorter: (a, b) => (a.change_30d ?? -Infinity) - (b.change_30d ?? -Infinity),
       render: (value: number | null) => <ChangeValue value={value} />,
     },
     {
@@ -401,17 +463,15 @@ function DashboardMainlineSection() {
 }
 
 export default function Dashboard() {
-  const { pageContainerStyle } = useStyles();
+
   const navigate = useNavigate();
+  const [mobileView, setMobileView] = useState<MobileDashboardView>("all");
 
   const today = new Date();
   const dateStr = `${today.getFullYear()}年${today.getMonth() + 1}月${today.getDate()}日`;
 
   return (
-    <div
-      className="dashboard-page"
-      style={{ ...pageContainerStyle, width: "100%", maxWidth: "none", boxSizing: "border-box" }}
-    >
+    <PageShell width="full" className="dashboard-page">
       <header className="dashboard-hero">
         <div className="dashboard-hero__copy">
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -424,9 +484,19 @@ export default function Dashboard() {
             <span style={{ fontSize: "var(--c-font-xs)", color: "var(--c-text-muted)" }}>·</span>
             <span style={{ fontSize: "var(--c-font-xs)", color: "var(--c-text-secondary)", fontFamily: "var(--c-font-mono)" }}>{dateStr}</span>
           </div>
-          <h1>市场总览</h1>
+          <h1 className="dashboard-hero__title">市场总览</h1>
         </div>
         <div className="dashboard-hero__shortcuts">
+          <Button
+            size="small"
+            shape="round"
+            type="primary"
+            className="dashboard-hero__shortcut-btn"
+            icon={<RobotOutlined />}
+            onClick={() => navigate("/chat?prompt=" + encodeURIComponent("总结今日A股市场全景、领涨主线题材与资金攻击方向"))}
+          >
+            AI 盘面诊断
+          </Button>
           <Button
             size="small"
             shape="round"
@@ -486,7 +556,24 @@ export default function Dashboard() {
           </Button>
         </div>
       </header>
-      <div className="dashboard-layout">
+      <div className="dashboard-mobile-nav">
+        <Segmented
+          block
+          value={mobileView}
+          onChange={(val) => {
+            setMobileView(val as MobileDashboardView);
+            if (
+              typeof window !== "undefined" &&
+              typeof window.scrollTo === "function" &&
+              import.meta.env.MODE !== "test"
+            ) {
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }
+          }}
+          options={MOBILE_VIEW_OPTIONS}
+        />
+      </div>
+      <div className="dashboard-layout" data-mobile-view={mobileView}>
         <section className="dashboard-main" aria-label="首页中间内容">
           <section className="dashboard-market-board" aria-label="首页市场看板">
             <MarketOverviewBoard showRankings={false} onNavigate={(tab) => navigate(`/market?tab=${tab}`)} />
@@ -501,6 +588,7 @@ export default function Dashboard() {
           <WatchlistPanel />
         </aside>
       </div>
-    </div>
+      <FloatButton.BackTop tooltip="回到顶部" />
+    </PageShell>
   );
 }

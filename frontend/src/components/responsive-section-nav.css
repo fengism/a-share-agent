@@ -71,6 +71,28 @@
   min-width: 0;
 }
 
+/* 次级横向导航：标签过多时允许横向滚动，避免换行/溢出造成视觉混乱 */
+.responsive-section-nav__tabs > .ant-tabs-nav .ant-tabs-nav-wrap {
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scroll-snap-type: x proximity;
+}
+
+.responsive-section-nav__tabs > .ant-tabs-nav .ant-tabs-nav-wrap::-webkit-scrollbar {
+  height: 4px;
+}
+
+.responsive-section-nav__tabs > .ant-tabs-nav .ant-tabs-nav-wrap::-webkit-scrollbar-thumb {
+  background: var(--c-border, rgba(148, 163, 184, 0.4));
+  border-radius: 2px;
+}
+
+.responsive-section-nav__tabs > .ant-tabs-nav .ant-tabs-tab {
+  scroll-snap-align: start;
+}
+
 .responsive-section-nav__tabs .ant-tabs-tab-btn {
   white-space: nowrap;
 }
@@ -134,6 +156,54 @@
 }
 
 .responsive-section-nav__rail-item:focus-visible {
+  outline: 2px solid var(--c-focus-ring);
+  outline-offset: 2px;
+}
+
+/* 移动端横向胶囊导航：分区名称较长时保持可读，并支持横向滑动 */
+.responsive-section-nav__chips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 2px 0 4px;
+  scrollbar-width: none;
+  scroll-snap-type: x proximity;
+}
+
+.responsive-section-nav__chips::-webkit-scrollbar {
+  display: none;
+}
+
+.responsive-section-nav__chip {
+  flex: 0 0 auto;
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 1px solid var(--c-border);
+  border-radius: 999px;
+  background: var(--c-card-bg);
+  color: var(--c-text-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--c-font-sm, 13px);
+  line-height: 1.4;
+  white-space: nowrap;
+  scroll-snap-align: start;
+  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+.responsive-section-nav__chip:hover {
+  color: var(--c-text-primary);
+  border-color: var(--c-primary);
+}
+
+.responsive-section-nav__chip[aria-selected="true"] {
+  color: var(--c-primary);
+  border-color: var(--c-primary);
+  background: var(--c-primary-soft);
+  font-weight: var(--c-weight-bold);
+}
+
+.responsive-section-nav__chip:focus-visible {
   outline: 2px solid var(--c-focus-ring);
   outline-offset: 2px;
 }

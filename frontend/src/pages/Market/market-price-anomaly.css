@@ -3,22 +3,6 @@
   gap: 16px;
 }
 
-.market-price-anomaly__toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.market-price-anomaly__actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
 .market-price-anomaly__metrics .ant-card-body {
   padding: 14px 16px;
 }
@@ -36,16 +20,6 @@
 }
 
 @media (max-width: 576px) {
-  .market-price-anomaly__toolbar,
-  .market-price-anomaly__actions {
-    align-items: stretch;
-    width: 100%;
-  }
-
-  .market-price-anomaly__actions {
-    justify-content: space-between;
-  }
-
   .market-price-anomaly__pagination {
     justify-content: center;
   }

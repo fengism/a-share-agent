@@ -131,6 +131,30 @@ export default function ActiveFiltersBar({
     });
   }
 
+  const volumeRatioLabel = formatRangeLabel("量比", filters.volume_ratio_min, filters.volume_ratio_max);
+  if (volumeRatioLabel) {
+    activeItems.push({
+      key: "volume_ratio",
+      label: volumeRatioLabel,
+      onRemove: () => {
+        onFiltersChange({ ...filters, volume_ratio_min: null, volume_ratio_max: null, page: 1 });
+        onSearch();
+      },
+    });
+  }
+
+  const changePct60dLabel = formatRangeLabel("60日涨幅", filters.change_pct_60d_min, filters.change_pct_60d_max, "%");
+  if (changePct60dLabel) {
+    activeItems.push({
+      key: "change_pct_60d",
+      label: changePct60dLabel,
+      onRemove: () => {
+        onFiltersChange({ ...filters, change_pct_60d_min: null, change_pct_60d_max: null, page: 1 });
+        onSearch();
+      },
+    });
+  }
+
   if (filters.is_broken_net) {
     activeItems.push({
       key: "is_broken_net",
@@ -229,7 +253,7 @@ export default function ActiveFiltersBar({
         alignItems: "center",
         flexWrap: "wrap",
         gap: "6px 8px",
-        padding: "8px 12px",
+        padding: "var(--c-pad-inset, 7px 12px)",
         marginTop: 12,
         backgroundColor: c.nestedBg || "rgba(0, 0, 0, 0.02)",
         borderRadius: 6,

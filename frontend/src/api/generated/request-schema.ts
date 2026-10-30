@@ -1958,7 +1958,7 @@ export interface paths {
         };
         /**
          * List Concepts
-         * @description 获取概念列表，按成分股只数降序，用于概念选择器。
+         * @description 获取概念列表，用于概念选择器；order=change 时附带最近交易日涨跌聚合。
          */
         get: operations["list_concepts_api_market_concepts_get"];
         put?: never;
@@ -5703,6 +5703,11 @@ export interface components {
             price?: number | null;
             /** Quote Source */
             quote_source?: string | null;
+            /**
+             * Related Concepts
+             * @description 该股票所属的其他概念（最具体的几个，不含当前概念），用于概念间联动
+             */
+            related_concepts?: string[];
         };
         /**
          * ConceptConstituentResponse
@@ -5900,13 +5905,25 @@ export interface components {
         };
         /**
          * ConceptSummaryItem
-         * @description 概念列表中的单条摘要（名称 + 成分股只数）。
+         * @description 概念列表中的单条摘要（名称 + 成分股只数 + 最近交易日等权涨跌）。
          */
         ConceptSummaryItem: {
+            /** Change Date */
+            change_date?: string | null;
+            /** Change Pct */
+            change_pct?: number | null;
+            /** Down Count */
+            down_count?: number | null;
+            /** Limit Up Count */
+            limit_up_count?: number | null;
             /** Name */
             name: string;
+            /** Sample Count */
+            sample_count?: number | null;
             /** Stock Count */
             stock_count: number;
+            /** Up Count */
+            up_count?: number | null;
         };
         /**
          * ConfigResponse
@@ -11662,8 +11679,27 @@ export interface components {
              */
             success?: boolean;
         };
+        /** NationalTeamDailyFlow */
+        NationalTeamDailyFlow: {
+            /** Date */
+            date: string;
+            /** Flows By Category */
+            flows_by_category?: {
+                [key: string]: number;
+            };
+            /** Flows By Index */
+            flows_by_index?: {
+                [key: string]: number;
+            };
+            /** Total Flow 100M */
+            total_flow_100m?: number | null;
+            /** Total Shares Change 100M */
+            total_shares_change_100m?: number | null;
+        };
         /** NationalTeamEtfPoint */
         NationalTeamEtfPoint: {
+            /** Amount 100M */
+            amount_100m?: number | null;
             /** Close */
             close?: number | null;
             /** Date */
@@ -11691,6 +11727,11 @@ export interface components {
         };
         /** NationalTeamEtfSeries */
         NationalTeamEtfSeries: {
+            /**
+             * Category
+             * @default core_broad
+             */
+            category?: string;
             /** Change 20D 100M */
             change_20d_100m?: number | null;
             /** Change 5D 100M */
@@ -11708,6 +11749,13 @@ export interface components {
             index_key: string;
             /** Index Name */
             index_name: string;
+            /**
+             * Is Abnormal Volume
+             * @default false
+             */
+            is_abnormal_volume?: boolean;
+            /** Latest Amount 100M */
+            latest_amount_100m?: number | null;
             /** Latest Change 1D 100M */
             latest_change_1d_100m?: number | null;
             /** Latest Date */
@@ -11718,6 +11766,21 @@ export interface components {
             name: string;
             /** Points */
             points?: components["schemas"]["NationalTeamEtfPoint"][];
+            /** Volume Ratio */
+            volume_ratio?: number | null;
+        };
+        /** NationalTeamHolderEntity */
+        NationalTeamHolderEntity: {
+            /** Estimated Aum Trillion */
+            estimated_aum_trillion: number;
+            /** Focus */
+            focus: string;
+            /** Name */
+            name: string;
+            /** Role */
+            role: string;
+            /** Short Name */
+            short_name: string;
         };
         /** NationalTeamIndexPoint */
         NationalTeamIndexPoint: {
@@ -11739,6 +11802,11 @@ export interface components {
         };
         /** NationalTeamIndexSeries */
         NationalTeamIndexSeries: {
+            /**
+             * Category
+             * @default core_broad
+             */
+            category?: string;
             /** Change 20D 100M */
             change_20d_100m?: number | null;
             /** Change 5D 100M */
@@ -11764,6 +11832,55 @@ export interface components {
             /** Points */
             points?: components["schemas"]["NationalTeamIndexPoint"][];
         };
+        /** NationalTeamIndustryAllocation */
+        NationalTeamIndustryAllocation: {
+            /** Industry */
+            industry: string;
+            /** Market Value 100M */
+            market_value_100m: number;
+            /** Representative Stocks */
+            representative_stocks?: string[];
+            /** Weight Pct */
+            weight_pct: number;
+        };
+        /** NationalTeamMilestone */
+        NationalTeamMilestone: {
+            /** Date */
+            date: string;
+            /** Description */
+            description: string;
+            /** Index Points */
+            index_points?: {
+                [key: string]: number;
+            };
+            /** Title */
+            title: string;
+            /**
+             * Type
+             * @default policy
+             * @enum {string}
+             */
+            type?: "statement" | "intervention" | "policy" | "liquidity";
+        };
+        /** NationalTeamPortrait */
+        NationalTeamPortrait: {
+            /** Entities */
+            entities?: components["schemas"]["NationalTeamHolderEntity"][];
+            /** Industry Allocations */
+            industry_allocations?: components["schemas"]["NationalTeamIndustryAllocation"][];
+            /**
+             * Reporting Period
+             * @default 2024Q3 / 2024年报
+             */
+            reporting_period?: string;
+            /** Top Holdings */
+            top_holdings?: components["schemas"]["NationalTeamTopHolding"][];
+            /**
+             * Total Market Value Trillion
+             * @default 3.85
+             */
+            total_market_value_trillion?: number;
+        };
         /** NationalTeamResponse */
         NationalTeamResponse: {
             /** As Of Date */
@@ -11778,6 +11895,8 @@ export interface components {
              * @default 0
              */
             covered_etf_count?: number;
+            /** Daily Flows */
+            daily_flows?: components["schemas"]["NationalTeamDailyFlow"][];
             /** Disclaimer */
             disclaimer: string;
             /** Etfs */
@@ -11790,6 +11909,8 @@ export interface components {
             indices?: components["schemas"]["NationalTeamIndexSeries"][];
             /** Methodology */
             methodology: string;
+            /** Milestones */
+            milestones?: components["schemas"]["NationalTeamMilestone"][];
             /** Missing Etfs */
             missing_etfs?: string[];
             /** Missing Indices */
@@ -11805,6 +11926,7 @@ export interface components {
              * @default false
              */
             partial?: boolean;
+            portrait?: components["schemas"]["NationalTeamPortrait"];
             /**
              * Refreshing
              * @default false
@@ -11823,9 +11945,12 @@ export interface components {
              */
             stale?: boolean;
             summary?: components["schemas"]["NationalTeamSummary"];
+            support_score?: components["schemas"]["NationalTeamSupportScore"];
+            /** Support Zones */
+            support_zones?: components["schemas"]["NationalTeamSupportZone"][];
             /**
              * Total Etf Count
-             * @default 12
+             * @default 22
              */
             total_etf_count?: number;
         };
@@ -11864,6 +11989,84 @@ export interface components {
             estimated_net_flow_5d_100m?: number | null;
             /** Total Shares 100M */
             total_shares_100m?: number | null;
+        };
+        /** NationalTeamSupportScore */
+        NationalTeamSupportScore: {
+            /**
+             * Breadth Factor
+             * @default 0
+             */
+            breadth_factor?: number;
+            /**
+             * Description
+             * @default
+             */
+            description?: string;
+            /**
+             * Divergence Factor
+             * @default 0
+             */
+            divergence_factor?: number;
+            /**
+             * Label
+             * @default 市场自发
+             */
+            label?: string;
+            /**
+             * Net Flow Factor
+             * @default 0
+             */
+            net_flow_factor?: number;
+            /**
+             * Score
+             * @default 50
+             */
+            score?: number;
+            /**
+             * Status
+             * @default neutral
+             * @enum {string}
+             */
+            status?: "neutral" | "moderate" | "active" | "strong";
+        };
+        /** NationalTeamSupportZone */
+        NationalTeamSupportZone: {
+            /** Cost Buffer Pct */
+            cost_buffer_pct?: number | null;
+            /** Current Price */
+            current_price?: number | null;
+            /** Index Key */
+            index_key: string;
+            /** Index Name */
+            index_name: string;
+            /** Weighted Avg Cost */
+            weighted_avg_cost?: number | null;
+            /** Zones */
+            zones?: components["schemas"]["NationalTeamSupportZoneItem"][];
+        };
+        /** NationalTeamSupportZoneItem */
+        NationalTeamSupportZoneItem: {
+            /** Net Flow 100M */
+            net_flow_100m: number;
+            /** Range Label */
+            range_label: string;
+            /** Share Pct */
+            share_pct: number;
+        };
+        /** NationalTeamTopHolding */
+        NationalTeamTopHolding: {
+            /** Code */
+            code: string;
+            /** Holder Name */
+            holder_name: string;
+            /** Industry */
+            industry: string;
+            /** Market Value 100M */
+            market_value_100m: number;
+            /** Name */
+            name: string;
+            /** Shareholding Ratio Pct */
+            shareholding_ratio_pct: number;
         };
         /** NeedsSetupResponse */
         NeedsSetupResponse: {
@@ -12174,8 +12377,18 @@ export interface components {
         PortfolioClosedPosition: {
             /** Buy Count */
             buy_count: number;
+            /**
+             * Currency
+             * @default CNY
+             */
+            currency?: string;
             /** First Trade Time */
             first_trade_time: string;
+            /**
+             * Fx Rate To Cny
+             * @default 1
+             */
+            fx_rate_to_cny?: number;
             /** Holding Days */
             holding_days: number;
             /** Last Trade Time */
@@ -12222,6 +12435,19 @@ export interface components {
         };
         /** PortfolioEquityCurveResponse */
         PortfolioEquityCurveResponse: {
+            /** Annualized Return Pct */
+            annualized_return_pct?: number | null;
+            /** Annualized Volatility Pct */
+            annualized_volatility_pct?: number | null;
+            /**
+             * Base Currency
+             * @default CNY
+             */
+            base_currency?: string;
+            /** Best Day Pct */
+            best_day_pct?: number | null;
+            /** Calmar Ratio */
+            calmar_ratio?: number | null;
             /** Current Securities Value */
             current_securities_value?: number | null;
             /** Current Total Assets */
@@ -12231,8 +12457,14 @@ export interface components {
              * Format: date
              */
             end_date: string;
+            /** Fx Rates */
+            fx_rates?: {
+                [key: string]: number;
+            };
             /** Initial Cash */
             initial_cash?: number | null;
+            /** Longest Drawdown Days */
+            longest_drawdown_days?: number | null;
             /** Max Drawdown Pct */
             max_drawdown_pct?: number | null;
             /**
@@ -12242,14 +12474,30 @@ export interface components {
             mode: "total_assets" | "securities_only";
             /** Points */
             points?: components["schemas"]["PortfolioEquityCurvePoint"][];
+            /**
+             * Risk Free Rate Pct
+             * @default 0
+             */
+            risk_free_rate_pct?: number;
+            /** Sharpe Ratio */
+            sharpe_ratio?: number | null;
             /** Sources */
             sources?: string[];
             /** Start Date */
             start_date?: string | null;
             /** Total Return Pct */
             total_return_pct?: number | null;
+            /**
+             * Trading Days
+             * @default 0
+             */
+            trading_days?: number;
             /** Warnings */
             warnings?: string[];
+            /** Win Rate Pct */
+            win_rate_pct?: number | null;
+            /** Worst Day Pct */
+            worst_day_pct?: number | null;
         };
         /** PortfolioLotMatch */
         PortfolioLotMatch: {
@@ -12259,6 +12507,11 @@ export interface components {
             buy_time: string;
             /** Buy Transaction Id */
             buy_transaction_id: number;
+            /**
+             * Currency
+             * @default CNY
+             */
+            currency?: string;
             /** Matched Cost */
             matched_cost: number;
             /** Shares */
@@ -12276,16 +12529,41 @@ export interface components {
             change_pct?: number | null;
             /** Cost Value */
             cost_value: number;
+            /**
+             * Cost Value Native
+             * @default 0
+             */
+            cost_value_native?: number;
+            /**
+             * Currency
+             * @default CNY
+             */
+            currency?: string;
             /** Current Price */
             current_price?: number | null;
+            /** Daily Profit Amount */
+            daily_profit_amount?: number | null;
+            /** Daily Profit Pct */
+            daily_profit_pct?: number | null;
+            /** Frozen Shares */
+            frozen_shares?: number | null;
+            /**
+             * Fx Rate To Cny
+             * @default 1
+             */
+            fx_rate_to_cny?: number;
             /** Id */
             id: number;
             /** Market Value */
             market_value?: number | null;
+            /** Prev Close */
+            prev_close?: number | null;
             /** Profit Amount */
             profit_amount?: number | null;
             /** Profit Pct */
             profit_pct?: number | null;
+            /** Sellable Shares */
+            sellable_shares?: number | null;
             /** Shares */
             shares: number;
             /** Stock Code */
@@ -12335,11 +12613,17 @@ export interface components {
         };
         /** PortfolioRiskSummary */
         PortfolioRiskSummary: {
+            /** Cash Pct */
+            cash_pct?: number | null;
+            /** Concentration Index */
+            concentration_index?: number | null;
             /**
              * Concentration Level
              * @enum {string}
              */
             concentration_level: "low" | "medium" | "high" | "unknown";
+            /** Effective Holding Count */
+            effective_holding_count?: number | null;
             /** Largest Position Stock Code */
             largest_position_stock_code?: string | null;
             /** Largest Position Stock Name */
@@ -12358,10 +12642,22 @@ export interface components {
             max_total_position_limit_pct: number;
             /** Priced Stock Count */
             priced_stock_count: number;
+            /** Remaining Add Capacity */
+            remaining_add_capacity?: number | null;
             /** Sector Allocations */
             sector_allocations?: components["schemas"]["PortfolioSectorAllocation"][];
+            /** Securities Concentration Index */
+            securities_concentration_index?: number | null;
+            /** Securities Effective Holding Count */
+            securities_effective_holding_count?: number | null;
+            /** Securities Top5 Concentration Pct */
+            securities_top5_concentration_pct?: number | null;
             /** Top3 Concentration Pct */
             top3_concentration_pct?: number | null;
+            /** Top5 Concentration Pct */
+            top5_concentration_pct?: number | null;
+            /** Trim Suggestions */
+            trim_suggestions?: components["schemas"]["PortfolioTrimSuggestion"][];
             /** Unpriced Stock Count */
             unpriced_stock_count: number;
             /** Warnings */
@@ -12388,12 +12684,36 @@ export interface components {
             change_pct?: number | null;
             /** Cost Value */
             cost_value: number;
+            /**
+             * Currency
+             * @default CNY
+             */
+            currency?: string;
             /** Current Price */
             current_price?: number | null;
+            /** Daily Profit Amount */
+            daily_profit_amount?: number | null;
+            /** Daily Profit Pct */
+            daily_profit_pct?: number | null;
+            /** Frozen Shares */
+            frozen_shares?: number | null;
+            /**
+             * Fx Rate To Cny
+             * @default 1
+             */
+            fx_rate_to_cny?: number;
+            /** Lot Size */
+            lot_size?: number | null;
             /** Market Value */
             market_value?: number | null;
+            /** Max Additional Shares */
+            max_additional_shares?: number | null;
+            /** Max Additional Value */
+            max_additional_value?: number | null;
             /** Position Count */
             position_count: number;
+            /** Prev Close */
+            prev_close?: number | null;
             /** Profit Amount */
             profit_amount?: number | null;
             /** Profit Contribution Pct */
@@ -12406,6 +12726,8 @@ export interface components {
             sector_name?: string | null;
             /** Securities Allocation Pct */
             securities_allocation_pct?: number | null;
+            /** Sellable Shares */
+            sellable_shares?: number | null;
             /** Stock Code */
             stock_code: string;
             /** Stock Name */
@@ -12417,20 +12739,41 @@ export interface components {
         };
         /** PortfolioSummary */
         PortfolioSummary: {
+            /**
+             * Base Currency
+             * @default CNY
+             */
+            base_currency?: string;
             /** Cash Balance */
             cash_balance?: number | null;
             /** Cash Configured */
             cash_configured: boolean;
             /** Combined Profit Amount */
             combined_profit_amount: number;
+            /**
+             * Daily Profit Amount
+             * @default 0
+             */
+            daily_profit_amount?: number;
+            /** Daily Profit Pct */
+            daily_profit_pct?: number | null;
             /** Estimated Securities Value */
             estimated_securities_value: number;
+            /** Fx Rates */
+            fx_rates?: {
+                [key: string]: number;
+            };
             /** Initial Cash */
             initial_cash?: number | null;
             /** Losing Count */
             losing_count: number;
             /** Position Count */
             position_count: number;
+            /**
+             * Previous Close Value
+             * @default 0
+             */
+            previous_close_value?: number;
             /** Priced Cost */
             priced_cost: number;
             /** Profitable Count */
@@ -12462,8 +12805,23 @@ export interface components {
         PortfolioTransaction: {
             /** Created At */
             created_at: string;
+            /**
+             * Currency
+             * @default CNY
+             */
+            currency?: string;
             /** Fee */
             fee: number;
+            /**
+             * Fee Native
+             * @default 0
+             */
+            fee_native?: number;
+            /**
+             * Fx Rate To Cny
+             * @default 1
+             */
+            fx_rate_to_cny?: number;
             /** Id */
             id: number;
             /** Matched Cost */
@@ -12485,6 +12843,16 @@ export interface components {
             stock_code: string;
             /** Stock Name */
             stock_name: string;
+            /**
+             * Trade Amount
+             * @default 0
+             */
+            trade_amount?: number;
+            /**
+             * Trade Amount Native
+             * @default 0
+             */
+            trade_amount_native?: number;
             /** Trade Price */
             trade_price: number;
             /** Trade Time */
@@ -12525,12 +12893,29 @@ export interface components {
             available_shares: number;
             /** Cash Balance After */
             cash_balance_after?: number | null;
+            /**
+             * Currency
+             * @default CNY
+             */
+            currency?: string;
             /** Current Shares After */
             current_shares_after: number;
             /** Estimated Total Assets After */
             estimated_total_assets_after?: number | null;
             /** Fee */
             fee: number;
+            /**
+             * Fee Native
+             * @default 0
+             */
+            fee_native?: number;
+            /** Frozen Shares */
+            frozen_shares?: number | null;
+            /**
+             * Fx Rate To Cny
+             * @default 1
+             */
+            fx_rate_to_cny?: number;
             /** Matched Cost */
             matched_cost?: number | null;
             /** Matches */
@@ -12541,6 +12926,10 @@ export interface components {
             sector_name?: string | null;
             /** Sector Position Pct After */
             sector_position_pct_after?: number | null;
+            /** Sellable After Trade */
+            sellable_after_trade?: number | null;
+            /** Sellable Shares */
+            sellable_shares?: number | null;
             /** Shares After Trade */
             shares_after_trade: number;
             /**
@@ -12556,10 +12945,41 @@ export interface components {
             total_position_pct_after?: number | null;
             /** Trade Amount */
             trade_amount: number;
+            /**
+             * Trade Amount Native
+             * @default 0
+             */
+            trade_amount_native?: number;
             /** Trade Time */
             trade_time: string;
             /** Warnings */
             warnings?: string[];
+        };
+        /**
+         * PortfolioTrimSuggestion
+         * @description 超限仓位的减仓建议（按最小交易单位向上取整，确保回到上限内）。
+         */
+        PortfolioTrimSuggestion: {
+            /** Current Pct */
+            current_pct: number;
+            /** Estimated Amount */
+            estimated_amount: number;
+            /** Lot Size */
+            lot_size: number;
+            /** Reasons */
+            reasons?: string[];
+            /** Sector Name */
+            sector_name?: string | null;
+            /** Sellable Shares */
+            sellable_shares: number;
+            /** Stock Code */
+            stock_code: string;
+            /** Stock Name */
+            stock_name: string;
+            /** Suggested Shares */
+            suggested_shares: number;
+            /** Target Pct */
+            target_pct: number;
         };
         /**
          * PotentialDailyResult
@@ -13966,6 +14386,10 @@ export interface components {
             amplitude_max?: number | null;
             /** Amplitude Min */
             amplitude_min?: number | null;
+            /** Change Pct 60D Max */
+            change_pct_60d_max?: number | null;
+            /** Change Pct 60D Min */
+            change_pct_60d_min?: number | null;
             /** Change Pct Max */
             change_pct_max?: number | null;
             /** Change Pct Min */
@@ -14030,6 +14454,10 @@ export interface components {
             turnover_pct_max?: number | null;
             /** Turnover Pct Min */
             turnover_pct_min?: number | null;
+            /** Volume Ratio Max */
+            volume_ratio_max?: number | null;
+            /** Volume Ratio Min */
+            volume_ratio_min?: number | null;
         };
         /**
          * ScreenerItem
@@ -14042,8 +14470,12 @@ export interface components {
             board?: string | null;
             /** Change Pct */
             change_pct?: number | null;
+            /** Change Pct 60D */
+            change_pct_60d?: number | null;
             /** Code */
             code: string;
+            /** Composite Score */
+            composite_score?: number | null;
             /** Concepts */
             concepts?: string[];
             /** Exchange */
@@ -14074,6 +14506,8 @@ export interface components {
             turnover_pct?: number | null;
             /** Volume */
             volume?: number | null;
+            /** Volume Ratio */
+            volume_ratio?: number | null;
         };
         /**
          * ScreenerPreset
@@ -19867,6 +20301,8 @@ export interface operations {
                 /** @description 概念名称模糊搜索 */
                 query?: string;
                 limit?: number;
+                /** @description 排序：size=按成分股只数（默认），change=按最近交易日等权涨幅 */
+                order?: string;
             };
             header?: never;
             path?: never;

@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useLayoutEffect, useMemo } from "react";
-import { BrowserRouter, Navigate, Routes, Route, useParams, useSearchParams } from "react-router-dom";
+import { RouterProvider } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { ConfigProvider, theme } from "antd";
 import zhCN from "antd/locale/zh_CN";
@@ -9,24 +9,13 @@ import { APP_FONT_FAMILY, APP_MONO_FONT_FAMILY } from "./theme/typography";
 import "./styles/base.css";
 import "./styles/markdown.css";
 import "./styles/analysis-export.css";
-import RequireAuth from "./components/RequireAuth";
 import ErrorBoundary from "./components/ErrorBoundary";
 import RouteLoadingFallback from "./components/RouteLoadingFallback";
 import { useAuthStore } from "./store/authStore";
 import { queryClient } from "./api/queryClient";
 import { pageLoaders, preloadAppRoute } from "./routes/pageLoaders";
 import RoutePreloadProvider from "./routes/RoutePreloadProvider";
-import { buildStockAnalysisUrl } from "./utils/stockLinks";
-
-/** 旧路径 `/investment-research/:code` 重定向到 `/analysis/:code?view=report`（保留历史日期）。 */
-function LegacyResearchRedirect() {
-  const { code = "" } = useParams<{ code: string }>();
-  const [searchParams] = useSearchParams();
-  const params = new URLSearchParams({ view: "report" });
-  const date = searchParams.get("date");
-  if (date) params.set("date", date);
-  return <Navigate to={`${buildStockAnalysisUrl(code)}?${params.toString()}`} replace />;
-}
+import { createAppRouter } from "./routes/appRoutes";
 
 // ── 路由级代码分割 ──
 const AppLayout = lazy(pageLoaders.appLayout);
@@ -177,6 +166,42 @@ function AntProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * 路由表（data router）。
+ *
+ * 使用 `createBrowserRouter` 而非声明式 `<Routes>`：只有 data router 才提供
+ * `useBlocker`，设置页等"未保存表单"页面需要它来做站内离开拦截。
+ */
+const router = createAppRouter({
+  AppLayout,
+  EarthScope,
+  Dashboard,
+  Watchlist,
+  Market,
+  NationalTeam,
+  TradingCalendar,
+  Screener,
+  Analysis,
+  Concept,
+  Stock,
+  AnalysisEntry,
+  DailyReview: DailyReviewPage,
+  Potential: PotentialPage,
+  Chat,
+  Settings,
+  Feed,
+  IndustryChain,
+  Macro,
+  Portfolio,
+  Quant,
+  Capabilities,
+  MasterData,
+  Login,
+  Register,
+  ResetPassword,
+  ForceChangePassword,
+});
+
 export default function App() {
   // Validate the HttpOnly cookie session once before protected routes render.
   useEffect(() => {
@@ -186,55 +211,13 @@ export default function App() {
   return (
     <AntProvider>
       <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
-          <RoutePreloadProvider preload={preloadAppRoute}>
-            <ErrorBoundary>
-              <Suspense fallback={<RouteLoadingFallback />}>
-                <Routes>
-                <Route path="/earthscope" element={<EarthScope />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/register" element={<Register />} />
-                <Route path="/reset-password" element={<ResetPassword />} />
-                <Route element={<RequireAuth />}>
-                <Route path="/force-change-password" element={<ErrorBoundary><ForceChangePassword /></ErrorBoundary>} />
-                <Route element={<AppLayout />}>
-                  <Route path="/" element={<ErrorBoundary><Dashboard /></ErrorBoundary>} />
-                  <Route path="/watchlist" element={<ErrorBoundary><Watchlist /></ErrorBoundary>} />
-                  <Route path="/market" element={<ErrorBoundary><Market /></ErrorBoundary>} />
-                  <Route path="/national-team" element={<ErrorBoundary><NationalTeam /></ErrorBoundary>} />
-                  <Route path="/hk-market" element={<Navigate to="/market?market=hk" replace />} />
-                  <Route path="/trading-calendar" element={<ErrorBoundary><TradingCalendar /></ErrorBoundary>} />
-                  <Route path="/screener" element={<ErrorBoundary><Screener /></ErrorBoundary>} />
-                  <Route path="/daily-review" element={<ErrorBoundary><DailyReviewPage /></ErrorBoundary>} />
-                <Route path="/potential" element={<ErrorBoundary><PotentialPage /></ErrorBoundary>} />
-                  <Route path="/feed" element={<ErrorBoundary><Feed /></ErrorBoundary>} />
-                  <Route path="/twitter" element={<Navigate to="/feed?tab=twitter" replace />} />
-                  <Route path="/analysis" element={<ErrorBoundary><AnalysisEntry /></ErrorBoundary>} />
-                  <Route path="/stock" element={<Navigate to="/analysis" replace />} />
-                  <Route path="/investment-research" element={<Navigate to="/analysis" replace />} />
-                  <Route path="/investment-research/:code" element={<LegacyResearchRedirect />} />
-                  <Route path="/macro" element={<ErrorBoundary><Macro /></ErrorBoundary>} />
-                  <Route path="/compare" element={<Navigate to="/screener" replace />} />
-                  <Route path="/portfolio" element={<ErrorBoundary><Portfolio /></ErrorBoundary>} />
-                  <Route path="/quant" element={<ErrorBoundary><Quant /></ErrorBoundary>} />
-                  <Route path="/industry-chain" element={<ErrorBoundary><IndustryChain /></ErrorBoundary>} />
-                  <Route path="/industry-chain/:name" element={<ErrorBoundary><IndustryChain /></ErrorBoundary>} />
-                  <Route path="/chat" element={<ErrorBoundary><Chat /></ErrorBoundary>} />
-                  <Route path="/capabilities" element={<ErrorBoundary><Capabilities /></ErrorBoundary>} />
-                  <Route path="/master-data" element={<ErrorBoundary><MasterData /></ErrorBoundary>} />
-                  <Route path="/stock-concept" element={<Navigate to="/master-data?tab=concept" replace />} />
-                  <Route path="/industry-classification" element={<Navigate to="/master-data?tab=industry" replace />} />
-                  <Route path="/settings" element={<ErrorBoundary><Settings /></ErrorBoundary>} />
-                  <Route path="/concept" element={<ErrorBoundary><Concept /></ErrorBoundary>} />
-                  <Route path="/stock/:code" element={<ErrorBoundary><Stock /></ErrorBoundary>} />
-                  <Route path="/analysis/:code" element={<ErrorBoundary><Analysis /></ErrorBoundary>} />
-                </Route>
-                </Route>
-                </Routes>
-              </Suspense>
-            </ErrorBoundary>
-          </RoutePreloadProvider>
-        </BrowserRouter>
+        <RoutePreloadProvider preload={preloadAppRoute}>
+          <ErrorBoundary>
+            <Suspense fallback={<RouteLoadingFallback />}>
+              <RouterProvider router={router} />
+            </Suspense>
+          </ErrorBoundary>
+        </RoutePreloadProvider>
       </QueryClientProvider>
     </AntProvider>
   );

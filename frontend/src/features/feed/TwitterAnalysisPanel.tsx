@@ -10,12 +10,33 @@ import { useColors, semanticTagStyle } from "../../styles/ui";
 
 const markdownPlugins = [remarkGfm];
 
-export default function TwitterAnalysisPanel({ authors }: { authors: string[] }) {
+export interface TwitterAnalysisPanelProps {
+  authors: string[];
+  selectedAuthor?: string;
+  onSelectAuthor?: (author: string) => void;
+}
+
+export default function TwitterAnalysisPanel({
+  authors,
+  selectedAuthor,
+  onSelectAuthor,
+}: TwitterAnalysisPanelProps) {
   const colors = useColors();
-  const [preferredAuthor, setPreferredAuthor] = useState("");
-  const selectedAuthor = authors.includes(preferredAuthor) ? preferredAuthor : authors[0] || "";
-  const { data: analysis, isLoading, error, refetch } = useMarketTwitterAnalysis(selectedAuthor);
-  const regenerateMutation = useMarketTwitterAnalysisRefresh(selectedAuthor);
+  const [internalAuthor, setInternalAuthor] = useState("");
+  const activeAuthor = selectedAuthor !== undefined
+    ? (authors.includes(selectedAuthor) ? selectedAuthor : authors[0] || "")
+    : (authors.includes(internalAuthor) ? internalAuthor : authors[0] || "");
+
+  const handleAuthorChange = (newAuthor: string) => {
+    if (onSelectAuthor) {
+      onSelectAuthor(newAuthor);
+    } else {
+      setInternalAuthor(newAuthor);
+    }
+  };
+
+  const { data: analysis, isLoading, error, refetch } = useMarketTwitterAnalysis(activeAuthor);
+  const regenerateMutation = useMarketTwitterAnalysisRefresh(activeAuthor);
   const coreViews = analysis?.core_views || [];
   const sectors = analysis?.sectors || [];
   const stocks = analysis?.stocks || [];
@@ -38,8 +59,8 @@ export default function TwitterAnalysisPanel({ authors }: { authors: string[] })
           <span>选择解读账号</span>
           <Select
             aria-label="选择 Twitter 大 V"
-            value={selectedAuthor}
-            onChange={setPreferredAuthor}
+            value={activeAuthor}
+            onChange={handleAuthorChange}
             options={authors.map((author) => ({ value: author, label: `@${author}` }))}
             showSearch
             optionFilterProp="label"
@@ -48,7 +69,7 @@ export default function TwitterAnalysisPanel({ authors }: { authors: string[] })
           <Button
             icon={<ReloadOutlined />}
             loading={regenerateMutation.isPending}
-            disabled={!selectedAuthor}
+            disabled={!activeAuthor}
             onClick={() => regenerateMutation.mutate(undefined, {
               onSuccess: () => message.success("AI 大 V 解读已重新生成"),
               onError: (regenerateError) => message.error(regenerateError?.message || "重新生成失败"),
@@ -60,7 +81,7 @@ export default function TwitterAnalysisPanel({ authors }: { authors: string[] })
         </div>
       ) : null}
 
-      {!selectedAuthor ? (
+      {!activeAuthor ? (
         <div className="feed-state">
           <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无可解读的 Twitter 账号" />
         </div>
@@ -73,7 +94,7 @@ export default function TwitterAnalysisPanel({ authors }: { authors: string[] })
           <QueryErrorState error={error} onRetry={() => refetch()} title="AI 大 V 解读加载失败" compact />
         </div>
       ) : analysis ? (
-        <div className="feed-analysis-scroll">
+        <div className="twitter-analysis-scroll">
           <div className="twitter-analysis-meta">
             <span>基于 @{analysis.username} 最近 {analysis.content_count} 条推文与文章生成</span>
             <span>
@@ -95,19 +116,32 @@ export default function TwitterAnalysisPanel({ authors }: { authors: string[] })
 
               {coreViews.length > 0 ? (
                 <section className="twitter-analysis-section">
-                  <h3>核心观点</h3>
+                  <h3>核心研判</h3>
                   {coreViews.map((view, index) => (
                     <article className="twitter-analysis-view" key={`${view.text}-${index}`}>
                       <div className="twitter-analysis-view-meta">
-                        <span>{view.stance}</span>
+                        <Tag
+                          color={view.stance === "看多" ? "red" : view.stance === "看空" ? "green" : "default"}
+                          style={{ margin: 0 }}
+                        >
+                          {view.stance}
+                        </Tag>
                         <span>置信度 {view.confidence}%</span>
                       </div>
                       <p>{view.text}</p>
                       {(view.references || []).length > 0 ? (
                         <div className="twitter-analysis-references">
+                          <span className="twitter-analysis-references-title">佐证原文：</span>
                           {(view.references || []).map((reference) => (
-                            <a key={`${reference.index}-${reference.url}`} href={reference.url} target="_blank" rel="noopener noreferrer">
-                              <LinkOutlined /> [{reference.index}] {reference.title || "原文"}
+                            <a
+                              key={`${reference.index}-${reference.url}`}
+                              href={reference.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="twitter-ref-pill"
+                            >
+                              <LinkOutlined style={{ marginRight: 4 }} />
+                              [{reference.index}] {reference.title || "推文原文"}
                             </a>
                           ))}
                         </div>
@@ -119,7 +153,7 @@ export default function TwitterAnalysisPanel({ authors }: { authors: string[] })
 
               {sectors.length > 0 || stocks.length > 0 ? (
                 <section className="twitter-analysis-section">
-                  <h3>关注方向</h3>
+                  <h3>重点关注标的与板块</h3>
                   <div className="twitter-analysis-tags">
                     {sectors.map((sector) => <Tag key={`sector-${sector}`}>{sector}</Tag>)}
                     {stocks.map((stock) => <Tag style={semanticTagStyle("primary")} key={`stock-${stock}`}>{stock}</Tag>)}

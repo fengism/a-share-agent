@@ -25,6 +25,12 @@ interface ResponsiveSectionNavProps {
   tabBarGutter?: number;
   collapseQuery?: string;
   preserveVisited?: boolean;
+  /**
+   * 移动端导航形态：
+   * - `select`（默认）紧凑下拉，适合分区较少且名称较短的页面
+   * - `chips` 横向可滑动胶囊，分区名称较长时仍保持可读
+   */
+  mobileMode?: "select" | "chips";
 }
 
 function buildSelectOptions(items: ResponsiveSectionNavItem[]): NonNullable<SelectProps<string>["options"]> {
@@ -62,6 +68,7 @@ export default function ResponsiveSectionNav({
   tabBarGutter,
   collapseQuery = "(max-width: 767px)",
   preserveVisited = false,
+  mobileMode = "select",
 }: ResponsiveSectionNavProps) {
   const isMobile = useMediaQuery(collapseQuery);
   const activeItem = items.find((item) => item.key === activeKey) ?? items[0];
@@ -110,14 +117,32 @@ export default function ResponsiveSectionNav({
   if (isMobile) {
     return (
       <section className="responsive-section-nav__mobile" aria-label={ariaLabel}>
-        <Select
-          value={activeItem.key}
-          onChange={handleChange}
-          options={buildSelectOptions(items)}
-          size="large"
-          className="responsive-section-nav__select"
-          aria-label={ariaLabel}
-        />
+        {mobileMode === "chips" ? (
+          <div className="responsive-section-nav__chips" role="tablist" aria-label={ariaLabel}>
+            {items.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                role="tab"
+                aria-selected={item.key === activeItem.key}
+                className="responsive-section-nav__chip"
+                data-chip-key={item.key}
+                onClick={() => handleChange(item.key)}
+              >
+                {item.mobileLabel ?? item.label}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <Select
+            value={activeItem.key}
+            onChange={handleChange}
+            options={buildSelectOptions(items)}
+            size="large"
+            className="responsive-section-nav__select"
+            aria-label={ariaLabel}
+          />
+        )}
         <div className="responsive-section-nav__content">{sectionContent}</div>
       </section>
     );

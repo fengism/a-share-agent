@@ -33,7 +33,9 @@ export const ChatConversation = memo(function ChatConversation({
       const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
       if (distanceFromBottom > 120) return;
     }
-    sentinel?.scrollIntoView({ behavior: "auto" });
+    if (typeof sentinel?.scrollIntoView === "function") {
+      sentinel.scrollIntoView({ behavior: "auto" });
+    }
   }, []);
 
   useEffect(() => {

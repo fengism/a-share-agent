@@ -82,7 +82,7 @@ export default function IndustryDecisionResearch({ result }: { result: IndustryC
                 background: "var(--c-bg-card, #ffffff)",
                 border: "1px solid var(--c-border-light, #e2e8f0)",
                 borderRadius: 8,
-                padding: "12px 14px",
+                padding: "var(--c-pad-card, 16px 18px)",
               }}
             >
               <div style={{ fontWeight: 700, color: "var(--c-text-primary, #0f172a)", marginBottom: 6 }}>
@@ -107,7 +107,7 @@ export default function IndustryDecisionResearch({ result }: { result: IndustryC
     {!!result.relationships?.length && <>
       <h3>关系与利润传导</h3>
       <p>以下为证据线索和条件假设；正负方向针对目标节点，不作定量盈利预测。</p>
-      <ul style={{ listStyle: "none", padding: 0, margin: "12px 0 16px" }}>{result.relationships.map((edge, index) => <li key={`${edge.source_node}-${edge.target_node}-${index}`} style={{ background: "var(--c-bg-card, #ffffff)", border: "1px solid var(--c-border-light, #e2e8f0)", borderRadius: 8, padding: "12px 14px", marginBottom: 10 }}>
+      <ul style={{ listStyle: "none", padding: 0, margin: "12px 0 16px" }}>{result.relationships.map((edge, index) => <li key={`${edge.source_node}-${edge.target_node}-${index}`} style={{ background: "var(--c-bg-card, #ffffff)", border: "1px solid var(--c-border-light, #e2e8f0)", borderRadius: 8, padding: "var(--c-pad-card, 16px 18px)", marginBottom: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 4 }}>
           <strong>{edge.source_node} → {edge.target_node}</strong>{" "}
           <Tag>{RELATION[edge.relation_type]}</Tag><Tag>{DIRECTION[edge.impact_direction || "unknown"]}</Tag>

@@ -2,6 +2,7 @@ import {
   ExperimentOutlined,
   EyeOutlined,
   RobotOutlined,
+  ThunderboltOutlined,
 } from "@ant-design/icons";
 import { Button, Space, Tag, Typography } from "antd";
 import { semanticTagStyle } from "../../styles/ui";
@@ -17,6 +18,7 @@ interface ScreenerBatchActionsProps {
   onAnalyze: () => void;
   onBacktest: () => void;
   onClear: () => void;
+  onAiDiagnose?: () => void;
 }
 
 export default function ScreenerBatchActions({
@@ -28,6 +30,7 @@ export default function ScreenerBatchActions({
   onAnalyze,
   onBacktest,
   onClear,
+  onAiDiagnose,
 }: ScreenerBatchActionsProps) {
   const count = selectedCodes.length;
   if (count === 0) return null;
@@ -43,6 +46,19 @@ export default function ScreenerBatchActions({
       >
         加入自选
       </Button>
+      {onAiDiagnose ? (
+        <Button
+          size="small"
+          type="primary"
+          ghost
+          icon={<ThunderboltOutlined />}
+          disabled={count > 8}
+          title={count > 8 ? "AI 诊断最多支持 8 只" : undefined}
+          onClick={onAiDiagnose}
+        >
+          AI 诊断
+        </Button>
+      ) : null}
       <Button
         size="small"
         icon={<RobotOutlined />}

@@ -1,8 +1,12 @@
-import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import Market from ".";
+
+function LocationProbe() {
+  return <div data-testid="location-probe">{useLocation().search}</div>;
+}
 
 const mocks = vi.hoisted(() => ({
   activeKey: "",
@@ -33,9 +37,17 @@ vi.mock("../../components/ResponsiveSectionNav", () => ({
 }));
 
 vi.mock("../../features/hk-market/HKMarketTab", () => ({
-  default: ({ defaultStockCode }: { defaultStockCode?: string }) => (
+  default: ({
+    defaultStockCode,
+    onStockSelect,
+  }: {
+    defaultStockCode?: string;
+    onStockSelect?: (code: string | null) => void;
+  }) => (
     <div data-testid="hk-market-tab">
       港股市场内容{defaultStockCode ? ` - 个股:${defaultStockCode}` : ""}
+      <button onClick={() => onStockSelect?.("00700")}>选择腾讯</button>
+      <button onClick={() => onStockSelect?.(null)}>清空个股</button>
     </div>
   ),
 }));
@@ -182,5 +194,23 @@ describe("Market", () => {
     );
 
     expect(await screen.findByText("港股市场内容 - 个股:00700")).toBeInTheDocument();
+  });
+
+  it("updates and clears the code query param via onStockSelect", async () => {
+    render(
+      <MemoryRouter initialEntries={["/market?market=hk"]}>
+        <Market />
+        <LocationProbe />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByTestId("hk-market-tab")).toBeInTheDocument();
+    expect(screen.getByTestId("location-probe")).not.toHaveTextContent("code=");
+
+    fireEvent.click(screen.getByRole("button", { name: "选择腾讯" }));
+    expect(screen.getByTestId("location-probe")).toHaveTextContent("code=00700");
+
+    fireEvent.click(screen.getByRole("button", { name: "清空个股" }));
+    expect(screen.getByTestId("location-probe")).not.toHaveTextContent("code=");
   });
 });

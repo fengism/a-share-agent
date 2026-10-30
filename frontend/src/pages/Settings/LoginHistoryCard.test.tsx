@@ -1,14 +1,19 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import LoginHistoryCard from "./LoginHistoryCard";
 
 const mocks = vi.hoisted(() => ({
   refetch: vi.fn(),
   useMyLoginAuditLogs: vi.fn(),
+  isNarrow: false,
 }));
 
 vi.mock("../../api/queries", () => ({
   useMyLoginAuditLogs: mocks.useMyLoginAuditLogs,
+}));
+
+vi.mock("../../hooks/useMediaQuery", () => ({
+  useMediaQuery: () => mocks.isNarrow,
 }));
 
 function mockLogs(items: unknown[], total = items.length) {
@@ -23,6 +28,7 @@ function mockLogs(items: unknown[], total = items.length) {
 describe("LoginHistoryCard", () => {
   afterEach(() => {
     vi.clearAllMocks();
+    mocks.isNarrow = false;
   });
 
   it("renders own login attempts with Beijing time and device label", () => {
@@ -87,5 +93,27 @@ describe("LoginHistoryCard", () => {
     render(<LoginHistoryCard />);
     fireEvent.click(screen.getByRole("button", { name: /刷\s*新/ }));
     expect(mocks.refetch).toHaveBeenCalled();
+  });
+
+  it("renders a card list instead of a wide table on narrow screens", () => {
+    mocks.isNarrow = true;
+    mockLogs([
+      {
+        id: 3,
+        username: "alice",
+        user_id: 7,
+        ip_address: "198.51.100.4",
+        user_agent: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0) Safari/604.1",
+        status: "success",
+        details: "",
+        created_at: "2026-10-22 10:00:00",
+      },
+    ]);
+
+    render(<LoginHistoryCard />);
+
+    const list = screen.getByRole("list", { name: "我的登录记录列表" });
+    expect(within(list).getByText("198.51.100.4")).toBeInTheDocument();
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
   });
 });

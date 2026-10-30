@@ -36,7 +36,8 @@ export const queryKeys = {
     limitHistory: (date: string, category: string) => ["marketLimitHistory", date, category] as const,
     sectorStocksHistory: (date: string, plateId: string) =>
       ["marketSectorStocksHistory", date, plateId] as const,
-    concepts: (limit: number) => ["marketConcepts", limit] as const,
+    concepts: (limit: number, order: "size" | "change" = "size") =>
+      ["marketConcepts", limit, order] as const,
     conceptConstituents: (concept: string) => ["marketConceptConstituents", concept] as const,
     conceptIndex: (concept: string, days: number) => ["marketConceptIndex", concept, days] as const,
     wind: ["marketWind"] as const,

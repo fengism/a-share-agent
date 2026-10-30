@@ -16,6 +16,8 @@ const mocks = vi.hoisted(() => ({
       parameters: Record<string, number | boolean | string>;
     };
   }>,
+  stockSearchResults: [] as Array<{ code: string; name: string; price?: number; market?: string }>,
+  watchlistItems: [] as Array<{ stock_code: string; stock_name: string }>,
 }));
 
 vi.mock("../../api/queries", () => ({
@@ -24,6 +26,17 @@ vi.mock("../../api/queries", () => ({
   useSaveQuantStrategy: () => ({ mutateAsync: mocks.saveStrategy, isPending: false }),
   useDeleteQuantStrategy: () => ({ mutateAsync: mocks.deleteStrategy, isPending: false }),
   useCreateQuantBacktest: () => ({ mutateAsync: mocks.createRun, isPending: false }),
+  useStockSearch: () => ({
+    data: mocks.stockSearchResults,
+    isFetching: false,
+    isError: false,
+    error: null,
+    refetch: vi.fn(),
+  }),
+  useWatchlist: () => ({
+    data: { items: mocks.watchlistItems },
+    isLoading: false,
+  }),
 }));
 
 function selectStrategy(name: RegExp) {
@@ -69,6 +82,8 @@ describe("BacktestForm", () => {
     mocks.deleteStrategy.mockReset();
     mocks.presets.length = 0;
     mocks.savedStrategies.length = 0;
+    mocks.stockSearchResults.length = 0;
+    mocks.watchlistItems.length = 0;
   });
 
   it("groups the workflow and switches strategy-specific fields", async () => {
@@ -309,4 +324,109 @@ describe("BacktestForm", () => {
     expect(screen.getByText("已修改")).toBeInTheDocument();
   });
 
+  it("updates backtest name automatically when stock codes or universe source changes", async () => {
+    render(<BacktestForm onCreated={vi.fn()} />);
+
+    expect(screen.getByLabelText("回测名称")).toHaveValue("双均线趋势 · 600519回测");
+
+    // 修改为单只股票代码
+    fireEvent.change(screen.getByLabelText("股票代码"), { target: { value: "000001" } });
+    await waitFor(() => {
+      expect(screen.getByLabelText("回测名称")).toHaveValue("双均线趋势 · 000001回测");
+    });
+
+    // 修改为多只股票代码
+    fireEvent.change(screen.getByLabelText("股票代码"), { target: { value: "000001, 300750" } });
+    await waitFor(() => {
+      expect(screen.getByLabelText("回测名称")).toHaveValue("双均线趋势 · 2只股票回测");
+    });
+
+    // 切换为当前持仓
+    fireEvent.mouseDown(screen.getByRole("combobox", { name: "股票池" }));
+    fireEvent.click(await screen.findByText("当前持仓"));
+    await waitFor(() => {
+      expect(screen.getByLabelText("回测名称")).toHaveValue("双均线趋势 · 当前持仓回测");
+    });
+
+    // 切换回自定义股票
+    fireEvent.mouseDown(screen.getByRole("combobox", { name: "股票池" }));
+    fireEvent.click(await screen.findByText("自定义股票"));
+    await waitFor(() => {
+      expect(screen.getByLabelText("回测名称")).toHaveValue("双均线趋势 · 2只股票回测");
+    });
+  });
+
+  it("supports entering stock names and resolves them to codes", async () => {
+    const onCreated = vi.fn();
+    render(<BacktestForm onCreated={onCreated} />);
+
+    // 输入股票中文名称“贵州茅台”
+    fireEvent.change(screen.getByLabelText("股票代码"), { target: { value: "贵州茅台" } });
+    fireEvent.blur(screen.getByLabelText("股票代码"));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("股票代码")).toHaveValue("600519");
+      expect(screen.getByLabelText("回测名称")).toHaveValue("双均线趋势 · 600519回测");
+    });
+
+    // 提交时正确发送解析后的 6 位代码
+    fireEvent.click(screen.getByRole("button", { name: "开始回测" }));
+    await waitFor(() => expect(mocks.createRun).toHaveBeenCalledWith(expect.objectContaining({
+      name: "双均线趋势 · 600519回测",
+      universe: { source: "custom", codes: ["600519"] },
+    })));
+  });
+
+  it("supports quick stock presets and dynamically updates backtest name and stock tags", async () => {
+    render(<BacktestForm onCreated={vi.fn()} />);
+
+    // 点击快捷加单股中的“宁德时代”
+    fireEvent.click(screen.getByText("宁德时代"));
+    await waitFor(() => {
+      expect(screen.getByLabelText("股票代码")).toHaveValue("600519, 300750");
+      expect(screen.getByLabelText("回测名称")).toHaveValue("双均线趋势 · 2只股票回测");
+    });
+    expect(screen.getByText("已选股票 (2/30):")).toBeInTheDocument();
+  });
+
+  it("imports stocks from watchlist and updates universe and backtest name", async () => {
+    mocks.watchlistItems.push(
+      { stock_code: "600036", stock_name: "招商银行" },
+      { stock_code: "000001", stock_name: "平安银行" },
+      { stock_code: "601398", stock_name: "工商银行" },
+    );
+    render(<BacktestForm onCreated={vi.fn()} />);
+
+    expect(screen.getByText("导入自选股 (3)")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("导入自选股 (3)"));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("股票代码")).toHaveValue("600036, 000001, 601398");
+      expect(screen.getByLabelText("回测名称")).toHaveValue("双均线趋势 · 3只股票回测");
+    });
+    expect(screen.getByText("已选股票 (3/30):")).toBeInTheDocument();
+  });
+
+  it("selects date range presets and quick benchmarks", async () => {
+    render(<BacktestForm onCreated={vi.fn()} />);
+
+    // 点击快速基准指数切换：中证500
+    fireEvent.click(screen.getByText("中证500"));
+    expect(screen.getByLabelText("基准指数")).toHaveValue("000905");
+
+    // 点击快速回测区间：近3年
+    fireEvent.click(screen.getByText("近3年"));
+    expect(screen.getByLabelText("回测区间")).toBeInTheDocument();
+  });
+
+  it("selects expanded thematic sector presets", async () => {
+    render(<BacktestForm onCreated={vi.fn()} />);
+
+    // 点击新增的热门赛道主题池：半导体芯片
+    fireEvent.click(screen.getByText("半导体芯片"));
+    await waitFor(() => {
+      expect(screen.getByLabelText("股票代码")).toHaveValue("688981, 002371, 688012, 688041, 603501, 688008");
+      expect(screen.getByLabelText("回测名称")).toHaveValue("双均线趋势 · 6只股票回测");
+    });
+  });
 });

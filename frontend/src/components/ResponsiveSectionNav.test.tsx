@@ -34,6 +34,46 @@ describe("ResponsiveSectionNav", () => {
     expect(screen.getByText("北向资金内容")).toBeInTheDocument();
   });
 
+  it("renders horizontally scrollable chips on mobile when mobileMode=chips", () => {
+    const onChange = vi.fn();
+    render(
+      <ResponsiveSectionNav
+        activeKey="ai"
+        onChange={onChange}
+        ariaLabel="系统配置分类"
+        mobileMode="chips"
+        items={[
+          { key: "account", label: "账号与安全", children: <div>账号内容</div> },
+          { key: "ai", label: "AI 模型配置", children: <div>AI 内容</div> },
+        ]}
+      />,
+    );
+
+    const chips = screen.getAllByRole("tab");
+    expect(chips).toHaveLength(2);
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "AI 模型配置" })).toHaveAttribute("aria-selected", "true");
+
+    fireEvent.click(screen.getByRole("tab", { name: "账号与安全" }));
+    expect(onChange).toHaveBeenCalledWith("account");
+  });
+
+  it("keeps the select control on mobile by default", () => {
+    render(
+      <ResponsiveSectionNav
+        activeKey="account"
+        onChange={vi.fn()}
+        ariaLabel="系统配置分类"
+        items={[
+          { key: "account", label: "账号与安全", children: <div>账号内容</div> },
+        ]}
+      />,
+    );
+
+    expect(screen.getByRole("combobox", { name: "系统配置分类" })).toBeInTheDocument();
+    expect(screen.queryByRole("tab")).not.toBeInTheDocument();
+  });
+
   it("preloads desktop tabs on pointer intent and before selection", () => {
     mocks.useMediaQuery.mockReturnValue(false);
     const preloadMarket = vi.fn();

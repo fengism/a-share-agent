@@ -183,6 +183,12 @@
   box-shadow: inset 2px 0 0 var(--c-primary);
 }
 
+.quant-history-compare-checkbox {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
 .quant-history-summary {
   min-width: 0;
   flex: 1;

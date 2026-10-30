@@ -49,11 +49,11 @@ export default function MarketBreadthTab() {
     () => ({
       tooltip: {
         position: "top",
-        backgroundColor: "rgba(255, 255, 255, 0.95)",
+        backgroundColor: c.cardBg,
         borderColor: c.border,
         borderWidth: 1,
         textStyle: { color: c.textPrimary, fontSize: 12 },
-        extraCssText: "box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08); border-radius: 8px;",
+        extraCssText: "box-shadow: var(--c-shadow-md); border-radius: 8px;",
         formatter: (params: { data: [number, number, number | null] }) => {
           const [x, y, value] = params.data;
           const dateStr = dates[x] || "-";
@@ -89,6 +89,7 @@ export default function MarketBreadthTab() {
       },
       dataZoom: [
         { type: "inside", xAxisIndex: 0 },
+        { type: "inside", yAxisIndex: 0 },
         { type: "slider", xAxisIndex: 0, height: 18, bottom: 26, borderColor: "transparent" },
       ],
       series: [
@@ -101,7 +102,7 @@ export default function MarketBreadthTab() {
         },
       ],
     }),
-    [heatmapData, dates, industries, c.textPrimary, c.textSecondary, c.border],
+    [heatmapData, dates, industries, c.textPrimary, c.textSecondary, c.border, c.cardBg],
   );
 
   return (
@@ -122,7 +123,7 @@ export default function MarketBreadthTab() {
               <Statistic
                 title={<span style={{ color: c.textSecondary, fontSize: t.font.sm }}>统计日期</span>}
                 value={lastSummary?.date || "-"}
-                styles={{ content: { color: c.textPrimary, fontWeight: Number(t.weight.bold) } }}
+                styles={{ content: { color: c.textPrimary, fontWeight: Number(t.weight.bold), fontFamily: "var(--c-font-mono)" } }}
               />
             </Card>
           </Col>
@@ -131,7 +132,7 @@ export default function MarketBreadthTab() {
               <Statistic
                 title={<span style={{ color: c.textSecondary, fontSize: t.font.sm }}>强势行业占比 (宽&gt;50%)</span>}
                 value={formatPct(lastSummary?.strong_ratio)}
-                styles={{ content: { color: (lastSummary?.strong_ratio ?? 0) >= 50 ? c.up : c.down, fontWeight: Number(t.weight.bold) } }}
+                styles={{ content: { color: (lastSummary?.strong_ratio ?? 0) >= 50 ? c.up : c.down, fontWeight: Number(t.weight.bold), fontFamily: "var(--c-font-mono)" } }}
               />
             </Card>
           </Col>
@@ -142,7 +143,7 @@ export default function MarketBreadthTab() {
                 value={lastSummary
                   ? `${lastSummary.strong_industry_count} / ${lastSummary.total_industry_count}`
                   : "-"}
-                styles={{ content: { color: c.textPrimary, fontWeight: Number(t.weight.bold) } }}
+                styles={{ content: { color: c.textPrimary, fontWeight: Number(t.weight.bold), fontFamily: "var(--c-font-mono)" } }}
               />
             </Card>
           </Col>

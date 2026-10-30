@@ -23,6 +23,7 @@ import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { useStockSearchController } from "../../hooks/useStockSearchController";
 import { useColors, useStyles } from "../../styles/ui";
 import type { PortfolioStockSummary, PortfolioTransactionCreate } from "../../types/portfolio";
+import { isHkStockCode } from "../../utils/stockLinks";
 import { errorMessage, formatInteger, formatPrice } from "./portfolioFormatters";
 import TransactionPreviewAlert from "./TransactionPreviewAlert";
 
@@ -38,14 +39,17 @@ interface TransactionFormValues {
 
 interface TransactionEntryCardProps {
   stocks: PortfolioStockSummary[];
+  onSuccess?: () => void;
+  isDrawer?: boolean;
 }
 
 export interface TransactionEntryCardHandle {
-  startSell: (stock: PortfolioStockSummary) => void;
+  /** 打开卖出表单；传入 shares 时预填减仓建议的建议股数。 */
+  startSell: (stock: PortfolioStockSummary, shares?: number) => void;
 }
 
 const TransactionEntryCard = forwardRef<TransactionEntryCardHandle, TransactionEntryCardProps>(
-  function TransactionEntryCard({ stocks }, ref) {
+  function TransactionEntryCard({ stocks, onSuccess, isDrawer = false }, ref) {
   const colors = useColors();
   const { cardStyle } = useStyles();
   const isMobile = useMediaQuery("(max-width: 768px)");
@@ -70,7 +74,7 @@ const TransactionEntryCard = forwardRef<TransactionEntryCardHandle, TransactionE
   const resetPreview = previewMutation.reset;
 
   useImperativeHandle(ref, () => ({
-    startSell: (stock) => {
+    startSell: (stock, shares) => {
       clearSearch();
       resetPreview();
       form.setFieldsValue({
@@ -78,7 +82,7 @@ const TransactionEntryCard = forwardRef<TransactionEntryCardHandle, TransactionE
         sell_stock_code: stock.stock_code,
         trade_price: stock.current_price ?? undefined,
         trade_time: dayjs(),
-        shares: undefined,
+        shares: shares ?? undefined,
         fee: 0,
         note: "",
       });
@@ -92,17 +96,26 @@ const TransactionEntryCard = forwardRef<TransactionEntryCardHandle, TransactionE
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
         <span>{item.name} ({item.code})</span>
         <span style={{ color: colors.textSecondary }}>
-          {item.price == null ? "" : formatPrice(item.price)}
+          {item.price == null ? "" : formatPrice(item.price, isHkStockCode(item.code) ? "HKD" : "CNY")}
         </span>
       </div>
     ),
   })), [colors.textSecondary, currentResults]);
 
-  const sellOptions = useMemo(() => stocks.map((stock) => ({
-    value: stock.stock_code,
-    label: `${stock.stock_name} (${stock.stock_code}) · 可卖 ${formatInteger(stock.total_shares)} 股`,
-  })), [stocks]);
+  const sellableOf = (stock: PortfolioStockSummary) => stock.sellable_shares ?? stock.total_shares;
+  const sellOptions = useMemo(() => stocks.map((stock) => {
+    const sellable = stock.sellable_shares ?? stock.total_shares;
+    const frozen = stock.frozen_shares ?? Math.max(stock.total_shares - sellable, 0);
+    return {
+      value: stock.stock_code,
+      disabled: sellable <= 0,
+      label:
+        `${stock.stock_name} (${stock.stock_code}) · 可卖 ${formatInteger(sellable)} 股` +
+        (frozen > 0 ? ` · T+1 冻结 ${formatInteger(frozen)} 股` : ""),
+    };
+  }), [stocks]);
   const selectedHolding = stocks.find((stock) => stock.stock_code === sellStockCode);
+  const selectedSellable = selectedHolding ? sellableOf(selectedHolding) : undefined;
 
   const buildTransaction = (values: TransactionFormValues): PortfolioTransactionCreate | null => {
     const stockCode = values.side === "buy" ? resolveCode() : values.sell_stock_code;
@@ -141,8 +154,8 @@ const TransactionEntryCard = forwardRef<TransactionEntryCardHandle, TransactionE
   const handleSubmit = async (values: TransactionFormValues) => {
     const transaction = buildTransaction(values);
     if (!transaction) return;
-    if (values.side === "sell" && selectedHolding && values.shares > selectedHolding.total_shares) {
-      message.warning(`最多可卖 ${formatInteger(selectedHolding.total_shares)} 股`);
+    if (values.side === "sell" && selectedHolding && values.shares > (selectedSellable ?? 0)) {
+      message.warning(`最多可卖 ${formatInteger(selectedSellable ?? 0)} 股`);
       return;
     }
 
@@ -159,26 +172,20 @@ const TransactionEntryCard = forwardRef<TransactionEntryCardHandle, TransactionE
         fee: 0,
         note: "",
       });
+      onSuccess?.();
     } catch (mutationError) {
       message.error(`记录失败：${errorMessage(mutationError)}`);
     }
   };
 
-  return (
-    <div ref={containerRef}>
-      <Card
-        title="记录交易流水"
-        size="small"
-        style={{ ...cardStyle, marginBottom: 16 }}
-        styles={{ body: { padding: isMobile ? "16px 14px 4px" : "18px 20px 4px" } }}
-      >
-      <Form<TransactionFormValues>
-        form={form}
-        layout="vertical"
-        initialValues={{ side: "buy", trade_time: dayjs(), fee: 0 }}
-        onFinish={handleSubmit}
-        onValuesChange={() => previewMutation.reset()}
-      >
+  const formElement = (
+    <Form<TransactionFormValues>
+      form={form}
+      layout="vertical"
+      initialValues={{ side: "buy", trade_time: dayjs(), fee: 0 }}
+      onFinish={handleSubmit}
+      onValuesChange={() => previewMutation.reset()}
+    >
         <Row gutter={[16, 0]} align="bottom">
           <Col xs={24} sm={8} md={4}>
             <Form.Item name="side" label="方向">
@@ -244,12 +251,17 @@ const TransactionEntryCard = forwardRef<TransactionEntryCardHandle, TransactionE
           <Col xs={12} sm={8} md={4}>
             <Form.Item
               name="shares"
-              label={side === "sell" && selectedHolding ? `股数（最多 ${formatInteger(selectedHolding.total_shares)}）` : "股数"}
+              label={side === "sell" && selectedHolding ? `股数（最多 ${formatInteger(selectedSellable ?? 0)}）` : "股数"}
               rules={[{ required: true, message: "请输入股数" }]}
+              extra={
+                side === "sell" && selectedHolding && (selectedHolding.frozen_shares ?? 0) > 0
+                  ? `A 股 T+1：当日买入的 ${formatInteger(selectedHolding.frozen_shares ?? 0)} 股暂不可卖`
+                  : undefined
+              }
             >
               <InputNumber
                 min={1}
-                max={side === "sell" ? selectedHolding?.total_shares : 1_000_000_000}
+                max={side === "sell" ? selectedSellable : 1_000_000_000}
                 precision={0}
                 step={1}
                 style={{ width: "100%" }}
@@ -322,7 +334,22 @@ const TransactionEntryCard = forwardRef<TransactionEntryCardHandle, TransactionE
           </div>
         ) : null}
       </Form>
-      </Card>
+  );
+
+  return (
+    <div ref={containerRef}>
+      {isDrawer ? (
+        <div style={{ padding: "4px 0" }}>{formElement}</div>
+      ) : (
+        <Card
+          title="记录交易流水"
+          size="small"
+          style={{ ...cardStyle, marginBottom: 16 }}
+          styles={{ body: { padding: isMobile ? "16px 14px 4px" : "18px 20px 4px" } }}
+        >
+          {formElement}
+        </Card>
+      )}
     </div>
   );
 });

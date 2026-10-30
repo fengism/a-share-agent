@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import NationalTeam from ".";
 
@@ -12,10 +13,10 @@ vi.mock("../../api/queries", () => ({
 }));
 
 vi.mock("echarts-for-react/lib/core", () => ({
-  default: ({ option }: {
+  default: ({ option, ...rest }: {
     option: {
       title?: { text?: string };
-      yAxis?: unknown[];
+      yAxis?: unknown[] | unknown;
       legend?: { show?: boolean };
       series?: Array<{
         lineStyle?: { color?: string; type?: string };
@@ -23,11 +24,12 @@ vi.mock("echarts-for-react/lib/core", () => ({
         symbolSize?: number;
       }>;
     };
+    [key: string]: unknown;
   }) => (
     <div
-      data-testid="national-team-chart"
+      data-testid={(rest["data-testid"] as string) || "national-team-chart"}
       data-title={option.title?.text}
-      data-y-axes={option.yAxis?.length ?? 0}
+      data-y-axes={Array.isArray(option.yAxis) ? option.yAxis.length : (option.yAxis ? 1 : 0)}
       data-legend-visible={String(option.legend?.show !== false)}
       data-series-colors={option.series?.map((series) => series.lineStyle?.color).join(",")}
       data-series-line-types={option.series?.map((series) => series.lineStyle?.type).join(",")}
@@ -36,6 +38,8 @@ vi.mock("echarts-for-react/lib/core", () => ({
     />
   ),
 }));
+
+const renderPage = (ui = <NationalTeam />) => render(<MemoryRouter>{ui}</MemoryRouter>);
 
 const indexNames = ["沪深300", "上证50", "中证500", "中证1000", "科创50", "创业板"];
 const etfs = [
@@ -56,6 +60,7 @@ const etfs = [
   name,
   fund_manager,
   index_name,
+  category: (index_name === "沪深300" || index_name === "上证50") ? "core_broad" : "growth",
   index_key: `index-${order}`,
   exchange: code.startsWith("5") ? "SH" : "SZ",
   latest_date: "2026-09-16",
@@ -63,6 +68,9 @@ const etfs = [
   latest_change_1d_100m: order % 2 === 0 ? 1.2 : -0.8,
   change_5d_100m: 2.4,
   change_20d_100m: 5.6,
+  latest_amount_100m: order === 0 ? 32.5 : 5.0,
+  volume_ratio: order === 0 ? 2.5 : 1.1,
+  is_abnormal_volume: order === 0,
   points: [],
 }));
 
@@ -84,6 +92,112 @@ const data = {
   calendar_degraded: false,
   refreshing: false,
   observations: [],
+  daily_flows: [
+    {
+      date: "2026-09-15",
+      total_flow_100m: 15.2,
+      total_shares_change_100m: 8.5,
+      flows_by_index: { csi300: 10.0, sz50: 5.2 },
+      flows_by_category: { core_broad: 15.2, a500: 0, growth: 0, dividend: 0 },
+    },
+    {
+      date: "2026-09-16",
+      total_flow_100m: -3.5,
+      total_shares_change_100m: -2.1,
+      flows_by_index: { csi300: -2.0, sz50: -1.5 },
+      flows_by_category: { core_broad: -3.5, a500: 0, growth: 0, dividend: 0 },
+    },
+  ],
+  support_score: {
+    score: 68.5,
+    status: "active" as const,
+    label: "积极托底",
+    description: "主力资金在重点战略宽基上呈现持续净买入，有效构筑下方防线。",
+    net_flow_factor: 25.5,
+    breadth_factor: 22.0,
+    divergence_factor: 21.0,
+  },
+  milestones: [
+    {
+      date: "2024-02-06",
+      title: "汇金扩大增持范围并加大力度",
+      type: "policy" as const,
+      description: "中央汇金公告充分认可当前A股配置价值，扩大增持范围。",
+      index_points: { "沪深300": 3316.33 },
+    },
+  ],
+  support_zones: [
+    {
+      index_key: "csi300",
+      index_name: "沪深300",
+      current_price: 3850.0,
+      weighted_avg_cost: 3600.0,
+      cost_buffer_pct: 6.94,
+      zones: [
+        { range_label: "3400-3600", net_flow_100m: 120.0, share_pct: 60.0 },
+        { range_label: "3600-3800", net_flow_100m: 80.0, share_pct: 40.0 },
+      ],
+    },
+  ],
+  portrait: {
+    reporting_period: "2024年报 / 2024Q3权威公告",
+    total_market_value_trillion: 3.85,
+    entities: [
+      {
+        name: "中央汇金投资有限责任公司 / 汇金资管",
+        short_name: "中央汇金",
+        role: "国家级金融投资平台（平准与长效战略持股）",
+        estimated_aum_trillion: 2.45,
+        focus: "四大国有行、龙头券商及核心宽基 ETF",
+      },
+      {
+        name: "中国证券金融股份有限公司",
+        short_name: "中证金 (CSF)",
+        role: "维稳流动性救市主力机构",
+        estimated_aum_trillion: 0.65,
+        focus: "大盘蓝筹、系统重要性券商及周期龙头",
+      },
+      {
+        name: "全国社会保障基金理事会",
+        short_name: "全国社保基金",
+        role: "长期战略价值投资标杆",
+        estimated_aum_trillion: 0.75,
+        focus: "高股息红利、高端制造、医药生物与科技自主可控",
+      },
+    ],
+    industry_allocations: [
+      {
+        industry: "银行金融",
+        weight_pct: 48.5,
+        market_value_100m: 18670.0,
+        representative_stocks: ["工商银行", "建设银行"],
+      },
+      {
+        industry: "能源周期",
+        weight_pct: 16.2,
+        market_value_100m: 6237.0,
+        representative_stocks: ["中国神华", "中国石油"],
+      },
+    ],
+    top_holdings: [
+      {
+        code: "601398",
+        name: "工商银行",
+        holder_name: "中央汇金",
+        shareholding_ratio_pct: 34.79,
+        market_value_100m: 7850.0,
+        industry: "银行金融",
+      },
+      {
+        code: "600900",
+        name: "长江电力",
+        holder_name: "证金/社保",
+        shareholding_ratio_pct: 4.85,
+        market_value_100m: 352.0,
+        industry: "公用事业",
+      },
+    ],
+  },
   summary: {
     total_shares_100m: 1234.56,
     change_1d_100m: 12.34,
@@ -96,6 +210,7 @@ const data = {
   indices: indexNames.map((index_name, index) => ({
     index_key: `index-${index}`,
     index_name,
+    category: (index_name === "沪深300" || index_name === "上证50") ? "core_broad" : "growth",
     index_code: `00000${index}.SH`,
     etf_codes: etfs.filter((item) => item.index_name === index_name).map((item) => item.code),
     covered_etf_codes: etfs.filter((item) => item.index_name === index_name && item.code !== "159629").map((item) => item.code),
@@ -140,7 +255,7 @@ describe("NationalTeam page", () => {
   });
 
   it("renders proxy disclosure, summary, six independent dual-axis charts, and all ETFs", () => {
-    render(<NationalTeam />);
+    renderPage();
 
     expect(screen.getByRole("heading", { name: "国家队" })).toBeInTheDocument();
     expect(screen.getByText(/不等于中央汇金真实持仓/)).toBeInTheDocument();
@@ -190,7 +305,7 @@ describe("NationalTeam page", () => {
       refetch: mocks.refetch,
     }));
 
-    render(<NationalTeam />);
+    renderPage();
 
     const chinextChart = screen.getAllByTestId("national-team-chart")[5];
     expect(chinextChart).toHaveAttribute("data-series-show-symbol", "true,true");
@@ -216,7 +331,7 @@ describe("NationalTeam page", () => {
       refetch: mocks.refetch,
     });
 
-    render(<NationalTeam />);
+    renderPage();
 
     expect(screen.getAllByText("截至 2026-09-15")).toHaveLength(6);
     expect(screen.getAllByText("1日 -")).toHaveLength(6);
@@ -238,7 +353,7 @@ describe("NationalTeam page", () => {
       refetch: mocks.refetch,
     });
 
-    const { container } = render(<NationalTeam />);
+    const { container } = renderPage();
     const rows = container.querySelectorAll(".national-team-rotation__item");
     expect(rows).toHaveLength(3);
     expect(rows[0].querySelector(".national-team-rotation__name")).toHaveTextContent("中证500");
@@ -252,7 +367,7 @@ describe("NationalTeam page", () => {
   });
 
   it("requests the selected history window and refreshes on demand", () => {
-    render(<NationalTeam />);
+    renderPage();
 
     expect(mocks.useNationalTeamHoldings).toHaveBeenLastCalledWith(120);
     fireEvent.click(screen.getByRole("radio", { name: "240 天" }));
@@ -263,7 +378,7 @@ describe("NationalTeam page", () => {
   });
 
   it("allows switching the rotation ranking timeframe and filtering ETF table by broad-based index", () => {
-    render(<NationalTeam />);
+    renderPage();
 
     expect(screen.getByText("结构轮动 · 20 日份额变化")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("radio", { name: "5 日" }));
@@ -291,6 +406,94 @@ describe("NationalTeam page", () => {
     fireEvent.change(searchInput, { target: { value: "" } });
     expect(screen.getByText("510310")).toBeInTheDocument();
   });
+
+  it("renders daily flow stacked chart and switches tactical category tabs", () => {
+    renderPage();
+
+    expect(screen.getByTestId("national-team-daily-flow-chart")).toBeInTheDocument();
+    expect(screen.getByText("全市场宽基每日净申赎走势")).toBeInTheDocument();
+
+    // Default: all 6 charts
+    expect(screen.getAllByTestId("national-team-chart")).toHaveLength(6);
+
+    // Switch to "核心大盘" category
+    fireEvent.click(screen.getByRole("radio", { name: "核心大盘" }));
+
+    // Only 沪深300 & 上证50 dual-axis charts shown
+    expect(screen.getAllByTestId("national-team-chart")).toHaveLength(2);
+    expect(screen.getByRole("heading", { name: "沪深300" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "上证50" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "中证500" })).not.toBeInTheDocument();
+
+    // ETF table shows 5 core broad ETFs
+    expect(screen.getByText("510300")).toBeInTheDocument();
+    expect(screen.getByText("510050")).toBeInTheDocument();
+    expect(screen.queryByText("510500")).not.toBeInTheDocument();
+
+    // Switch back to "全部板块"
+    fireEvent.click(screen.getByRole("radio", { name: "全部板块" }));
+    expect(screen.getAllByTestId("national-team-chart")).toHaveLength(6);
+    expect(screen.getByText("510500")).toBeInTheDocument();
+  });
+
+  it("renders support score radar, policy milestone timeline, and support zones cost distribution", () => {
+    renderPage();
+
+    // 1. Support score radar
+    expect(screen.getByTestId("national-team-support-radar")).toBeInTheDocument();
+    expect(screen.getByText("国家队托底雷达")).toBeInTheDocument();
+    expect(screen.getByText("69")).toBeInTheDocument();
+    expect(screen.getByText("积极托底")).toBeInTheDocument();
+    expect(screen.getByText(/资金托底因子/)).toBeInTheDocument();
+    expect(screen.getByText("25.5 / 40")).toBeInTheDocument();
+
+    // 2. Milestones
+    expect(screen.getByTestId("national-team-milestones")).toBeInTheDocument();
+    expect(screen.getByText("国家队关键政策底救市标尺")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /查看历次救市节点/ }));
+    expect(screen.getByText("汇金扩大增持范围并加大力度")).toBeInTheDocument();
+
+    // 3. Support zones
+    expect(screen.getByTestId("national-team-support-zones")).toBeInTheDocument();
+    expect(screen.getByText("核心指数主力成本中枢与托底点位分布")).toBeInTheDocument();
+    expect(screen.getByText(/加权平均买入成本：/)).toBeInTheDocument();
+    expect(screen.getByText("3600 点")).toBeInTheDocument();
+    expect(screen.getByText("安全垫 +6.94%")).toBeInTheDocument();
+    expect(screen.getByText("3400-3600")).toBeInTheDocument();
+  });
+
+  it("renders ETF volume and abnormal volume tags", () => {
+    renderPage();
+    expect(screen.getByText("盘中主力放量异动监测")).toBeInTheDocument();
+    expect(screen.getAllByText("成交额").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("量比").length).toBeGreaterThan(0);
+    expect(screen.getByText("32.5亿")).toBeInTheDocument();
+    expect(screen.getAllByText("放量 2.5x").length).toBeGreaterThan(0);
+  });
+
+  it("switches to strategic institutional bottom-holding portrait view", () => {
+    renderPage();
+    const viewSwitcher = screen.getByTestId("national-team-view-switcher");
+    expect(viewSwitcher).toBeInTheDocument();
+
+    const portraitTab = screen.getByText("战略机构底仓全景 (汇金/证金/社保)");
+    fireEvent.click(portraitTab);
+
+    expect(screen.getByTestId("national-team-portrait-panel")).toBeInTheDocument();
+    expect(screen.getAllByText("中央汇金").length).toBeGreaterThan(0);
+    expect(screen.getByText("中证金 (CSF)")).toBeInTheDocument();
+    expect(screen.getByText("全国社保基金")).toBeInTheDocument();
+    expect(screen.getByText("国家队战略底仓行业配置与权重分布")).toBeInTheDocument();
+    expect(screen.getAllByText("银行金融").length).toBeGreaterThan(0);
+    expect(screen.getByText("48.5%")).toBeInTheDocument();
+    expect(screen.getByText("核心压舱石标的 · 汇金 / 证金 / 社保前十大战略重仓")).toBeInTheDocument();
+    expect(screen.getAllByText("工商银行").length).toBeGreaterThan(0);
+    expect(screen.getByText("长江电力")).toBeInTheDocument();
+
+    const exportBtn = screen.getByRole("button", { name: /导出画像 CSV/ });
+    expect(exportBtn).toBeInTheDocument();
+    fireEvent.click(exportBtn);
+  });
 });
 
 
@@ -306,7 +509,7 @@ describe("NationalTeam data quality", () => {
       },
       isLoading: false, isFetching: false, error: null, refetch: mocks.refetch,
     });
-    const { container } = render(<NationalTeam />);
+    const { container } = renderPage();
     expect(screen.queryByText("数据不完整")).not.toBeInTheDocument();
     fireEvent.mouseOver(container.querySelector(".national-team-date")!);
     const tooltip = await screen.findByRole("tooltip");
@@ -326,7 +529,7 @@ describe("NationalTeam data quality", () => {
       },
       isLoading: false, isFetching: false, error: null, refetch: mocks.refetch,
     });
-    render(<NationalTeam />);
+    renderPage();
     expect(screen.getByText("数据不完整 · 后台更新中")).toBeInTheDocument();
     expect(screen.getByText(new RegExp("覆盖 8/12 只宽基 ETF"))).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /查看明细/ }));
@@ -339,7 +542,7 @@ describe("NationalTeam data quality", () => {
   });
 
   it("supports exporting ETF data to CSV and previewing dual-axis chart modal", () => {
-    render(<NationalTeam />);
+    renderPage();
 
     const exportBtn = screen.getByRole("button", { name: /导出 CSV/ });
     expect(exportBtn).toBeInTheDocument();

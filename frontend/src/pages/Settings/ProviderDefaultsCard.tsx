@@ -21,7 +21,7 @@ export function ProviderDefaultsCard({ providerDefaults }: { providerDefaults: R
           <div
             key={name}
             style={{
-              padding: "10px 14px",
+              padding: "var(--c-pad-inset, 7px 12px)",
               background: colors.hoverBg,
               border: `1px solid ${colors.border}`,
               borderRadius: 8,

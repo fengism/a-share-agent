@@ -147,7 +147,7 @@ export default function BacktestMetrics({
             justifyContent: "space-between",
             flexWrap: "wrap",
             gap: 8,
-            padding: "8px 12px",
+            padding: "var(--c-pad-inset, 7px 12px)",
             marginBottom: 12,
             borderRadius: "var(--c-radius-sm)",
             background: "color-mix(in srgb, var(--c-primary) 6%, var(--c-nested-bg))",

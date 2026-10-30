@@ -206,7 +206,7 @@ function RecordEditorModal({
       <Alert
         type="info"
         showIcon
-        message="手工维护的概念记录会被锁定，CSV 导入仅在开启强制覆盖时可替换。"
+        title="手工维护的概念记录会被锁定，CSV 导入仅在开启强制覆盖时可替换。"
         style={{ marginBottom: 16 }}
       />
       <Form form={form} layout="vertical" requiredMark="optional">
@@ -355,7 +355,7 @@ function ImportDrawer({
         <Alert
           type="info"
           showIcon
-          message="文件格式要求"
+          title="文件格式要求"
           description="支持 CSV 或 Excel 格式，必须包含【股票代码】和【所属概念】列（如 i问财导出的表头）。多个概念支持分号或逗号分隔。"
         />
         <Upload.Dragger {...uploadProps} disabled={busy}>
@@ -405,7 +405,7 @@ function ImportDrawer({
             <Alert
               type="warning"
               showIcon
-              message={`预检提示（${preview.warnings.length}）`}
+              title={`预检提示（${preview.warnings.length}）`}
               description={
                 <ul>
                   {preview.warnings.slice(0, 8).map((warning) => (

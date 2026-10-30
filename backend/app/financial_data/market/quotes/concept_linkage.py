@@ -51,6 +51,24 @@ MAX_INDEX_DAYS = 3650
 class ConceptSummary:
     name: str
     stock_count: int
+    change_pct: float | None = None
+    change_date: str | None = None
+    up_count: int | None = None
+    down_count: int | None = None
+    limit_up_count: int | None = None
+    sample_count: int | None = None
+
+
+@dataclass(frozen=True)
+class ConceptDailyChange:
+    """某个概念的最近一个交易日等权涨跌聚合（口径与合成指数一致）。"""
+
+    date: str
+    change_pct: float
+    up_count: int
+    down_count: int
+    limit_up_count: int
+    sample_count: int
 
 
 @dataclass(frozen=True)
@@ -73,7 +91,18 @@ def _industry_connection() -> sqlite3.Connection:
     return get_connection("industry")
 
 
-def list_concepts(*, query: str = "", limit: int = 200) -> list[ConceptSummary]:
+def _market_daily_connection() -> sqlite3.Connection:
+    return get_connection("market_daily")
+
+
+def list_concepts(*, query: str = "", limit: int = 200, order: str = "size") -> list[ConceptSummary]:
+    """概念列表，附带最近交易日等权涨跌（无数据时为 None）。
+
+    ``order="size"`` 按成分股只数降序（历史默认）；``order="change"`` 按最近
+    交易日等权涨幅降序（无数据的排在最后，同涨幅按规模降序）。涨跌聚合来自
+    :func:`get_concept_daily_changes`，按交易日缓存 24 小时，因此两种排序都不产生
+    逐概念的上游调用；前端也可以直接用返回值给关联概念、当前概念贴涨幅。
+    """
     connection = _industry_connection()
     if query.strip():
         rows = connection.execute(
@@ -86,7 +115,122 @@ def list_concepts(*, query: str = "", limit: int = 200) -> list[ConceptSummary]:
             "SELECT name, stock_count FROM stock_concepts ORDER BY stock_count DESC, name ASC LIMIT ?",
             (limit,),
         ).fetchall()
-    return [ConceptSummary(name=str(row[0]), stock_count=int(row[1])) for row in rows]
+
+    changes = get_concept_daily_changes()
+    summaries: list[ConceptSummary] = []
+    for row in rows:
+        name = str(row[0])
+        change = changes.get(name)
+        summaries.append(
+            ConceptSummary(
+                name=name,
+                stock_count=int(row[1]),
+                change_pct=change.change_pct if change else None,
+                change_date=change.date if change else None,
+                up_count=change.up_count if change else None,
+                down_count=change.down_count if change else None,
+                limit_up_count=change.limit_up_count if change else None,
+                sample_count=change.sample_count if change else None,
+            )
+        )
+
+    if order == "change":
+        summaries.sort(
+            key=lambda item: (
+                -(item.change_pct if item.change_pct is not None else float("-inf")),
+                -item.stock_count,
+                item.name,
+            )
+        )
+    return summaries
+
+
+def get_concept_daily_changes() -> dict[str, ConceptDailyChange]:
+    """全部概念的最近交易日等权涨跌聚合，键为概念名。
+
+    口径与合成指数一致：前复权价、等权平均（见 :mod:`app.modules.market_daily.concept_index`），
+    但只算最近两个交易日，成本一次到位（全市场 ~5000 只 × 两日复权价 + 概念映射展开），
+    结果按 ``concept_changes:{date}`` 缓存 24 小时。供概念列表排序与标签展示使用，
+    不做逐概念的上游调用。
+    """
+    market_daily = _market_daily_connection()
+    date_rows = market_daily.execute(
+        "SELECT DISTINCT trade_date FROM market_daily_bars "
+        "WHERE market = 'cn' AND instrument_type = 'stock' "
+        "ORDER BY trade_date DESC LIMIT 2"
+    ).fetchall()
+    if len(date_rows) < 2:
+        return {}
+    latest = str(date_rows[0]["trade_date"])
+    prev = str(date_rows[1]["trade_date"])
+
+    cache_key = f"concept_changes:{latest}"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached  # type: ignore[return-value]
+
+    # 两日的复权价：走 (trade_date DESC, market, instrument_type, code) 索引
+    price_rows = market_daily.execute(
+        """SELECT b.code AS code, b.trade_date AS trade_date,
+                  b.close * f.qfq_multiplier + f.qfq_offset AS px
+             FROM market_daily_bars b
+             JOIN market_daily_adjustment_factors f
+               ON f.market = b.market AND f.code = b.code AND f.trade_date = b.trade_date
+            WHERE b.market = 'cn'
+              AND b.instrument_type = 'stock'
+              AND b.trade_date IN (?, ?)
+              AND b.close > 0""",
+        (prev, latest),
+    ).fetchall()
+    prices: dict[str, dict[str, float]] = {}
+    for row in price_rows:
+        prices.setdefault(str(row["code"]), {})[str(row["trade_date"])] = float(row["px"])
+
+    # 个股一日收益（复权，与合成指数的日收益率同口径）
+    returns: dict[str, float] = {}
+    for code, by_date in prices.items():
+        prev_px = by_date.get(prev)
+        latest_px = by_date.get(latest)
+        if prev_px is None or latest_px is None or prev_px <= 0:
+            continue
+        returns[code] = (latest_px / prev_px - 1.0) * 100.0
+    if not returns:
+        return {}
+
+    # 概念映射展开聚合：一只股票平均带 20~40 个概念，Python 侧累加 ~12 万次，可忽略
+    industry = _industry_connection()
+    mapping_rows = industry.execute(
+        "SELECT stock_code, concepts_json FROM stock_concept_mappings"
+    ).fetchall()
+    sums: dict[str, list[float]] = {}
+    for row in mapping_rows:
+        code = _split_code(str(row["stock_code"]))
+        change = returns.get(code)
+        if change is None:
+            continue
+        for name in _parse_concepts(row["concepts_json"]):
+            bucket = sums.get(name)
+            if bucket is None:
+                bucket = sums[name] = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+            bucket[0] += change
+            bucket[1] += 1.0 if change > 0 else 0.0
+            bucket[2] += 1.0 if change < 0 else 0.0
+            bucket[3] += 1.0 if change >= 9.8 else 0.0
+            bucket[5] += 1.0
+
+    result = {
+        name: ConceptDailyChange(
+            date=latest,
+            change_pct=round(bucket[0] / bucket[5], 4),
+            up_count=int(bucket[1]),
+            down_count=int(bucket[2]),
+            limit_up_count=int(bucket[3]),
+            sample_count=int(bucket[5]),
+        )
+        for name, bucket in sums.items()
+    }
+    cache.set(cache_key, result, ttl=CONCEPT_LINKAGE.ttl_seconds)
+    return result
 
 
 def _concept_constituent_rows(concept: str) -> list[sqlite3.Row]:
@@ -145,6 +289,19 @@ def list_constituents(concept: str) -> tuple[list[ConceptConstituent], int]:
     return constituents, len(constituents)
 
 
+def _all_concept_sizes() -> dict[str, int]:
+    """全部概念的成分股只数，按天缓存。用于把"具体题材"排在"普适属性"前面。"""
+    cache_key = "concept_sizes:all"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached  # type: ignore[return-value]
+    connection = _industry_connection()
+    rows = connection.execute("SELECT name, stock_count FROM stock_concepts").fetchall()
+    sizes = {str(row["name"]): int(row["stock_count"]) for row in rows}
+    cache.set(cache_key, sizes, ttl=CONCEPT_LINKAGE.ttl_seconds)
+    return sizes
+
+
 def _concept_sizes(names: list[str]) -> dict[str, int]:
     if not names:
         return {}
@@ -183,6 +340,35 @@ def _confirmed_local_closes(codes: list[str]) -> dict[str, dict]:
             "source": f"market_daily_close:{today}",
         }
     return result
+
+
+#: 每只成分股回给前端的"其他概念"标签数（不含当前概念）。
+#: 上游 iwencai 每只股票带 20~40 个标签，全量回传会让响应体多出几百 KB；
+#: 这里按"具体程度"取最细的几个，足够用户判断这只股票还属于哪些题材。
+CONSTITUENT_TAG_LIMIT = 3
+
+
+def _pick_constituent_tags(
+    concept: str,
+    concepts: list[str],
+    *,
+    concept_size: int,
+    sizes: dict[str, int],
+) -> list[str]:
+    """挑出最具体的 N 个其他概念标签。
+
+    ``concept_size`` 是当前概念的成分股只数：融资融券、深股通这类普适属性
+    （3861/1879 只）对任何题材都是噪音，因此只保留规模不超过当前概念 2 倍的
+    标签，再按规模升序取最细的几个——「人形机器人」优先于「预盈预增」。
+    """
+    size_limit = max(concept_size, 1) * 2
+    candidates = [
+        name
+        for name in concepts
+        if name != concept and sizes.get(name, 0) <= size_limit
+    ]
+    candidates.sort(key=lambda name: (sizes.get(name, 0), name))
+    return candidates[:CONSTITUENT_TAG_LIMIT]
 
 
 def _related_concepts(concept: str, constituents: list[ConceptConstituent]) -> list[RelatedConcept]:
@@ -266,6 +452,10 @@ async def get_concept_constituents(concept: str, quote_codes: list[str] | None =
         except Exception:
             logger.warning("概念成分股本地收盘兜底失败: concept=%s", concept, exc_info=True)
 
+    # 行内"其他概念"标签：规模表按天缓存，挑选规则见 _pick_constituent_tags
+    concept_sizes = await asyncio.to_thread(_all_concept_sizes)
+    concept_size = concept_sizes.get(concept, total)
+
     for item in constituents:
         quote = quotes.get(item.code)
         price = change_pct = None
@@ -292,6 +482,12 @@ async def get_concept_constituents(concept: str, quote_codes: list[str] | None =
                 "change_pct": change_pct,
                 "amount": amount,
                 "quote_source": source,
+                "related_concepts": _pick_constituent_tags(
+                    concept,
+                    item.concepts,
+                    concept_size=concept_size,
+                    sizes=concept_sizes,
+                ),
             }
         )
 

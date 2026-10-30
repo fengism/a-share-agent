@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { exportBacktestTearsheetMarkdown, exportEquityCurveCsv } from "./exportTearsheet";
+import { exportBacktestTearsheetMarkdown, exportEquityCurveCsv, exportTradesCsv } from "./exportTearsheet";
 import type { QuantBacktestResult } from "../../../api/queries";
 
 describe("exportTearsheet", () => {
@@ -80,6 +80,12 @@ describe("exportTearsheet", () => {
 
     exportEquityCurveCsv(mockResult.equity_curve);
     expect(downloadedFilename).toContain("量化每日净值序列_");
+
+    exportTradesCsv([
+      { date: "2024-01-02", code: "600519", side: "buy", price: 1750, shares: 100, amount: 175000, fee: 5, realized_pnl: null },
+      { date: "2024-01-10", code: "600519", side: "sell", price: 1850, shares: 100, amount: 185000, fee: 5, realized_pnl: 10000 },
+    ]);
+    expect(downloadedFilename).toContain("量化回测成交明细_");
 
     createElementSpy.mockRestore();
     URL.createObjectURL = originalCreateObjectURL;

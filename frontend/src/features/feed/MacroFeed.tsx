@@ -176,6 +176,21 @@ export default function MacroFeed({ searchQuery = "" }: { searchQuery?: string }
 
   return (
     <div className="macro-feed">
+      {/* 1. 核心基准利率看板置顶，第一时间掌握流动性环境 */}
+      <SectionDataState
+        isLoading={feed.isLoading}
+        error={feed.error}
+        onRetry={() => feed.refetch()}
+        isEmpty={!feed.isLoading && !feed.error && !hasFeed}
+        emptyText="暂无宏观数据"
+        errorTitle="宏观数据加载失败"
+        skeletonRows={3}
+        minHeight={100}
+      >
+        <RatesCard rates={feedData?.rates ?? []} />
+      </SectionDataState>
+
+      {/* 2. 宏观解读（AI）与宏观事件时间轴 */}
       <SectionDataState
         isLoading={analysis.isLoading}
         error={analysis.error}
@@ -222,6 +237,7 @@ export default function MacroFeed({ searchQuery = "" }: { searchQuery?: string }
         </Card>
       </SectionDataState>
 
+      {/* 3. 国家统计局数据与金融政策列表 */}
       <SectionDataState
         isLoading={feed.isLoading}
         error={feed.error}
@@ -232,7 +248,6 @@ export default function MacroFeed({ searchQuery = "" }: { searchQuery?: string }
         skeletonRows={5}
         minHeight={200}
       >
-        <RatesCard rates={feedData?.rates ?? []} />
         <div className="macro-lists">
           <Card className="macro-card" size="small" title={`国家统计局发布数据（${releases.length}）`}>
             <FeedList items={releases} emptyText="近一个月暂无发布数据" />

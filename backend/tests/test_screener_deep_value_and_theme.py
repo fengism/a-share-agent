@@ -23,6 +23,8 @@ def mock_spot_df() -> pd.DataFrame:
             "市净率": 0.85,
             "总市值": 50000000000,
             "成交额": 500000000,
+            "量比": 1.1,
+            "60日涨跌幅": 5.2,
         },
         {
             "代码": "600002",
@@ -38,6 +40,8 @@ def mock_spot_df() -> pd.DataFrame:
             "市净率": 4.5,
             "总市值": 8000000000,
             "成交额": 850000000,
+            "量比": 2.8,
+            "60日涨跌幅": 25.6,
         },
         {
             "代码": "600003",
@@ -53,6 +57,8 @@ def mock_spot_df() -> pd.DataFrame:
             "市净率": 0.7,
             "总市值": 1000000000,
             "成交额": 5000000,
+            "量比": 0.6,
+            "60日涨跌幅": -18.3,
         },
     ])
 
@@ -87,6 +93,48 @@ def test_amplitude_filtering_and_sorting(mock_spot_df: pd.DataFrame):
     assert result.items[0].code == "600002"
     assert result.items[0].amplitude is not None
     assert result.items[0].amplitude > 10.0
+
+
+def test_volume_ratio_and_momentum_filtering(mock_spot_df: pd.DataFrame):
+    # 筛选放量且60日强势个股 (量比 >= 2.0 且 60日涨幅 >= 20%)
+    filters = ScreenerFilter(
+        volume_ratio_min=2.0,
+        change_pct_60d_min=20.0,
+        sort_by="volume_ratio",
+        sort_order="desc",
+    )
+    result = _screen_dataframe(
+        df=mock_spot_df,
+        second_industry_map={},
+        exchange_master=None,
+        filters=filters,
+    )
+    assert result.total == 1
+    item = result.items[0]
+    assert item.code == "600002"
+    assert item.volume_ratio == 2.8
+    assert item.change_pct_60d == 25.6
+
+
+def test_composite_score_calculation_and_sorting(mock_spot_df: pd.DataFrame):
+    # 多因子综合得分排序 (排除 ST，按综合得分降序)
+    filters = ScreenerFilter(
+        exclude_st=True,
+        sort_by="composite_score",
+        sort_order="desc",
+    )
+    result = _screen_dataframe(
+        df=mock_spot_df,
+        second_industry_map={},
+        exchange_master=None,
+        filters=filters,
+    )
+    assert result.total == 2
+    for item in result.items:
+        assert item.composite_score is not None
+        assert 0.0 <= item.composite_score <= 100.0
+    # 验证降序
+    assert result.items[0].composite_score >= result.items[1].composite_score
 
 
 def test_screener_presets_definitions():

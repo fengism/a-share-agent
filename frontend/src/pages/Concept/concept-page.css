@@ -1,4 +1,4 @@
-/* 概念板块联动页面样式 */
+/* 概念页样式：对齐全站设计令牌（--c-*），布局为「选择器 → 指数+侧栏 → 全宽成分股表」 */
 
 .concept-page {
   display: flex;
@@ -8,34 +8,15 @@
   width: 100%;
 }
 
-.concept-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.concept-header__icon {
-  font-size: 20px;
-  color: var(--c-primary);
-  flex-shrink: 0;
-}
-
-.concept-header__title {
-  margin: 0;
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--c-text-primary);
-  line-height: var(--c-leading-tight);
-}
-
-.concept-header__desc {
-  margin: 2px 0 0;
-  font-size: var(--c-font-xs);
+/* ── 页头 ── */
+.concept-page__desc {
+  margin: 0 0 2px;
+  font-size: var(--c-font-sm);
   color: var(--c-text-muted);
   line-height: var(--c-leading-normal);
 }
 
+/* ── 选择器卡片 ── */
 .concept-search-bar {
   display: flex;
   gap: 10px;
@@ -56,22 +37,79 @@
   flex-wrap: wrap;
 }
 
-.concept-mobile-view-tabs {
-  display: none;
-  width: 100%;
-  margin-bottom: 2px;
-}
-
-/* 概念指数面板 */
-.concept-index-panel {
+.concept-picker__chips {
   display: flex;
-  flex-direction: column;
-  gap: 10px;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 8px;
   min-width: 0;
-  width: 100%;
 }
 
-.concept-index-header {
+.concept-picker__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--c-font-xs);
+  color: var(--c-text-muted);
+  flex-shrink: 0;
+}
+
+/* 热门/最近概念 chip：可点击按钮，带排名与涨幅 */
+.concept-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius-pill);
+  background: var(--c-hover-bg);
+  color: var(--c-text-primary);
+  font-size: var(--c-font-xs);
+  line-height: 20px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+}
+
+.concept-chip:hover {
+  border-color: var(--c-primary);
+  background: var(--c-primary-soft);
+}
+
+.concept-chip--active {
+  border-color: var(--c-primary);
+  background: var(--c-primary-soft);
+  color: var(--c-primary);
+}
+
+.concept-chip__rank {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  border-radius: var(--c-radius-sm);
+  background: var(--c-primary-2);
+  color: var(--c-primary);
+  font-size: 10px;
+  font-weight: var(--c-weight-semibold);
+  font-family: var(--c-font-mono);
+}
+
+.concept-chip__name {
+  max-width: 128px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.concept-chip__pct {
+  font-size: 11px;
+  font-weight: var(--c-weight-medium);
+}
+
+/* ── KPI 条（指数卡顶部） ── */
+.concept-kpi {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -79,7 +117,7 @@
   flex-wrap: wrap;
 }
 
-.concept-index-price {
+.concept-kpi__main {
   display: flex;
   align-items: baseline;
   gap: 10px;
@@ -87,45 +125,196 @@
   flex-wrap: wrap;
 }
 
-.concept-index-price__name {
+.concept-kpi__name {
   font-size: var(--c-font-md);
+  font-weight: var(--c-weight-semibold);
   color: var(--c-text-primary);
 }
 
-.concept-index-price__val {
+.concept-kpi__close {
   font-family: var(--c-font-mono);
-  font-size: 18px;
+  font-size: 26px;
+  font-weight: var(--c-weight-bold);
+  line-height: 1.1;
+}
+
+.concept-kpi__period {
+  font-size: var(--c-font-xs);
+}
+
+.concept-kpi__stats {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: var(--c-font-xs);
+  color: var(--c-text-muted);
+}
+
+.concept-kpi__stat {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.concept-kpi__stat-label {
+  color: var(--c-text-muted);
+}
+
+.concept-kpi__stat-value {
   color: var(--c-text-primary);
   font-weight: var(--c-weight-semibold);
 }
 
-.concept-index-ranges {
+.concept-kpi__tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--c-font-xs);
+  color: var(--c-text-muted);
+  cursor: help;
+}
+
+.concept-index-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.concept-index-toolbar__controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ── 概念对比 ── */
+.concept-compare__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.concept-compare__legend {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.concept-compare__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--c-font-xs);
+}
+
+/* ── 成分股筛选行 ── */
+.concept-constituent-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+/* ── 涨跌分布条 ── */
+.concept-breadth {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.concept-breadth__bar {
+  display: flex;
+  width: 96px;
+  height: 6px;
+  border-radius: var(--c-radius-pill);
+  overflow: hidden;
+  background: var(--c-muted-soft);
   flex-shrink: 0;
 }
 
-/* 指数统计栏（桌面端 flex 流，移动端微型卡片网格） */
-.concept-index-stats {
-  display: flex;
-  gap: 14px;
-  flex-wrap: wrap;
-  font-size: var(--c-font-xs);
-  color: var(--c-text-muted);
+.concept-breadth__bar > span {
+  display: block;
+  min-width: 0;
+}
+
+.concept-breadth__labels {
+  display: inline-flex;
   align-items: center;
+  gap: 8px;
+  font-size: var(--c-font-xs);
+  white-space: nowrap;
 }
 
-.concept-index-stats__tag {
-  margin-inline-end: 0 !important;
+/* ── 右侧栏：领涨/领跌 + 关联概念 ── */
+.concept-side__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--c-font-sm);
 }
 
-/* 成分股面板 */
-.concept-constituent-panel {
+.concept-leaders__col {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
   min-width: 0;
-  width: 100%;
 }
 
+.concept-leaders__col-label {
+  font-size: var(--c-font-xs);
+}
+
+.concept-leader-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  font-size: var(--c-font-sm);
+}
+
+.concept-leader-row__name {
+  color: var(--c-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.concept-leader-row__name:hover {
+  color: var(--c-primary);
+}
+
+.concept-related {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.concept-related__tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+}
+
+.concept-related__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.concept-related__overlap {
+  font-size: 11px;
+  color: var(--c-text-muted);
+}
+
+/* ── 成分股表 ── */
 .concept-constituent-header {
   display: flex;
   align-items: center;
@@ -136,31 +325,117 @@
 
 .concept-constituent-info {
   display: flex;
-  align-items: baseline;
-  gap: 8px;
+  align-items: center;
+  gap: 12px;
   min-width: 0;
   flex-wrap: wrap;
 }
 
-.concept-related-tags {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
+.concept-quote-progress {
+  display: inline-flex;
   align-items: center;
+  white-space: nowrap;
 }
 
-/* 移动端屏幕适配 (< 768px) */
+/* 涨跌幅单元格：数字右侧贴齐，背景条从右往左按波动幅度着色 */
+.concept-change-cell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  padding: 1px 6px;
+  border-radius: var(--c-radius-sm);
+  min-width: 88px;
+}
+
+.concept-change-cell__badge {
+  flex-shrink: 0;
+}
+
+.concept-row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* 行内「其他概念」标签：窄屏不展示，避免挤占行情列 */
+.concept-other-tags {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.concept-other-tags__tag {
+  max-width: 78px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  line-height: 18px;
+  padding-inline: 6px;
+}
+
+/* 脚注与口径说明 */
+.concept-index-note {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--c-text-muted);
+}
+
+.concept-caliper p {
+  margin: 0 0 6px;
+  font-size: var(--c-font-xs);
+  line-height: 1.7;
+  color: var(--c-text-secondary);
+}
+
+.concept-caliper p:last-child {
+  margin-bottom: 0;
+}
+
+.concept-mobile-view-tabs {
+  display: none;
+  width: 100%;
+  margin-bottom: 2px;
+}
+
+/* ── 未收录概念兑底 ── */
+.concept-missing {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: var(--c-space-7) var(--c-space-4);
+  text-align: center;
+}
+
+.concept-missing__title {
+  margin: 0;
+  font-size: var(--c-font-md);
+  font-weight: var(--c-weight-semibold);
+}
+
+.concept-missing__desc {
+  margin: 0 0 var(--c-space-3);
+  font-size: var(--c-font-sm);
+}
+
+.concept-missing__actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* ── 移动端适配 (< 768px) ── */
 @media (max-width: 767px) {
   .concept-page {
     gap: 10px;
   }
 
-  .concept-header {
-    gap: 8px;
-  }
-
-  .concept-header__title {
-    font-size: 18px;
+  .concept-page__desc {
+    font-size: var(--c-font-xs);
   }
 
   .concept-search-input {
@@ -176,6 +451,23 @@
   .concept-search-meta {
     justify-content: space-between;
     font-size: var(--c-font-xs);
+  }
+
+  .concept-chips-scroll,
+  .concept-picker__chips {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+
+  .concept-picker__chips::-webkit-scrollbar {
+    display: none;
+  }
+
+  .concept-picker__chips > * {
+    flex-shrink: 0;
   }
 
   .concept-mobile-view-tabs {
@@ -196,42 +488,17 @@
     text-align: center;
   }
 
-  .concept-index-header {
+  .concept-kpi {
     flex-direction: column;
     align-items: stretch;
     gap: 8px;
   }
 
-  .concept-index-ranges {
-    width: 100%;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
+  .concept-kpi__close {
+    font-size: 22px;
   }
 
-  .concept-index-ranges::-webkit-scrollbar {
-    display: none;
-  }
-
-  .concept-index-ranges .ant-segmented {
-    width: 100%;
-    display: flex;
-  }
-
-  .concept-index-ranges .ant-segmented-group {
-    width: 100%;
-    display: flex;
-  }
-
-  .concept-index-ranges .ant-segmented-item {
-    flex: 1;
-    text-align: center;
-    padding-inline: 4px;
-    font-size: var(--c-font-xs);
-  }
-
-  /* 移动端紧凑统计微型网格 */
-  .concept-index-stats {
+  .concept-kpi__stats {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: 6px;
@@ -241,16 +508,35 @@
     border: 1px solid var(--c-border-subtle);
   }
 
-  .concept-index-stats > span {
-    display: flex;
+  .concept-kpi__stat {
     justify-content: space-between;
-    align-items: center;
   }
 
-  .concept-index-stats__tag {
-    grid-column: 1 / -1;
+  .concept-index-toolbar {
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .concept-index-toolbar .ant-segmented {
+    width: 100%;
+    display: flex;
+  }
+
+  .concept-index-toolbar .ant-segmented-group {
+    width: 100%;
+    display: flex;
+  }
+
+  .concept-index-toolbar .ant-segmented-item {
+    flex: 1;
     text-align: center;
-    justify-content: center;
+    padding-inline: 4px;
+    font-size: var(--c-font-xs);
+  }
+
+  .concept-breadth__bar {
+    width: 72px;
   }
 
   .concept-constituent-header {
@@ -275,21 +561,5 @@
   .concept-constituent-sort .ant-segmented-item {
     flex: 1;
     text-align: center;
-  }
-
-  .concept-related-tags {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    flex-wrap: nowrap;
-    padding-bottom: 4px;
-    scrollbar-width: none;
-  }
-
-  .concept-related-tags::-webkit-scrollbar {
-    display: none;
-  }
-
-  .concept-related-tags > * {
-    flex-shrink: 0;
   }
 }

@@ -4,6 +4,7 @@ import {
   CopyOutlined,
   DownloadOutlined,
   ExportOutlined,
+  FileImageOutlined,
   RedoOutlined,
 } from "@ant-design/icons";
 import { Button, Tooltip } from "antd";
@@ -18,6 +19,11 @@ import { AssistantProcess } from "./AssistantProcess";
 import { BlinkingCursor } from "./BlinkingCursor";
 import { marketDateStamp } from "../../../utils/marketTime";
 import { ChatResultActions } from "./ChatResultActions";
+import { StockMentionPill } from "./StockMentionPill";
+import { NextPromptSuggestions } from "./NextPromptSuggestions";
+import { ResearchCardExportModal } from "./ResearchCardExportModal";
+import { CodeBlock } from "./CodeBlock";
+import { enrichStockMentions, parseStockProtocolUrl } from "../stockMarkdownEnhancer";
 
 const markdownPlugins = [remarkGfm];
 
@@ -26,6 +32,7 @@ interface AssistantMessageProps {
   onPush?: (messageId: string, content: string) => void;
   onRegenerate?: () => void;
   onResultAction?: ChatResultActionHandler;
+  onSelectPrompt?: (prompt: string) => void;
 }
 
 export const AssistantMessage = React.memo(function AssistantMessage({
@@ -33,12 +40,18 @@ export const AssistantMessage = React.memo(function AssistantMessage({
   onPush,
   onRegenerate,
   onResultAction,
+  onSelectPrompt,
 }: AssistantMessageProps) {
   const [copied, setCopied] = useState(false);
+  const [exportCardOpen, setExportCardOpen] = useState(false);
   const copyTimerRef = useRef<number | null>(null);
   const hasContent = !!message.content;
   const isStreaming = message.isStreaming;
   const normalizedContent = message.content.replace(/\n{3,}/g, "\n\n");
+  const enrichedContent = useMemo(
+    () => enrichStockMentions(normalizedContent),
+    [normalizedContent],
+  );
   const resultContext = useMemo(() => extractChatResultContext(message), [message]);
 
   useEffect(() => {
@@ -73,6 +86,62 @@ export const AssistantMessage = React.memo(function AssistantMessage({
     }
   };
 
+  const markdownComponents = useMemo(() => ({
+    pre: CodeBlock,
+    table: ({ children, ...props }: React.TableHTMLAttributes<HTMLTableElement>) => (
+      <div style={{ overflowX: "auto", margin: "10px 0", borderRadius: 8, border: "1px solid var(--c-border)" }}>
+        <table style={{ margin: 0, width: "100%", borderCollapse: "collapse" }} {...props}>
+          {children}
+        </table>
+      </div>
+    ),
+    td: ({ children, ...props }: React.TdHTMLAttributes<HTMLTableCellElement>) => {
+      let content = children;
+      if (typeof children === "string") {
+        const trimmed = children.trim();
+        if (/^\+[0-9]+(\.[0-9]+)?%?$/.test(trimmed)) {
+          content = (
+            <span style={{ color: "var(--c-up)", fontWeight: 600, fontFamily: "var(--c-font-mono)" }}>
+              {children}
+            </span>
+          );
+        } else if (/^-[0-9]+(\.[0-9]+)?%?$/.test(trimmed)) {
+          content = (
+            <span style={{ color: "var(--c-down)", fontWeight: 600, fontFamily: "var(--c-font-mono)" }}>
+              {children}
+            </span>
+          );
+        } else if (/^[0-9]+(\.[0-9]+)?%?$/.test(trimmed)) {
+          content = (
+            <span style={{ fontFamily: "var(--c-font-mono)" }}>
+              {children}
+            </span>
+          );
+        }
+      }
+      return <td {...props}>{content}</td>;
+    },
+    a: ({ href, children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => {
+      if (href) {
+        const stock = parseStockProtocolUrl(href);
+        if (stock) {
+          return (
+            <StockMentionPill
+              code={stock.code}
+              name={stock.name}
+              onSelectPrompt={onSelectPrompt}
+            />
+          );
+        }
+      }
+      return (
+        <a href={href} target="_blank" rel="noopener noreferrer" {...props}>
+          {children}
+        </a>
+      );
+    },
+  }), [onSelectPrompt]);
+
   return (
     <div className="chat-assistant-message">
       <AssistantProcess message={message} />
@@ -80,10 +149,23 @@ export const AssistantMessage = React.memo(function AssistantMessage({
       {hasContent && (
         <div className="chat-assistant-answer">
           <div className="chat-markdown">
-            <ReactMarkdown remarkPlugins={markdownPlugins}>{normalizedContent}</ReactMarkdown>
+            <ReactMarkdown
+              remarkPlugins={markdownPlugins}
+              components={markdownComponents}
+            >
+              {enrichedContent}
+            </ReactMarkdown>
           </div>
           {isStreaming && <BlinkingCursor />}
         </div>
+      )}
+
+      {!isStreaming && hasContent && onSelectPrompt && (
+        <NextPromptSuggestions
+          content={message.content}
+          stockCodes={resultContext.stockCodes}
+          onSelectPrompt={onSelectPrompt}
+        />
       )}
 
       {!isStreaming && onResultAction ? (
@@ -114,6 +196,17 @@ export const AssistantMessage = React.memo(function AssistantMessage({
               />
             </Tooltip>
           )}
+          {hasContent && (
+            <Tooltip title="导出投研长图卡片">
+              <Button
+                type="text"
+                size="small"
+                icon={<FileImageOutlined />}
+                onClick={() => setExportCardOpen(true)}
+                aria-label="导出投研长图卡片"
+              />
+            </Tooltip>
+          )}
           {hasContent && onPush && (
             <Tooltip title="推送回答">
               <Button
@@ -137,6 +230,15 @@ export const AssistantMessage = React.memo(function AssistantMessage({
             </Tooltip>
           )}
         </div>
+      )}
+
+      {hasContent && (
+        <ResearchCardExportModal
+          open={exportCardOpen}
+          onClose={() => setExportCardOpen(false)}
+          content={message.content}
+          messageId={message.id}
+        />
       )}
     </div>
   );

@@ -15,8 +15,8 @@ for (const width of [1440, 1024, 768, 390]) {
 
     await page.goto("/settings");
     if (width < 768) {
-      await page.getByRole("combobox", { name: "系统配置分类" }).click();
-      await page.getByText("协同与自动推送", { exact: true }).click();
+      // 窄屏使用横向胶囊导航（mobileMode="chips"），不再是下拉框
+      await page.getByRole("tab", { name: "协同与自动推送", exact: true }).click();
     } else {
       await page.getByRole("button", { name: "协同与自动推送", exact: true }).click();
     }

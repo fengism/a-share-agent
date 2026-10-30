@@ -91,5 +91,64 @@ describe("AssistantMessage", () => {
     expect(window.URL.createObjectURL).toHaveBeenCalled();
     expect(clickSpy).toHaveBeenCalled();
     clickSpy.mockRestore();
+
+    // Test export card modal trigger
+    const exportCardBtn = screen.getByRole("button", { name: "导出投研长图卡片" });
+    expect(exportCardBtn).toBeInTheDocument();
+    fireEvent.click(exportCardBtn);
+    expect(screen.getByText("导出投研报告卡片")).toBeInTheDocument();
+  });
+
+  it("renders next prompt suggestions and handles click", () => {
+    const onSelectPrompt = vi.fn();
+    render(
+      <AssistantMessage
+        message={{
+          id: "msg-suggestions",
+          role: "assistant",
+          content: "今日大盘主线题材与涨停连板龙头有哪些？",
+          isStreaming: false,
+        }}
+        onSelectPrompt={onSelectPrompt}
+      />,
+    );
+
+    expect(screen.getByText(/猜你想问/)).toBeInTheDocument();
+    const suggestionBtn = screen.getByText(/分析领涨题材的持续性/);
+    fireEvent.click(suggestionBtn);
+    expect(onSelectPrompt).toHaveBeenCalledWith(expect.stringContaining("分析领涨题材的持续性"));
+  });
+
+  it("renders financial tables with tabular numerals and percentage coloring", () => {
+    render(
+      <AssistantMessage
+        message={{
+          id: "msg-table",
+          role: "assistant",
+          content: "| 股票 | 涨跌幅 |\n| --- | --- |\n| 茅台 | +5.20% |\n| 五粮液 | -1.80% |",
+          isStreaming: false,
+        }}
+      />,
+    );
+
+    expect(screen.getByText("+5.20%")).toBeInTheDocument();
+    expect(screen.getByText("-1.80%")).toBeInTheDocument();
+  });
+
+  it("renders python strategy code block with toolbar badge and copy button", () => {
+    render(
+      <AssistantMessage
+        message={{
+          id: "msg-code",
+          role: "assistant",
+          content: "```python\n# 量化回测策略\ndef handle_data(context):\n    buy(stock, 100)\n```",
+          isStreaming: false,
+        }}
+      />,
+    );
+
+    expect(screen.getByText("PYTHON")).toBeInTheDocument();
+    expect(screen.getByText("量化策略片段")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "复制代码" })).toBeInTheDocument();
   });
 });

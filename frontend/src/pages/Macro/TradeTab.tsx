@@ -1,5 +1,5 @@
-import { Row, Col, Tag, Card, Table, Space } from "antd";
-import { RocketOutlined } from "@ant-design/icons";
+import { Row, Col, Tag, Card, Table, Space, Statistic } from "antd";
+import { RocketOutlined, ExportOutlined, ImportOutlined, DollarOutlined } from "@ant-design/icons";
 import { useMacroAllData, useCustomsTradeData } from "../../api/queries";
 import SectionDataState from "../../components/SectionDataState";
 import MacroIndicatorCard from "./MacroIndicatorCard";
@@ -85,18 +85,59 @@ export default function TradeTab() {
       {exportYoY != null ? (
         <div className="macro-insight-banner">
           <div className="macro-insight-banner__title">
-            <span>💡 进出口与外贸景气度监测</span>
+            <span>💡 进出口景气与出海产业链研判</span>
             <Tag color={tradeBal != null && tradeBal >= 0 ? "blue" : "purple"}>
-              {tradeBal != null && tradeBal >= 0 ? "对外贸易顺差格局" : "外贸进出口动态"}
+              {tradeBal != null && tradeBal >= 0 ? "对外贸易高顺差格局" : "外贸进出口动态"}
             </Tag>
           </div>
           <div className="macro-insight-banner__body">
-            出口同比 <strong>{exportYoY > 0 ? `+${exportYoY.toFixed(1)}` : exportYoY.toFixed(1)}%</strong>，进口同比 <strong>{importYoY != null ? `${importYoY > 0 ? "+" : ""}${importYoY.toFixed(1)}%` : "-"}</strong>
-            {tradeBal != null ? <>，当期贸易差额 <strong className="financial-num">{tradeBal.toFixed(1)}</strong> 亿美元</> : null}。
-            外贸作为总需求“三驾马车”的重要组成部分，直观反映外需景气与全球供应链分工地位。
+            出口当月同比 <strong>{exportYoY > 0 ? `+${exportYoY.toFixed(1)}` : exportYoY.toFixed(1)}%</strong>，
+            进口同比 <strong>{importYoY != null ? `${importYoY > 0 ? "+" : ""}${importYoY.toFixed(1)}%` : "-"}</strong>
+            {tradeBal != null ? <>，当期贸易顺差 <strong className="financial-num">{tradeBal.toFixed(1)}</strong> 亿美元</> : null}。
+            外贸作为总需求三驾马车的重要支柱，彰显出海优势链（汽车整车、船舶制造、工程机械、光储充与电网设备）的全球竞争力；
+            顺差保持高位持续为境内结汇与外汇平稳提供支撑。
           </div>
         </div>
       ) : null}
+
+      {/* 3 大核心外贸与顺差 KPI */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14, marginBottom: 16 }}>
+        <Card size="small" className="macro-kpi-card" variant="borderless">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: 12, color: c.textSecondary }}>全国出口增速 (月同比)</span>
+            <Tag color="blue" icon={<ExportOutlined />}>出海需求韧性</Tag>
+          </div>
+          <Statistic
+            value={exportYoY != null ? `${exportYoY > 0 ? "+" : ""}${exportYoY.toFixed(1)}%` : "-"}
+            styles={{ content: { fontSize: 20, fontWeight: 700, color: (exportYoY ?? 0) >= 0 ? c.up : c.down, marginTop: 4 } }}
+          />
+          <div className="macro-kpi-subtext">高端装备、新能源与出海链支撑</div>
+        </Card>
+
+        <Card size="small" className="macro-kpi-card" variant="borderless">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: 12, color: c.textSecondary }}>全国进口增速 (月同比)</span>
+            <Tag color="cyan" icon={<ImportOutlined />}>国内内需拉动</Tag>
+          </div>
+          <Statistic
+            value={importYoY != null ? `${importYoY > 0 ? "+" : ""}${importYoY.toFixed(1)}%` : "-"}
+            styles={{ content: { fontSize: 20, fontWeight: 700, color: (importYoY ?? 0) >= 0 ? c.up : c.down, marginTop: 4 } }}
+          />
+          <div className="macro-kpi-subtext">工业原材料与大宗补库动能</div>
+        </Card>
+
+        <Card size="small" className="macro-kpi-card" variant="borderless">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: 12, color: c.textSecondary }}>单月贸易顺差 (亿美元)</span>
+            <Tag color="purple" icon={<DollarOutlined />}>净出口贡献</Tag>
+          </div>
+          <Statistic
+            value={tradeBal != null ? tradeBal.toFixed(1) : "-"}
+            styles={{ content: { fontSize: 20, fontWeight: 700, color: (tradeBal ?? 0) >= 0 ? "#722ed1" : c.down, marginTop: 4 } }}
+          />
+          <div className="macro-kpi-subtext">外贸基本盘与汇率稳定缓冲垫</div>
+        </Card>
+      </div>
 
       <Row className="macro-card-grid" gutter={[16, 16]} style={{ marginBottom: 16 }}>
         <Col xs={24} md={12}>

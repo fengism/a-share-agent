@@ -10,8 +10,11 @@ import {
 describe("portfolio formatters", () => {
   it("formats monetary values and empty values", () => {
     expect(formatMoney(1234.5)).toBe("¥1,234.50");
+    expect(formatMoney(1234.5, "HKD")).toBe("HK$1,234.50");
+    expect(formatMoney(1234.5, "USD")).toBe("US$1,234.50");
     expect(formatMoney(null)).toBe("-");
     expect(formatPrice(12.34567)).toBe("¥12.3457");
+    expect(formatPrice(385.2, "HKD")).toBe("HK$385.20");
     expect(formatInteger(1234)).toBe("1,234");
   });
 

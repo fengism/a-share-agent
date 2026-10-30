@@ -18,6 +18,7 @@ vi.mock("echarts-for-react/lib/core", () => ({
 
 const totalCurve: PortfolioEquityCurveResponse = {
   mode: "total_assets",
+  base_currency: "CNY",
   start_date: "2026-01-02",
   end_date: "2026-01-05",
   initial_cash: 10000,
@@ -25,6 +26,16 @@ const totalCurve: PortfolioEquityCurveResponse = {
   current_securities_value: 720,
   total_return_pct: 1.93,
   max_drawdown_pct: -1.98,
+  annualized_return_pct: 42.5,
+  annualized_volatility_pct: 18.2,
+  sharpe_ratio: 2.34,
+  calmar_ratio: 21.46,
+  win_rate_pct: 66.67,
+  best_day_pct: 2.1,
+  worst_day_pct: -1.98,
+  longest_drawdown_days: 3,
+  trading_days: 2,
+  risk_free_rate_pct: 0,
   points: [
     { date: "2026-01-02", cash_balance: 8995, securities_value: 1000, total_assets: 9995, cumulative_return_pct: -0.05, drawdown_pct: -0.05, unpriced_count: 0 },
     { date: "2026-01-05", cash_balance: 9473, securities_value: 720, total_assets: 10193, cumulative_return_pct: 1.93, drawdown_pct: 0, unpriced_count: 0 },
@@ -55,6 +66,10 @@ describe("PortfolioEquityCurve", () => {
     expect(screen.getByText("期末总资产").closest(".ant-statistic")).toHaveTextContent("10,193.00");
     expect(screen.getByText("累计收益率").closest(".ant-statistic")).toHaveTextContent("1.93%");
     expect(screen.getByText("最大回撤").closest(".ant-statistic")).toHaveTextContent("-1.98%");
+    expect(screen.getByText("年化收益").closest(".ant-statistic")).toHaveTextContent("42.50%");
+    expect(screen.getByText("夏普比率").closest(".ant-statistic")).toHaveTextContent("2.34");
+    expect(screen.getByText("胜率").closest(".ant-statistic")).toHaveTextContent("66.67%");
+    expect(screen.getByText(/最佳单日 2.10% · 最差单日 -1.98%/)).toBeInTheDocument();
     const option = JSON.parse(screen.getByTestId("portfolio-equity-chart").getAttribute("data-option") || "{}");
     expect(option.series.map((item: { name: string }) => item.name)).toEqual(["总资产", "证券市值", "现金余额"]);
     fireEvent.click(screen.getByRole("button", { name: /刷新/ }));

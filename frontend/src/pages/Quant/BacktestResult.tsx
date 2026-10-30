@@ -1,12 +1,14 @@
-import { CopyOutlined, DownloadOutlined, FileTextOutlined, InfoCircleOutlined } from "@ant-design/icons";
+import { CopyOutlined, DownloadOutlined, ExperimentOutlined, FileTextOutlined, InfoCircleOutlined } from "@ant-design/icons";
 import { Button, Space, message } from "antd";
 import type { QuantBacktestResult, QuantStrategyConfig } from "../../api/queries";
+import BacktestAiAttribution from "./results/BacktestAiAttribution";
 import BacktestCharts from "./results/BacktestCharts";
 import BacktestMetrics from "./results/BacktestMetrics";
 import BacktestParameterSensitivity from "./results/BacktestParameterSensitivity";
 import BacktestTables from "./results/BacktestTables";
 import BacktestTradeKline from "./results/BacktestTradeKline";
-import { exportBacktestTearsheetMarkdown, exportEquityCurveCsv } from "./results/exportTearsheet";
+import ConstituentPerformanceMatrix from "./results/ConstituentPerformanceMatrix";
+import { exportBacktestTearsheetMarkdown, exportEquityCurveCsv, exportTradesCsv } from "./results/exportTearsheet";
 import { quantStrategyIdentity, quantStrategyParameterSummary } from "./quantRun";
 import "./quant-results.css";
 
@@ -49,17 +51,45 @@ export default function BacktestResult({
     message.success("每日净值序列 (CSV) 已导出");
   };
 
+  const handleExportTrades = () => {
+    if (!result.trades?.length) {
+      message.info("暂无成交记录可导出");
+      return;
+    }
+    exportTradesCsv(result.trades);
+    message.success("成交记录 (CSV) 已导出");
+  };
+
+  const handleTuneParameters = () => {
+    const url = new URL(window.location.href);
+    url.searchParams.set("panel", "setup");
+    window.history.pushState({}, "", url.toString());
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  };
+
   return (
     <section aria-label="回测结果">
       <div className="quant-result-toolbar">
         <nav className="quant-result-nav" aria-label="回测结果导航">
           <a href="#quant-result-metrics">核心指标</a>
+          <a href="#quant-result-attribution">AI战术归因</a>
           <a href="#quant-result-charts">净值与回撤</a>
           <a href="#quant-result-trades-chart">交易点位</a>
+          <a href="#quant-result-constituents">标的拆解</a>
           <a href="#quant-result-details">收益与成交</a>
           <a href="#quant-result-sensitivity">参数敏感性</a>
         </nav>
         <Space size={8} wrap>
+          <Button
+            size="small"
+            type="primary"
+            ghost
+            icon={<ExperimentOutlined />}
+            onClick={handleTuneParameters}
+            aria-label="微调参数重新回测"
+          >
+            微调参数
+          </Button>
           <Button
             size="small"
             icon={<CopyOutlined />}
@@ -83,6 +113,14 @@ export default function BacktestResult({
             aria-label="导出净值 CSV"
           >
             导出净值 (CSV)
+          </Button>
+          <Button
+            size="small"
+            icon={<DownloadOutlined />}
+            onClick={handleExportTrades}
+            aria-label="导出成交 CSV"
+          >
+            导出成交 (CSV)
           </Button>
         </Space>
       </div>
@@ -110,14 +148,29 @@ export default function BacktestResult({
           holdoutValidation={result.holdout_validation}
         />
       </div>
+      <div id="quant-result-attribution" className="quant-result-anchor">
+        <BacktestAiAttribution result={result} strategy={strategy} />
+      </div>
       <div id="quant-result-charts" className="quant-result-anchor">
         <BacktestCharts equityCurve={result.equity_curve} />
       </div>
       <div id="quant-result-trades-chart" className="quant-result-anchor">
         <BacktestTradeKline codes={result.codes} equityCurve={result.equity_curve} trades={result.trades} marketSnapshots={result.market_snapshots} />
       </div>
+      <div id="quant-result-constituents" className="quant-result-anchor">
+        <ConstituentPerformanceMatrix
+          codes={result.codes}
+          trades={result.trades}
+          marketSnapshots={result.market_snapshots}
+        />
+      </div>
       <div id="quant-result-details" className="quant-result-anchor">
-        <BacktestTables monthlyReturns={result.monthly_returns} trades={result.trades} metrics={result.metrics} />
+        <BacktestTables
+          monthlyReturns={result.monthly_returns}
+          trades={result.trades}
+          metrics={result.metrics}
+          marketSnapshots={result.market_snapshots}
+        />
       </div>
       <div id="quant-result-sensitivity" className="quant-result-anchor">
         <BacktestParameterSensitivity runId={runId} strategy={strategy} />

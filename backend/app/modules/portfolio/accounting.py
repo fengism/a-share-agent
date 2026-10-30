@@ -106,6 +106,7 @@ class LedgerReplay:
 @dataclass(frozen=True, slots=True)
 class TransactionPreview:
     available_shares: int
+    sellable_shares: int
     shares_after_trade: int
     current_shares_after: int
     matched_cost: Decimal | None
@@ -243,6 +244,8 @@ def replay_transactions(rows: list[dict[str, Any]]) -> LedgerReplay:
 def preview_transaction(
     rows: list[dict[str, Any]],
     candidate: dict[str, Any],
+    *,
+    t_plus_one: bool = True,
 ) -> TransactionPreview:
     candidate_id = int(candidate["id"])
     candidate_stock_code = str(candidate["stock_code"])
@@ -251,6 +254,13 @@ def preview_transaction(
     before_replay = replay_transactions(ordered[:candidate_index])
     available_shares = sum(
         lot.remaining_shares for lot in before_replay.open_lots if lot.stock_code == candidate_stock_code
+    )
+    candidate_trade_date = parse_trade_time(str(candidate["trade_time"])).date()
+    sellable_shares = sum(
+        lot.remaining_shares
+        for lot in before_replay.open_lots
+        if lot.stock_code == candidate_stock_code
+        and (not t_plus_one or parse_trade_time(lot.buy_time).date() < candidate_trade_date)
     )
     replay = replay_transactions(ordered)
     previewed = next(transaction for transaction in replay.transactions if transaction.id == candidate_id)
@@ -261,6 +271,7 @@ def preview_transaction(
     )
     return TransactionPreview(
         available_shares=available_shares,
+        sellable_shares=sellable_shares,
         shares_after_trade=shares_after_trade,
         current_shares_after=current_shares_after,
         matched_cost=previewed.matched_cost,

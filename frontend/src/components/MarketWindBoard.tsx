@@ -5,11 +5,13 @@ import {
   FireOutlined,
   ReloadOutlined,
   RiseOutlined,
+  RobotOutlined,
   ThunderboltOutlined,
 } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 import { useMarketWind, useMarketWindStocks } from "../api/queries";
 import ChangeValue from "./ChangeValue";
+import PreloadLink from "./PreloadLink";
 import RefreshBadge from "./RefreshBadge";
 import SectionDataState from "./SectionDataState";
 import StockExternalLink from "./StockExternalLink";
@@ -122,6 +124,22 @@ export default function MarketWindBoard({ embedded = false }: { embedded?: boole
               <strong>今日风口</strong>
               <small>当前聚焦：{selectedPlate?.plate_name || "等待选择"}{selectedPlate?.catalyst ? ` · ${selectedPlate.catalyst}` : ""}</small>
             </span>
+            {selectedPlate && (
+              <PreloadLink
+                to={`/chat?prompt=${encodeURIComponent(
+                  `深度分析【${selectedPlate.plate_name}】板块异动逻辑、核心催化剂（${selectedPlate.catalyst || "资金面"}）及板块内龙头股的持续性`,
+                )}`}
+              >
+                <Button
+                  size="small"
+                  type="link"
+                  icon={<RobotOutlined />}
+                  style={{ padding: "0 4px", fontSize: 12 }}
+                >
+                  AI 解读风口
+                </Button>
+              </PreloadLink>
+            )}
             <Space size={[8, 8]} wrap style={{ marginLeft: "auto" }}>
               <Tag style={semanticTagStyle("primary")}>{plates.length} 个风口</Tag>
               <Tag style={semanticTagStyle("up")}>{stockMetricValue} 只龙头</Tag>

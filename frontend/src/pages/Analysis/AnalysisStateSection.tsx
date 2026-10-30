@@ -42,7 +42,7 @@ export default memo(function AnalysisStateSection({
       />
       {error && !isAnalyzing && (
         <Alert
-          message={`研究失败: ${error}`}
+          title={`研究失败: ${error}`}
           type="error"
           showIcon
           closable

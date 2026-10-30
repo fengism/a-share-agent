@@ -299,8 +299,23 @@ describe("WatchlistPage", () => {
 
     expect(screen.getByText("已选 1 只")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /批量回测/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /AI 对比/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /AI 组合诊断/ })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /清空选择/ }));
     expect(screen.queryByText("已选 1 只")).not.toBeInTheDocument();
+  });
+
+  it("renders AI watchlist diagnosis button and supports cards layout toggle", () => {
+    renderPage();
+
+    expect(screen.getByRole("button", { name: /AI 诊断自选池/ })).toBeInTheDocument();
+    expect(screen.getByText("组合概念暴露分布")).toBeInTheDocument();
+
+    const cardToggle = screen.getByText("卡片");
+    fireEvent.click(cardToggle);
+
+    expect(screen.getByLabelText("选择贵州茅台")).toBeInTheDocument();
+    expect(screen.getByLabelText("AI体检贵州茅台")).toBeInTheDocument();
   });
 });

@@ -2882,6 +2882,14 @@
               }
             ],
             "title": "Quote Source"
+          },
+          "related_concepts": {
+            "description": "该股票所属的其他概念（最具体的几个，不含当前概念），用于概念间联动",
+            "items": {
+              "type": "string"
+            },
+            "title": "Related Concepts",
+            "type": "array"
           }
         },
         "required": [
@@ -3334,15 +3342,81 @@
         "type": "object"
       },
       "ConceptSummaryItem": {
-        "description": "概念列表中的单条摘要（名称 + 成分股只数）。",
+        "description": "概念列表中的单条摘要（名称 + 成分股只数 + 最近交易日等权涨跌）。",
         "properties": {
+          "change_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Date"
+          },
+          "change_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Pct"
+          },
+          "down_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Down Count"
+          },
+          "limit_up_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit Up Count"
+          },
           "name": {
             "title": "Name",
             "type": "string"
           },
+          "sample_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sample Count"
+          },
           "stock_count": {
             "title": "Stock Count",
             "type": "integer"
+          },
+          "up_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Up Count"
           }
         },
         "required": [
@@ -16944,8 +17018,68 @@
         "title": "MutationResponse",
         "type": "object"
       },
+      "NationalTeamDailyFlow": {
+        "properties": {
+          "date": {
+            "title": "Date",
+            "type": "string"
+          },
+          "flows_by_category": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Flows By Category",
+            "type": "object"
+          },
+          "flows_by_index": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Flows By Index",
+            "type": "object"
+          },
+          "total_flow_100m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Flow 100M"
+          },
+          "total_shares_change_100m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Shares Change 100M"
+          }
+        },
+        "required": [
+          "date"
+        ],
+        "title": "NationalTeamDailyFlow",
+        "type": "object"
+      },
       "NationalTeamEtfPoint": {
         "properties": {
+          "amount_100m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount 100M"
+          },
           "close": {
             "anyOf": [
               {
@@ -17029,6 +17163,11 @@
       },
       "NationalTeamEtfSeries": {
         "properties": {
+          "category": {
+            "default": "core_broad",
+            "title": "Category",
+            "type": "string"
+          },
           "change_20d_100m": {
             "anyOf": [
               {
@@ -17075,6 +17214,22 @@
             "title": "Index Name",
             "type": "string"
           },
+          "is_abnormal_volume": {
+            "default": false,
+            "title": "Is Abnormal Volume",
+            "type": "boolean"
+          },
+          "latest_amount_100m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Amount 100M"
+          },
           "latest_change_1d_100m": {
             "anyOf": [
               {
@@ -17118,6 +17273,17 @@
             },
             "title": "Points",
             "type": "array"
+          },
+          "volume_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Volume Ratio"
           }
         },
         "required": [
@@ -17129,6 +17295,39 @@
           "index_name"
         ],
         "title": "NationalTeamEtfSeries",
+        "type": "object"
+      },
+      "NationalTeamHolderEntity": {
+        "properties": {
+          "estimated_aum_trillion": {
+            "title": "Estimated Aum Trillion",
+            "type": "number"
+          },
+          "focus": {
+            "title": "Focus",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "short_name": {
+            "title": "Short Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "short_name",
+          "role",
+          "estimated_aum_trillion",
+          "focus"
+        ],
+        "title": "NationalTeamHolderEntity",
         "type": "object"
       },
       "NationalTeamIndexPoint": {
@@ -17189,6 +17388,11 @@
       },
       "NationalTeamIndexSeries": {
         "properties": {
+          "category": {
+            "default": "core_broad",
+            "title": "Category",
+            "type": "string"
+          },
           "change_20d_100m": {
             "anyOf": [
               {
@@ -17297,6 +17501,114 @@
         "title": "NationalTeamIndexSeries",
         "type": "object"
       },
+      "NationalTeamIndustryAllocation": {
+        "properties": {
+          "industry": {
+            "title": "Industry",
+            "type": "string"
+          },
+          "market_value_100m": {
+            "title": "Market Value 100M",
+            "type": "number"
+          },
+          "representative_stocks": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Representative Stocks",
+            "type": "array"
+          },
+          "weight_pct": {
+            "title": "Weight Pct",
+            "type": "number"
+          }
+        },
+        "required": [
+          "industry",
+          "weight_pct",
+          "market_value_100m"
+        ],
+        "title": "NationalTeamIndustryAllocation",
+        "type": "object"
+      },
+      "NationalTeamMilestone": {
+        "properties": {
+          "date": {
+            "title": "Date",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "index_points": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Index Points",
+            "type": "object"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "type": {
+            "default": "policy",
+            "enum": [
+              "statement",
+              "intervention",
+              "policy",
+              "liquidity"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "date",
+          "title",
+          "description"
+        ],
+        "title": "NationalTeamMilestone",
+        "type": "object"
+      },
+      "NationalTeamPortrait": {
+        "properties": {
+          "entities": {
+            "items": {
+              "$ref": "#/components/schemas/NationalTeamHolderEntity"
+            },
+            "title": "Entities",
+            "type": "array"
+          },
+          "industry_allocations": {
+            "items": {
+              "$ref": "#/components/schemas/NationalTeamIndustryAllocation"
+            },
+            "title": "Industry Allocations",
+            "type": "array"
+          },
+          "reporting_period": {
+            "default": "2024Q3 / 2024年报",
+            "title": "Reporting Period",
+            "type": "string"
+          },
+          "top_holdings": {
+            "items": {
+              "$ref": "#/components/schemas/NationalTeamTopHolding"
+            },
+            "title": "Top Holdings",
+            "type": "array"
+          },
+          "total_market_value_trillion": {
+            "default": 3.85,
+            "title": "Total Market Value Trillion",
+            "type": "number"
+          }
+        },
+        "title": "NationalTeamPortrait",
+        "type": "object"
+      },
       "NationalTeamResponse": {
         "properties": {
           "as_of_date": {
@@ -17319,6 +17631,13 @@
             "default": 0,
             "title": "Covered Etf Count",
             "type": "integer"
+          },
+          "daily_flows": {
+            "items": {
+              "$ref": "#/components/schemas/NationalTeamDailyFlow"
+            },
+            "title": "Daily Flows",
+            "type": "array"
           },
           "disclaimer": {
             "title": "Disclaimer",
@@ -17356,6 +17675,13 @@
           "methodology": {
             "title": "Methodology",
             "type": "string"
+          },
+          "milestones": {
+            "items": {
+              "$ref": "#/components/schemas/NationalTeamMilestone"
+            },
+            "title": "Milestones",
+            "type": "array"
           },
           "missing_etfs": {
             "items": {
@@ -17397,6 +17723,9 @@
             "title": "Partial",
             "type": "boolean"
           },
+          "portrait": {
+            "$ref": "#/components/schemas/NationalTeamPortrait"
+          },
           "refreshing": {
             "default": false,
             "title": "Refreshing",
@@ -17419,8 +17748,18 @@
           "summary": {
             "$ref": "#/components/schemas/NationalTeamSummary"
           },
+          "support_score": {
+            "$ref": "#/components/schemas/NationalTeamSupportScore"
+          },
+          "support_zones": {
+            "items": {
+              "$ref": "#/components/schemas/NationalTeamSupportZone"
+            },
+            "title": "Support Zones",
+            "type": "array"
+          },
           "total_etf_count": {
-            "default": 12,
+            "default": 22,
             "title": "Total Etf Count",
             "type": "integer"
           }
@@ -17560,6 +17899,172 @@
           }
         },
         "title": "NationalTeamSummary",
+        "type": "object"
+      },
+      "NationalTeamSupportScore": {
+        "properties": {
+          "breadth_factor": {
+            "default": 0.0,
+            "title": "Breadth Factor",
+            "type": "number"
+          },
+          "description": {
+            "default": "",
+            "title": "Description",
+            "type": "string"
+          },
+          "divergence_factor": {
+            "default": 0.0,
+            "title": "Divergence Factor",
+            "type": "number"
+          },
+          "label": {
+            "default": "市场自发",
+            "title": "Label",
+            "type": "string"
+          },
+          "net_flow_factor": {
+            "default": 0.0,
+            "title": "Net Flow Factor",
+            "type": "number"
+          },
+          "score": {
+            "default": 50.0,
+            "title": "Score",
+            "type": "number"
+          },
+          "status": {
+            "default": "neutral",
+            "enum": [
+              "neutral",
+              "moderate",
+              "active",
+              "strong"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "title": "NationalTeamSupportScore",
+        "type": "object"
+      },
+      "NationalTeamSupportZone": {
+        "properties": {
+          "cost_buffer_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Buffer Pct"
+          },
+          "current_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Price"
+          },
+          "index_key": {
+            "title": "Index Key",
+            "type": "string"
+          },
+          "index_name": {
+            "title": "Index Name",
+            "type": "string"
+          },
+          "weighted_avg_cost": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weighted Avg Cost"
+          },
+          "zones": {
+            "items": {
+              "$ref": "#/components/schemas/NationalTeamSupportZoneItem"
+            },
+            "title": "Zones",
+            "type": "array"
+          }
+        },
+        "required": [
+          "index_key",
+          "index_name"
+        ],
+        "title": "NationalTeamSupportZone",
+        "type": "object"
+      },
+      "NationalTeamSupportZoneItem": {
+        "properties": {
+          "net_flow_100m": {
+            "title": "Net Flow 100M",
+            "type": "number"
+          },
+          "range_label": {
+            "title": "Range Label",
+            "type": "string"
+          },
+          "share_pct": {
+            "title": "Share Pct",
+            "type": "number"
+          }
+        },
+        "required": [
+          "range_label",
+          "net_flow_100m",
+          "share_pct"
+        ],
+        "title": "NationalTeamSupportZoneItem",
+        "type": "object"
+      },
+      "NationalTeamTopHolding": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "holder_name": {
+            "title": "Holder Name",
+            "type": "string"
+          },
+          "industry": {
+            "title": "Industry",
+            "type": "string"
+          },
+          "market_value_100m": {
+            "title": "Market Value 100M",
+            "type": "number"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "shareholding_ratio_pct": {
+            "title": "Shareholding Ratio Pct",
+            "type": "number"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "holder_name",
+          "shareholding_ratio_pct",
+          "market_value_100m",
+          "industry"
+        ],
+        "title": "NationalTeamTopHolding",
         "type": "object"
       },
       "NeedsSetupResponse": {
@@ -18171,9 +18676,19 @@
             "title": "Buy Count",
             "type": "integer"
           },
+          "currency": {
+            "default": "CNY",
+            "title": "Currency",
+            "type": "string"
+          },
           "first_trade_time": {
             "title": "First Trade Time",
             "type": "string"
+          },
+          "fx_rate_to_cny": {
+            "default": 1.0,
+            "title": "Fx Rate To Cny",
+            "type": "number"
           },
           "holding_days": {
             "title": "Holding Days",
@@ -18310,6 +18825,55 @@
       },
       "PortfolioEquityCurveResponse": {
         "properties": {
+          "annualized_return_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Annualized Return Pct"
+          },
+          "annualized_volatility_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Annualized Volatility Pct"
+          },
+          "base_currency": {
+            "default": "CNY",
+            "title": "Base Currency",
+            "type": "string"
+          },
+          "best_day_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Best Day Pct"
+          },
+          "calmar_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Calmar Ratio"
+          },
           "current_securities_value": {
             "anyOf": [
               {
@@ -18337,6 +18901,13 @@
             "title": "End Date",
             "type": "string"
           },
+          "fx_rates": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Fx Rates",
+            "type": "object"
+          },
           "initial_cash": {
             "anyOf": [
               {
@@ -18347,6 +18918,17 @@
               }
             ],
             "title": "Initial Cash"
+          },
+          "longest_drawdown_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Longest Drawdown Days"
           },
           "max_drawdown_pct": {
             "anyOf": [
@@ -18373,6 +18955,22 @@
             },
             "title": "Points",
             "type": "array"
+          },
+          "risk_free_rate_pct": {
+            "default": 0.0,
+            "title": "Risk Free Rate Pct",
+            "type": "number"
+          },
+          "sharpe_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sharpe Ratio"
           },
           "sources": {
             "items": {
@@ -18404,12 +19002,39 @@
             ],
             "title": "Total Return Pct"
           },
+          "trading_days": {
+            "default": 0,
+            "title": "Trading Days",
+            "type": "integer"
+          },
           "warnings": {
             "items": {
               "type": "string"
             },
             "title": "Warnings",
             "type": "array"
+          },
+          "win_rate_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Win Rate Pct"
+          },
+          "worst_day_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Worst Day Pct"
           }
         },
         "required": [
@@ -18432,6 +19057,11 @@
           "buy_transaction_id": {
             "title": "Buy Transaction Id",
             "type": "integer"
+          },
+          "currency": {
+            "default": "CNY",
+            "title": "Currency",
+            "type": "string"
           },
           "matched_cost": {
             "title": "Matched Cost",
@@ -18482,6 +19112,16 @@
             "title": "Cost Value",
             "type": "number"
           },
+          "cost_value_native": {
+            "default": 0,
+            "title": "Cost Value Native",
+            "type": "number"
+          },
+          "currency": {
+            "default": "CNY",
+            "title": "Currency",
+            "type": "string"
+          },
           "current_price": {
             "anyOf": [
               {
@@ -18492,6 +19132,44 @@
               }
             ],
             "title": "Current Price"
+          },
+          "daily_profit_amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daily Profit Amount"
+          },
+          "daily_profit_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daily Profit Pct"
+          },
+          "frozen_shares": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frozen Shares"
+          },
+          "fx_rate_to_cny": {
+            "default": 1.0,
+            "title": "Fx Rate To Cny",
+            "type": "number"
           },
           "id": {
             "title": "Id",
@@ -18507,6 +19185,17 @@
               }
             ],
             "title": "Market Value"
+          },
+          "prev_close": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prev Close"
           },
           "profit_amount": {
             "anyOf": [
@@ -18529,6 +19218,17 @@
               }
             ],
             "title": "Profit Pct"
+          },
+          "sellable_shares": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sellable Shares"
           },
           "shares": {
             "title": "Shares",
@@ -18657,6 +19357,28 @@
       },
       "PortfolioRiskSummary": {
         "properties": {
+          "cash_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cash Pct"
+          },
+          "concentration_index": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Concentration Index"
+          },
           "concentration_level": {
             "enum": [
               "low",
@@ -18666,6 +19388,17 @@
             ],
             "title": "Concentration Level",
             "type": "string"
+          },
+          "effective_holding_count": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective Holding Count"
           },
           "largest_position_stock_code": {
             "anyOf": [
@@ -18738,12 +19471,56 @@
             "title": "Priced Stock Count",
             "type": "integer"
           },
+          "remaining_add_capacity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remaining Add Capacity"
+          },
           "sector_allocations": {
             "items": {
               "$ref": "#/components/schemas/PortfolioSectorAllocation"
             },
             "title": "Sector Allocations",
             "type": "array"
+          },
+          "securities_concentration_index": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Securities Concentration Index"
+          },
+          "securities_effective_holding_count": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Securities Effective Holding Count"
+          },
+          "securities_top5_concentration_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Securities Top5 Concentration Pct"
           },
           "top3_concentration_pct": {
             "anyOf": [
@@ -18755,6 +19532,24 @@
               }
             ],
             "title": "Top3 Concentration Pct"
+          },
+          "top5_concentration_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top5 Concentration Pct"
+          },
+          "trim_suggestions": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioTrimSuggestion"
+            },
+            "title": "Trim Suggestions",
+            "type": "array"
           },
           "unpriced_stock_count": {
             "title": "Unpriced Stock Count",
@@ -18847,6 +19642,11 @@
             "title": "Cost Value",
             "type": "number"
           },
+          "currency": {
+            "default": "CNY",
+            "title": "Currency",
+            "type": "string"
+          },
           "current_price": {
             "anyOf": [
               {
@@ -18857,6 +19657,55 @@
               }
             ],
             "title": "Current Price"
+          },
+          "daily_profit_amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daily Profit Amount"
+          },
+          "daily_profit_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daily Profit Pct"
+          },
+          "frozen_shares": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frozen Shares"
+          },
+          "fx_rate_to_cny": {
+            "default": 1.0,
+            "title": "Fx Rate To Cny",
+            "type": "number"
+          },
+          "lot_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lot Size"
           },
           "market_value": {
             "anyOf": [
@@ -18869,9 +19718,42 @@
             ],
             "title": "Market Value"
           },
+          "max_additional_shares": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Additional Shares"
+          },
+          "max_additional_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Additional Value"
+          },
           "position_count": {
             "title": "Position Count",
             "type": "integer"
+          },
+          "prev_close": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prev Close"
           },
           "profit_amount": {
             "anyOf": [
@@ -18932,6 +19814,17 @@
             ],
             "title": "Securities Allocation Pct"
           },
+          "sellable_shares": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sellable Shares"
+          },
           "stock_code": {
             "title": "Stock Code",
             "type": "string"
@@ -18970,6 +19863,11 @@
       },
       "PortfolioSummary": {
         "properties": {
+          "base_currency": {
+            "default": "CNY",
+            "title": "Base Currency",
+            "type": "string"
+          },
           "cash_balance": {
             "anyOf": [
               {
@@ -18989,9 +19887,32 @@
             "title": "Combined Profit Amount",
             "type": "number"
           },
+          "daily_profit_amount": {
+            "default": 0,
+            "title": "Daily Profit Amount",
+            "type": "number"
+          },
+          "daily_profit_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daily Profit Pct"
+          },
           "estimated_securities_value": {
             "title": "Estimated Securities Value",
             "type": "number"
+          },
+          "fx_rates": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Fx Rates",
+            "type": "object"
           },
           "initial_cash": {
             "anyOf": [
@@ -19011,6 +19932,11 @@
           "position_count": {
             "title": "Position Count",
             "type": "integer"
+          },
+          "previous_close_value": {
+            "default": 0,
+            "title": "Previous Close Value",
+            "type": "number"
           },
           "priced_cost": {
             "title": "Priced Cost",
@@ -19112,8 +20038,23 @@
             "title": "Created At",
             "type": "string"
           },
+          "currency": {
+            "default": "CNY",
+            "title": "Currency",
+            "type": "string"
+          },
           "fee": {
             "title": "Fee",
+            "type": "number"
+          },
+          "fee_native": {
+            "default": 0,
+            "title": "Fee Native",
+            "type": "number"
+          },
+          "fx_rate_to_cny": {
+            "default": 1.0,
+            "title": "Fx Rate To Cny",
             "type": "number"
           },
           "id": {
@@ -19172,6 +20113,16 @@
           "stock_name": {
             "title": "Stock Name",
             "type": "string"
+          },
+          "trade_amount": {
+            "default": 0,
+            "title": "Trade Amount",
+            "type": "number"
+          },
+          "trade_amount_native": {
+            "default": 0,
+            "title": "Trade Amount Native",
+            "type": "number"
           },
           "trade_price": {
             "title": "Trade Price",
@@ -19269,6 +20220,11 @@
             ],
             "title": "Cash Balance After"
           },
+          "currency": {
+            "default": "CNY",
+            "title": "Currency",
+            "type": "string"
+          },
           "current_shares_after": {
             "title": "Current Shares After",
             "type": "integer"
@@ -19286,6 +20242,27 @@
           },
           "fee": {
             "title": "Fee",
+            "type": "number"
+          },
+          "fee_native": {
+            "default": 0,
+            "title": "Fee Native",
+            "type": "number"
+          },
+          "frozen_shares": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frozen Shares"
+          },
+          "fx_rate_to_cny": {
+            "default": 1.0,
+            "title": "Fx Rate To Cny",
             "type": "number"
           },
           "matched_cost": {
@@ -19339,6 +20316,28 @@
             ],
             "title": "Sector Position Pct After"
           },
+          "sellable_after_trade": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sellable After Trade"
+          },
+          "sellable_shares": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sellable Shares"
+          },
           "shares_after_trade": {
             "title": "Shares After Trade",
             "type": "integer"
@@ -19381,6 +20380,11 @@
             "title": "Trade Amount",
             "type": "number"
           },
+          "trade_amount_native": {
+            "default": 0,
+            "title": "Trade Amount Native",
+            "type": "number"
+          },
           "trade_time": {
             "title": "Trade Time",
             "type": "string"
@@ -19404,6 +20408,73 @@
           "fee"
         ],
         "title": "PortfolioTransactionPreview",
+        "type": "object"
+      },
+      "PortfolioTrimSuggestion": {
+        "description": "超限仓位的减仓建议（按最小交易单位向上取整，确保回到上限内）。",
+        "properties": {
+          "current_pct": {
+            "title": "Current Pct",
+            "type": "number"
+          },
+          "estimated_amount": {
+            "title": "Estimated Amount",
+            "type": "number"
+          },
+          "lot_size": {
+            "title": "Lot Size",
+            "type": "integer"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "sector_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sector Name"
+          },
+          "sellable_shares": {
+            "title": "Sellable Shares",
+            "type": "integer"
+          },
+          "stock_code": {
+            "title": "Stock Code",
+            "type": "string"
+          },
+          "stock_name": {
+            "title": "Stock Name",
+            "type": "string"
+          },
+          "suggested_shares": {
+            "title": "Suggested Shares",
+            "type": "integer"
+          },
+          "target_pct": {
+            "title": "Target Pct",
+            "type": "number"
+          }
+        },
+        "required": [
+          "stock_code",
+          "stock_name",
+          "current_pct",
+          "target_pct",
+          "suggested_shares",
+          "sellable_shares",
+          "estimated_amount",
+          "lot_size"
+        ],
+        "title": "PortfolioTrimSuggestion",
         "type": "object"
       },
       "PotentialDailyResult": {
@@ -23313,6 +24384,28 @@
             ],
             "title": "Amplitude Min"
           },
+          "change_pct_60d_max": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Pct 60D Max"
+          },
+          "change_pct_60d_min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Pct 60D Min"
+          },
           "change_pct_max": {
             "anyOf": [
               {
@@ -23442,7 +24535,7 @@
           },
           "page_size": {
             "default": 50,
-            "maximum": 200.0,
+            "maximum": 1000.0,
             "minimum": 1.0,
             "title": "Page Size",
             "type": "integer"
@@ -23544,6 +24637,28 @@
               }
             ],
             "title": "Turnover Pct Min"
+          },
+          "volume_ratio_max": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Volume Ratio Max"
+          },
+          "volume_ratio_min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Volume Ratio Min"
           }
         },
         "title": "ScreenerFilter",
@@ -23585,9 +24700,31 @@
             ],
             "title": "Change Pct"
           },
+          "change_pct_60d": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Pct 60D"
+          },
           "code": {
             "title": "Code",
             "type": "string"
+          },
+          "composite_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Composite Score"
           },
           "concepts": {
             "items": {
@@ -23733,6 +24870,17 @@
               }
             ],
             "title": "Volume"
+          },
+          "volume_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Volume Ratio"
           }
         },
         "required": [
@@ -35523,7 +36671,7 @@
     },
     "/api/market/concepts": {
       "get": {
-        "description": "获取概念列表，按成分股只数降序，用于概念选择器。",
+        "description": "获取概念列表，用于概念选择器；order=change 时附带最近交易日涨跌聚合。",
         "operationId": "list_concepts_api_market_concepts_get",
         "parameters": [
           {
@@ -35549,6 +36697,19 @@
               "minimum": 1,
               "title": "Limit",
               "type": "integer"
+            }
+          },
+          {
+            "description": "排序：size=按成分股只数（默认），change=按最近交易日等权涨幅",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "default": "size",
+              "description": "排序：size=按成分股只数（默认），change=按最近交易日等权涨幅",
+              "pattern": "^(size|change)$",
+              "title": "Order",
+              "type": "string"
             }
           }
         ],

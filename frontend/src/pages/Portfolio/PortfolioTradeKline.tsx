@@ -4,9 +4,11 @@ import dayjs from "dayjs";
 import { useEffect, useMemo, useState } from "react";
 import { useKlineData } from "../../api/queries";
 import LazyKlineChart from "../../charts/LazyKlineChart";
+import PreloadLink from "../../components/PreloadLink";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
-import { semanticTagStyle, useStyles } from "../../styles/ui";
+import { semanticTagStyle, useColors, useStyles } from "../../styles/ui";
 import type { PortfolioStockSummary, PortfolioTransaction } from "../../types/portfolio";
+import { changeColor } from "../../utils/format";
 import { formatInteger, formatMoney, formatPrice, formatTime } from "./portfolioFormatters";
 import {
   buildPortfolioTradeMarkers,
@@ -17,18 +19,28 @@ import {
 interface PortfolioTradeKlineProps {
   stocks: PortfolioStockSummary[];
   transactions: PortfolioTransaction[];
+  selectedStockCode?: string;
 }
 
-export default function PortfolioTradeKline({ stocks, transactions }: PortfolioTradeKlineProps) {
+export default function PortfolioTradeKline({
+  stocks,
+  transactions,
+  selectedStockCode,
+}: PortfolioTradeKlineProps) {
+  const colors = useColors();
   const { cardStyle } = useStyles();
   const isNarrow = useMediaQuery("(max-width: 768px)");
   const stockCodes = useMemo(() => stocks.map((stock) => stock.stock_code), [stocks]);
-  const [selectedCode, setSelectedCode] = useState(stockCodes[0] ?? "");
+  const [selectedCode, setSelectedCode] = useState(selectedStockCode || (stockCodes[0] ?? ""));
   const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
-    if (!stockCodes.includes(selectedCode)) setSelectedCode(stockCodes[0] ?? "");
-  }, [selectedCode, stockCodes]);
+    if (selectedStockCode && stockCodes.includes(selectedStockCode)) {
+      setSelectedCode(selectedStockCode);
+    } else if (!stockCodes.includes(selectedCode)) {
+      setSelectedCode(stockCodes[0] ?? "");
+    }
+  }, [selectedCode, selectedStockCode, stockCodes]);
 
   const currentStock = useMemo(
     () => stocks.find((stock) => stock.stock_code === selectedCode),
@@ -99,7 +111,7 @@ export default function PortfolioTradeKline({ stocks, transactions }: PortfolioT
   const cardTitle = isNarrow ? (
     <div className="portfolio-trade-kline__mobile-head">
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-        <span style={{ fontWeight: 600, fontSize: "14px" }}>持仓个股实际买卖点</span>
+        <span style={{ fontWeight: 600, fontSize: "var(--c-font-base)" }}>持仓个股实际买卖点</span>
         {chartItems.length > 0 && (
           <Button
             size="small"
@@ -107,7 +119,7 @@ export default function PortfolioTradeKline({ stocks, transactions }: PortfolioT
             ghost
             icon={<FullscreenOutlined />}
             onClick={() => setExpanded(true)}
-            style={{ padding: "0 8px", height: 24, fontSize: "12px" }}
+            style={{ padding: "0 8px", height: 24, fontSize: "var(--c-font-sm)" }}
           >
             放大
           </Button>
@@ -139,6 +151,7 @@ export default function PortfolioTradeKline({ stocks, transactions }: PortfolioT
   return (
     <>
       <Card
+        id="portfolio-trade-kline"
         title={cardTitle}
         size="small"
         style={{ ...cardStyle, marginBottom: 16 }}
@@ -163,6 +176,66 @@ export default function PortfolioTradeKline({ stocks, transactions }: PortfolioT
           <Empty description="暂无对应成交区间 K 线" />
         ) : (
           <>
+            {currentStock ? (
+              <div
+                style={{
+                  background: colors.nestedBg,
+                  borderRadius: 8,
+                  padding: "var(--c-pad-inset, 7px 12px)",
+                  marginBottom: 10,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  flexWrap: "wrap",
+                  gap: "6px 14px",
+                  border: `1px solid ${colors.border ?? "rgba(128,128,128,0.15)"}`,
+                }}
+                className="portfolio-trade-snapshot-ribbon"
+              >
+                <Space size={isNarrow ? 10 : 18} wrap>
+                  <div>
+                    <span style={{ fontSize: 11, color: colors.textMuted }}>当前持股: </span>
+                    <strong style={{ fontSize: 13 }}>{formatInteger(currentStock.total_shares)}</strong>
+                    {currentStock.sellable_shares != null && currentStock.sellable_shares < currentStock.total_shares ? (
+                      <span style={{ fontSize: 11, color: colors.warning, marginLeft: 4 }}>
+                        (可卖 {formatInteger(currentStock.sellable_shares)})
+                      </span>
+                    ) : null}
+                  </div>
+                  <div>
+                    <span style={{ fontSize: 11, color: colors.textMuted }}>持仓成本: </span>
+                    <span style={{ fontSize: 13, fontWeight: 600 }}>{formatPrice(currentStock.average_cost, currentStock.currency)}</span>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: 11, color: colors.textMuted }}>当前价: </span>
+                    <span style={{ fontSize: 13, fontWeight: 600 }}>{formatPrice(currentStock.current_price, currentStock.currency)}</span>
+                    {currentStock.change_pct != null ? (
+                      <span style={{ marginLeft: 4, fontSize: 12, color: changeColor(currentStock.change_pct, colors), fontWeight: 600 }}>
+                        ({currentStock.change_pct > 0 ? "+" : ""}{currentStock.change_pct.toFixed(2)}%)
+                      </span>
+                    ) : null}
+                  </div>
+                  <div>
+                    <span style={{ fontSize: 11, color: colors.textMuted }}>浮动盈亏: </span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: changeColor(currentStock.profit_amount, colors) }}>
+                      {currentStock.profit_amount != null ? (currentStock.profit_amount >= 0 ? "+" : "") + formatMoney(currentStock.profit_amount) : "-"}
+                      {currentStock.profit_pct != null ? ` (${currentStock.profit_pct >= 0 ? "+" : ""}${currentStock.profit_pct.toFixed(2)}%)` : ""}
+                    </span>
+                  </div>
+                  {currentStock.allocation_pct != null ? (
+                    <div>
+                      <span style={{ fontSize: 11, color: colors.textMuted }}>仓位占比: </span>
+                      <span style={{ fontSize: 13, fontWeight: 600 }}>{currentStock.allocation_pct.toFixed(2)}%</span>
+                    </div>
+                  ) : null}
+                </Space>
+                <PreloadLink to={`/analysis?code=${currentStock.stock_code}`}>
+                  <Button size="small" type="link" style={{ padding: "0 4px", fontSize: 12 }}>
+                    研报分析 →
+                  </Button>
+                </PreloadLink>
+              </div>
+            ) : null}
             <LazyKlineChart
               data={chartItems}
               tradeMarkers={markers}
@@ -182,7 +255,7 @@ export default function PortfolioTradeKline({ stocks, transactions }: PortfolioT
 
         {selectedTransactions.length ? (
           <div style={{ marginTop: 14 }}>
-            <Typography.Text type="secondary" style={{ fontSize: "12px" }}>实际成交明细（由新到旧）</Typography.Text>
+            <Typography.Text type="secondary" style={{ fontSize: "var(--c-font-sm)" }}>实际成交明细（由新到旧）</Typography.Text>
             <div className="portfolio-trade-kline__tag-list" style={{ marginTop: 8 }}>
               <Space wrap size={[6, 6]}>
                 {selectedTransactions.map((transaction) => (
@@ -193,11 +266,11 @@ export default function PortfolioTradeKline({ stocks, transactions }: PortfolioT
                       marginInlineEnd: 0,
                       padding: "4px 8px",
                       whiteSpace: "normal",
-                      fontSize: "12px",
+                      fontSize: "var(--c-font-sm)",
                     }}
                   >
                     <strong>{transaction.side === "buy" ? "B" : "S"}</strong>
-                    {` ${formatTime(transaction.trade_time)} · ${formatPrice(transaction.trade_price)} · ${formatInteger(transaction.shares)} 股 · 手续费 ${formatMoney(transaction.fee)}`}
+                    {` ${formatTime(transaction.trade_time)} · ${formatPrice(transaction.trade_price, transaction.currency)} · ${formatInteger(transaction.shares)} 股 · 手续费 ${formatMoney(transaction.fee)}`}
                   </Tag>
                 ))}
               </Space>
@@ -236,7 +309,7 @@ export default function PortfolioTradeKline({ stocks, transactions }: PortfolioT
         )}
         {selectedTransactions.length > 0 && (
           <div style={{ marginTop: 12, padding: "0 8px" }}>
-            <Typography.Text type="secondary" style={{ display: "block", marginBottom: 6, fontSize: "12px" }}>
+            <Typography.Text type="secondary" style={{ display: "block", marginBottom: 6, fontSize: "var(--c-font-sm)" }}>
               成交流水明细（共 {selectedTransactions.length} 笔）
             </Typography.Text>
             <div style={{ maxHeight: 180, overflowY: "auto", display: "flex", flexWrap: "wrap", gap: "6px 8px" }}>
@@ -247,11 +320,11 @@ export default function PortfolioTradeKline({ stocks, transactions }: PortfolioT
                     ...semanticTagStyle(transaction.side === "buy" ? "up" : "down"),
                     marginInlineEnd: 0,
                     padding: "3px 8px",
-                    fontSize: "12px",
+                    fontSize: "var(--c-font-sm)",
                   }}
                 >
                   <strong>{transaction.side === "buy" ? "B" : "S"}</strong>
-                  {` ${formatTime(transaction.trade_time)} · ${formatPrice(transaction.trade_price)} · ${formatInteger(transaction.shares)} 股 · 手续费 ${formatMoney(transaction.fee)}`}
+                  {` ${formatTime(transaction.trade_time)} · ${formatPrice(transaction.trade_price, transaction.currency)} · ${formatInteger(transaction.shares)} 股 · 手续费 ${formatMoney(transaction.fee)}`}
                 </Tag>
               ))}
             </div>

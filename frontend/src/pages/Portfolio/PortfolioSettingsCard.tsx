@@ -13,9 +13,11 @@ const { Text } = Typography;
 
 interface PortfolioSettingsCardProps {
   settings: PortfolioAccountSettings;
+  isModal?: boolean;
+  onSaved?: () => void;
 }
 
-export default function PortfolioSettingsCard({ settings }: PortfolioSettingsCardProps) {
+export default function PortfolioSettingsCard({ settings, isModal = false, onSaved }: PortfolioSettingsCardProps) {
   const colors = useColors();
   const { cardStyle } = useStyles();
   const [form] = Form.useForm<PortfolioAccountSettingsUpdate>();
@@ -43,18 +45,15 @@ export default function PortfolioSettingsCard({ settings }: PortfolioSettingsCar
         initial_cash: values.initial_cash ?? null,
       });
       message.success("仓位设置已保存");
+      onSaved?.();
     } catch (mutationError) {
       message.error(`保存失败：${errorMessage(mutationError)}`);
     }
   };
 
-  return (
-    <Card
-      size="small"
-      title={<span><SettingOutlined style={{ marginRight: 6 }} />账户与风控设置</span>}
-      style={{ ...cardStyle, marginBottom: 16 }}
-    >
-      <Text style={{ color: colors.textMuted, display: "block", marginBottom: 12 }}>
+  const formContent = (
+    <>
+      <Text style={{ color: colors.textMuted, display: "block", marginBottom: 16, fontSize: "var(--c-font-sm, 13px)" }}>
         初始资金用于计算现金、总资产和真实仓位；留空时仅展示证券持仓内部权重。
       </Text>
       <Form<PortfolioAccountSettingsUpdate>
@@ -69,7 +68,7 @@ export default function PortfolioSettingsCard({ settings }: PortfolioSettingsCar
         onFinish={handleSave}
       >
         <Row gutter={[16, 0]} align="bottom">
-          <Col xs={24} sm={12} lg={6}>
+          <Col xs={24} sm={12} lg={isModal ? 12 : 6}>
             <Form.Item name="initial_cash" label="初始资金">
               <InputNumber
                 min={0}
@@ -81,7 +80,7 @@ export default function PortfolioSettingsCard({ settings }: PortfolioSettingsCar
               />
             </Form.Item>
           </Col>
-          <Col xs={12} sm={6} lg={5}>
+          <Col xs={12} sm={6} lg={isModal ? 12 : 5}>
             <Form.Item
               name="max_total_position_pct"
               label="总仓位上限"
@@ -90,7 +89,7 @@ export default function PortfolioSettingsCard({ settings }: PortfolioSettingsCar
               <InputNumber min={0.01} max={100} precision={2} suffix="%" style={{ width: "100%" }} />
             </Form.Item>
           </Col>
-          <Col xs={12} sm={6} lg={5}>
+          <Col xs={12} sm={6} lg={isModal ? 12 : 5}>
             <Form.Item
               name="max_single_stock_pct"
               label="单股仓位上限"
@@ -99,7 +98,7 @@ export default function PortfolioSettingsCard({ settings }: PortfolioSettingsCar
               <InputNumber min={0.01} max={100} precision={2} suffix="%" style={{ width: "100%" }} />
             </Form.Item>
           </Col>
-          <Col xs={12} sm={6} lg={5}>
+          <Col xs={12} sm={6} lg={isModal ? 12 : 5}>
             <Form.Item
               name="max_sector_pct"
               label="行业仓位上限"
@@ -108,14 +107,15 @@ export default function PortfolioSettingsCard({ settings }: PortfolioSettingsCar
               <InputNumber min={0.01} max={100} precision={2} suffix="%" style={{ width: "100%" }} />
             </Form.Item>
           </Col>
-          <Col xs={24} sm={6} lg={3}>
-            <Form.Item label=" " className="portfolio-settings-submit-item">
+          <Col xs={24} sm={isModal ? 24 : 6} lg={isModal ? 24 : 3}>
+            <Form.Item label={isModal ? undefined : " "} className="portfolio-settings-submit-item">
               <Button
                 type="primary"
                 htmlType="submit"
                 icon={<SaveOutlined />}
                 loading={updateMutation.isPending}
                 block
+                style={isModal ? { marginTop: 8 } : undefined}
               >
                 保存设置
               </Button>
@@ -123,6 +123,20 @@ export default function PortfolioSettingsCard({ settings }: PortfolioSettingsCar
           </Col>
         </Row>
       </Form>
+    </>
+  );
+
+  if (isModal) {
+    return <div className="portfolio-settings-modal-content">{formContent}</div>;
+  }
+
+  return (
+    <Card
+      size="small"
+      title={<span><SettingOutlined style={{ marginRight: 6 }} />账户与风控设置</span>}
+      style={{ ...cardStyle, marginBottom: 16 }}
+    >
+      {formContent}
     </Card>
   );
 }

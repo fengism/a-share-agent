@@ -180,7 +180,7 @@ export default function LlmConfigCard({
           flexWrap: "wrap",
           gap: 12,
           marginBottom: 20,
-          padding: "10px 14px",
+          padding: "var(--c-pad-inset, 7px 12px)",
           borderRadius: 8,
           border: `1px solid ${
             isAdmin

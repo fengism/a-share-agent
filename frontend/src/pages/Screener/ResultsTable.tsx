@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Table, Tag, Spin, Empty, Tooltip } from "antd";
+import { Table, Tag, Spin, Empty, Tooltip, Space, Button, message } from "antd";
+import { PlusOutlined, RobotOutlined, LineChartOutlined, CheckOutlined } from "@ant-design/icons";
+import { useNavigate } from "react-router-dom";
 import type { ColumnsType, TableProps } from "antd/es/table";
 import ChangeValue from "../../components/ChangeValue";
 import ResponsiveMetricGrid from "../../components/ResponsiveMetricGrid";
@@ -19,6 +21,7 @@ interface Props {
   onSortChange: (sortBy: ScreenerFilter["sort_by"], sortOrder: ScreenerFilter["sort_order"]) => void;
   selectedCodes: string[];
   onSelectedCodesChange: (codes: string[]) => void;
+  onAddWatchlist?: (stock: ScreenerItem) => Promise<void> | void;
   strategySignalDates?: ReadonlyMap<string, string>;
   strategySignalAges?: ReadonlyMap<string, number>;
   strategyReturnsSinceSignal?: ReadonlyMap<string, number | null>;
@@ -27,7 +30,7 @@ interface Props {
   strategyFallbackCodes?: ReadonlySet<string>;
 }
 
-type SortableKey = "price" | "change_pct" | "pe" | "pb" | "market_cap" | "turnover_pct" | "volume" | "amplitude";
+type SortableKey = "price" | "change_pct" | "pe" | "pb" | "market_cap" | "turnover_pct" | "volume" | "amplitude" | "volume_ratio" | "change_pct_60d" | "composite_score";
 type LocalStrategySortKey = "strategy_signal_age" | "strategy_return_since_signal" | "strategy_average_amount_20d";
 
 const SORT_FIELD_MAP: Record<string, SortableKey> = {
@@ -39,6 +42,9 @@ const SORT_FIELD_MAP: Record<string, SortableKey> = {
   turnover_pct: "turnover_pct",
   volume: "volume",
   amplitude: "amplitude",
+  volume_ratio: "volume_ratio",
+  change_pct_60d: "change_pct_60d",
+  composite_score: "composite_score",
 };
 
 const LOCAL_STRATEGY_SORT_KEYS = new Set<LocalStrategySortKey>([
@@ -61,6 +67,89 @@ function compareOptionalNumbers(
   return order === "ascend" ? left - right : right - left;
 }
 
+function renderStockBadges(record: ScreenerItem) {
+  const badges = [];
+  if (record.change_pct != null && record.change_pct >= 9.8) {
+    badges.push(
+      <span
+        key="limit-up"
+        style={{
+          fontSize: 10,
+          lineHeight: "14px",
+          padding: "0 3px",
+          borderRadius: 2,
+          backgroundColor: "rgba(245, 34, 45, 0.15)",
+          color: "#f5222d",
+          fontWeight: 600,
+        }}
+      >
+        涨停
+      </span>,
+    );
+  } else if (record.change_pct != null && record.change_pct <= -9.8) {
+    badges.push(
+      <span
+        key="limit-down"
+        style={{
+          fontSize: 10,
+          lineHeight: "14px",
+          padding: "0 3px",
+          borderRadius: 2,
+          backgroundColor: "rgba(82, 196, 26, 0.15)",
+          color: "#52c41a",
+          fontWeight: 600,
+        }}
+      >
+        跌停
+      </span>,
+    );
+  }
+
+  if (record.turnover_pct != null && record.turnover_pct >= 8) {
+    badges.push(
+      <span
+        key="high-turnover"
+        style={{
+          fontSize: 10,
+          lineHeight: "14px",
+          padding: "0 3px",
+          borderRadius: 2,
+          backgroundColor: "rgba(250, 140, 22, 0.15)",
+          color: "#fa8c16",
+          fontWeight: 600,
+        }}
+      >
+        高换手
+      </span>,
+    );
+  }
+
+  if (record.volume_ratio != null && record.volume_ratio >= 2.0) {
+    badges.push(
+      <span
+        key="high-vol-ratio"
+        style={{
+          fontSize: 10,
+          lineHeight: "14px",
+          padding: "0 3px",
+          borderRadius: 2,
+          backgroundColor: "rgba(114, 46, 209, 0.15)",
+          color: "#722ed1",
+          fontWeight: 600,
+        }}
+      >
+        放量
+      </span>,
+    );
+  }
+
+  return badges.length > 0 ? (
+    <span style={{ display: "inline-flex", gap: 3, alignItems: "center" }}>
+      {badges}
+    </span>
+  ) : null;
+}
+
 export default function ResultsTable({
   data,
   isLoading,
@@ -71,6 +160,7 @@ export default function ResultsTable({
   onSortChange,
   selectedCodes,
   onSelectedCodesChange,
+  onAddWatchlist,
   strategySignalDates,
   strategySignalAges,
   strategyReturnsSinceSignal,
@@ -79,8 +169,27 @@ export default function ResultsTable({
   strategyFallbackCodes,
 }: Props) {
   const c = useColors();
+  const navigate = useNavigate();
   const isNarrow = useMediaQuery("(max-width: 768px)");
+  const [addedCodes, setAddedCodes] = useState<Set<string>>(new Set());
+
+  const handleAddWatchlist = useCallback(async (record: ScreenerItem) => {
+    try {
+      if (onAddWatchlist) {
+        await onAddWatchlist(record);
+      }
+      setAddedCodes((prev) => new Set(prev).add(record.code));
+    } catch {
+      message.error(`添加 ${record.name} 到自选失败`);
+    }
+  }, [onAddWatchlist]);
+
+  const handleAiDiagnose = useCallback((record: ScreenerItem) => {
+    const prompt = `请对股票 ${record.name}（代码：${record.code}）进行深度量化与基本面体检，评估其估值水平（当前 PE: ${record.pe_ttm ?? "未知"}，PB: ${record.pb ?? "未知"}）、行业竞争壁垒、技术走势及潜在投资风险。`;
+    navigate(`/chat?prompt=${encodeURIComponent(prompt)}`);
+  }, [navigate]);
   const currentSortOrder = filters.sort_order === "asc" ? "ascend" : "descend";
+  const [columnPerspective, setColumnPerspective] = useState<"all" | "valuation" | "momentum">("all");
   const [localSort, setLocalSort] = useState<{
     key: LocalStrategySortKey;
     order: "ascend" | "descend";
@@ -122,12 +231,36 @@ export default function ResultsTable({
         {
           title: "股票",
           key: "stock",
-          width: 132,
+          width: 140,
           render: (_: unknown, record: ScreenerItem) => (
             <PreloadLink to={buildStockProfileUrl(record.code)} style={{ display: "block", color: c.primary }}>
               <span style={{ display: "block", color: c.textPrimary, fontWeight: "var(--c-weight-semibold)" }}>{record.name}</span>
-              <span style={{ display: "block", color: c.textMuted, fontSize: "var(--c-font-xs)" }}>
-                {record.code}{record.board || record.exchange ? ` · ${record.board || record.exchange}` : ""}
+              <span style={{ display: "flex", alignItems: "center", gap: 4, color: c.textMuted, fontSize: "var(--c-font-xs)", flexWrap: "wrap", marginTop: 2 }}>
+                <span>{record.code}{record.board || record.exchange ? ` · ${record.board || record.exchange}` : ""}</span>
+                {renderStockBadges(record)}
+                {record.composite_score != null ? (
+                  <Tag
+                    color={record.composite_score >= 80 ? "gold" : record.composite_score >= 65 ? "blue" : undefined}
+                    style={{ fontSize: 10, lineHeight: "14px", padding: "0 3px", margin: 0, fontWeight: 600 }}
+                  >
+                    {record.composite_score.toFixed(0)}分
+                  </Tag>
+                ) : null}
+                {record.is_broken_net ? (
+                  <span
+                    style={{
+                      fontSize: "var(--c-font-xs, 11px)",
+                      lineHeight: "14px",
+                      padding: "0 3px",
+                      borderRadius: 2,
+                      backgroundColor: "rgba(24, 144, 255, 0.12)",
+                      color: "#1890ff",
+                      fontWeight: 600,
+                    }}
+                  >
+                    破净
+                  </span>
+                ) : null}
               </span>
             </PreloadLink>
           ),
@@ -191,9 +324,15 @@ export default function ResultsTable({
     {
       title: "名称",
       dataIndex: "name",
-      width: 105,
+      width: 120,
       ellipsis: true,
       fixed: "left",
+      render: (name: string, record: ScreenerItem) => (
+        <span style={{ display: "inline-flex", flexDirection: "column", gap: 2 }}>
+          <span>{name}</span>
+          {renderStockBadges(record)}
+        </span>
+      ),
     },
     {
       title: "市场",
@@ -201,6 +340,23 @@ export default function ResultsTable({
       width: 90,
       ellipsis: true,
       render: (_: unknown, record: ScreenerItem) => record.board || record.exchange || "-",
+    },
+    {
+      title: "综合评分",
+      dataIndex: "composite_score",
+      width: 88,
+      align: "center",
+      sorter: true,
+      sortOrder: filters.sort_by === "composite_score" ? serverSortOrder : null,
+      render: (v: number | null) => {
+        if (v == null) return "-";
+        const color = v >= 80 ? "gold" : v >= 65 ? "blue" : undefined;
+        return (
+          <Tag color={color} style={{ fontWeight: 600, minWidth: 42, textAlign: "center", margin: 0 }}>
+            {v.toFixed(1)}
+          </Tag>
+        );
+      },
     },
     {
       title: "价格",
@@ -241,7 +397,7 @@ export default function ResultsTable({
           {record.is_broken_net && (
             <span
               style={{
-                fontSize: "10px",
+                fontSize: "var(--c-font-xs, 11px)",
                 lineHeight: "14px",
                 padding: "0 3px",
                 borderRadius: 2,
@@ -288,6 +444,35 @@ export default function ResultsTable({
       sorter: true,
       sortOrder: filters.sort_by === "turnover_pct" ? serverSortOrder : null,
       render: (v: number | null) => v != null ? <span className="financial-num">{v.toFixed(2)}%</span> : "-",
+    },
+    {
+      title: "量比",
+      dataIndex: "volume_ratio",
+      width: 75,
+      align: "right",
+      sorter: true,
+      sortOrder: filters.sort_by === "volume_ratio" ? serverSortOrder : null,
+      render: (v: number | null) => {
+        if (v == null) return "-";
+        const isHighlight = v >= 1.8;
+        return (
+          <span
+            className="financial-num"
+            style={isHighlight ? { color: c.up, fontWeight: "var(--c-weight-semibold)" } : undefined}
+          >
+            {v.toFixed(2)}
+          </span>
+        );
+      },
+    },
+    {
+      title: "60日涨幅",
+      dataIndex: "change_pct_60d",
+      width: 85,
+      align: "right",
+      sorter: true,
+      sortOrder: filters.sort_by === "change_pct_60d" ? serverSortOrder : null,
+      render: (value: number | null) => (value != null ? <ChangeValue value={value} fontWeight={500} /> : "-"),
     },
     {
       title: "成交量",
@@ -435,8 +620,76 @@ export default function ResultsTable({
         },
       );
     }
+
+    nextColumns.push({
+      title: "操作",
+      key: "actions",
+      width: 110,
+      fixed: "right",
+      render: (_: unknown, record: ScreenerItem) => {
+        const isAdded = addedCodes.has(record.code);
+        return (
+          <Space size={2}>
+            <Tooltip title={isAdded ? "已加自选" : "加入自选"}>
+              <Button
+                type="text"
+                size="small"
+                aria-label={`加自选-${record.code}`}
+                icon={isAdded ? <CheckOutlined style={{ color: "#52c41a" }} /> : <PlusOutlined />}
+                disabled={isAdded}
+                onClick={() => void handleAddWatchlist(record)}
+              />
+            </Tooltip>
+            <Tooltip title="AI 深度体检">
+              <Button
+                type="text"
+                size="small"
+                aria-label={`AI体检-${record.code}`}
+                icon={<RobotOutlined style={{ color: c.primary }} />}
+                onClick={() => handleAiDiagnose(record)}
+              />
+            </Tooltip>
+            <Tooltip title="详情分析">
+              <Button
+                type="text"
+                size="small"
+                aria-label={`详情-${record.code}`}
+                icon={<LineChartOutlined />}
+                onClick={() => navigate(buildStockProfileUrl(record.code))}
+              />
+            </Tooltip>
+          </Space>
+        );
+      },
+    });
+
+    if (columnPerspective === "valuation") {
+      const allowed = new Set([
+        "code", "name", "composite_score", "price", "change_pct", "pe_ttm", "pb", "market_cap",
+        "second_industry", "concepts", "actions", "strategy_signal_date", "strategy_signal_age",
+        "strategy_return_since_signal", "strategy_average_amount_20d", "strategy_data_source",
+        "pe_percentile", "pb_percentile",
+      ]);
+      return nextColumns.filter((col) => {
+        const key = (col.key || (col as { dataIndex?: string }).dataIndex) as string;
+        return !key || allowed.has(key);
+      });
+    }
+
+    if (columnPerspective === "momentum") {
+      const allowed = new Set([
+        "code", "name", "price", "change_pct", "amplitude", "market_cap", "turnover_pct", "volume_ratio",
+        "change_pct_60d", "volume", "actions", "strategy_signal_date", "strategy_signal_age",
+        "strategy_return_since_signal", "strategy_average_amount_20d", "strategy_data_source",
+      ]);
+      return nextColumns.filter((col) => {
+        const key = (col.key || (col as { dataIndex?: string }).dataIndex) as string;
+        return !key || allowed.has(key);
+      });
+    }
+
     return nextColumns;
-  }, [c, filters.sort_by, isNarrow, localSort, percentileMap, serverSortOrder, showPercentile, strategyAverageAmounts, strategyDataSources, strategyFallbackCodes, strategyReturnsSinceSignal, strategySignalAges, strategySignalDates]);
+  }, [addedCodes, c, columnPerspective, filters.sort_by, handleAddWatchlist, handleAiDiagnose, isNarrow, localSort, navigate, percentileMap, serverSortOrder, showPercentile, strategyAverageAmounts, strategyDataSources, strategyFallbackCodes, strategyReturnsSinceSignal, strategySignalAges, strategySignalDates]);
 
   const displayedItems = useMemo(() => {
     const items = data?.items ?? [];
@@ -457,11 +710,15 @@ export default function ResultsTable({
     const pePercentile = percentileMap.get(record.code);
     const pbPercentile = percentileMap.get(`${record.code}_pb`);
     return (
-      <ResponsiveMetricGrid
-        items={[
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <ResponsiveMetricGrid
+          items={[
+          ...(record.composite_score != null ? [{ key: "composite-score", label: "综合评分", value: `${record.composite_score.toFixed(1)} 分` }] : []),
           { key: "pe", label: "PE(TTM)", value: record.pe_ttm?.toFixed(1) ?? "-" },
           { key: "pb", label: "PB", value: record.pb?.toFixed(2) ?? "-" },
           { key: "amplitude", label: "日内振幅", value: record.amplitude != null ? `${record.amplitude.toFixed(2)}%` : "-" },
+          { key: "volume-ratio", label: "量比", value: record.volume_ratio != null ? record.volume_ratio.toFixed(2) : "-" },
+          { key: "change-60d", label: "60日涨幅", value: record.change_pct_60d != null ? <ChangeValue value={record.change_pct_60d} fontWeight={500} /> : "-" },
           ...(record.is_broken_net ? [{ key: "broken-net", label: "破净状态", value: "破净标的 (PB ≤ 1.0)" }] : []),
           {
             key: "market-cap",
@@ -526,42 +783,102 @@ export default function ResultsTable({
           ] : []),
         ]}
       />
-    );
-  }, [percentileMap, showPercentile, strategyAverageAmounts, strategyDataSources, strategyFallbackCodes, strategyReturnsSinceSignal, strategySignalAges, strategySignalDates]);
+      <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap", borderTop: "1px dashed var(--c-border)", paddingTop: 8 }}>
+        <Button
+          size="small"
+          icon={addedCodes.has(record.code) ? <CheckOutlined style={{ color: "#52c41a" }} /> : <PlusOutlined />}
+          disabled={addedCodes.has(record.code)}
+          onClick={() => void handleAddWatchlist(record)}
+        >
+          {addedCodes.has(record.code) ? "已加自选" : "加自选"}
+        </Button>
+        <Button
+          size="small"
+          type="primary"
+          ghost
+          icon={<RobotOutlined />}
+          onClick={() => handleAiDiagnose(record)}
+        >
+          AI 深度体检
+        </Button>
+        <Button
+          size="small"
+          icon={<LineChartOutlined />}
+          onClick={() => navigate(buildStockProfileUrl(record.code))}
+        >
+          详情分析
+        </Button>
+      </div>
+    </div>
+  );
+}, [addedCodes, handleAddWatchlist, handleAiDiagnose, navigate, percentileMap, showPercentile, strategyAverageAmounts, strategyDataSources, strategyFallbackCodes, strategyReturnsSinceSignal, strategySignalAges, strategySignalDates]);
 
   return (
-    <Table
-      columns={columns}
-      dataSource={displayedItems}
-      rowKey="code"
-      rowSelection={{
-        selectedRowKeys: selectedCodes,
-        preserveSelectedRowKeys: true,
-        onChange: (keys) => onSelectedCodesChange(keys.map(String).slice(0, 10)),
-        getCheckboxProps: (record) => ({
-          disabled: selectedCodes.length >= 10 && !selectedCodes.includes(record.code),
-        }),
-      }}
-      loading={isLoading}
-      size="small"
-      pagination={{
-        current: data?.page || 1,
-        pageSize: data?.page_size || 50,
-        total: data?.total || 0,
-        showSizeChanger: !isNarrow,
-        showLessItems: isNarrow,
-        responsive: true,
-        pageSizeOptions: ["20", "50", "100"],
-        showTotal: (total) => `共 ${total} 只`,
-        onChange: (page, pageSize) => onPageChange(page, pageSize),
-      }}
-      onChange={handleTableChange}
-      expandable={isNarrow ? {
-        expandedRowRender: renderExpandedRow,
-        columnWidth: 38,
-      } : undefined}
-      locale={{ emptyText: <Empty description="无匹配股票，请调整筛选条件" /> }}
-      scroll={isNarrow ? { x: 380 } : { x: "max-content" }}
-    />
+    <div>
+      {!isNarrow && (
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8, alignItems: "center", gap: 6 }}>
+          <span style={{ fontSize: 12, color: c.textMuted }}>指标视角:</span>
+          <Space size={4}>
+            <Button
+              size="small"
+              type={columnPerspective === "all" ? "primary" : "text"}
+              onClick={() => setColumnPerspective("all")}
+              style={{ fontSize: 12, padding: "0 8px" }}
+            >
+              全部指标
+            </Button>
+            <Button
+              size="small"
+              type={columnPerspective === "valuation" ? "primary" : "text"}
+              onClick={() => setColumnPerspective("valuation")}
+              style={{ fontSize: 12, padding: "0 8px" }}
+            >
+              估值核心
+            </Button>
+            <Button
+              size="small"
+              type={columnPerspective === "momentum" ? "primary" : "text"}
+              onClick={() => setColumnPerspective("momentum")}
+              style={{ fontSize: 12, padding: "0 8px" }}
+            >
+              量价动量
+            </Button>
+          </Space>
+        </div>
+      )}
+      <Table
+        columns={columns}
+        dataSource={displayedItems}
+        rowKey="code"
+        rowSelection={{
+          selectedRowKeys: selectedCodes,
+          preserveSelectedRowKeys: true,
+          onChange: (keys) => onSelectedCodesChange(keys.map(String).slice(0, 10)),
+          getCheckboxProps: (record) => ({
+            disabled: selectedCodes.length >= 10 && !selectedCodes.includes(record.code),
+          }),
+        }}
+        loading={isLoading}
+        size="small"
+        pagination={{
+          current: data?.page || 1,
+          pageSize: data?.page_size || 50,
+          total: data?.total || 0,
+          showSizeChanger: !isNarrow,
+          showLessItems: isNarrow,
+          responsive: true,
+          pageSizeOptions: ["20", "50", "100"],
+          showTotal: isNarrow ? undefined : (total) => `共 ${total} 只`,
+          onChange: (page, pageSize) => onPageChange(page, pageSize),
+        }}
+        onChange={handleTableChange}
+        expandable={isNarrow ? {
+          expandedRowRender: renderExpandedRow,
+          columnWidth: 38,
+        } : undefined}
+        locale={{ emptyText: <Empty description="无匹配股票，请调整筛选条件" /> }}
+        scroll={isNarrow ? { x: 380 } : { x: "max-content" }}
+      />
+    </div>
   );
 }

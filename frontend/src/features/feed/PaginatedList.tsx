@@ -3,7 +3,7 @@ import { Empty, Pagination, Skeleton } from "antd";
 import QueryErrorState from "../../components/QueryErrorState";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import type { FeedNewsItem } from "../../types/stock";
-import { clampPage } from "./feedHelpers";
+import { clampPage, clusterNewsItems } from "./feedHelpers";
 import NewsListItem from "./NewsListItem";
 import type { FeedItemLayout } from "./NewsListItem";
 
@@ -34,6 +34,7 @@ export default function PaginatedList({
 }: PaginatedListProps) {
   const isNarrow = useMediaQuery("(max-width: 640px)");
   const [page, setPage] = useState(1);
+  const [dedupeEnabled, setDedupeEnabled] = useState(true);
 
   const filteredItems = useMemo(() => {
     if (!searchQuery) return items;
@@ -44,15 +45,21 @@ export default function PaginatedList({
     );
   }, [items, searchQuery]);
 
-  const total = filteredItems.length;
+  const clusteredItems = useMemo(
+    () => clusterNewsItems(filteredItems, dedupeEnabled),
+    [filteredItems, dedupeEnabled],
+  );
+
+  const total = clusteredItems.length;
+  const clusteredCount = filteredItems.length - clusteredItems.length;
   const totalPages = Math.ceil(total / pageSize);
   const currentPage = clampPage(page, total, pageSize);
   const start = (currentPage - 1) * pageSize;
-  const pageItems = filteredItems.slice(start, start + pageSize);
+  const pageItems = clusteredItems.slice(start, start + pageSize);
 
   useEffect(() => {
     setPage(1);
-  }, [searchQuery]);
+  }, [searchQuery, dedupeEnabled]);
 
   useEffect(() => {
     setPage((current) => clampPage(current, total, pageSize));
@@ -80,6 +87,23 @@ export default function PaginatedList({
 
   return (
     <div className="feed-list-surface">
+      <div className="feed-list-toolbar">
+        <div className="feed-list-count">
+          <span>共 {total} 条</span>
+          {dedupeEnabled && clusteredCount > 0 && (
+            <span className="feed-dedupe-hint">（已智能聚合 {clusteredCount} 条重复报道）</span>
+          )}
+        </div>
+        <label className="feed-dedupe-toggle" title="开启后自动将各大媒体重复转载的同质新闻合并展示">
+          <input
+            type="checkbox"
+            checked={dedupeEnabled}
+            onChange={(e) => setDedupeEnabled(e.target.checked)}
+          />
+          <span>智能过滤同质资讯</span>
+        </label>
+      </div>
+
       <div className={layout === "editorial" ? "feed-news-grid" : "feed-stream-list"}>
         {pageItems.map((item, index) => (
           <NewsListItem

@@ -6,6 +6,8 @@ describe("PortfolioSummaryCards", () => {
   it("shows realized, unrealized, and combined profit separately", () => {
     render(
       <PortfolioSummaryCards summary={{
+        base_currency: "CNY",
+        fx_rates: { CNY: 1 },
         stock_count: 1,
         position_count: 1,
         transaction_count: 2,
@@ -26,6 +28,9 @@ describe("PortfolioSummaryCards", () => {
         estimated_securities_value: 660,
         total_asset_value: 100054,
         total_position_pct: 0.66,
+        previous_close_value: 630,
+        daily_profit_amount: 30,
+        daily_profit_pct: 4.76,
       }} />,
     );
 
@@ -37,10 +42,14 @@ describe("PortfolioSummaryCards", () => {
     expect(screen.getByText("总资产").closest(".ant-statistic")).toHaveTextContent("100,054.00");
     expect(screen.getByText("现金余额").closest(".ant-statistic")).toHaveTextContent("99,394.00");
     expect(screen.getByText("总仓位").closest(".ant-statistic")).toHaveTextContent("0.66%");
+    expect(screen.getByText("当日盈亏").closest(".ant-statistic")).toHaveTextContent("30.00");
+    expect(screen.getByText(/昨收市值 ¥630.00 · 4.76%/)).toBeInTheDocument();
   });
 
   it("prompts for initial cash when account accounting is not configured", () => {
     render(<PortfolioSummaryCards summary={{
+      base_currency: "CNY",
+      fx_rates: { CNY: 1 },
       stock_count: 0,
       position_count: 0,
       transaction_count: 0,
@@ -61,6 +70,9 @@ describe("PortfolioSummaryCards", () => {
       estimated_securities_value: 0,
       total_asset_value: null,
       total_position_pct: null,
+      previous_close_value: 0,
+      daily_profit_amount: 0,
+      daily_profit_pct: null,
     }} />);
 
     expect(screen.getByText("尚未配置初始资金")).toBeInTheDocument();

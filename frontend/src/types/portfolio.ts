@@ -3,6 +3,7 @@ import type { components } from "../api/generated/schema";
 export type PortfolioPositionCreate = components["schemas"]["PortfolioPositionCreate"];
 export type PortfolioPosition = components["schemas"]["PortfolioPosition"];
 export type PortfolioStockSummary = components["schemas"]["PortfolioStockSummary"];
+export type PortfolioTrimSuggestion = components["schemas"]["PortfolioTrimSuggestion"];
 export type PortfolioSummary = components["schemas"]["PortfolioSummary"];
 export type PortfolioRiskSummary = components["schemas"]["PortfolioRiskSummary"];
 export type PortfolioClosedPosition = components["schemas"]["PortfolioClosedPosition"];

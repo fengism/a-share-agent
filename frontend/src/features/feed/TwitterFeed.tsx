@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { ClockCircleOutlined, SyncOutlined } from "@ant-design/icons";
-import { Button, message, Typography } from "antd";
+import { ClockCircleOutlined, FilterOutlined, SyncOutlined, UserOutlined } from "@ant-design/icons";
+import { Button, message, Segmented, Typography } from "antd";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import "dayjs/locale/zh-cn";
@@ -46,16 +46,28 @@ function RelativeRefreshTime({ updatedAt, itemCount }: { updatedAt: number; item
 }
 
 export default function TwitterFeed({ searchQuery }: { searchQuery: string }) {
+  const [mobileTab, setMobileTab] = useState<"tweets" | "analysis">("tweets");
+  const [selectedAuthor, setSelectedAuthor] = useState<string>("");
   const { data: items = [], dataUpdatedAt, isLoading, error, refetch } = useMarketTwitterFeed();
   const refreshMutation = useMarketTwitterFeedRefresh();
-  const authors = useMemo(
-    () => Array.from(new Set(
-      items
-        .map((item) => item.author?.trim())
-        .filter((author): author is string => Boolean(author)),
-    )),
-    [items],
-  );
+
+  const authorCounts = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const item of items) {
+      const author = item.author?.trim();
+      if (author) {
+        map.set(author, (map.get(author) || 0) + 1);
+      }
+    }
+    return map;
+  }, [items]);
+
+  const authors = useMemo(() => Array.from(authorCounts.keys()), [authorCounts]);
+
+  const displayedItems = useMemo(() => {
+    if (!selectedAuthor) return items;
+    return items.filter((item) => item.author?.trim() === selectedAuthor);
+  }, [items, selectedAuthor]);
 
   const handleRefresh = () => {
     refreshMutation.mutate(undefined, {
@@ -65,7 +77,19 @@ export default function TwitterFeed({ searchQuery }: { searchQuery: string }) {
   };
 
   return (
-    <div className="feed-layout twitter-feed-layout">
+    <div className="feed-layout twitter-feed-layout" data-mobile-tab={mobileTab}>
+      <div className="twitter-mobile-nav">
+        <Segmented
+          block
+          value={mobileTab}
+          onChange={(val) => setMobileTab(val as "tweets" | "analysis")}
+          options={[
+            { label: `💬 推文动态 (${displayedItems.length})`, value: "tweets" },
+            { label: "🤖 AI 大 V 核心解读", value: "analysis" },
+          ]}
+        />
+      </div>
+
       <main className="feed-main-column">
         <div className="feed-tab-meta">
           <RelativeRefreshTime updatedAt={dataUpdatedAt} itemCount={items.length} />
@@ -81,10 +105,38 @@ export default function TwitterFeed({ searchQuery }: { searchQuery: string }) {
             </Button>
           </div>
         </div>
+
+        {authors.length > 0 && (
+          <div className="twitter-author-pills" role="navigation" aria-label="大 V 筛选">
+            <span className="twitter-pills-label">
+              <FilterOutlined style={{ marginRight: 4 }} />
+              大 V 聚焦：
+            </span>
+            <button
+              type="button"
+              className={`twitter-pill ${!selectedAuthor ? "is-active" : ""}`}
+              onClick={() => setSelectedAuthor("")}
+            >
+              全部 ({items.length})
+            </button>
+            {authors.map((author) => (
+              <button
+                key={author}
+                type="button"
+                className={`twitter-pill ${selectedAuthor === author ? "is-active" : ""}`}
+                onClick={() => setSelectedAuthor(selectedAuthor === author ? "" : author)}
+              >
+                <UserOutlined style={{ marginRight: 3, fontSize: 11 }} />
+                @{author} ({authorCounts.get(author)})
+              </button>
+            ))}
+          </div>
+        )}
+
         <PaginatedList
-          items={items}
+          items={displayedItems}
           isLoading={isLoading}
-          emptyText="暂无 Twitter 资讯"
+          emptyText={selectedAuthor ? "该作者暂无推文" : "暂无 Twitter 资讯"}
           showSourceTag
           pageSize={PAGE_SIZE}
           searchQuery={searchQuery}
@@ -94,8 +146,13 @@ export default function TwitterFeed({ searchQuery }: { searchQuery: string }) {
           layout="editorial"
         />
       </main>
+
       <aside className="feed-rail">
-        <TwitterAnalysisPanel authors={authors} />
+        <TwitterAnalysisPanel
+          authors={authors}
+          selectedAuthor={selectedAuthor || undefined}
+          onSelectAuthor={setSelectedAuthor}
+        />
       </aside>
     </div>
   );

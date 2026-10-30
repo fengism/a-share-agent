@@ -53,6 +53,8 @@ describe("TransactionEntryCard", () => {
       <TransactionEntryCard stocks={[{
         stock_code: "600519",
         stock_name: "贵州茅台",
+        currency: "CNY",
+        fx_rate_to_cny: 1,
         position_count: 1,
         total_shares: 60,
         average_cost: 10.1,
@@ -98,6 +100,8 @@ describe("TransactionEntryCard", () => {
       <TransactionEntryCard stocks={[{
         stock_code: "600519",
         stock_name: "贵州茅台",
+        currency: "CNY",
+        fx_rate_to_cny: 1,
         position_count: 1,
         total_shares: 60,
         average_cost: 10.1,
@@ -170,11 +174,13 @@ describe("TransactionEntryCard", () => {
     }));
   });
 
-  it("opens a selected holding for sale and prefills its current price", async () => {
+  it("opens a selected holding for sale and prefills its current price and suggested shares", async () => {
     const ref = createRef<TransactionEntryCardHandle>();
     const stock = {
       stock_code: "600519",
       stock_name: "贵州茅台",
+      currency: "CNY",
+      fx_rate_to_cny: 1,
       position_count: 1,
       total_shares: 60,
       average_cost: 10.1,
@@ -189,11 +195,12 @@ describe("TransactionEntryCard", () => {
     };
     render(<TransactionEntryCard ref={ref} stocks={[stock]} />);
 
-    act(() => ref.current?.startSell(stock));
+    act(() => ref.current?.startSell(stock, 40));
 
     await waitFor(() => expect(screen.getByRole("radio", { name: "卖出" })).toBeChecked());
     expect(screen.getByRole("combobox", { name: "持仓股票" })).toBeInTheDocument();
     expect(screen.getByText(/贵州茅台.*可卖 60 股/)).toBeInTheDocument();
     expect(screen.getByRole("spinbutton", { name: "卖出价" })).toHaveValue("11.0000");
+    expect(screen.getByRole("spinbutton", { name: /股数/ })).toHaveValue("40");
   });
 });

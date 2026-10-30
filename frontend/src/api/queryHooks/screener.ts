@@ -54,6 +54,22 @@ export function useScreenerScreen(filters: ScreenerFilter, enabled = true) {
   });
 }
 
+export async function fetchScreenerExportData(
+  filters: ScreenerFilter,
+  limit = 500,
+): Promise<ScreenerItem[]> {
+  const result = await apiPost<ScreenerResult>(
+    "/screener/screen",
+    {
+      ...filters,
+      page: 1,
+      page_size: limit,
+    },
+    { timeoutMs: API_TIMEOUTS.SCREENER },
+  );
+  return normalizeScreenerResult(result).items;
+}
+
 export function useIndustries() {
   return useQuery({
     queryKey: queryKeys.screener.industries,

@@ -1,7 +1,11 @@
+import asyncio
+
 import app.modules.portfolio.builder as portfolio_builder
 from app.core.concurrency.rate_limiter import call_blocking, database_semaphore
 from app.infrastructure.persistence import portfolio as portfolio_store
 from app.modules.portfolio.accounting import replay_transactions
+from app.modules.portfolio.availability import resolve_portfolio_as_of_date
+from app.modules.portfolio.fx import fetch_fx_rates
 from app.modules.portfolio.schemas import (
     PortfolioPosition,
     PortfolioPositionCreate,
@@ -31,7 +35,16 @@ async def add_position(request: PortfolioPositionCreate, user_id: int) -> Portfo
     if created is None:
         return None
     row, quote, _ = created
-    return portfolio_builder.position_from_transaction(row, quote)
+    fx_rates, as_of_date = await asyncio.gather(
+        fetch_fx_rates([request.stock_code]),
+        resolve_portfolio_as_of_date([request.stock_code]),
+    )
+    return portfolio_builder.position_from_transaction(
+        row,
+        quote,
+        as_of_date=as_of_date,
+        fx_rates=fx_rates,
+    )
 
 
 async def delete_position(position_id: int, user_id: int) -> bool:

@@ -58,6 +58,13 @@ vi.mock("../../api/queries", () => ({
   useScreenerScreen: () => mocks.useScreen(),
 }));
 vi.mock("../../styles/ui", () => ({
+  useColors: () => ({
+    primary: "#1677ff",
+    textPrimary: "#1f1f1f",
+    textMuted: "#8c8c8c",
+    up: "#f5222d",
+    down: "#52c41a",
+  }),
   useStyles: () => ({
     cardStyle: {},
     pageContainerStyle: {},

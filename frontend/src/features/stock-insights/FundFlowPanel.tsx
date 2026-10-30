@@ -1,5 +1,5 @@
-import { useCallback, useMemo } from "react";
-import { Alert, Button, Card, Col, Row, Table, Typography, Tag } from "antd";
+import { useCallback, useMemo, useState } from "react";
+import { Alert, Button, Card, Col, Row, Segmented, Table, Typography, Tag } from "antd";
 import ReactEChartsCore from "echarts-for-react/lib/core";
 import echarts from "../../charts/echarts-setup";
 import { useStockFundFlowPages } from "../../api/queries";
@@ -66,9 +66,16 @@ export default function FundFlowPanel({ code, isExportingPdf = false }: { code: 
   }, [data]);
   const latest = recentData[0] ?? null;
   const isStale = useMemo(() => recentData.some((item) => item.is_stale), [recentData]);
+  const [chartDays, setChartDays] = useState<number>(60);
+  const chartData = useMemo(() => recentData.slice(0, chartDays), [recentData, chartDays]);
+
+  const cumulativeMainNet = useMemo(() => {
+    return chartData.reduce((acc, item) => acc + (item.main_net ?? 0), 0);
+  }, [chartData]);
+
   const chartOption = useMemo(() => {
-    if (recentData.length === 0) return null;
-    const recent = [...recentData].reverse();
+    if (chartData.length === 0) return null;
+    const recent = [...chartData].reverse();
     const dates = recent.map((d) => d.date.slice(5));
     const mainNets = recent.map((d) => d.main_net === null ? null : +(d.main_net / 1e8).toFixed(2));
     return {
@@ -87,7 +94,7 @@ export default function FundFlowPanel({ code, isExportingPdf = false }: { code: 
         },
       ],
     };
-  }, [recentData, c.textSecondary, c.up, c.down]);
+  }, [chartData, c.textSecondary, c.up, c.down]);
 
   const tileColors = { textSecondary: c.textSecondary, hoverBg: c.hoverBg, border: c.border, up: c.up, down: c.down, muted: c.textMuted };
 
@@ -212,25 +219,100 @@ export default function FundFlowPanel({ code, isExportingPdf = false }: { code: 
       ) : null}
       {/* Summary cards for latest day */}
       {latest && (
-        <Row gutter={[10, 10]}>
-          <Col xs={12} sm={8}><FlowTile label="主力净流入" value={latest.main_net} colors={tileColors} /></Col>
-          <Col xs={12} sm={8}><FlowTile label="超大单净流入" value={latest.super_net} colors={tileColors} /></Col>
-          <Col xs={12} sm={8}><FlowTile label="大单净流入" value={latest.large_net} colors={tileColors} /></Col>
-          <Col xs={12} sm={8}><FlowTile label="中单净流入" value={latest.mid_net} colors={tileColors} /></Col>
-          <Col xs={12} sm={8}><FlowTile label="小单净流入" value={latest.small_net} colors={tileColors} /></Col>
-          <Col xs={12} sm={8}>
-            <div style={{ padding: "14px 12px", background: c.hoverBg, border: `1px solid ${c.border}`, borderRadius: 10, textAlign: "center" }}>
-              <div style={{ color: c.textSecondary, fontSize: "var(--c-font-sm)", marginBottom: 4 }}>统计日期</div>
-              <div style={{ fontSize: "var(--c-font-base)", fontWeight: "var(--c-weight-bold)", color: c.textPrimary }}>{latest.date}</div>
-            </div>
-          </Col>
-        </Row>
+        <div style={{ display: "grid", gap: 10 }}>
+          <Row gutter={[10, 10]}>
+            <Col xs={12} sm={8}><FlowTile label="主力净流入" value={latest.main_net} colors={tileColors} /></Col>
+            <Col xs={12} sm={8}><FlowTile label="超大单净流入" value={latest.super_net} colors={tileColors} /></Col>
+            <Col xs={12} sm={8}><FlowTile label="大单净流入" value={latest.large_net} colors={tileColors} /></Col>
+            <Col xs={12} sm={8}><FlowTile label="中单净流入" value={latest.mid_net} colors={tileColors} /></Col>
+            <Col xs={12} sm={8}><FlowTile label="小单净流入" value={latest.small_net} colors={tileColors} /></Col>
+            <Col xs={12} sm={8}>
+              <div style={{ padding: "14px 12px", background: c.hoverBg, border: `1px solid ${c.border}`, borderRadius: 10, textAlign: "center" }}>
+                <div style={{ color: c.textSecondary, fontSize: "var(--c-font-sm)", marginBottom: 4 }}>统计日期</div>
+                <div style={{ fontSize: "var(--c-font-base)", fontWeight: "var(--c-weight-bold)", color: c.textPrimary }}>{latest.date}</div>
+              </div>
+            </Col>
+          </Row>
+
+          {/* 主力 vs 散户 筹码博弈诊断 */}
+          {(() => {
+            const mainVal = latest.main_net ?? ((latest.super_net ?? 0) + (latest.large_net ?? 0));
+            const retailVal = (latest.mid_net ?? 0) + (latest.small_net ?? 0);
+            let stanceLabel = "资金存量博弈，多空震荡整理";
+            let stanceTagColor: "primary" | "up" | "down" | "warning" = "primary";
+
+            if (mainVal > 0 && retailVal < 0) {
+              stanceLabel = "主力吸筹进场，散户加速筹码离场（筹码集中）";
+              stanceTagColor = "up";
+            } else if (mainVal > 0 && retailVal >= 0) {
+              stanceLabel = "主力与各方资金合力净流入，做多动能充沛";
+              stanceTagColor = "up";
+            } else if (mainVal < 0 && retailVal > 0) {
+              stanceLabel = "主力大资金减仓派发，散户买单接盘（警惕承压）";
+              stanceTagColor = "down";
+            } else if (mainVal < 0 && retailVal <= 0) {
+              stanceLabel = "场内资金全线净流出，防守避险情绪浓厚";
+              stanceTagColor = "warning";
+            }
+
+            return (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 12,
+                  flexWrap: "wrap",
+                  padding: "10px 14px",
+                  background: c.hoverBg,
+                  borderRadius: 8,
+                  border: `1px solid ${c.border}`,
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <Text strong style={{ fontSize: "var(--c-font-sm)" }}>博弈诊断：</Text>
+                  <Tag style={semanticTagStyle(stanceTagColor)}>{stanceLabel}</Tag>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 16, fontSize: "var(--c-font-xs)", fontFamily: "var(--c-font-mono)" }}>
+                  <span>主力合计: <strong style={{ color: mainVal >= 0 ? c.up : c.down }}>{mainVal > 0 ? `+${formatAmount(mainVal)}` : formatAmount(mainVal)}</strong></span>
+                  <span>散户合计: <strong style={{ color: retailVal >= 0 ? c.up : c.down }}>{retailVal > 0 ? `+${formatAmount(retailVal)}` : formatAmount(retailVal)}</strong></span>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
       )}
 
       {/* Bar chart */}
       {chartOption && (
         <Card size="small" style={cardStyle} styles={{ body: { padding: 8 } }}>
-          <Text style={{ fontSize: "var(--c-font-md)", fontWeight: "var(--c-weight-semibold)", color: c.textPrimary, marginBottom: 4, display: "block", paddingLeft: 4 }}>主力净流入走势（已加载 {recentData.length} 日）</Text>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 6, paddingLeft: 4, paddingRight: 4 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <Text style={{ fontSize: "var(--c-font-md)", fontWeight: "var(--c-weight-semibold)", color: c.textPrimary }}>
+                主力净流入走势（近 {chartData.length} 日）
+              </Text>
+              {chartData.length > 0 && (
+                <span style={{ fontSize: "var(--c-font-xs)", color: "var(--c-text-secondary)" }}>
+                  累计: <strong style={{ color: cumulativeMainNet >= 0 ? c.up : c.down, fontFamily: "var(--c-font-mono)" }}>
+                    {cumulativeMainNet > 0 ? `+${formatAmount(cumulativeMainNet)}` : formatAmount(cumulativeMainNet)}
+                  </strong>
+                </span>
+              )}
+            </div>
+            {!isExportingPdf && (
+              <Segmented
+                size="small"
+                aria-label="资金流向周期"
+                options={[
+                  { label: "近5日", value: 5 },
+                  { label: "近20日", value: 20 },
+                  { label: "近60日", value: 60 },
+                ]}
+                value={chartDays}
+                onChange={(val) => setChartDays(Number(val))}
+              />
+            )}
+          </div>
           <ReactEChartsCore echarts={echarts} option={chartOption} style={{ height: 220 }} notMerge />
         </Card>
       )}

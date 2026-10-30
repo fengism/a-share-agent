@@ -61,4 +61,18 @@ describe("shared screener URL state", () => {
     });
     expect(parseScreenerUrlState(serializeScreenerUrlState(state))).toEqual(state);
   });
+
+  it("round-trips volume ratio and 60-day momentum filters", () => {
+    const state = parseScreenerUrlState(new URLSearchParams(
+      "volume_ratio_min=1.8&change_pct_60d_min=15&sort=volume_ratio&order=desc",
+    ));
+
+    expect(state.filters).toMatchObject({
+      volume_ratio_min: 1.8,
+      change_pct_60d_min: 15,
+      sort_by: "volume_ratio",
+      sort_order: "desc",
+    });
+    expect(parseScreenerUrlState(serializeScreenerUrlState(state))).toEqual(state);
+  });
 });

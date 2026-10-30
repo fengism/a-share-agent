@@ -159,8 +159,8 @@ export default function MarketVolumeCard({
             `<div style="font-weight:600;margin-bottom:6px;border-bottom:1px solid ${c.border};padding-bottom:4px;">${item.date}</div>`,
             `<div style="display:flex;justify-content:space-between;gap:16px;"><span>两市总成交额:</span><strong>${item.amountYi.toLocaleString("zh-CN", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} 亿元</strong></div>`,
             `<div style="display:flex;justify-content:space-between;gap:16px;color:${changeColor};"><span>较前一交易日:</span><strong>${changeSign}${item.changeYi.toFixed(1)} 亿元 (${changeSign}${item.changePct.toFixed(1)}%)</strong></div>`,
-            `<div style="display:flex;justify-content:space-between;gap:16px;color:#f59e0b;"><span>5日均量 (MA5):</span><strong>${item.ma5.toLocaleString("zh-CN", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} 亿元</strong></div>`,
-            `<div style="display:flex;justify-content:space-between;gap:16px;color:#8b5cf6;"><span>20日均量 (MA20):</span><strong>${item.ma20.toLocaleString("zh-CN", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} 亿元</strong></div>`,
+            `<div style="display:flex;justify-content:space-between;gap:16px;color:${c.warning};"><span>5日均量 (MA5):</span><strong>${item.ma5.toLocaleString("zh-CN", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} 亿元</strong></div>`,
+            `<div style="display:flex;justify-content:space-between;gap:16px;color:${c.accent};"><span>20日均量 (MA20):</span><strong>${item.ma20.toLocaleString("zh-CN", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} 亿元</strong></div>`,
           ];
           return rows.join("");
         },
@@ -219,11 +219,9 @@ export default function MarketVolumeCard({
           itemStyle: {
             color: (params: { dataIndex: number }) => {
               const it = displayItems[params.dataIndex];
-              // 放量日（红）与缩量日（绿）区分，采用适度透明度契合整体风格
-              return it?.isHigherThanPrev
-                ? "rgba(239, 68, 68, 0.72)"
-                : "rgba(16, 185, 129, 0.72)";
+              return it?.isHigherThanPrev ? c.up : c.down;
             },
+            opacity: 0.75,
             borderRadius: [2, 2, 0, 0],
           },
         },
@@ -235,9 +233,9 @@ export default function MarketVolumeCard({
           showSymbol: false,
           lineStyle: {
             width: 2,
-            color: "#f59e0b",
+            color: c.warning,
           },
-          itemStyle: { color: "#f59e0b" },
+          itemStyle: { color: c.warning },
         },
         {
           name: "MA20",
@@ -247,9 +245,9 @@ export default function MarketVolumeCard({
           showSymbol: false,
           lineStyle: {
             width: 2,
-            color: "#8b5cf6",
+            color: c.accent,
           },
-          itemStyle: { color: "#8b5cf6" },
+          itemStyle: { color: c.accent },
         },
       ],
     };
@@ -257,7 +255,7 @@ export default function MarketVolumeCard({
 
   return (
     <Card
-      className={className}
+      className={className ? `market-volume-card ${className}` : "market-volume-card"}
       style={{
         borderRadius: t.radius.md,
         border: `1px solid ${c.border}`,
@@ -268,7 +266,7 @@ export default function MarketVolumeCard({
         <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
           <BarChartOutlined style={{ color: c.primary }} />
           <span style={{ fontWeight: Number(t.weight.semibold) }}>A股全市场成交额走势</span>
-          <Text type="secondary" style={{ fontSize: t.font.xs, fontWeight: "normal" }}>
+          <Text type="secondary" className="market-volume-card__subtitle" style={{ fontSize: t.font.xs, fontWeight: "normal" }}>
             沪深北全市场合计
           </Text>
         </div>
@@ -314,7 +312,7 @@ export default function MarketVolumeCard({
               <Card
                 size="small"
                 style={{
-                  background: "var(--c-bg-subtle, rgba(0, 0, 0, 0.02))",
+                  background: c.nestedBg,
                   borderRadius: t.radius.sm,
                   border: `1px solid ${c.border}`,
                 }}
@@ -359,7 +357,7 @@ export default function MarketVolumeCard({
               <Card
                 size="small"
                 style={{
-                  background: "var(--c-bg-subtle, rgba(0, 0, 0, 0.02))",
+                  background: c.nestedBg,
                   borderRadius: t.radius.sm,
                   border: `1px solid ${c.border}`,
                 }}
@@ -373,7 +371,7 @@ export default function MarketVolumeCard({
                     content: {
                       fontSize: "clamp(16px, 3.5vw, 22px)",
                       fontWeight: Number(t.weight.bold),
-                      color: "#8b5cf6",
+                      color: c.accent,
                       fontFamily: "var(--c-font-mono)",
                     },
                   }}
@@ -381,7 +379,7 @@ export default function MarketVolumeCard({
                 <div style={{ marginTop: 4 }}>
                   <Text type="secondary" style={{ fontSize: t.font.xs }}>
                     量比 {stats.volumeRatio ?? "-"} ·{" "}
-                    {(stats.volumeRatio ?? 1) >= 1 ? "高于均量" : "低于均量"}
+                    {stats.volumeRatio != null ? (stats.volumeRatio >= 1 ? "高于均量" : "低于均量") : "计算中"}
                   </Text>
                 </div>
               </Card>
@@ -391,7 +389,7 @@ export default function MarketVolumeCard({
               <Card
                 size="small"
                 style={{
-                  background: "var(--c-bg-subtle, rgba(0, 0, 0, 0.02))",
+                  background: c.nestedBg,
                   borderRadius: t.radius.sm,
                   border: `1px solid ${c.border}`,
                 }}
@@ -422,7 +420,7 @@ export default function MarketVolumeCard({
               <Card
                 size="small"
                 style={{
-                  background: "var(--c-bg-subtle, rgba(0, 0, 0, 0.02))",
+                  background: c.nestedBg,
                   borderRadius: t.radius.sm,
                   border: `1px solid ${c.border}`,
                 }}
@@ -451,7 +449,7 @@ export default function MarketVolumeCard({
           </Row>
         )}
 
-        <div style={{ width: "100%", height: 340 }}>
+        <div className="market-volume__chart" style={{ width: "100%", height: 340 }}>
           <ReactECharts
             echarts={echarts}
             option={chartOption}

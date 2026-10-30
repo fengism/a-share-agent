@@ -35,6 +35,8 @@ describe("PortfolioTables", () => {
           closedPositions={[{
             stock_code: "600519",
             stock_name: "贵州茅台",
+            currency: "CNY",
+            fx_rate_to_cny: 1,
             transaction_count: 2,
             buy_count: 1,
             sell_count: 1,
@@ -51,16 +53,22 @@ describe("PortfolioTables", () => {
             stock_code: "600519",
             stock_name: "贵州茅台",
             side: "sell",
+            currency: "CNY",
+            fx_rate_to_cny: 1,
             trade_price: 12,
             trade_time: "2026-01-03T09:30:00",
             shares: 100,
             fee: 2,
+            fee_native: 2,
+            trade_amount: 1200,
+            trade_amount_native: 1200,
             note: "清仓",
             created_at: "2026-01-03T09:31:00",
             matched_cost: 1010,
             realized_profit_amount: 188,
             matches: [{
               buy_transaction_id: 1,
+              currency: "CNY",
               buy_time: "2026-01-02T09:30:00",
               buy_price: 10,
               shares: 100,
@@ -81,6 +89,8 @@ describe("PortfolioTables", () => {
       "/stock/600519",
     );
 
+    fireEvent.click(screen.getByRole("tab", { name: /交易流水/ }));
+
     const expandButton = container.querySelector<HTMLButtonElement>(".ant-table-row-expand-icon");
     expect(expandButton).not.toBeNull();
     fireEvent.click(expandButton!);
@@ -100,6 +110,8 @@ describe("PortfolioTables", () => {
           stocks={[{
             stock_code: "600519",
             stock_name: "贵州茅台",
+            currency: "CNY",
+            fx_rate_to_cny: 1,
             position_count: 1,
             total_shares: 60,
             average_cost: 10.1,
@@ -127,6 +139,41 @@ describe("PortfolioTables", () => {
     }));
   });
 
+  it("disables sell when all shares are frozen by T+1", () => {
+    const handleSell = vi.fn();
+    render(
+      <MemoryRouter>
+        <PortfolioTables
+          positions={[]}
+          stocks={[{
+            stock_code: "600519",
+            stock_name: "贵州茅台",
+            currency: "CNY",
+            fx_rate_to_cny: 1,
+            position_count: 1,
+            total_shares: 60,
+            sellable_shares: 0,
+            frozen_shares: 60,
+            average_cost: 10.1,
+            current_price: 11,
+            change_pct: 1,
+            cost_value: 606,
+            market_value: 660,
+            profit_amount: 54,
+            profit_pct: 8.91,
+            realized_profit_amount: 74,
+            total_profit_amount: 128,
+          }]}
+          closedPositions={[]}
+          transactions={[]}
+          onSell={handleSell}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("button", { name: "卖出 贵州茅台" })).toBeDisabled();
+  });
+
   it("supports exporting holdings to CSV and navigating to report analysis", () => {
     window.URL.createObjectURL = vi.fn(() => "blob:mock-url");
     window.URL.revokeObjectURL = vi.fn();
@@ -139,6 +186,8 @@ describe("PortfolioTables", () => {
           stocks={[{
             stock_code: "600519",
             stock_name: "贵州茅台",
+            currency: "CNY",
+            fx_rate_to_cny: 1,
             position_count: 1,
             total_shares: 60,
             average_cost: 10.1,
