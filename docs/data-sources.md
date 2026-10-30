@@ -54,6 +54,23 @@ Provider 由 `backend/app/infrastructure/providers/registry.py` 的 `_PROVIDER_E
 | `anysearch` | AnySearch 聚合检索（支持多 Key 轮询与配额冷却） |
 | `baidu_search` / `bing_cn_search` / `so360_search` / `google_search` | 无 Key 公共搜索引擎抓取，作为检索兜底 |
 
+### tdxhub 直连说明
+
+- 依赖固定为 `tdxhub-sdk==0.4.0`，由 `backend/app/infrastructure/providers/tdxhub.py` 进程内调用，
+  共享单例 `SharedTdxhubQuotes`（`Quotes.factory(market="std")`）。
+- 0.4.0 起 K 线默认走 round2 新协议（旧 `0x052d` 命令已被部分服务器停用）；
+  设置 `TDXHUB_KLINE_PROTOCOL=legacy` 可强制先走经典命令，失败再降级 round2。
+- 个股与指数 K 线统一走 `bars`：经典 `get_index_bars` 已停用，且裸 `000001` 会被当成深市个股，
+  因此指数必须传带市场前缀的代码（`sh000001`）；`bars` 返回的 vol 为「手」，统一 ×100 得到股。
+- 实时快照（`quotes()`）依赖经典 `get_security_quotes`，当前多数服务器返回空，
+  由 `tencent` / `sina` 在降级链中兜底；恢复后无需改代码。
+- 个股与指数 K 线统一走 `bars`：经典 `get_index_bars` 已停用，且裸 `000001` 会被当成深市个股，
+  因此指数必须传带市场前缀的代码（`sh000001`）；`bars` 返回的 vol 为「手」，统一 ×100 得到股。
+- 实时快照（`quotes()`）依赖经典 `get_security_quotes`，当前多数服务器返回空，
+  由 `tencent` / `sina` 在降级链中兜底；恢复后无需改代码。
+- 支持出网代理：在设置页「出站代理 → 走代理的接口与数据源」勾选 **通达信（TDX）**，
+  即由 `outbound_proxy_scopes` 中的 `tdxhub` 控制（见“四、限流与出站代理”）；未勾选则直连。
+
 ## 二、多源降级链
 
 业务层用 `BaseProviderChain(attempts, operation=...)` 声明"按顺序尝试的多源候选"，
@@ -103,8 +120,10 @@ source, items = await BaseProviderChain(
 
 ### 出站代理路由
 针对海外云厂商 IP 被部分国内数据源屏蔽（如东方财富历史 K 线连接重置、财联社主线频控），系统支持配置统一出站代理，并按接口作用域细粒度控制生效：
-- **可选项**：`eastmoney`（东方财富）、`ths`（同花顺）、`cls`（财联社）、`sina`（新浪财经）、`akshare`（AkShare）；
+- **可选项**：`eastmoney`（东方财富）、`ths`（同花顺）、`cls`（财联社）、`sina`（新浪财经）、`akshare`（AkShare）、`tdxhub`（通达信直连）；
 - **生效规则**：底层网络层（`client.py` / `ThsTransport` / `SinaDataProvider`）根据用户勾选的 `outbound_proxy_scopes` 动态决定是否走代理；未勾选的源保持海外直连（如新浪行情直连延迟更低更稳）。
+- **通达信直连（`tdxhub`）例外**：行情客户端直连行情服务器 IP:端口，不经过 HTTP，无法按主机名筛选，因此选中 `tdxhub` 后整条 TDX 链路走代理；
+  该链路自带 SOCKS5/HTTP CONNECT 握手实现，无需安装 PySocks，代理配置变更后共享客户端会自动重建。
 
 ### 请求限流防线
 两条独立防线，避免把上游打到反爬或 IP 封禁：

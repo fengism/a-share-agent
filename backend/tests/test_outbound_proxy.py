@@ -8,14 +8,17 @@ import requests
 from app.configuration import get_settings
 from app.infrastructure.http.proxy import (
     DIRECT_REQUEST,
+    PROXY_SCOPE_TDXHUB,
     PROXY_TYPE_HTTP,
     PROXY_TYPE_NONE,
     PROXY_TYPE_SOCKS5,
     ProxyConfigError,
     ProxyScope,
     normalize_proxy_url,
+    redact_proxy_url,
     resolve_outbound_proxy,
     resolve_proxy_request,
+    resolve_tdxhub_proxy,
 )
 
 KLINE_URL = "http://push2his.eastmoney.com/api/qt/stock/kline/get"
@@ -525,3 +528,40 @@ def test_outbound_proxy_scopes_selection() -> None:
     settings.outbound_proxy_scopes = []
     assert resolve_outbound_proxy(KLINE_URL, settings, EASTMONEY_SCOPE) is None
     assert resolve_outbound_proxy(ths_url, settings) is None
+
+
+# ────────────────────────── TDX 直连（原始 TCP）代理 ──────────────────────────
+
+
+def test_tdxhub_proxy_requires_scope_selection() -> None:
+    settings = _FakeSettings(proxy_type=PROXY_TYPE_SOCKS5, proxy_url="socks5h://proxy.local:2260")
+    settings.outbound_proxy_scopes = ["eastmoney"]
+    assert resolve_tdxhub_proxy(settings) is None
+
+    settings.outbound_proxy_scopes = ["eastmoney", PROXY_SCOPE_TDXHUB]
+    assert resolve_tdxhub_proxy(settings) == "socks5h://proxy.local:2260"
+
+
+def test_tdxhub_proxy_disabled_returns_none() -> None:
+    settings = _FakeSettings(proxy_type=PROXY_TYPE_NONE, proxy_url="")
+    settings.outbound_proxy_scopes = [PROXY_SCOPE_TDXHUB]
+    assert resolve_tdxhub_proxy(settings) is None
+
+    settings = _FakeSettings(proxy_type=PROXY_TYPE_HTTP, proxy_url="   ")
+    settings.outbound_proxy_scopes = [PROXY_SCOPE_TDXHUB]
+    assert resolve_tdxhub_proxy(settings) is None
+
+
+def test_tdxhub_proxy_normalizes_and_rejects_invalid() -> None:
+    settings = _FakeSettings(proxy_type=PROXY_TYPE_HTTP, proxy_url="proxy.local:3128")
+    settings.outbound_proxy_scopes = [PROXY_SCOPE_TDXHUB]
+    assert resolve_tdxhub_proxy(settings) == "http://proxy.local:3128"
+
+    settings.outbound_proxy_url = "socks5h://proxy.local:2260"
+    with pytest.raises(ProxyConfigError):
+        resolve_tdxhub_proxy(settings)
+
+
+def test_redact_proxy_url_hides_credentials() -> None:
+    assert redact_proxy_url("socks5h://user:secret@proxy.local:2260") == "socks5h://user:***@proxy.local:2260"
+    assert redact_proxy_url("http://proxy.local:3128") == "http://proxy.local:3128"

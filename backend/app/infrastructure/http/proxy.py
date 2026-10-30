@@ -62,9 +62,10 @@ class ProxyConfigError(ValueError):
 def _safe_port(split) -> int | None:
     """urlsplit 的 port 属性在端口非法时会抛错，这里统一降级为 None。"""
     try:
-        return split.port
+        port = split.port
     except ValueError as exc:
         raise ProxyConfigError(f"代理端口非法: {exc}") from exc
+    return int(port) if port is not None else None
 
 
 @dataclass(frozen=True, slots=True)
@@ -92,6 +93,9 @@ class ProxyScope:
 
 
 DEFAULT_PROXY_SCOPES = ("eastmoney",)
+
+PROXY_SCOPE_TDXHUB = "tdxhub"
+"""TDX 行情走原始 TCP，无法按主机名筛选，只能整体开关。"""
 
 SCOPE_PRESETS: dict[str, ProxyScope] = {
     "eastmoney": ProxyScope(
@@ -151,14 +155,7 @@ class OutboundProxy:
     @property
     def redacted(self) -> str:
         """可安全写入日志的脱敏形式，例如 socks5h://user:***@host:2260。"""
-        split = urlsplit(self.url)
-        if not split.username and not split.password:
-            return urlunsplit((split.scheme, split.netloc, "", "", ""))
-        netloc = f"{split.username or ''}:***@{split.hostname or ''}"
-        port = _safe_port(split)
-        if port:
-            netloc = f"{netloc}:{port}"
-        return urlunsplit((split.scheme, netloc, "", "", ""))
+        return redact_proxy_url(self.url)
 
     def proxies(self) -> dict[str, str]:
         """构造 requests 的 proxies 参数，同时覆盖 http 与 https 目标。"""
@@ -180,6 +177,18 @@ class ProxyRequestOptions:
 
 DIRECT_REQUEST = ProxyRequestOptions()
 """未启用代理时的请求参数（保持直连与调用方默认超时）。"""
+
+
+def redact_proxy_url(url: str) -> str:
+    """把代理地址里的账号密码替换为 ***，保证可安全写入日志。"""
+    split = urlsplit(url)
+    if not split.username and not split.password:
+        return urlunsplit((split.scheme, split.netloc, "", "", ""))
+    netloc = f"{split.username or ''}:***@{split.hostname or ''}"
+    port = _safe_port(split)
+    if port:
+        netloc = f"{netloc}:{port}"
+    return urlunsplit((split.scheme, netloc, "", "", ""))
 
 
 def normalize_proxy_url(raw_url: str, proxy_type: str) -> str:
@@ -269,6 +278,31 @@ def resolve_outbound_proxy(
 
     logger.debug("出站代理生效: %s", proxy.redacted)
     return proxy
+
+
+def resolve_tdxhub_proxy(settings) -> str | None:
+    """解析 TDX 直连（原始 TCP）应使用的代理地址。
+
+    TDX 行情客户端直连行情服务器 IP:端口，不经过 HTTP，因此无法复用
+    :func:`resolve_outbound_proxy` 的主机名作用域；这里只认作用域开关
+    ``tdxhub``，选中后整条链路走代理。
+
+    Param:
+        settings: 应用配置对象
+    Return:
+        str | None: 规范化后的代理地址（如 ``socks5h://host:2260``）；未启用返回 None
+    """
+    configured_scopes = getattr(settings, SETTING_SCOPES, None)
+    if configured_scopes is not None and PROXY_SCOPE_TDXHUB not in set(configured_scopes):
+        return None
+
+    proxy_type = str(getattr(settings, SETTING_TYPE, PROXY_TYPE_NONE) or PROXY_TYPE_NONE)
+    raw_url = str(getattr(settings, SETTING_URL, "") or "")
+    if proxy_type == PROXY_TYPE_NONE or not raw_url.strip():
+        return None
+
+    # tdxhub 自带 SOCKS5/HTTP CONNECT 握手实现，不依赖 PySocks，无需 socks 依赖检查。
+    return normalize_proxy_url(raw_url, proxy_type)
 
 
 def resolve_proxy_request(

@@ -44,6 +44,13 @@ export const PROXY_SCOPE_OPTIONS: ProxyScopeOption[] = [
     tagColor: "success",
     desc: "行情快照、大盘指数分时、历史K线（无境外 IP 墙，直连延迟最低）",
   },
+  {
+    label: "通达信（TDX）",
+    value: "tdxhub",
+    tag: "按需启用",
+    tagColor: "default",
+    desc: "实时行情、K线与 F10 直连行情服务器（原始 TCP，整条链路走代理，SOCKS5 无需额外依赖）",
+  },
 ];
 
 export const PLACEHOLDER: Record<OutboundProxyType, string> = {

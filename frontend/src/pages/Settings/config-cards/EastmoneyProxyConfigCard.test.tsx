@@ -104,6 +104,17 @@ describe("OutboundProxyConfigCard", () => {
     });
   });
 
+  it("offers the TDX scope so the raw-TCP market feed can use the proxy", () => {
+    const { onChange } = renderCard({
+      form: { outbound_proxy_type: "socks5", outbound_proxy_url: "socks5h://h:2260", outbound_proxy_scopes: [] },
+    });
+
+    fireEvent.click(screen.getByLabelText(/通达信/));
+    expect(onChange).toHaveBeenCalledWith({
+      outbound_proxy_scopes: expect.arrayContaining(["tdxhub"]),
+    });
+  });
+
   it("renders the connectivity test result", () => {
     renderCard({
       form: { outbound_proxy_type: "socks5", outbound_proxy_url: "socks5h://h:2260" },

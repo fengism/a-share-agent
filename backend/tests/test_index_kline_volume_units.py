@@ -20,7 +20,9 @@ from app.infrastructure.providers.tencent import TencentDataProvider
 _AMOUNT_YUAN = 452_004_282_368.0
 _PLAUSIBLE_PRICE_RANGE = (10.0, 200.0)
 
-_TDX_INDEX_RAW_VOLUME = 1_826_788.0  # 万手
+# bars 已把指数原始 vol 归一到「手」（与东财手数一致），故 TDX 系数与个股同为 100
+_TDX_INDEX_RAW_VOLUME = 182_678_834.0  # 手
+_TENCENT_INDEX_RAW_VOLUME = 182_678_834.0  # 手（腾讯原始 vol 亦为手）
 _EASTMONEY_INDEX_RAW_VOLUME = 182_678_834.0  # 手
 _TRADING_DAY = "2026-10-13"
 
@@ -50,16 +52,35 @@ def test_tdx_index_volume_is_normalized_to_shares():
         _tdx_index_frame(),
         start_date=_TRADING_DAY,
         end_date=_TRADING_DAY,
-        volume_multiplier=10_000,
+        volume_multiplier=100,
     )
     row = frame.iloc[-1]
     _assert_contract(float(row["volume"]), float(row["amount"]), "TDX 指数")
 
 
-def test_tdx_index_multiplier_is_not_shared_with_stock_path():
-    """个股 raw vol 是「手」（系数 100），指数 raw vol 是「万手」，两者不可混用。"""
-    assert "volume_multiplier=10_000" in inspect.getsource(tdxhub_provider.fetch_index_kline)
+def test_tdx_index_uses_bars_path_with_stock_factor():
+    """指数改走 bars（经典 index 命令已被服务器停用），系数与个股同为 100。"""
+    index_src = inspect.getsource(tdxhub_provider.fetch_index_kline)
+    assert '"bars"' in index_src
+    assert '"index"' not in index_src
+    assert "volume_multiplier=100" in index_src
     assert "value * 100" in inspect.getsource(tdxhub_provider.fetch_stock_kline)
+
+
+def test_tdx_index_kline_requests_prefixed_symbol():
+    """指数必须带市场前缀：裸 000001 会被当成平安银行（深市个股）。"""
+    captured = {}
+
+    def fake_call(method, **kwargs):
+        captured.update(method=method, **kwargs)
+        return _tdx_index_frame()
+
+    with patch.object(tdxhub_provider._quotes, "call", side_effect=fake_call):
+        frame = tdxhub_provider.fetch_index_kline("000001", _TRADING_DAY, _TRADING_DAY)
+
+    assert captured["method"] == "bars"
+    assert captured["symbol"] == "sh000001"
+    assert not frame.empty
 
 
 def test_tdx_stock_volume_stays_in_shares():
@@ -119,7 +140,7 @@ def test_eastmoney_index_volume_factor_matches_stock_kline():
 @pytest.mark.parametrize("symbol", ["sz399006", "sh000300", "sh000001"])
 def test_tencent_index_volume_and_amount_units(symbol: str):
     """腾讯原始 vol 是手（provider 内乘 100）、amount 是万元（乘 10000），输出须为股/元。"""
-    raw_volume = _TDX_INDEX_RAW_VOLUME * 100.0
+    raw_volume = _TENCENT_INDEX_RAW_VOLUME
     raw_amount_wan = _AMOUNT_YUAN / 10000.0
     payload = {
         "data": {

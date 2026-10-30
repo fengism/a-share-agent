@@ -19,8 +19,10 @@ class _Upstream:
     def __init__(self) -> None:
         self.available = True
         self.probes = 0
+        self.proxies: list[str | None] = []
 
-    def factory(self, market, timeout):
+    def factory(self, market, timeout, proxy=None):
+        self.proxies.append(proxy)
         self.probes += 1
         time.sleep(_PROBE_DELAY_SECONDS)  # 模拟全量服务器探测耗时
         if not self.available:
@@ -51,7 +53,7 @@ def bind_upstream(monkeypatch):
     monkeypatch.setattr(
         tdxhub_module,
         "Quotes",
-        SimpleNamespace(factory=lambda market, timeout: upstream.factory(market, timeout)),
+        SimpleNamespace(factory=lambda market, timeout, proxy=None: upstream.factory(market, timeout, proxy)),
     )
     return upstream
 
@@ -121,10 +123,10 @@ def test_concurrent_callers_reuse_inflight_rebuild(bind_upstream):
     release_probe = threading.Event()
     original_factory = bind_upstream.factory
 
-    def slow_factory(market, timeout):
+    def slow_factory(market, timeout, proxy=None):
         probe_started.set()
         release_probe.wait(timeout=5)
-        return original_factory(market, timeout)
+        return original_factory(market, timeout, proxy)
 
     tdxhub_module.Quotes = SimpleNamespace(factory=slow_factory)
     shared = SharedTdxhubQuotes(_settings_provider())
@@ -160,7 +162,7 @@ def test_rebuilds_once_after_transport_error(bind_upstream):
         def second(self) -> str:
             return "recovered"
 
-    tdxhub_module.Quotes = SimpleNamespace(factory=lambda market, timeout: _Flaky())
+    tdxhub_module.Quotes = SimpleNamespace(factory=lambda market, timeout, proxy=None: _Flaky())
     shared = SharedTdxhubQuotes(_settings_provider())
 
     assert shared.call("second") == "recovered"
@@ -180,3 +182,69 @@ def test_reset_drops_client_and_clear_cooldown_releases_circuit(bind_upstream):
     assert shared.is_cooling_down() is True
     shared.clear_cooldown()
     assert shared.is_cooling_down() is False
+
+# ------------------------------------------------------------------ 出站代理接入
+
+
+def _proxy_settings(**overrides):
+    values = {
+        "tdxhub_timeout_seconds": 5.0,
+        "tdxhub_rebuild_cooldown_seconds": 2.0,
+        "outbound_proxy_type": "none",
+        "outbound_proxy_url": "",
+        "outbound_proxy_scopes": ["eastmoney"],
+    }
+    values.update(overrides)
+    return SimpleNamespace(**values)
+
+
+def test_proxy_passed_to_factory_when_scope_enabled(bind_upstream):
+    settings = _proxy_settings(
+        outbound_proxy_type="socks5",
+        outbound_proxy_url="socks5://proxy.local:2260",
+        outbound_proxy_scopes=["eastmoney", "tdxhub"],
+    )
+    shared = SharedTdxhubQuotes(lambda: settings)
+
+    assert shared.call("ping") == "ok-1"
+    # 地址按配置原样传递（socks5/socks5h 对 TDX 的 IP 目标等价）
+    assert bind_upstream.proxies == ["socks5://proxy.local:2260"]
+
+
+def test_proxy_skipped_when_scope_not_selected(bind_upstream):
+    settings = _proxy_settings(
+        outbound_proxy_type="http",
+        outbound_proxy_url="http://proxy.local:8080",
+        outbound_proxy_scopes=["eastmoney"],
+    )
+    shared = SharedTdxhubQuotes(lambda: settings)
+
+    assert shared.call("ping") == "ok-1"
+    assert bind_upstream.proxies == [None]
+
+
+def test_proxy_config_change_rebuilds_client(bind_upstream):
+    settings = _proxy_settings()
+    shared = SharedTdxhubQuotes(lambda: settings)
+
+    assert shared.call("ping") == "ok-1"
+    settings.outbound_proxy_type = "socks5"
+    settings.outbound_proxy_url = "socks5h://proxy.local:2260"
+    settings.outbound_proxy_scopes = ["tdxhub"]
+
+    assert shared.call("ping") == "ok-2"
+    assert bind_upstream.probes == 2
+    assert bind_upstream.proxies == [None, "socks5h://proxy.local:2260"]
+
+
+def test_invalid_proxy_config_falls_back_to_direct(bind_upstream):
+    settings = _proxy_settings(
+        outbound_proxy_type="socks5",
+        # 缺少端口属于非法配置，应按直连降级而不是让行情整体不可用
+        outbound_proxy_url="socks5://proxy.local",
+        outbound_proxy_scopes=["tdxhub"],
+    )
+    shared = SharedTdxhubQuotes(lambda: settings)
+
+    assert shared.call("ping") == "ok-1"
+    assert bind_upstream.proxies == [None]

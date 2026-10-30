@@ -28,6 +28,7 @@ from app.core.market import (
 )
 from app.core.timezones import SHANGHAI_TIMEZONE
 from app.domain.timezones import market_now
+from app.infrastructure.http.proxy import ProxyConfigError, redact_proxy_url, resolve_tdxhub_proxy
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +55,16 @@ _KLINE_COLUMNS = [
 class _FundFlowBatch(TypedDict):
     dates: list[str]
     items: list[dict[str, Any]]
+
+
+def _resolve_proxy(settings: Any) -> str | None:
+    """当前配置下的 TDX 代理地址；配置非法时降级直连并告警。"""
+    try:
+        return resolve_tdxhub_proxy(settings)
+    except ProxyConfigError as exc:
+        # 代理配置非法不能拖垮行情：按直连处理并告警，便于在日志中定位。
+        logger.error("TDX 代理配置非法，本次按直连处理: %s", exc)
+        return None
 
 
 class TdxhubError(RuntimeError):
@@ -96,11 +107,18 @@ class SharedTdxhubQuotes:
         self._lock = threading.Lock()
         self._rebuild_lock = threading.Lock()
         self._client = None
+        self._client_proxy: str | None = None
         self._blocked_until = 0.0
 
-    def _new_client(self):
+    def _proxy(self) -> str | None:
+        """当前配置下的 TDX 代理地址（未启用返回 None）。"""
+        return _resolve_proxy(self._settings_provider())
+
+    def _new_client(self, proxy: str | None):
         timeout = float(self._settings_provider().tdxhub_timeout_seconds)
-        return Quotes.factory(market="std", timeout=timeout)
+        if proxy:
+            logger.info("TDX 行情走代理: %s", redact_proxy_url(proxy))
+        return Quotes.factory(market="std", timeout=timeout, proxy=proxy)
 
     def call(self, method: str, *args: Any, **kwargs: Any) -> Any:
         def invoke(client):
@@ -124,8 +142,14 @@ class SharedTdxhubQuotes:
 
     def _invoke_with_retry(self, invoke: Callable[[Any], Any]) -> Any:
         self._reject_if_cooling_down()
+        proxy = self._proxy()
         with self._lock:
             client = self._client
+            if client is not None and proxy != self._client_proxy:
+                # 代理配置变更后旧客户端仍走旧链路，必须重建。
+                logger.info("TDX 代理配置变更，重建共享客户端")
+                self._client = None
+                client = None
             if client is not None:
                 try:
                     return invoke(client)
@@ -135,11 +159,11 @@ class SharedTdxhubQuotes:
         # 重建在串行锁之外：SDK 构造时的全量服务器探测可能耗时数十秒，持锁探测会
         # 让 reset()/is_cooling_down() 等入口一并阻塞。并发调用在这里排队，
         # 由 single-flight 保证只有一次探测，其余人复用重建结果。
-        return invoke(self._rebuild())
+        return invoke(self._rebuild(proxy))
 
-    def _rebuild(self):
+    def _rebuild(self, proxy: str | None):
         with self._rebuild_lock:
-            if self._client is not None:
+            if self._client is not None and proxy == self._client_proxy:
                 # 并发失败时，其它线程已完成重建，直接复用。
                 return self._client
             # 排队等待 single-flight 期间，前一个线程可能已探测失败并进入冷却。
@@ -147,12 +171,21 @@ class SharedTdxhubQuotes:
             # 这个窗口，导致后续线程逐个重复付出探测代价。
             self._reject_if_cooling_down()
             try:
-                client = self._acquire_client()
-            except Exception:
+                client = self._acquire_client(proxy)
+            except Exception as exc:
                 self._enter_cooldown()
+                # 探测失败的原始原因只在这里可见，不带日志的话故障期只能看到
+                # "连接不可用"，无法区分是服务器全挂还是代理/网络问题。
+                logger.warning(
+                    "TDX 客户端重建失败，进入 %.0fs 冷却: %s: %s",
+                    self._cooldown_seconds(),
+                    type(exc).__name__,
+                    exc,
+                )
                 raise
             with self._lock:
                 self._client = client
+                self._client_proxy = proxy
             return client
 
     def _cooldown_seconds(self) -> float:
@@ -165,9 +198,9 @@ class SharedTdxhubQuotes:
     def _enter_cooldown(self) -> None:
         self._blocked_until = time.monotonic() + self._cooldown_seconds()
 
-    def _acquire_client(self):
+    def _acquire_client(self, proxy: str | None):
         try:
-            return self._new_client()
+            return self._new_client(proxy)
         except _RECONNECT_ERRORS as exc:
             raise TdxhubUnavailableError("TDX 行情服务器连接不可用") from exc
 
@@ -175,6 +208,7 @@ class SharedTdxhubQuotes:
         """丢弃当前客户端，下次调用时重建，供异常恢复与测试隔离使用。"""
         with self._lock:
             self._client = None
+            self._client_proxy = None
 
     def clear_cooldown(self) -> None:
         """提前结束重建冷却，供后台测速任务主动尝试恢复链路。"""
@@ -261,7 +295,10 @@ class TdxhubDataProvider:
             # timing out asyncio.to_thread alone does not stop a worker thread.
             with request_budget(budget):
                 with Quotes.factory(
-                    market="std", timeout=settings.tdxhub_timeout_seconds, raise_exception=True,
+                    market="std",
+                    timeout=settings.tdxhub_timeout_seconds,
+                    raise_exception=True,
+                    proxy=_resolve_proxy(settings),
                 ) as client:
                     if dates is None:
                         stage = "daily_bars"
@@ -462,21 +499,25 @@ class TdxhubDataProvider:
         Return:
             包含 date、OHLCV、amount、pre_close、change_pct 的 DataFrame
         """
-        raw_symbol = self._normalize_index_request(symbol)
+        self._normalize_index_request(symbol)  # 仅做 6 位数字校验
         offset = self._calculate_offset(start_date, end_date)
+        # 指数与个股统一走 bars：经典 index 命令（0x052d 之前的 get_index_bars）
+        # 已被上游服务器停用，调用只会返回 None；bars 内部走 round2 新协议，
+        # 并按代码段自动识别指数（sh000xxx / sz399xxx / bj899xxx）。
+        # 这里必须传带市场前缀的代码，否则 000001 会被当成平安银行。
+        prefixed_symbol = normalize_index_symbol(str(symbol).strip().lower())
         raw_df = self._quotes.call(
-            "index",
-            symbol=raw_symbol,
+            "bars",
+            symbol=prefixed_symbol,
             frequency=self.DAILY_FREQUENCY,
             start=0,
             offset=offset,
         )
-        # 指数与个股的原始 vol 量纲不同：个股 bars_all 的 vol 是「手」，而指数
-        # bars 的 vol 是「万手」。都要统一到「股」，因此这里的系数是个股路径的
-        # 100 倍。系数用错会让指数成交量与成交额不自洽（amount/volume 偏离
-        # 成分股均价三个数量级），并与腾讯指数链相差 100 倍。
+        # bars 已把指数与个股的原始 vol 统一归一到「手」（与东财手数一致），
+        # 统一到「股」的系数与个股相同为 100。旧 index 命令返回的是「万手」，
+        # 系数需 10000；两者不可混用，否则成交量与成交额差 100 倍。
         return self._format_index_kline_df(
-            raw_df, start_date=start_date, end_date=end_date, volume_multiplier=10_000,
+            raw_df, start_date=start_date, end_date=end_date, volume_multiplier=100,
         )
 
     def fetch_stock_bars(self, code: str, start_date: str = "", end_date: str = "") -> pd.DataFrame:

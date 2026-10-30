@@ -159,15 +159,15 @@ def test_akshare_index_matches_stock_normalization():
     assert 'frame["成交量"] = pd.to_numeric(frame["成交量"], errors="coerce") * 100' in stock_src
 
 
-# ── TDX 指数：原始为万手 ────────────────────────────────────────────────────
-def test_tdx_index_volume_uses_wan_shou_factor():
+# ── TDX 指数：bars 返回「手」，系数与个股一致 ───────────────────────────────
+def test_tdx_index_volume_uses_shou_factor():
     raw = pd.DataFrame([{
         "open": 2899.15, "close": 2958.34, "high": 2999.76, "low": 2860.80,
-        "vol": 1_826_788.0, "volume": 1_826_788.0,
+        "vol": 182_678_834.0, "volume": 182_678_834.0,
         "amount": 452_004_282_368.0, "datetime": f"{_TRADING_DAY} 15:00",
     }])
     frame = tdxhub_provider._format_index_kline_df(
-        raw, start_date=_TRADING_DAY, end_date=_TRADING_DAY, volume_multiplier=10_000,
+        raw, start_date=_TRADING_DAY, end_date=_TRADING_DAY, volume_multiplier=100,
     )
     row = frame.iloc[-1]
     assert float(row["volume"]) == pytest.approx(18_267_880_000.0)
