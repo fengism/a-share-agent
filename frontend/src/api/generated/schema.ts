@@ -875,6 +875,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/config/proxy/test-tdx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Test Tdx Proxy
+         * @description 探测 TDX 行情直连链路：代理隧道握手 + round2 协议往返，不修改任何配置。
+         *
+         *     与 ``/proxy/test`` 的区别：后者只验证 HTTP(S) 出网，而 TDX 走原始 TCP，
+         *     必须由 SDK 自己完成 CONNECT / SOCKS5 隧道。
+         */
+        post: operations["test_tdx_proxy_api_config_proxy_test_tdx_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/daily-review/cycle_trend": {
         parameters: {
             query?: never;
@@ -15949,6 +15972,26 @@ export interface components {
             entry: components["schemas"]["StrategySignalExpression-Output"];
             exit: components["schemas"]["StrategySignalExpression-Output"];
         };
+        /**
+         * TdxProxyTestResponse
+         * @description TDX 原始 TCP 链路探测结果（与 HTTP 代理探测分开建模）。
+         */
+        TdxProxyTestResponse: {
+            /** Endpoint */
+            endpoint?: string | null;
+            /** Latency Ms */
+            latency_ms: number;
+            /** Message */
+            message: string;
+            /** Ok */
+            ok: boolean;
+            /** Proxy Enabled */
+            proxy_enabled: boolean;
+            /** Proxy Type */
+            proxy_type: string;
+            /** Stage */
+            stage: string;
+        };
         /** TechnicalBoll */
         TechnicalBoll: {
             /** Lower */
@@ -18465,6 +18508,35 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProxyTestResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    test_tdx_proxy_api_config_proxy_test_tdx_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TdxProxyTestResponse"];
                 };
             };
             /** @description 统一错误响应 */

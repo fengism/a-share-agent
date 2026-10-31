@@ -175,3 +175,229 @@ async def test_upstream_5xx_is_reported_as_not_ok(monkeypatch: pytest.MonkeyPatc
 
     assert response.ok is False
     assert "HTTP 502" in response.message
+
+# ------------------------------------------------- TDX 原始 TCP 链路探测
+
+from app.api.routes.settings import TdxProxyTestResponse  # noqa: E402
+from app.infrastructure.providers import tdxhub as tdxhub_module  # noqa: E402
+from app.infrastructure.providers.tdxhub import probe_tdx_connectivity  # noqa: E402
+
+
+class _FakeRound2:
+    """模拟 round2 客户端：分别控制建连与行情协议两个阶段。"""
+
+    def __init__(self, *, proxy=None, connect_timeout=5.0):
+        self.proxy = proxy
+        self.connect_timeout = connect_timeout
+        self.closed = False
+        self.connect_error: Exception | None = None
+        self.bars_error: Exception | None = None
+
+    def connect(self, ip, port, time_out=None):
+        if self.connect_error is not None:
+            raise self.connect_error
+        return self
+
+    def get_security_bars(self, category, market, code, start=0, count=1):
+        if self.bars_error is not None:
+            raise self.bars_error
+        import pandas as pd
+
+        return pd.DataFrame([{"time": "2026-09-30", "open": 10.0}])
+
+    def close(self) -> None:
+        self.closed = True
+
+
+def _patch_tdx(monkeypatch: pytest.MonkeyPatch, *, connect_error=None, bars_error=None, endpoints=None):
+    instances: list[_FakeRound2] = []
+
+    def _factory(**kwargs):
+        client = _FakeRound2(**kwargs)
+        client.connect_error = connect_error
+        client.bars_error = bars_error
+        instances.append(client)
+        return client
+
+    monkeypatch.setattr(tdxhub_module, "Round2Client", _factory)
+    monkeypatch.setattr(
+        tdxhub_module,
+        "_hq_endpoints",
+        lambda limit: (endpoints if endpoints is not None else [("10.0.0.9", 7709)])[:limit],
+    )
+    return instances
+
+
+async def _run_tdx() -> TdxProxyTestResponse:
+    return await settings_routes.test_tdx_proxy(_ADMIN)
+
+
+@pytest.mark.asyncio
+async def test_tdx_probe_reports_success_through_proxy(monkeypatch: pytest.MonkeyPatch) -> None:
+    settings = _patch_settings(
+        monkeypatch,
+        proxy_type=PROXY_TYPE_HTTP,
+        proxy_url="http://proxy.local:3128",
+        outbound_proxy_scopes=["eastmoney", "tdxhub"],
+    )
+    instances = _patch_tdx(monkeypatch)
+
+    response = await _run_tdx()
+
+    assert response.ok is True
+    assert response.stage == "ok"
+    assert response.endpoint == "10.0.0.9:7709"
+    assert response.proxy_enabled is True
+    assert "代理隧道" in response.message
+    # 探测必须真的走代理，否则测的就不是隧道
+    assert instances[0].proxy is not None
+    assert settings.outbound_proxy_type == PROXY_TYPE_HTTP
+    assert instances[0].closed is True
+
+
+@pytest.mark.asyncio
+async def test_tdx_probe_reports_direct_route_when_scope_not_selected(monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_settings(
+        monkeypatch,
+        proxy_type=PROXY_TYPE_HTTP,
+        proxy_url="http://proxy.local:3128",
+        outbound_proxy_scopes=["eastmoney"],
+    )
+    instances = _patch_tdx(monkeypatch)
+
+    response = await _run_tdx()
+
+    assert response.ok is True
+    assert response.proxy_enabled is False
+    assert "直连" in response.message
+    assert instances[0].proxy is None
+
+
+@pytest.mark.asyncio
+async def test_tdx_probe_distinguishes_tunnel_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_settings(
+        monkeypatch,
+        proxy_type=PROXY_TYPE_HTTP,
+        proxy_url="http://proxy.local:3128",
+        outbound_proxy_scopes=["tdxhub"],
+    )
+    _patch_tdx(monkeypatch, connect_error=ConnectionError("proxy tunnel closed"))
+
+    response = await _run_tdx()
+
+    assert response.ok is False
+    assert response.stage == "connect"
+    assert "代理隧道不可用" in response.message
+
+
+@pytest.mark.asyncio
+async def test_tdx_probe_distinguishes_protocol_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    """隧道通了但目标节点协议不可用时，不能误报成代理故障。"""
+    _patch_settings(
+        monkeypatch,
+        proxy_type=PROXY_TYPE_HTTP,
+        proxy_url="http://proxy.local:3128",
+        outbound_proxy_scopes=["tdxhub"],
+    )
+    _patch_tdx(monkeypatch, bars_error=RuntimeError("ProtocolError: 快照记录 marker 未找到"))
+
+    response = await _run_tdx()
+
+    assert response.ok is False
+    assert response.stage == "protocol"
+    assert "目标行情节点不可用" in response.message
+
+
+@pytest.mark.asyncio
+async def test_tdx_probe_falls_back_to_next_endpoint(monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_settings(monkeypatch, proxy_type=PROXY_TYPE_NONE)
+    _patch_tdx(
+        monkeypatch,
+        endpoints=[("10.0.0.1", 7709), ("10.0.0.2", 7709)],
+    )
+    calls: list[str] = []
+
+    class _Fallback(_FakeRound2):
+        def connect(self, ip, port, time_out=None):
+            calls.append(ip)
+            if ip == "10.0.0.1":
+                raise ConnectionError("node down")
+            return self
+
+    monkeypatch.setattr(tdxhub_module, "Round2Client", lambda **kwargs: _Fallback(**kwargs))
+
+    response = await _run_tdx()
+
+    assert response.ok is True
+    assert response.endpoint == "10.0.0.2:7709"
+    assert calls == ["10.0.0.1", "10.0.0.2"]
+
+
+@pytest.mark.asyncio
+async def test_tdx_probe_reports_empty_candidate_list(monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_settings(monkeypatch, proxy_type=PROXY_TYPE_NONE)
+    _patch_tdx(monkeypatch, endpoints=[])
+
+    response = await _run_tdx()
+
+    assert response.ok is False
+    assert response.stage == "config"
+    assert response.endpoint is None
+
+
+@pytest.mark.asyncio
+async def test_tdx_probe_invalid_proxy_address_returns_422(monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_settings(
+        monkeypatch,
+        proxy_type=PROXY_TYPE_HTTP,
+        proxy_url="socks5h://proxy.local:2260",
+        outbound_proxy_scopes=["tdxhub"],
+    )
+
+    with pytest.raises(ApiError) as excinfo:
+        await _run_tdx()
+
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.code == "config.proxy_invalid"
+
+
+def test_tdx_probe_function_returns_plain_dict(monkeypatch: pytest.MonkeyPatch) -> None:
+    settings = get_settings().model_copy(update={"outbound_proxy_type": PROXY_TYPE_NONE})
+    _patch_tdx(monkeypatch)
+
+    result = probe_tdx_connectivity(settings)
+
+    assert set(result) == {
+        "ok",
+        "endpoint",
+        "stage",
+        "proxy_enabled",
+        "proxy_type",
+        "latency_ms",
+        "message",
+    }
+
+
+def test_tdx_probe_success_releases_shared_client_cooldown(monkeypatch: pytest.MonkeyPatch) -> None:
+    """探测成功即视为链路恢复：两个共享实例的重建冷却都要提前解除。"""
+    settings = get_settings().model_copy(update={"outbound_proxy_type": PROXY_TYPE_NONE})
+    _patch_tdx(monkeypatch)
+
+    class _StubShared:
+        def __init__(self) -> None:
+            self.released = 0
+
+        def clear_cooldown(self) -> None:
+            self.released += 1
+
+    lenient, strict = _StubShared(), _StubShared()
+    monkeypatch.setattr(tdxhub_module, "shared_tdxhub_quotes", lenient)
+    monkeypatch.setattr(tdxhub_module, "shared_tdxhub_raise_quotes", strict)
+
+    assert probe_tdx_connectivity(settings)["ok"] is True
+    assert (lenient.released, strict.released) == (1, 1)
+
+    # 探测失败不得动冷却状态，否则会变成"失败也重试"的风暴入口
+    _patch_tdx(monkeypatch, connect_error=OSError("refused"))
+    assert probe_tdx_connectivity(settings)["ok"] is False
+    assert (lenient.released, strict.released) == (1, 1)

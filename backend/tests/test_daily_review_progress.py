@@ -12,6 +12,7 @@ from datetime import date
 import pytest
 
 from app.core.progress import ProgressEmitter
+from app.domain.market import IndexItem, MarketIndices
 from app.modules.daily_review import collector, pipeline
 
 
@@ -34,8 +35,21 @@ def _patch_sources(monkeypatch: pytest.MonkeyPatch, *, slow: str | None = None) 
         "get_indices", "get_hot_stocks", "get_ths_hot_concept", "get_ths_hot_industry",
         "get_dragon_tiger_list", "get_market_statistics", "get_market_news",
         "get_market_volume_stats", "get_macro_data", "get_limit_up_ladder",
+        "get_market_emotion",
     ):
         monkeypatch.setattr(collector, name, _source(name))
+
+    async def _fixed_indices(target_date: date) -> MarketIndices:
+        # use_realtime=False 会走 _historical_indices → get_index_kline（真实上游）。
+        # 不替换会让单测依赖外网：上游不可用时 indices 变成 unavailable，
+        # 断言随之失败（离线/限流环境下的假红）。
+        return MarketIndices(
+            date=target_date.isoformat(),
+            indices=[IndexItem(code="000001", name="上证指数", price=3000.0)],
+            source="test",
+        )
+
+    monkeypatch.setattr(collector, "_historical_indices", _fixed_indices)
     monkeypatch.setattr(collector, "get_macro_analysis", _zero)
     monkeypatch.setattr(collector, "get_limit_break_pool", _zero)
     monkeypatch.setattr(collector, "_target_northbound", _zero)

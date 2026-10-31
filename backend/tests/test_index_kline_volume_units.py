@@ -58,11 +58,11 @@ def test_tdx_index_volume_is_normalized_to_shares():
     _assert_contract(float(row["volume"]), float(row["amount"]), "TDX 指数")
 
 
-def test_tdx_index_uses_bars_path_with_stock_factor():
-    """指数改走 bars（经典 index 命令已被服务器停用），系数与个股同为 100。"""
+def test_tdx_index_uses_bars_with_index_flag():
+    """指数走 bars(index=True)（0.5.1 起显式指数开关），系数与个股同为 100。"""
     index_src = inspect.getsource(tdxhub_provider.fetch_index_kline)
     assert '"bars"' in index_src
-    assert '"index"' not in index_src
+    assert "index=True" in index_src
     assert "volume_multiplier=100" in index_src
     assert "value * 100" in inspect.getsource(tdxhub_provider.fetch_stock_kline)
 
@@ -79,6 +79,7 @@ def test_tdx_index_kline_requests_prefixed_symbol():
         frame = tdxhub_provider.fetch_index_kline("000001", _TRADING_DAY, _TRADING_DAY)
 
     assert captured["method"] == "bars"
+    assert captured["index"] is True
     assert captured["symbol"] == "sh000001"
     assert not frame.empty
 

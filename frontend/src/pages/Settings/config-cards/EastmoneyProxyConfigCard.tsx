@@ -3,7 +3,7 @@ import { GlobalOutlined, InfoCircleOutlined, WifiOutlined } from "@ant-design/ic
 import { Alert, Button, Checkbox, Col, Divider, Input, InputNumber, Row, Segmented, Tag, Tooltip, Typography } from "antd";
 import { useColors, useStyles } from "../../../styles/ui";
 import { SettingsCard, type ConfigCardProps } from "../SettingsCard";
-import type { OutboundProxyType, ProxyTestResponse } from "../../../types/settings";
+import type { OutboundProxyType, ProxyTestResponse, TdxProxyTestResponse } from "../../../types/settings";
 import {
   PLACEHOLDER,
   PROXY_SCOPE_OPTIONS,
@@ -27,10 +27,16 @@ export default function OutboundProxyConfigCard({
   onTest,
   isTesting,
   testResult,
+  onTestTdx,
+  isTestingTdx,
+  tdxTestResult,
 }: ConfigCardProps & {
   onTest?: () => void;
   isTesting?: boolean;
   testResult?: ProxyTestResponse | null;
+  onTestTdx?: () => void;
+  isTestingTdx?: boolean;
+  tdxTestResult?: TdxProxyTestResponse | null;
 }) {
   const { fieldLabelStyle } = useStyles();
   const colors = useColors();
@@ -39,6 +45,7 @@ export default function OutboundProxyConfigCard({
   const proxyUrl = form.outbound_proxy_url ?? "";
   const proxyEnabled = proxyType !== "none";
   const selectedScopes = form.outbound_proxy_scopes ?? ["eastmoney"];
+  const tdxScopeEnabled = selectedScopes.includes("tdxhub");
 
   const urlError = useMemo(() => {
     if (!proxyEnabled) return null;
@@ -224,10 +231,43 @@ export default function OutboundProxyConfigCard({
         </Col>
       </Row>
 
+      {/* TDX 行情走原始 TCP，HTTP 探测测不到，需要单独做隧道 + 协议往返验证 */}
+      {proxyEnabled && tdxScopeEnabled && (
+        <Row gutter={[12, 12]} align="middle" style={{ marginTop: 8 }}>
+          <Col xs={24} sm={14}>
+            <Button icon={<WifiOutlined />} loading={isTestingTdx} onClick={onTestTdx}>
+              测试 TDX 连通性
+            </Button>
+            {tdxTestResult && (
+              <span style={{ marginLeft: 12, color: tdxTestResult.ok ? colors.success : colors.down }}>
+                {tdxTestResult.ok ? "TDX 可用" : "TDX 不可用"} · {tdxTestResult.latency_ms}ms
+                {tdxTestResult.endpoint ? ` · ${tdxTestResult.endpoint}` : ""}
+              </span>
+            )}
+          </Col>
+          <Col xs={24} sm={10}>
+            {tdxTestResult && (
+              <Typography.Paragraph
+                type="secondary"
+                style={{ marginBottom: 0, fontSize: "var(--c-font-xs)", wordBreak: "break-all" }}
+              >
+                {tdxTestResult.message}
+              </Typography.Paragraph>
+            )}
+          </Col>
+        </Row>
+      )}
+
       <Typography.Paragraph type="secondary" style={{ marginTop: 12, marginBottom: 0, fontSize: "var(--c-font-xs)" }}>
         连通性测试针对当前已保存的配置，请先保存再测试。SOCKS5 代理需要后端安装 PySocks 或
         socksio 依赖，否则请求会直接报错。
       </Typography.Paragraph>
+      {proxyEnabled && tdxScopeEnabled && (
+        <Typography.Paragraph type="secondary" style={{ marginBottom: 0, fontSize: "var(--c-font-xs)" }}>
+          TDX 连通性测试会先建立代理隧道，再向行情节点发一次 round2 协议请求；
+          “代理隧道不可用”说明代理配置有问题，“目标行情节点不可用”说明代理正常但该节点行情接口异常。
+        </Typography.Paragraph>
+      )}
     </SettingsCard>
   );
 }

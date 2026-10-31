@@ -44,6 +44,7 @@ import type {
   MarketDailyBarRefreshResult,
   ProxyTestRequest,
   ProxyTestResponse,
+  TdxProxyTestResponse,
 } from "../../types/settings";
 
 export function useConfig() {
@@ -73,6 +74,16 @@ export function useTestOutboundProxy() {
     mutationFn: (payload?: ProxyTestRequest) =>
       // 探测目标可能走不稳定代理，超时窗口要比普通配置请求更长
       apiPost<ProxyTestResponse>("/config/proxy/test", payload ?? {}, {
+        timeoutMs: API_TIMEOUTS.EXTERNAL,
+      }),
+  });
+}
+
+export function useTestTdxProxy() {
+  return useMutation({
+    // TDX 走原始 TCP，探测可能依次尝试多个候选节点，给足外部请求超时
+    mutationFn: () =>
+      apiPost<TdxProxyTestResponse>("/config/proxy/test-tdx", {}, {
         timeoutMs: API_TIMEOUTS.EXTERNAL,
       }),
   });

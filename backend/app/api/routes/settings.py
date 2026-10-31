@@ -141,6 +141,19 @@ class ProxyTestResponse(BaseModel):
     message: str
 
 
+class TdxProxyTestResponse(BaseModel):
+    """TDX 原始 TCP 链路探测结果（与 HTTP 代理探测分开建模）。"""
+
+    ok: bool
+    endpoint: str | None = None
+    # config / connect / protocol / ok：用于区分代理故障与目标节点故障
+    stage: str
+    proxy_enabled: bool
+    proxy_type: str
+    latency_ms: int
+    message: str
+
+
 async def _probe_exit_ip(proxy: dict[str, str] | None, timeout: float) -> str | None:
     """经同一代理查询出口 IP，便于管理员确认代理真正生效。"""
     probe_timeout = min(float(timeout), 10.0)
@@ -230,6 +243,26 @@ async def test_outbound_proxy(
         latency_ms=latency_ms,
         message=detail,
     )
+
+
+@router.post("/proxy/test-tdx", response_model=TdxProxyTestResponse)
+async def test_tdx_proxy(
+    admin: AuthenticatedUser = Depends(require_admin),
+) -> TdxProxyTestResponse:
+    """探测 TDX 行情直连链路：代理隧道握手 + round2 协议往返，不修改任何配置。
+
+    与 ``/proxy/test`` 的区别：后者只验证 HTTP(S) 出网，而 TDX 走原始 TCP，
+    必须由 SDK 自己完成 CONNECT / SOCKS5 隧道。
+    """
+    from app.infrastructure.providers.tdxhub import probe_tdx_connectivity
+
+    settings = get_settings()
+    try:
+        result = await asyncio.to_thread(probe_tdx_connectivity, settings)
+    except ProxyConfigError as error:
+        # 配置本身非法（例如协议与类型不匹配）属于 422 而非连通性问题
+        raise ApiError(status_code=422, code="config.proxy_invalid", message=str(error)) from error
+    return TdxProxyTestResponse(**result)
 
 
 @router.post("/llm/models", response_model=LlmModelsResponse)

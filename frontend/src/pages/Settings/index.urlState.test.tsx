@@ -9,6 +9,7 @@ import SettingsPage from ".";
 vi.mock("../../api/queries", () => ({
   useConfig: () => ({ data: config, isLoading: false, error: null, refetch: vi.fn() }),
   useTestOutboundProxy: () => ({ mutate: vi.fn(), isPending: false }),
+  useTestTdxProxy: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 vi.mock("./useSettingsForm", () => ({

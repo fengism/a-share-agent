@@ -49,6 +49,18 @@ export interface ProxyTestResponse {
   message: string;
 }
 
+/** TDX 原始 TCP 链路探测结果（代理隧道 + round2 行情握手）。 */
+export interface TdxProxyTestResponse {
+  ok: boolean;
+  endpoint: string | null;
+  /** config / connect / protocol / ok */
+  stage: string;
+  proxy_enabled: boolean;
+  proxy_type: string;
+  latency_ms: number;
+  message: string;
+}
+
 export type BotJobStatus = "pending" | "running" | "succeeded" | "failed";
 
 export interface BotAdminJob {

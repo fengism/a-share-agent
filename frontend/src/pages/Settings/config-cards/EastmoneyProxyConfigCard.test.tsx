@@ -198,3 +198,65 @@ describe("OutboundProxyConfigCard", () => {
     });
   });
 });
+describe("OutboundProxyConfigCard · TDX 连通性", () => {
+  it("hides the TDX test until the proxy and the tdxhub scope are both on", () => {
+    renderCard({
+      form: { outbound_proxy_type: "socks5", outbound_proxy_url: "socks5h://h:2260", outbound_proxy_scopes: ["eastmoney"] },
+    });
+    expect(screen.queryByRole("button", { name: /测试 TDX 连通性/ })).not.toBeInTheDocument();
+
+    renderCard({
+      form: { outbound_proxy_type: "none", outbound_proxy_url: "", outbound_proxy_scopes: ["tdxhub"] },
+    });
+    expect(screen.queryByRole("button", { name: /测试 TDX 连通性/ })).not.toBeInTheDocument();
+  });
+
+  it("triggers the TDX probe once the scope is selected", () => {
+    const onTestTdx = vi.fn();
+    renderCard({
+      form: { outbound_proxy_type: "socks5", outbound_proxy_url: "socks5h://h:2260", outbound_proxy_scopes: ["tdxhub"] },
+      onTestTdx,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /测试 TDX 连通性/ }));
+    expect(onTestTdx).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders the TDX probe result with its endpoint", () => {
+    renderCard({
+      form: { outbound_proxy_type: "socks5", outbound_proxy_url: "socks5h://h:2260", outbound_proxy_scopes: ["tdxhub"] },
+      tdxTestResult: {
+        ok: true,
+        endpoint: "10.0.0.9:7709",
+        stage: "ok",
+        proxy_enabled: true,
+        proxy_type: "socks5",
+        latency_ms: 421,
+        message: "代理隧道 + round2 行情握手成功（返回 1 条日 K）",
+      },
+    });
+
+    expect(screen.getByText(/TDX 可用 · 421ms · 10\.0\.0\.9:7709/)).toBeInTheDocument();
+    expect(screen.getByText(/round2 行情握手成功/)).toBeInTheDocument();
+  });
+
+  it("surfaces a failed TDX probe", () => {
+    renderCard({
+      form: { outbound_proxy_type: "socks5", outbound_proxy_url: "socks5h://h:2260", outbound_proxy_scopes: ["tdxhub"] },
+      tdxTestResult: {
+        ok: false,
+        endpoint: "10.0.0.9:7709",
+        stage: "connect",
+        proxy_enabled: true,
+        proxy_type: "socks5",
+        latency_ms: 3000,
+        message: "代理隧道不可用（代理隧道，已尝试 1 个节点）: ConnectionError",
+      },
+    });
+
+    expect(screen.getByText(/TDX 不可用 · 3000ms/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/代理隧道不可用（代理隧道，已尝试 1 个节点）: ConnectionError/),
+    ).toBeInTheDocument();
+  });
+});

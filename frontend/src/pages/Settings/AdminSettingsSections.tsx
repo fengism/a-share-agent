@@ -25,7 +25,7 @@ import InviteManagerCard from "./InviteManagerCard";
 import SecurityAuditCard from "./SecurityAuditCard";
 import UserManagerCard from "./UserManagerCard";
 import type { ConfigSectionProps } from "./sectionTypes";
-import type { ProxyTestResponse } from "../../types/settings";
+import type { ProxyTestResponse, TdxProxyTestResponse } from "../../types/settings";
 import type { SettingsCards } from "./useSettingsForm";
 
 interface DataSourcesSettingsSectionProps extends ConfigSectionProps {
@@ -34,6 +34,9 @@ interface DataSourcesSettingsSectionProps extends ConfigSectionProps {
   onTestOutboundProxy?: () => void;
   isTestingOutboundProxy?: boolean;
   outboundProxyTestResult?: ProxyTestResponse | null;
+  onTestTdxProxy?: () => void;
+  isTestingTdxProxy?: boolean;
+  tdxProxyTestResult?: TdxProxyTestResponse | null;
   isAdmin?: boolean;
   cards: SettingsCards;
 }
@@ -48,6 +51,9 @@ export function DataSourcesSettingsSection({
   onTestOutboundProxy,
   isTestingOutboundProxy = false,
   outboundProxyTestResult = null,
+  onTestTdxProxy,
+  isTestingTdxProxy = false,
+  tdxProxyTestResult = null,
   isAdmin = true,
   cards,
 }: DataSourcesSettingsSectionProps) {
@@ -151,6 +157,9 @@ export function DataSourcesSettingsSection({
                   onTest={onTestOutboundProxy}
                   isTesting={isTestingOutboundProxy}
                   testResult={outboundProxyTestResult}
+                  onTestTdx={onTestTdxProxy}
+                  isTestingTdx={isTestingTdxProxy}
+                  tdxTestResult={tdxProxyTestResult}
                 />
               </Col>
               <Col xs={24} style={{ display: "flex" }}>

@@ -28260,6 +28260,56 @@
         "title": "StrategySignals",
         "type": "object"
       },
+      "TdxProxyTestResponse": {
+        "description": "TDX 原始 TCP 链路探测结果（与 HTTP 代理探测分开建模）。",
+        "properties": {
+          "endpoint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Endpoint"
+          },
+          "latency_ms": {
+            "title": "Latency Ms",
+            "type": "integer"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "proxy_enabled": {
+            "title": "Proxy Enabled",
+            "type": "boolean"
+          },
+          "proxy_type": {
+            "title": "Proxy Type",
+            "type": "string"
+          },
+          "stage": {
+            "title": "Stage",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "stage",
+          "proxy_enabled",
+          "proxy_type",
+          "latency_ms",
+          "message"
+        ],
+        "title": "TdxProxyTestResponse",
+        "type": "object"
+      },
       "TechnicalBoll": {
         "properties": {
           "lower": {
@@ -33624,6 +33674,43 @@
           }
         ],
         "summary": "Test Outbound Proxy",
+        "tags": [
+          "config"
+        ]
+      }
+    },
+    "/api/config/proxy/test-tdx": {
+      "post": {
+        "description": "探测 TDX 行情直连链路：代理隧道握手 + round2 协议往返，不修改任何配置。\n\n与 ``/proxy/test`` 的区别：后者只验证 HTTP(S) 出网，而 TDX 走原始 TCP，\n必须由 SDK 自己完成 CONNECT / SOCKS5 隧道。",
+        "operationId": "test_tdx_proxy_api_config_proxy_test_tdx_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TdxProxyTestResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Test Tdx Proxy",
         "tags": [
           "config"
         ]

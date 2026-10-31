@@ -3637,7 +3637,7 @@ requires-dist = [
     { name = "scrapling", extras = ["fetchers"], specifier = ">=0.4" },
     { name = "socksio", specifier = ">=1.0.0" },
     { name = "sse-starlette", specifier = ">=2.0.0" },
-    { name = "tdxhub-sdk", specifier = "==0.4.0" },
+    { name = "tdxhub-sdk", specifier = "==0.5.1" },
     { name = "tenacity", specifier = ">=9.0.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.34.0" },
 ]
@@ -3662,7 +3662,7 @@ wheels = [
 
 [[package]]
 name = "tdxhub-sdk"
-version = "0.4.0"
+version = "0.5.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click" },
@@ -3674,9 +3674,9 @@ dependencies = [
     { name = "tenacity" },
     { name = "tqdm" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/62/2b/3be08b6b54b1b6ebe2dc2b63b350265f83c57dafbbf63035dd0c02c4dc4d/tdxhub_sdk-0.4.0.tar.gz", hash = "sha256:0050e60a21688173dc4e78515ca8edf6bea707b5a3ecb65c2712ae6e67d7a62f", size = 272882, upload-time = "2026-10-30T17:14:21.179Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/58/46/7b823058389a22d74348712c2bda67ae281983ca001ab522145189aaccc5/tdxhub_sdk-0.5.1.tar.gz", hash = "sha256:62d4fb3fbf676bca8da4f6e3b9ad7657ecaf417f0bcc3b788d355f494f043665", size = 275065, upload-time = "2026-10-31T06:35:17.261Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d5/dc/26e55219d6ef9c33978c87453fd475fdab5c4ff7508bec225ae66c662ca5/tdxhub_sdk-0.4.0-py3-none-any.whl", hash = "sha256:991e36a0b9cb9d2690882dbbc16ba435f0d14ea04bd86f0d70071ea071a593b1", size = 273782, upload-time = "2026-10-30T17:14:19.738Z" },
+    { url = "https://files.pythonhosted.org/packages/87/90/860155b7ed3bccd6bfbc1b0a2538827eac22bd3a05953a41e22a5ee12f9d/tdxhub_sdk-0.5.1-py3-none-any.whl", hash = "sha256:cf8fb42f8b2c6d2683841817574311b628d3fa95d7605bfa16f1d75e59d3e3c6", size = 275292, upload-time = "2026-10-31T06:35:15.768Z" },
 ]
 
 [[package]]

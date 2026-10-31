@@ -6,9 +6,11 @@
 
 import logging
 import math
+import random
 import threading
 import time
 from collections.abc import Callable
+from contextlib import suppress
 from datetime import datetime, timedelta
 from typing import Any, TypedDict
 
@@ -16,6 +18,13 @@ import pandas as pd
 from tdxhub.exceptions import TdxhubConnectionError, TdxhubIncompleteDataError
 from tdxhub.quotes import Quotes
 from tdxhub.tdx.deadline import remaining, request_budget
+from tdxhub.tdx.errors import (
+    ProtocolError,
+    ResponseHeaderRecvFails,
+    ResponseRecvFails,
+    SendRequestPkgFails,
+)
+from tdxhub.tdx.round2 import Round2Client
 
 from app.configuration import get_settings
 from app.core.cache import TTLCache
@@ -36,6 +45,19 @@ _DAILY_FREQUENCY = 9
 # TDX 协议单次行情快照的代码数量上限
 _QUOTES_BATCH_SIZE = 80
 _FUND_FLOW_DAYS = 60
+# 快照缺失代码的负缓存：退市/代码变更会让整批快照解析失败（SDK 严格比对条数），
+# 二分剔除一次后就记住，避免同一只代码每次实时行情都重新二分。
+# TTL 取 1 小时：退市代码长期有效，而服务器差异或瞬时故障导致的误判能自愈。
+_quotes_missing_codes = TTLCache(maxsize=4000, name="tdxhub_quotes_missing")
+_QUOTES_MISSING_TTL_SECONDS = 3600
+# 单个 80 只批次最多花多少次往返在二分剔除上。1 只缺失代码约需 16 次，
+# 32 次足够且能封住病态输入。
+_QUOTES_MAX_REQUESTS_PER_BATCH = 32
+# 单个批次花在二分剔除上的墙钟预算（秒）：预算必须留够余量，否则会被截断而
+# 永远定位不到那只代码、每次都重复付出代价。超时后返回部分结果，其余交给降级链。
+_QUOTES_BISECT_BUDGET_SECONDS = 6.0
+# 单次行情请求所有批次共享的二分总预算：多批同时有缺失代码时也不能累加。
+_QUOTES_TOTAL_BISECT_BUDGET_SECONDS = 10.0
 # Store only fully validated historical daily aggregates, not the connection.
 # Versioned keys keep these values separate from all other provider/SDK caches.
 _fund_flow_day_cache = TTLCache(maxsize=6000, name="tdxhub_fund_flow_days")
@@ -75,7 +97,29 @@ class TdxhubUnavailableError(TdxhubError, ConnectionError):
     pass
 
 
-_RECONNECT_ERRORS = (TdxhubConnectionError, ConnectionError, OSError, TimeoutError)
+# round2 线缆层把"读超时/EOF/发送失败"包装成 ProtocolError 的子类，但它们是
+# 传输故障而不是"接口不支持"，必须触发共享客户端重建，否则死连接会一直留在缓存里。
+_TRANSPORT_ERRORS = (ResponseHeaderRecvFails, ResponseRecvFails, SendRequestPkgFails)
+_RECONNECT_ERRORS = (
+    TdxhubConnectionError,
+    ConnectionError,
+    OSError,
+    TimeoutError,
+    *_TRANSPORT_ERRORS,
+)
+
+
+def _budget_exhausted() -> bool:
+    """本次调用的 I/O 预算（``request_budget``）是否已耗尽。
+
+    预算耗尽是调用方自己的墙钟限制，不是链路故障：此时重建客户端只会白付一次
+    全量探测（还可能把实例推进冷却），让已经超时的请求更慢地失败。
+    """
+    try:
+        remaining()
+    except TimeoutError:
+        return True
+    return False
 
 
 class SharedTdxhubQuotes:
@@ -100,25 +144,63 @@ class SharedTdxhubQuotes:
 
     冷却只缓存**时间窗**、不缓存失效 IP 黑名单：冷却到期后的下一次请求会重新
     全量探测，届时恢复的服务器自然重新参与竞争，因此不存在"IP 被移除后挪不回来"。
+
+    冷却时长按连续失败次数指数退避（``tdxhub_rebuild_backoff_base_seconds`` 起步，
+    上限 ``tdxhub_rebuild_cooldown_seconds``）：单次瞬时抖动只需停几秒，持续故障才
+    逐步拉长到上限，避免一次探测失败就让全部 TDX 功能停摆半分钟。
+
+    ``raise_exception`` 由 SDK 构造函数决定失败语义：历史资金流需要区分"连接失败"
+    与"当日缺少分笔数据"，因此使用 ``raise_exception=True`` 的独立实例；两个实例
+    各自持有 single-flight 与冷却状态，但都只做一次全量探测。
+
+    实时快照由 SDK 内部的 ``quotes()`` 负责（新版已切到 round2 ``0x054c``，经典
+    命令返回空时自动降级），本类只提供统一的串行化、重建与冷却语义。
     """
 
-    def __init__(self, settings_provider: Callable[[], Any] = get_settings):
+    def __init__(
+        self,
+        settings_provider: Callable[[], Any] = get_settings,
+        *,
+        raise_exception: bool = False,
+    ):
         self._settings_provider = settings_provider
+        self._raise_exception = raise_exception
         self._lock = threading.Lock()
         self._rebuild_lock = threading.Lock()
         self._client = None
         self._client_proxy: str | None = None
         self._blocked_until = 0.0
+        self._failures: int = 0
 
     def _proxy(self) -> str | None:
         """当前配置下的 TDX 代理地址（未启用返回 None）。"""
         return _resolve_proxy(self._settings_provider())
 
     def _new_client(self, proxy: str | None):
-        timeout = float(self._settings_provider().tdxhub_timeout_seconds)
+        settings = self._settings_provider()
+        timeout = float(settings.tdxhub_timeout_seconds)
         if proxy:
             logger.info("TDX 行情走代理: %s", redact_proxy_url(proxy))
-        return Quotes.factory(market="std", timeout=timeout, proxy=proxy)
+        options: dict[str, Any] = {
+            "market": "std",
+            "timeout": timeout,
+            "proxy": proxy,
+            "raise_exception": self._raise_exception,
+        }
+        preferred = _preferred_hq_endpoint()
+        if preferred is not None:
+            # 首选节点可用时只需一次建连（~1s），而不是对 SERVER.HQ 全量并发
+            # 探测（10s 量级）；不可用则立刻回退全量探测，不牺牲可用性。
+            try:
+                return Quotes.factory(server=preferred, **options)
+            except _RECONNECT_ERRORS as exc:
+                logger.info(
+                    "TDX 首选节点 %s:%s 不可用，回退全量探测: %s",
+                    preferred[0],
+                    preferred[1],
+                    exc,
+                )
+        return Quotes.factory(**options)
 
     def call(self, method: str, *args: Any, **kwargs: Any) -> Any:
         def invoke(client):
@@ -154,6 +236,9 @@ class SharedTdxhubQuotes:
                 try:
                     return invoke(client)
                 except _RECONNECT_ERRORS as exc:
+                    if _budget_exhausted():
+                        # 我们自己设的 deadline 到点：连接本身没坏，重建毫无意义。
+                        raise
                     logger.warning("tdxhub 连接异常，重建客户端后重试: %s", exc)
                     self._client = None
         # 重建在串行锁之外：SDK 构造时的全量服务器探测可能耗时数十秒，持锁探测会
@@ -173,12 +258,13 @@ class SharedTdxhubQuotes:
             try:
                 client = self._acquire_client(proxy)
             except Exception as exc:
-                self._enter_cooldown()
+                cooldown_seconds = self._enter_cooldown()
                 # 探测失败的原始原因只在这里可见，不带日志的话故障期只能看到
                 # "连接不可用"，无法区分是服务器全挂还是代理/网络问题。
                 logger.warning(
-                    "TDX 客户端重建失败，进入 %.0fs 冷却: %s: %s",
-                    self._cooldown_seconds(),
+                    "TDX 客户端重建失败（连续 %d 次），进入 %.1fs 冷却: %s: %s",
+                    self._failures,
+                    cooldown_seconds,
                     type(exc).__name__,
                     exc,
                 )
@@ -186,17 +272,37 @@ class SharedTdxhubQuotes:
             with self._lock:
                 self._client = client
                 self._client_proxy = proxy
+            # 重建成功即认为链路已恢复，下次失败重新从最短冷却开始。
+            self._failures = 0
+            # 把本次真正连上的节点写回 BESTIP.HQ（内存），下次重建直接复用首选
+            # 快路径，无需再对 SERVER.HQ 全量探测。
+            _remember_hq_endpoint(client)
             return client
 
     def _cooldown_seconds(self) -> float:
+        """按连续失败次数计算指数退避的冷却时长（含向下抖动）。"""
         settings = self._settings_provider()
-        return max(
+        cap = max(
             0.0,
             float(getattr(settings, "tdxhub_rebuild_cooldown_seconds", 30.0)),
         )
+        if cap <= 0:
+            return 0.0
+        base = max(
+            0.0,
+            float(getattr(settings, "tdxhub_rebuild_backoff_base_seconds", 2.0)),
+        )
+        base = min(base, cap) if base > 0 else cap
+        # 首次失败停 base 秒，之后逐次翻倍直到上限。
+        delay: float = min(cap, base * (2 ** max(0, self._failures - 1)))
+        # 只向下抖动：多实例同刻失败时错开重探，同时保证不会突破上限。
+        return delay * random.uniform(0.8, 1.0)
 
-    def _enter_cooldown(self) -> None:
-        self._blocked_until = time.monotonic() + self._cooldown_seconds()
+    def _enter_cooldown(self) -> float:
+        self._failures += 1
+        seconds = self._cooldown_seconds()
+        self._blocked_until = time.monotonic() + seconds
+        return seconds
 
     def _acquire_client(self, proxy: str | None):
         try:
@@ -213,9 +319,154 @@ class SharedTdxhubQuotes:
     def clear_cooldown(self) -> None:
         """提前结束重建冷却，供后台测速任务主动尝试恢复链路。"""
         self._blocked_until = 0.0
+        self._failures = 0
 
 
 shared_tdxhub_quotes = SharedTdxhubQuotes()
+# 历史资金流专用：需要 SDK 的异常语义（失败抛错而非返回 None），
+# 否则连接故障会被误判成"当日缺少分笔资金"。同样只做一次全量探测。
+shared_tdxhub_raise_quotes = SharedTdxhubQuotes(raise_exception=True)
+
+
+def _preferred_hq_endpoint() -> tuple[str, int] | None:
+    """后台测速任务写回的 ``BESTIP.HQ``，作为客户端重建时的首选节点。
+
+    只信任显式写回的 BESTIP，不回退到 ``SERVER.HQ[0]``：后者等价于“无偏好”，
+    当成单节点候选反而会丢掉全量探测带来的容错。
+    """
+    from tdxhub import config as tdxhub_config
+
+    best = tdxhub_config.get("BESTIP.HQ")
+    if not best:
+        return None
+    with suppress(IndexError, TypeError, ValueError):
+        return (str(best[0]), int(best[1]))
+    return None
+
+
+def _remember_hq_endpoint(client: Any) -> None:
+    """把客户端实际连上的节点写回内存配置，供下次重建走首选快路径。"""
+    endpoint = getattr(getattr(client, "client", None), "endpoint", None) or getattr(
+        client, "server", None
+    )
+    if not endpoint:
+        return
+    try:
+        target = (str(endpoint[0]), int(endpoint[1]))
+    except (IndexError, TypeError, ValueError):
+        return
+    from tdxhub import config as tdxhub_config
+
+    # 只写内存（config.set 不落盘），进程重启后由后台测速任务重新选定。
+    with suppress(Exception):
+        tdxhub_config.set("BESTIP.HQ", target)
+
+
+def _hq_endpoints(limit: int) -> list[tuple[str, int]]:
+    """按 SDK 自身的优先级取候选行情服务器（BESTIP 优先，其余按配置顺序）。"""
+    from tdxhub import config as tdxhub_config
+
+    candidates: list[tuple[str, int]] = []
+    preferred = _preferred_hq_endpoint()
+    if preferred is not None:
+        candidates.append(preferred)
+    for item in tdxhub_config.get("SERVER.HQ", []) or []:
+        with suppress(IndexError, TypeError, ValueError):
+            candidates.append((str(item[1]), int(item[2])))
+    return list(dict.fromkeys(candidates))[:limit]
+
+
+def _release_shared_cooldown() -> None:
+    """探测成功即视为链路已恢复：提前结束两个共享实例的重建冷却。"""
+    for shared in (shared_tdxhub_quotes, shared_tdxhub_raise_quotes):
+        shared.clear_cooldown()
+
+
+def probe_tdx_connectivity(settings: Any = None, *, timeout: float = 5.0, limit: int = 3) -> dict[str, Any]:
+    """探测 TDX 直连链路：先过代理隧道，再做一次 round2 行情协议往返。
+
+    HTTP 层面的 ``/proxy/test`` 无法覆盖 TDX：行情走的是原始 TCP，代理需支持
+    CONNECT / SOCKS5 隧道。这里用 SDK 自己的 round2 客户端做端到端验证，并把
+    失败拆成两个阶段，便于区分"代理不可用"与"代理可用但目标节点不可用"。
+
+    Param:
+        settings: 应用配置对象，缺省取当前生效配置
+        timeout: 单个节点的连接/握手超时秒数
+        limit: 最多尝试的候选节点数
+    Return:
+        dict[str, Any]: ok / endpoint / stage / proxy_enabled / proxy_type / latency_ms / message
+    """
+    settings = settings if settings is not None else get_settings()
+    # 配置非法属于 422，交由调用方处理，不能当成"链路不通"
+    proxy = resolve_tdxhub_proxy(settings)
+    proxy_type = str(getattr(settings, "outbound_proxy_type", "none") or "none")
+    started = time.monotonic()
+
+    def elapsed_ms() -> int:
+        return int((time.monotonic() - started) * 1000)
+
+    endpoints = _hq_endpoints(limit)
+    if not endpoints:
+        return {
+            "ok": False,
+            "endpoint": None,
+            "stage": "config",
+            "proxy_enabled": proxy is not None,
+            "proxy_type": proxy_type,
+            "latency_ms": elapsed_ms(),
+            "message": "TDX 行情服务器候选列表为空，请检查 tdxhub 配置",
+        }
+
+    failures: list[str] = []
+    last_stage = "connect"
+    for ip, port in endpoints:
+        endpoint = f"{ip}:{port}"
+        last_stage = "connect"
+        client = Round2Client(proxy=proxy, connect_timeout=timeout)
+        try:
+            try:
+                client.connect(ip, port, time_out=timeout)
+            except Exception as error:  # noqa: BLE001 - 探测需报告任意失败原因
+                failures.append(f"{endpoint} 隧道/建连失败: {type(error).__name__}: {error}"[:200])
+                continue
+            # 握手已成功，说明隧道可用；再用一次日 K 请求验证协议层。
+            last_stage = "protocol"
+            try:
+                frame = client.get_security_bars(9, 1, "600000", 0, 1)
+            except Exception as error:  # noqa: BLE001
+                failures.append(f"{endpoint} 行情协议失败: {type(error).__name__}: {error}"[:200])
+                continue
+            rows = 0 if frame is None else len(frame)
+            route = "代理隧道" if proxy else "直连"
+            # 探测成功即视为链路已恢复：提前解除共享客户端的重建冷却，
+            # 让下一次业务请求立即重试，而不是继续等退避窗口走完。
+            _release_shared_cooldown()
+            return {
+                "ok": True,
+                "endpoint": endpoint,
+                "stage": "ok",
+                "proxy_enabled": proxy is not None,
+                "proxy_type": proxy_type,
+                "latency_ms": elapsed_ms(),
+                "message": f"{route} + round2 行情握手成功（返回 {rows} 条日 K）",
+            }
+        finally:
+            with suppress(Exception):
+                client.close()
+
+    route = "代理隧道" if proxy else "直连"
+    stage_hint = "代理隧道不可用" if proxy and last_stage == "connect" else "目标行情节点不可用"
+    detail = failures[0] if failures else "未知错误"
+    first_endpoint = f"{endpoints[0][0]}:{endpoints[0][1]}"
+    return {
+        "ok": False,
+        "endpoint": first_endpoint,
+        "stage": last_stage,
+        "proxy_enabled": proxy is not None,
+        "proxy_type": proxy_type,
+        "latency_ms": elapsed_ms(),
+        "message": f"{stage_hint}（{route}，已尝试 {len(endpoints)} 个节点）: {detail}",
+    }
 
 
 class TdxhubDataProvider:
@@ -249,12 +500,18 @@ class TdxhubDataProvider:
         "公司大事",
     )
 
-    def __init__(self, quotes: SharedTdxhubQuotes | None = None):
+    def __init__(
+        self,
+        quotes: SharedTdxhubQuotes | None = None,
+        raise_quotes: SharedTdxhubQuotes | None = None,
+    ):
         self._quotes = quotes or shared_tdxhub_quotes
+        self._raise_quotes = raise_quotes or shared_tdxhub_raise_quotes
 
     def reset_client(self) -> None:
         """清空共享 tdxhub 客户端，便于异常恢复或测试隔离。"""
         self._quotes.reset()
+        self._raise_quotes.reset()
 
     def _call(self, method: str, *args: Any, **kwargs: Any) -> Any:
         return self._quotes.call(method, *args, **kwargs)
@@ -293,32 +550,32 @@ class TdxhubDataProvider:
         try:
             # Propagate the wall-clock budget through the SDK to each TCP read;
             # timing out asyncio.to_thread alone does not stop a worker thread.
+            # 连接复用进程内共享客户端：SDK 构造会并发探测全部候选行情服务器，
+            # 每次查询都新建客户端等于为一次资金流付出一次全量探测。
             with request_budget(budget):
-                with Quotes.factory(
-                    market="std",
-                    timeout=settings.tdxhub_timeout_seconds,
-                    raise_exception=True,
-                    proxy=_resolve_proxy(settings),
-                ) as client:
-                    if dates is None:
-                        stage = "daily_bars"
-                        bars = client.bars(symbol, frequency=9, start=0, offset=_FUND_FLOW_DAYS)
-                        dates = _fund_flow_dates(bars, today)
-                    for current_date in dates[:limit]:
-                        remaining()
-                        cache_key = f"v1:{symbol}:{current_date}"
-                        cached = _fund_flow_day_cache.get(cache_key) if current_date < today else None
-                        if cached is not None:
-                            result.append(dict(cached))
-                            cached_days += 1
-                            continue
-                        stage = "historical_ticks"
-                        flow = client.capital_flow(symbol, date=current_date.replace("-", ""))
-                        remaining()
-                        row = _parse_daily_fund_flow(current_date, flow)
-                        result.append(row)
-                        if current_date < today:
-                            _fund_flow_day_cache.set(cache_key, dict(row), ttl=24 * 60 * 60)
+                if dates is None:
+                    stage = "daily_bars"
+                    bars = self._raise_quotes.call(
+                        "bars", symbol, frequency=_DAILY_FREQUENCY, start=0, offset=_FUND_FLOW_DAYS,
+                    )
+                    dates = _fund_flow_dates(bars, today)
+                for current_date in dates[:limit]:
+                    remaining()
+                    cache_key = f"v1:{symbol}:{current_date}"
+                    cached = _fund_flow_day_cache.get(cache_key) if current_date < today else None
+                    if cached is not None:
+                        result.append(dict(cached))
+                        cached_days += 1
+                        continue
+                    stage = "historical_ticks"
+                    flow = self._raise_quotes.call(
+                        "capital_flow", symbol, date=current_date.replace("-", ""),
+                    )
+                    remaining()
+                    row = _parse_daily_fund_flow(current_date, flow)
+                    result.append(row)
+                    if current_date < today:
+                        _fund_flow_day_cache.set(cache_key, dict(row), ttl=24 * 60 * 60)
             logger.info(
                 "tdxhub 资金流查询完成: code=%s days=%s cached_days=%s elapsed=%.2fs",
                 symbol, len(result), cached_days, time.monotonic() - started_at,
@@ -426,23 +683,111 @@ class TdxhubDataProvider:
     def fetch_stock_quotes(self, codes: list[str]) -> dict[str, dict[str, Any]]:
         """批量获取标准化实时行情（沪深京）。
 
-        统一走 SDK 0.3.0 的 quotes()，由 SDK 负责去重、80 条分块及
-        北交所原生协议路由，避免某批失败后返回看似完整的部分快照。
+        统一走 SDK 的 ``quotes()``（tdxhub-sdk 新版本内部已把快照切到 round2
+        ``0x054c``，经典命令返回空时自动降级），本层只负责分块与“缺失代码”
+        容错：服务端只返回有效代码的记录并严格比对条数，一只退市/改代码的股票
+        就会让整批报 ``ProtocolError``，因此失败批次会用二分剔除定位并记住
+        （见 ``_quote_frames``）。完全取不到数据时返回空字典，由上层降级链
+        （腾讯 / 新浪 / fuyao）兜底。
         """
         symbols = [normalize_code(code) for code in dict.fromkeys(codes)]
         if not symbols:
             return {}
         requested_codes = {symbol.raw for symbol in symbols}
-        frame = self._call("quotes", [symbol.prefixed_lower for symbol in symbols], batch_size=_QUOTES_BATCH_SIZE)
-        if not isinstance(frame, pd.DataFrame) or frame.empty:
+        # 已知无快照的代码直接跳过，避免每次都为一两只退市股付出二分代价。
+        prefixed = [
+            symbol.prefixed_lower
+            for symbol in symbols
+            if _quotes_missing_codes.get(symbol.prefixed_lower) is None
+        ]
+        if not prefixed:
             return {}
+
+        frames: list[pd.DataFrame] = []
+        # 多个 80 只批次共用一份二分预算，避免大代码表把剔除代价线性放大。
+        bisect_deadline: list[float | None] = [None]
+        for start in range(0, len(prefixed), _QUOTES_BATCH_SIZE):
+            batch = prefixed[start : start + _QUOTES_BATCH_SIZE]
+            frames.extend(self._quote_frames(batch, bisect_deadline))
+
         quotes: dict[str, dict[str, Any]] = {}
         quoted_at = market_now().isoformat(timespec="seconds")
-        for row in frame.to_dict("records"):
-            quote = _parse_quote_row(row, requested_codes, quoted_at)
-            if quote is not None:
-                quotes.setdefault(quote["code"], quote)
+        for frame in frames:
+            if not isinstance(frame, pd.DataFrame) or frame.empty:
+                continue
+            for row in frame.to_dict("records"):
+                quote = _parse_quote_row(row, requested_codes, quoted_at)
+                if quote is not None:
+                    quotes.setdefault(quote["code"], quote)
         return quotes
+
+    def _quote_frames(
+        self, batch: list[str], bisect_deadline: list[float | None]
+    ) -> list[pd.DataFrame]:
+        """取一个 ≤80 只批次；批内有无效代码时二分剔除并记住。
+
+        只有本批次已经成功过至少一个子批（证明链路正常）时才把单码失败记入
+        负缓存，避免连接/协议异常把整批有效代码误标成“无快照”。
+        """
+        budget = _QUOTES_MAX_REQUESTS_PER_BATCH
+        local_deadline: float | None = None
+        verified = False
+        # (起始偏移, 代码, 是否二分切出的子批)；首次请求不受预算限制，
+        # 否则前面批次的二分会把后面批次的正常请求一起挡掉。
+        frames: list[tuple[int, pd.DataFrame]] = []
+        pending: list[tuple[int, list[str], bool]] = [(0, batch, False)]
+        while pending:
+            offset, current, is_split = pending.pop(0)
+            if is_split:
+                now = time.monotonic()
+                if (
+                    budget <= 0
+                    or (local_deadline is not None and now > local_deadline)
+                    or (bisect_deadline[0] is not None and now > bisect_deadline[0])
+                ):
+                    logger.warning(
+                        "TDX 实时快照二分预算耗尽，返回部分结果（丢弃 %d 批）",
+                        len(pending) + 1,
+                    )
+                    break
+            budget -= 1
+            try:
+                frame = self._call("quotes", current, batch_size=_QUOTES_BATCH_SIZE)
+            except _TRANSPORT_ERRORS:
+                # 传输层故障（重建+重试后仍失败）不是"代码没有快照"，交给上层降级
+                raise
+            except ProtocolError as error:
+                if local_deadline is None:
+                    local_deadline = time.monotonic() + _QUOTES_BISECT_BUDGET_SECONDS
+                if bisect_deadline[0] is None:
+                    bisect_deadline[0] = (
+                        time.monotonic() + _QUOTES_TOTAL_BISECT_BUDGET_SECONDS
+                    )
+                if len(current) == 1:
+                    if verified:
+                        # 单码也解析失败且本批已成功过：该代码确实没有快照
+                        _quotes_missing_codes.set(
+                            current[0], True, ttl=_QUOTES_MISSING_TTL_SECONDS
+                        )
+                    continue
+                logger.debug("TDX 实时快照部分代码无数据，二分重试: %s", error)
+                # 广度优先：先拿到另一半个批次的结果，部分数据比“只解析完前半段”更有用
+                middle = len(current) // 2
+                pending.extend(
+                    [
+                        (offset, current[:middle], True),
+                        (offset + middle, current[middle:], True),
+                    ]
+                )
+                continue
+            if isinstance(frame, pd.DataFrame) and not frame.empty:
+                frames.append((offset, frame))
+            verified = True
+        return [
+            frame
+            for _, frame in sorted(frames, key=lambda item: item[0])
+            if isinstance(frame, pd.DataFrame) and not frame.empty
+        ]
 
     def fetch_stock_quote(self, code: str) -> dict[str, Any]:
         """获取单只股票的标准化实时行情。"""
@@ -501,21 +846,19 @@ class TdxhubDataProvider:
         """
         self._normalize_index_request(symbol)  # 仅做 6 位数字校验
         offset = self._calculate_offset(start_date, end_date)
-        # 指数与个股统一走 bars：经典 index 命令（0x052d 之前的 get_index_bars）
-        # 已被上游服务器停用，调用只会返回 None；bars 内部走 round2 新协议，
-        # 并按代码段自动识别指数（sh000xxx / sz399xxx / bj899xxx）。
-        # 这里必须传带市场前缀的代码，否则 000001 会被当成平安银行。
+        # 必须传带市场前缀的代码，否则 000001 会被当成平安银行。
         prefixed_symbol = normalize_index_symbol(str(symbol).strip().lower())
-        raw_df = self._quotes.call(
+        # 指数 K 线走 bars(index=True)：0.5.1 起 bars 支持显式指数开关，内部按指数
+        # 记录结构解析（round2 + 涨跌家数），与个股 K 线共用同一条取数路径。
+        # 返回的 vol 为「手」（与东财手数一致），统一 ×100 得到股。
+        raw_df = self._call(
             "bars",
             symbol=prefixed_symbol,
             frequency=self.DAILY_FREQUENCY,
             start=0,
             offset=offset,
+            index=True,
         )
-        # bars 已把指数与个股的原始 vol 统一归一到「手」（与东财手数一致），
-        # 统一到「股」的系数与个股相同为 100。旧 index 命令返回的是「万手」，
-        # 系数需 10000；两者不可混用，否则成交量与成交额差 100 倍。
         return self._format_index_kline_df(
             raw_df, start_date=start_date, end_date=end_date, volume_multiplier=100,
         )
@@ -539,7 +882,10 @@ class TdxhubDataProvider:
             start=0,
             offset=offset,
         )
-        return self._format_index_kline_df(raw_df, start_date=start_date, end_date=end_date)
+        # bars 的 vol 同样是「手」，与 fetch_stock_kline / fetch_index_kline 保持同一契约。
+        return self._format_index_kline_df(
+            raw_df, start_date=start_date, end_date=end_date, volume_multiplier=100,
+        )
 
     def _calculate_offset(self, start_date: str = "", end_date: str = "") -> int:
         """根据日期范围计算 TDX 请求条数，默认返回最近 DEFAULT_OFFSET 条。"""
@@ -715,7 +1061,10 @@ def _parse_quote_row(
     if code not in requested_codes:
         return None
     price = safe_float(row.get("price"))
+    # 经典 get_security_quotes 叫 last_close，round2 快照叫 pre_close
     last_close = safe_float(row.get("last_close"))
+    if last_close is None:
+        last_close = safe_float(row.get("pre_close"))
     high = safe_float(row.get("high"))
     low = safe_float(row.get("low"))
     return {

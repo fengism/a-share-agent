@@ -29,7 +29,7 @@ dependencies = [
     "litellm>=1.55.0",
     "sse-starlette>=2.0.0",
     "pypinyin>=0.52.0",
-    "tdxhub-sdk==0.4.0",
+    "tdxhub-sdk==0.5.1",
     "feedparser>=6.0.12",
     "beautifulsoup4>=4.12.0",
     "cryptography>=44.0.0",

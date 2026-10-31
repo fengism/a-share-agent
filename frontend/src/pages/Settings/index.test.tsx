@@ -17,6 +17,7 @@ vi.mock("../../api/queries", () => ({
     mutate: mocks.testOutboundProxy,
     isPending: false,
   }),
+  useTestTdxProxy: () => ({ mutate: vi.fn(), isPending: false }),
   // 「账号与安全」两张卡片（安全审计 / 登录设备）在别的用例里单独覆盖
   useAdminAuditActions: () => ({ data: { items: [], total: 0 }, isLoading: false, error: null, refetch: vi.fn() }),
   useSessions: () => ({ data: { items: [] }, isLoading: false, error: null, refetch: vi.fn() }),

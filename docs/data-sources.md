@@ -56,18 +56,31 @@ Provider 由 `backend/app/infrastructure/providers/registry.py` 的 `_PROVIDER_E
 
 ### tdxhub 直连说明
 
-- 依赖固定为 `tdxhub-sdk==0.4.0`，由 `backend/app/infrastructure/providers/tdxhub.py` 进程内调用，
-  共享单例 `SharedTdxhubQuotes`（`Quotes.factory(market="std")`）。
-- 0.4.0 起 K 线默认走 round2 新协议（旧 `0x052d` 命令已被部分服务器停用）；
+- 依赖固定为 `tdxhub-sdk==0.5.1`（该版本把个股实时快照与指数 K 线全面切到 round2，
+  并给 `bars()` 加了显式指数开关），
+  由 `backend/app/infrastructure/providers/tdxhub.py` 进程内调用，共享单例 `SharedTdxhubQuotes`
+  （`Quotes.factory(market="std")`）。
+- 共享实例有两个：普通行情用 `shared_tdxhub_quotes`，历史资金流用 `shared_tdxhub_raise_quotes`
+  （`raise_exception=True`，否则资金流失败会返回 `None` 而被误判成「当日缺少分笔资金」）。
+  两者各自单飞重建、各自冷却，但都只做**一次**全量服务器探测；资金流不再每次查询新建客户端。
+- 重建失败按连续失败次数**指数退避**进入冷却：从 `TDXHUB_REBUILD_BACKOFF_BASE_SECONDS`（默认 2s）
+  起翻倍，封顶 `TDXHUB_REBUILD_COOLDOWN_SECONDS`（默认 30s），并带向下抖动。瞬时抖动只需停几秒，
+  持续故障才拉长到上限；重建成功后计数归零。
+- 客户端重建优先用后台测速写回的 `BESTIP.HQ`（内存）做单节点建连（~2-3s）；该节点不可用时
+  立即回退对 `SERVER.HQ` 的全量并发探测（~6-7s），因此不牺牲可用性。重建成功后会把实际连上的
+  节点写回 `BESTIP.HQ`，让下一次重建继续走快路径。
+- K 线默认走 round2 新协议（旧 `0x052d` 命令已被部分服务器停用）；
   设置 `TDXHUB_KLINE_PROTOCOL=legacy` 可强制先走经典命令，失败再降级 round2。
-- 个股与指数 K 线统一走 `bars`：经典 `get_index_bars` 已停用，且裸 `000001` 会被当成深市个股，
-  因此指数必须传带市场前缀的代码（`sh000001`）；`bars` 返回的 vol 为「手」，统一 ×100 得到股。
-- 实时快照（`quotes()`）依赖经典 `get_security_quotes`，当前多数服务器返回空，
-  由 `tencent` / `sina` 在降级链中兜底；恢复后无需改代码。
-- 个股与指数 K 线统一走 `bars`：经典 `get_index_bars` 已停用，且裸 `000001` 会被当成深市个股，
-  因此指数必须传带市场前缀的代码（`sh000001`）；`bars` 返回的 vol 为「手」，统一 ×100 得到股。
-- 实时快照（`quotes()`）依赖经典 `get_security_quotes`，当前多数服务器返回空，
-  由 `tencent` / `sina` 在降级链中兜底；恢复后无需改代码。
+- 个股 K 线与个股行情走 `bars` / `quotes()`：0.5.0 的 `quotes()` 已把快照切到 round2
+  （`0x054c`），经典 `get_security_quotes` 返回空时自动降级，因此本层不再自建 round2 连接。
+- 指数 K 线：`bars(index=True)`（0.5.1 新增的显式指数开关，按指数记录结构解析、含涨跌家数），
+  个股 K 线仍走不带该开关的 `bars`。指数必须带市场前缀（裸 `000001` 会被当成平安银行），
+  返回的 vol 为「手」，统一 ×100 得到股。
+- 实时快照的“缺失代码”容错：服务端只返回有效代码的记录并严格比对条数，一只退市/改代码的
+  股票就会让整批报 `ProtocolError`。因此按 80 只分块请求，失败批次用二分剔除定位并记入
+  1 小时负缓存（下次直接跳过）；只有本批已成功过才把单码失败记为“无快照”，避免链路异常
+  把整批有效代码误标。多块共享一份二分预算（单批 6s / 总量 10s），耗尽时返回已拿到的部分
+  结果，其余代码交给 `tencent` / `sina` / `fuyao` 兜底。
 - 支持出网代理：在设置页「出站代理 → 走代理的接口与数据源」勾选 **通达信（TDX）**，
   即由 `outbound_proxy_scopes` 中的 `tdxhub` 控制（见“四、限流与出站代理”）；未勾选则直连。
 
@@ -124,6 +137,10 @@ source, items = await BaseProviderChain(
 - **生效规则**：底层网络层（`client.py` / `ThsTransport` / `SinaDataProvider`）根据用户勾选的 `outbound_proxy_scopes` 动态决定是否走代理；未勾选的源保持海外直连（如新浪行情直连延迟更低更稳）。
 - **通达信直连（`tdxhub`）例外**：行情客户端直连行情服务器 IP:端口，不经过 HTTP，无法按主机名筛选，因此选中 `tdxhub` 后整条 TDX 链路走代理；
   该链路自带 SOCKS5/HTTP CONNECT 握手实现，无需安装 PySocks，代理配置变更后共享客户端会自动重建。
+- **TDX 连通性测试**：勾选 `tdxhub` 且代理开启后，设置页会多出「测试 TDX 连通性」按钮
+  （`POST /api/config/proxy/test-tdx`）。它先建代理隧道、再向行情节点发一次 round2 协议请求，
+  因此能区分「代理隧道不可用」与「代理正常但目标节点行情接口异常」——普通 `HTTP` 探测对原始 TCP 无效。
+  探测成功会顺便提前解除两个共享客户端的重建冷却，让下一次业务请求立即重试（失败不动冷却，避免探测风暴）。
 
 ### 请求限流防线
 两条独立防线，避免把上游打到反爬或 IP 封禁：

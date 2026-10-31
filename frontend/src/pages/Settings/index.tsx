@@ -2,7 +2,7 @@ import { lazy, Suspense, useCallback, useState } from "react";
 import { RobotOutlined, UndoOutlined } from "@ant-design/icons";
 import { Button, message, Popconfirm, Tag } from "antd";
 import { useInRouterContext } from "react-router-dom";
-import { useConfig, useTestOutboundProxy } from "../../api/queries";
+import { useConfig, useTestOutboundProxy, useTestTdxProxy } from "../../api/queries";
 import ChangePasswordCard from "../../components/ChangePasswordCard";
 import SessionManagerCard from "./SessionManagerCard";
 import LoginHistoryCard from "./LoginHistoryCard";
@@ -10,7 +10,7 @@ import ResponsiveSectionNav from "../../components/ResponsiveSectionNav";
 import SectionDataState from "../../components/SectionDataState";
 import { useAuthStore } from "../../store/authStore";
 import { useColors, useStyles, semanticTagStyle } from "../../styles/ui";
-import type { ProxyTestResponse } from "../../types/settings";
+import type { ProxyTestResponse, TdxProxyTestResponse } from "../../types/settings";
 import SystemUpdateCard from "./SystemUpdateCard";
 import SettingsDirtySummary from "./SettingsDirtySummary";
 import SettingsLeaveBlocker from "./SettingsLeaveBlocker";
@@ -48,7 +48,12 @@ export default function SettingsPage() {
     mutate: testOutboundProxyMutate,
     isPending: isTestingOutboundProxy,
   } = useTestOutboundProxy();
+  const {
+    mutate: testTdxProxyMutate,
+    isPending: isTestingTdxProxy,
+  } = useTestTdxProxy();
   const [outboundProxyTestResult, setOutboundProxyTestResult] = useState<ProxyTestResponse | null>(null);
+  const [tdxProxyTestResult, setTdxProxyTestResult] = useState<TdxProxyTestResponse | null>(null);
   const user = useAuthStore((state) => state.user);
   const isAdmin = Boolean(config?.is_admin);
 
@@ -111,6 +116,20 @@ export default function SettingsPage() {
       onError: (error: Error) => message.error(`连通性测试失败: ${error.message}`),
     });
   }, [testOutboundProxyMutate]);
+
+  const handleTestTdxProxy = useCallback(() => {
+    testTdxProxyMutate(undefined, {
+      onSuccess: (result) => {
+        setTdxProxyTestResult(result);
+        if (result.ok) {
+          message.success(`TDX 链路可用（${result.latency_ms}ms）`);
+        } else {
+          message.warning(`TDX 链路不可用：${result.message}`);
+        }
+      },
+      onError: (error: Error) => message.error(`TDX 连通性测试失败: ${error.message}`),
+    });
+  }, [testTdxProxyMutate]);
 
   if (!config) {
     return (
@@ -263,6 +282,9 @@ export default function SettingsPage() {
                   onTestOutboundProxy={handleTestOutboundProxy}
                   isTestingOutboundProxy={isTestingOutboundProxy}
                   outboundProxyTestResult={outboundProxyTestResult}
+                  onTestTdxProxy={handleTestTdxProxy}
+                  isTestingTdxProxy={isTestingTdxProxy}
+                  tdxProxyTestResult={tdxProxyTestResult}
                   cards={cards}
                 />
               </Suspense>

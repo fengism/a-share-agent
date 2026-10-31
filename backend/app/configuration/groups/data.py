@@ -59,7 +59,10 @@ class NetworkGroup(ConfigGroup):
     # 客户端重建失败的冷却窗口。SDK 每次重建都会全量探测候选行情服务器，
     # 冷却期内快速失败可避免故障期间反复付出探测代价；到期后自动重新探测，
     # 恢复的服务器会自然重新参与，因此该值只影响恢复延迟、不影响可用性。
+    # 实际冷却时长按连续失败次数从 backoff_base 指数退避到该上限。
     tdxhub_rebuild_cooldown_seconds: float = Field(default=30.0, ge=0, le=600)
+    # 首次重建失败的冷却起点；瞬时抖动只需短暂停摆，持续故障才逐步拉长到上限。
+    tdxhub_rebuild_backoff_base_seconds: float = Field(default=2.0, ge=0, le=600)
     # 后台 TDX 行情服务器测速任务的执行周期。
     tdxhub_bestip_refresh_seconds: float = Field(default=1800.0, gt=0, le=86400)
     # 单次历史资金流备选查询的总 I/O 预算（包含连接、分页和逐日聚合）。

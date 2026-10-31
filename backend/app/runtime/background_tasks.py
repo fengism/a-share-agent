@@ -159,7 +159,10 @@ async def refresh_tdxhub_best_ip() -> None:
         from tdxhub import config as tdxhub_config
         from tdxhub.server import server
 
-        from app.infrastructure.providers.tdxhub import shared_tdxhub_quotes
+        from app.infrastructure.providers.tdxhub import (
+            shared_tdxhub_quotes,
+            shared_tdxhub_raise_quotes,
+        )
 
         def probe() -> list[tuple[str, int]]:
             # tdxhub 未提供类型桩，返回值形状由该库约定（endpoint 二元组列表）
@@ -178,16 +181,30 @@ async def refresh_tdxhub_best_ip() -> None:
         # 纯内存生效，不落盘（落盘的 setup() 有 _loaded 守卫，运行中不会重载）。
         tdxhub_config.update({"BESTIP": {"HQ": endpoints[0]}})
 
-        if shared_tdxhub_quotes.is_cooling_down():
-            # 冷却期内不硬闯，避免与业务请求的重建探测互相争抢带宽。
+        # 冷却期内不硬闯，避免与业务请求的重建探测互相争抢带宽；两个共享实例
+        # 各自冷却（普通行情 / 资金流互不影响），因此逐个判断而非一刀切。
+        cooling = [
+            name
+            for name, shared in (
+                ("行情", shared_tdxhub_quotes),
+                ("资金流", shared_tdxhub_raise_quotes),
+            )
+            if shared.is_cooling_down()
+        ]
+        if len(cooling) == 2:
             logger.info(
                 "TDX 客户端处于重建冷却期，本轮仅刷新最优服务器: best=%s remaining=%.1fs",
                 endpoints[0],
                 shared_tdxhub_quotes.cooldown_remaining_seconds(),
             )
             return
+        if cooling:
+            logger.info("TDX %s 实例仍在重建冷却期，本轮仅重置其余实例", " / ".join(cooling))
 
-        await call_blocking(shared_tdxhub_quotes.reset, semaphore=tdxhub_semaphore)
+        for name, shared in (("行情", shared_tdxhub_quotes), ("资金流", shared_tdxhub_raise_quotes)):
+            if name in cooling:
+                continue
+            await call_blocking(shared.reset, semaphore=tdxhub_semaphore)
         logger.info("TDX 最优服务器已刷新并重置共享客户端: best=%s 备选=%s", endpoints[0], endpoints[1:])
 
     settings = get_settings()
