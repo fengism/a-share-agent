@@ -1,5 +1,6 @@
-from enum import Enum
 import logging
+from enum import Enum
+
 import pandas as pd
 
 from app.constants.market import INDEX_FALLBACKS

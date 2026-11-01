@@ -24,7 +24,6 @@ from app.modules.market_daily.collectors import (
 from app.modules.market_daily.models import MarketDailyBar
 from app.modules.market_daily.reader import _to_kline_item
 
-
 _TRADE_DATE = date(2026, 10, 30)
 
 
@@ -158,7 +157,7 @@ def test_records_from_history_adapts_backfill_volume():
 
 def test_reader_to_kline_item_adapts_safely():
     """reader 模块从本地 SQLite 读出 MarketDailyBar 转化为 KlineItem 时，确保量纲为股。"""
-    from datetime import datetime, UTC
+    from datetime import UTC, datetime
     now = datetime.now(UTC)
     # 正常入库的股
     bar_normal = MarketDailyBar(
