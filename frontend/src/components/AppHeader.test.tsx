@@ -16,6 +16,7 @@ vi.mock("../styles/ui", async () => {
 });
 vi.mock("./DeferredAppHeaderSearch", () => ({ default: () => <div>全局股票搜索</div> }));
 vi.mock("./ThemeSelector", () => ({ default: () => <button>主题</button> }));
+vi.mock("./KeyboardShortcutsModal", () => ({ default: () => <button>快捷键</button> }));
 vi.mock("./AppUserMenu", () => ({ default: () => null }));
 vi.mock("./GlobalTaskIndicator", () => ({ default: () => null }));
 vi.mock("./HeaderMarketTicker", () => ({ default: () => null }));
@@ -35,5 +36,15 @@ describe("AppHeader command bar", () => {
     expect(screen.queryByRole("button", { name: /数据源/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /推送通知/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^分析$/ })).not.toBeInTheDocument();
+  });
+
+  it("hides desktop keyboard shortcuts on mobile viewports", () => {
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <AppHeader isMobile={true} themeKey="stellar-blue" onMobileNavOpen={vi.fn()} />
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByRole("button", { name: "快捷键" })).not.toBeInTheDocument();
   });
 });

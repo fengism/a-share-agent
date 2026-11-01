@@ -37,6 +37,7 @@ from app.core.market import (
 )
 from app.core.timezones import SHANGHAI_TIMEZONE
 from app.domain.timezones import market_now
+from app.financial_data.market.quotes.normalization import VolumeUnit, resolve_adaptive_volume
 from app.infrastructure.http.proxy import ProxyConfigError, redact_proxy_url, resolve_tdxhub_proxy
 
 logger = logging.getLogger(__name__)
@@ -662,9 +663,13 @@ class TdxhubDataProvider:
                     "close": safe_float(row.get("close")),
                     "high": safe_float(row.get("high")),
                     "low": safe_float(row.get("low")),
-                    # tdxhub bars_all 的 vol 单位为手；统一历史日线契约使用股。
-                    "volume": (
-                        value * 100 if (value := safe_float(row.get("vol"))) is not None else None
+                    # tdxhub bars_all 的 vol 可能是手或股；通过自适应量纲推导统一为股(shares)。
+                    "volume": resolve_adaptive_volume(
+                        safe_float(row.get("vol")),
+                        amount=safe_float(row.get("amount")),
+                        price=safe_float(row.get("close")),
+                        target_unit=VolumeUnit.SHARES,
+                        symbol=symbol.raw,
                     ),
                     "amount": safe_float(row.get("amount")),
                     "turnover_pct": safe_float(row.get("turnover")) if include_turnover else None,
@@ -882,9 +887,14 @@ class TdxhubDataProvider:
             start=0,
             offset=offset,
         )
-        # bars 的 vol 同样是「手」，与 fetch_stock_kline / fetch_index_kline 保持同一契约。
+        # bars 的 vol 通过自适应量纲解析统一为股(shares)。
         return self._format_index_kline_df(
-            raw_df, start_date=start_date, end_date=end_date, volume_multiplier=100,
+            raw_df,
+            start_date=start_date,
+            end_date=end_date,
+            volume_multiplier=1,
+            is_index=False,
+            symbol=sym.raw,
         )
 
     def _calculate_offset(self, start_date: str = "", end_date: str = "") -> int:
@@ -921,6 +931,8 @@ class TdxhubDataProvider:
         start_date: str = "",
         end_date: str = "",
         volume_multiplier: int | float = 1,
+        is_index: bool = True,
+        symbol: str = "",
     ) -> pd.DataFrame:
         """将 tdxhub 原始 K 线 DataFrame 统一整理为标准列。"""
         if raw_df is None or not isinstance(raw_df, pd.DataFrame) or raw_df.empty:
@@ -942,6 +954,19 @@ class TdxhubDataProvider:
         result = result.drop_duplicates(subset=["date"], keep="last")
         if volume_multiplier != 1:
             result["volume"] = result["volume"] * volume_multiplier
+
+        if not is_index and not result.empty:
+            result["volume"] = [
+                resolve_adaptive_volume(
+                    v,
+                    amount=a,
+                    price=c,
+                    target_unit=VolumeUnit.SHARES,
+                    is_index=False,
+                    symbol=symbol,
+                )
+                for v, a, c in zip(result["volume"], result["amount"], result["close"])
+            ]
 
         result["pre_close"] = result["close"].shift(1)
         result["change_pct"] = (result["close"] - result["pre_close"]) / result["pre_close"] * 100
@@ -1083,7 +1108,13 @@ def _parse_quote_row(
             if high is not None and low is not None and last_close not in (None, 0)
             else None
         ),
-        "volume": safe_float(row.get("vol")),
+        "volume": resolve_adaptive_volume(
+            safe_float(row.get("vol")),
+            amount=safe_float(row.get("amount")),
+            price=price,
+            target_unit=VolumeUnit.LOTS,
+            symbol=code,
+        ),
         "amount": safe_float(row.get("amount")),
         # 协议仅含时刻无日期，统一取抓取时刻，与原 tdx-api 行为一致
         "quoted_at": quoted_at,

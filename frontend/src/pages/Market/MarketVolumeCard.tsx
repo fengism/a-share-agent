@@ -19,6 +19,7 @@ type VolumeRange = "30" | "60" | "120" | "all";
 interface ProcessedVolumeItem {
   date: string;
   amountYi: number;
+  volumeYi: number;
   volumeWanShou: number;
   ma5: number;
   ma20: number;
@@ -49,7 +50,9 @@ export default function MarketVolumeCard({
     // 先计算完整全序列的 MA5 与 MA20，避免切片后起始点均线产生空值缺口
     const allMapped: ProcessedVolumeItem[] = rawItems.map((item, idx) => {
       const amountYi = Number((item.amount / 1e8).toFixed(2));
-      const volumeWanShou = Number((item.volume / 1e4).toFixed(0));
+      const volumeYi = item.volume ? Number((item.volume / 1e8).toFixed(2)) : 0;
+      // 1手 = 100股，万手 = 1e6 股
+      const volumeWanShou = item.volume ? Number((item.volume / 1e6).toFixed(0)) : 0;
 
       const start5 = Math.max(0, idx - 4);
       const slice5 = rawItems.slice(start5, idx + 1);
@@ -66,6 +69,7 @@ export default function MarketVolumeCard({
       return {
         date: item.date,
         amountYi,
+        volumeYi,
         volumeWanShou,
         ma5,
         ma20,
@@ -158,10 +162,13 @@ export default function MarketVolumeCard({
           const rows = [
             `<div style="font-weight:600;margin-bottom:6px;border-bottom:1px solid ${c.border};padding-bottom:4px;">${item.date}</div>`,
             `<div style="display:flex;justify-content:space-between;gap:16px;"><span>两市总成交额:</span><strong>${item.amountYi.toLocaleString("zh-CN", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} 亿元</strong></div>`,
+            item.volumeYi > 0
+              ? `<div style="display:flex;justify-content:space-between;gap:16px;color:${c.textSecondary};"><span>两市总成交量:</span><strong>${item.volumeYi.toFixed(1)} 亿股 (${(item.volumeYi / 100).toFixed(2)} 亿手)</strong></div>`
+              : "",
             `<div style="display:flex;justify-content:space-between;gap:16px;color:${changeColor};"><span>较前一交易日:</span><strong>${changeSign}${item.changeYi.toFixed(1)} 亿元 (${changeSign}${item.changePct.toFixed(1)}%)</strong></div>`,
-            `<div style="display:flex;justify-content:space-between;gap:16px;color:${c.warning};"><span>5日均量 (MA5):</span><strong>${item.ma5.toLocaleString("zh-CN", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} 亿元</strong></div>`,
-            `<div style="display:flex;justify-content:space-between;gap:16px;color:${c.accent};"><span>20日均量 (MA20):</span><strong>${item.ma20.toLocaleString("zh-CN", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} 亿元</strong></div>`,
-          ];
+            `<div style="display:flex;justify-content:space-between;gap:16px;color:${c.warning};"><span>5日均额 (MA5):</span><strong>${item.ma5.toLocaleString("zh-CN", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} 亿元</strong></div>`,
+            `<div style="display:flex;justify-content:space-between;gap:16px;color:${c.accent};"><span>20日均额 (MA20):</span><strong>${item.ma20.toLocaleString("zh-CN", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} 亿元</strong></div>`,
+          ].filter(Boolean);
           return rows.join("");
         },
       },

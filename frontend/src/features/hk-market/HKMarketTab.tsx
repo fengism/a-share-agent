@@ -869,6 +869,7 @@ export default function HKMarketTab({
         footer={null}
         width="min(1200px, calc(100vw - 20px))"
         centered
+        destroyOnHidden
         styles={{ body: { height: fullscreenHeight } }}
       >
         <LazyKlineChart
@@ -876,6 +877,7 @@ export default function HKMarketTab({
           height={fullscreenHeight}
           viewKey={`hk-index-modal-${activeIndex}-${indexPeriod}`}
           landscapeToolbar={indexPeriodControl}
+          forceRender
         />
       </Modal>
 
@@ -888,6 +890,7 @@ export default function HKMarketTab({
           footer={null}
           width="min(1200px, calc(100vw - 20px))"
           centered
+          destroyOnHidden
           styles={{ body: { height: fullscreenHeight } }}
         >
           <LazyKlineChart
@@ -895,6 +898,7 @@ export default function HKMarketTab({
             height={fullscreenHeight}
             viewKey={`hk-stock-modal-${activeStock.code}-${stockPeriod}-${adjust}`}
             landscapeToolbar={stockLandscapeToolbar}
+            forceRender
           />
         </Modal>
       )}

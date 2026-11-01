@@ -15,6 +15,7 @@ import { useChatController } from "../pages/Chat/useChatController";
 import { useChatResultActionController } from "../pages/Chat/useChatResultActionController";
 import { useChatStore } from "../store/chatStore";
 import { useColors, useTokens } from "../styles/ui";
+import { COPILOT_OPEN_EVENT, type CopilotOpenDetail } from "../utils/copilotEvents";
 
 export default function GlobalChatCopilot() {
   const location = useLocation();
@@ -33,6 +34,21 @@ export default function GlobalChatCopilot() {
     setOpen(false);
     navigate("/chat");
   }, [navigate]);
+
+  // 监听全局触发 Copilot 事件（例如个股页面、自选股列表一键 AI 诊断）
+  useEffect(() => {
+    const handleCopilotEvent = (e: Event) => {
+      const customEvent = e as CustomEvent<CopilotOpenDetail>;
+      const prompt = customEvent.detail?.prompt;
+      if (prompt) {
+        setInputValue(prompt);
+      }
+      setOpen(true);
+    };
+
+    window.addEventListener(COPILOT_OPEN_EVENT, handleCopilotEvent);
+    return () => window.removeEventListener(COPILOT_OPEN_EVENT, handleCopilotEvent);
+  }, []);
 
   // 全局快捷键 Cmd+J / Ctrl+J 切换伴随式 Copilot 抽屉
   useEffect(() => {
@@ -113,7 +129,7 @@ export default function GlobalChatCopilot() {
           </div>
         }
         placement="right"
-        width={isNarrow ? "100%" : 460}
+        size={isNarrow ? "100%" : 460}
         open={open}
         onClose={() => setOpen(false)}
         styles={{

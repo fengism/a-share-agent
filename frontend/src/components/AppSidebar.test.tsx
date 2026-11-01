@@ -293,7 +293,8 @@ describe("AppSidebar", () => {
     expect(marketItem).not.toHaveTextContent("市场");
   });
 
-  it("loads the Drawer boundary on mobile viewports", async () => {
+  it("loads the Drawer boundary on mobile viewports and allows closing", async () => {
+    const onMobileNavClose = vi.fn();
     render(
       <AppSidebar
         activeKey="/market"
@@ -302,13 +303,18 @@ describe("AppSidebar", () => {
         mobileNavOpen
         themeKey="stellar-blue"
         onCollapse={vi.fn()}
-        onMobileNavClose={vi.fn()}
+        onMobileNavClose={onMobileNavClose}
         onNavigate={vi.fn()}
       />,
     );
 
     expect(await screen.findByTestId("mobile-sidebar-drawer")).toBeInTheDocument();
     expect(loadMobileSidebarDrawer).toHaveBeenCalledTimes(1);
+
+    const closeBtn = screen.getByRole("button", { name: "关闭侧边栏" });
+    expect(closeBtn).toBeInTheDocument();
+    fireEvent.click(closeBtn);
+    expect(onMobileNavClose).toHaveBeenCalledTimes(1);
   });
 
   it("applies light theme background when themeKey is light", () => {

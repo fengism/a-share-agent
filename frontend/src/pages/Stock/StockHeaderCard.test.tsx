@@ -47,6 +47,7 @@ describe("StockHeaderCard", () => {
     expect(screen.getByText("白酒概念")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "加入自选" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "进入 AI 分析" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "AI 伴随诊断" })).toBeInTheDocument();
 
     // 点击概念板块跳转
     fireEvent.click(screen.getByText("白酒概念"));

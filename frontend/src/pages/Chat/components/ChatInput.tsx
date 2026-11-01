@@ -1,4 +1,4 @@
-import { useMemo, useState, type KeyboardEvent } from "react";
+import { useCallback, useMemo, useState, type KeyboardEvent } from "react";
 import {
   CodeOutlined,
   CompassOutlined,
@@ -21,7 +21,7 @@ interface ChatInputProps {
   onStop: () => void;
 }
 
-export interface SlashCommand {
+interface SlashCommand {
   key: string;
   command: string;
   icon: React.ReactNode;
@@ -30,7 +30,7 @@ export interface SlashCommand {
   template: string;
 }
 
-export const SLASH_COMMANDS: SlashCommand[] = [
+const SLASH_COMMANDS: SlashCommand[] = [
   {
     key: "kline",
     command: "/kline",
@@ -121,10 +121,10 @@ export function ChatInput({
     }
   };
 
-  const handleSelectCommand = (cmd: SlashCommand) => {
+  const handleSelectCommand = useCallback((cmd: SlashCommand) => {
     onChange(cmd.template);
     setDropdownOpen(false);
-  };
+  }, [onChange]);
 
   const handleSelectStock = (stock: { code: string; name: string }) => {
     if (!stockMatch) return;
@@ -150,7 +150,7 @@ export function ChatInput({
       ),
       onClick: () => handleSelectCommand(cmd),
     }));
-  }, [c]);
+  }, [c.primary, c.textMuted, c.textPrimary, handleSelectCommand]);
 
   const handleTextChange = (newVal: string) => {
     onChange(newVal);

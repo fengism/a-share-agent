@@ -7,6 +7,16 @@ export function formatVolume(val: number | null | undefined): string {
   return val.toFixed(0);
 }
 
+export function formatVolumeTooltip(val: number | null | undefined, market?: string): string {
+  if (val == null || isNaN(val)) return "成交量";
+  const sharesText = `${val.toLocaleString("zh-CN")} 股`;
+  if (market === "hk") {
+    return `成交量: ${sharesText}`;
+  }
+  const lots = Math.round(val / 100);
+  return `成交量: ${sharesText} (${lots.toLocaleString("zh-CN")} 手)`;
+}
+
 export function formatAmount(val: number | null | undefined): string {
   if (val == null || isNaN(val)) return "-";
   if (Math.abs(val) >= 1e8) return `${(val / 1e8).toFixed(2)}亿`;

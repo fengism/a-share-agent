@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { AiNaturalScreenerBar, parseNaturalLanguageToFilters } from "./AiNaturalScreenerBar";
+import { AiNaturalScreenerBar } from "./AiNaturalScreenerBar";
+import { parseNaturalLanguageToFilters } from "./naturalScreenerParser";
 import { DEFAULT_SCREENER_FILTERS } from "../../features/screener/screenerUrlState";
 
 const mockNavigate = vi.fn();

@@ -22,7 +22,7 @@ import type { ChanlunResult } from "../utils/chanlun";
 import { useColors } from "../styles/ui";
 import { APP_FONT_FAMILY, APP_FONT_SIZE } from "../theme/typography";
 import { createDebouncedResizeHandler, shouldFitChartContent } from "./chartLifecycle";
-import { formatAmount, formatVolume, renderVolumeRatioBadge } from "./klineChartFormatting";
+import { formatAmount, formatVolume, formatVolumeTooltip, renderVolumeRatioBadge } from "./klineChartFormatting";
 import { buildChanlunMarkers } from "./klineChartMarkers";
 import { toBusinessDay, hexToRgba } from "./utils";
 import { buildKlineTradeMarkers, type KlineTradeMarker } from "./klineMarkers";
@@ -1382,7 +1382,7 @@ export default function KlineChart({
             {activeCandle.volume != null && (
               <span
                 style={{ whiteSpace: "nowrap" }}
-                title={`成交量: ${activeCandle.volume.toLocaleString("zh-CN")} 股`}
+                title={formatVolumeTooltip(activeCandle.volume)}
               >
                 量: <strong style={{ color: c.textPrimary }}>{formatVolume(activeCandle.volume)}</strong>
               </span>
@@ -1671,7 +1671,12 @@ export default function KlineChart({
         >
           <div className="kline-chart__subindicator-info" style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "nowrap", overflow: "hidden", minWidth: 0 }}>
             {/* 同花顺风格副图指标切换器 */}
-            <div className="kline-chart__subindicator-tabs" style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0 }} onMouseDown={(e) => e.stopPropagation()}>
+            <div
+              className="kline-chart__subindicator-tabs"
+              style={{ display: "flex", alignItems: "center", gap: 3, flexShrink: 0 }}
+              onMouseDown={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
+            >
               {(["VOL", "AMO", "MACD", "KDJ", "RSI"] as const).map((tab) => {
                 const isActive = subIndicator === tab;
                 return (
@@ -1681,16 +1686,18 @@ export default function KlineChart({
                     onClick={() => setSubIndicator(tab)}
                     className="kline-chart__subindicator-tab-btn"
                     style={{
-                      padding: "0 5px",
-                      height: 16,
-                      fontSize: "10px",
+                      padding: "1px 6px",
+                      minHeight: 18,
+                      fontSize: "10.5px",
                       fontWeight: isActive ? 700 : 500,
-                      borderRadius: 2,
+                      borderRadius: 3,
                       border: isActive ? `1px solid ${c.primary}` : "1px solid transparent",
-                      background: isActive ? hexToRgba(c.primary, 0.12) : "transparent",
+                      background: isActive ? hexToRgba(c.primary, 0.16) : "transparent",
                       color: isActive ? c.primary : c.textSecondary,
                       cursor: "pointer",
-                      lineHeight: "14px",
+                      lineHeight: "16px",
+                      touchAction: "manipulation",
+                      transition: "all 0.15s ease",
                     }}
                   >
                     {tab}
@@ -1715,7 +1722,7 @@ export default function KlineChart({
                   <>
                     <span
                       className="kline-chart__vol-stat"
-                      title={activeCandle.volume != null ? `成交量: ${activeCandle.volume.toLocaleString("zh-CN")} 股` : "成交量"}
+                      title={formatVolumeTooltip(activeCandle.volume)}
                       style={{ fontSize: "11px", color: c.textMuted, whiteSpace: "nowrap" }}
                     >
                       VOL: <strong style={{ color: c.textPrimary, fontFamily: APP_FONT_FAMILY }}>{formatVolume(activeCandle.volume ?? activeCandle.amount)}</strong>
@@ -1774,7 +1781,7 @@ export default function KlineChart({
                     {activeCandle.volume != null && (
                       <span
                         className="kline-chart__vol-stat"
-                        title={`成交量: ${activeCandle.volume.toLocaleString("zh-CN")} 股`}
+                        title={formatVolumeTooltip(activeCandle.volume)}
                         style={{ fontSize: "11px", color: c.textMuted, whiteSpace: "nowrap" }}
                       >
                         量: <strong style={{ color: c.textPrimary, fontFamily: APP_FONT_FAMILY }}>{formatVolume(activeCandle.volume)}</strong>

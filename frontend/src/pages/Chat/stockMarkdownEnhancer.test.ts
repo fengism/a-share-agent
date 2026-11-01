@@ -2,6 +2,11 @@ import { describe, expect, it } from "vitest";
 import { enrichStockMentions, parseStockProtocolUrl } from "./stockMarkdownEnhancer";
 
 describe("stockMarkdownEnhancer", () => {
+  it("returns original text directly when no 5-digit number is present", () => {
+    const input = "你好，这是一段普通的宏观分析总结，没有任何股票提及。";
+    expect(enrichStockMentions(input)).toBe(input);
+  });
+
   it("converts stock mentions to stock:// protocol links", () => {
     const input = "推荐关注贵州茅台(600519)与宁德时代（300750）的估值表现。";
     const result = enrichStockMentions(input);

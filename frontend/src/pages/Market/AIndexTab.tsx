@@ -277,6 +277,7 @@ export default function AIndexTab() {
         footer={null}
         width="min(1200px, calc(100vw - 20px))"
         centered
+        destroyOnHidden
         styles={{ body: { height: fullscreenHeight } }}
       >
         <LazyKlineChart
@@ -286,6 +287,7 @@ export default function AIndexTab() {
           onReachLeftEdge={historyLimitReached ? undefined : handleReachLeftEdge}
           historyLimitReached={historyLimitReached}
           landscapeToolbar={periodControl}
+          forceRender
         />
       </Modal>
     </div>

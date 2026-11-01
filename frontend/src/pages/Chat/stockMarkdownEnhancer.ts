@@ -11,6 +11,11 @@ const LEADING_KEYWORDS_REGEX =
 export function enrichStockMentions(markdown: string): string {
   if (!markdown) return "";
 
+  // 快速短路：若文本中无连续 5 位数字，必然不存在 A 股或港股代码，直接返回
+  if (!/\d{5}/.test(markdown)) {
+    return markdown;
+  }
+
   // 分割代码块与普通文本，避免替换代码块中的文本
   const codeBlockRegex = /(```[\s\S]*?```|`[^`\n]+`)/g;
   const parts = markdown.split(codeBlockRegex);

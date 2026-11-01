@@ -8,7 +8,7 @@ interface NextPromptSuggestionsProps {
   onSelectPrompt: (prompt: string) => void;
 }
 
-export function generateSuggestedPrompts(content: string, stockCodes: string[]): string[] {
+function generateSuggestedPrompts(content: string, stockCodes: string[]): string[] {
   const suggestions: string[] = [];
 
   // 1. 如果回答中包含具体股票

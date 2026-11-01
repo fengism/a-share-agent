@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button, message, Result } from "antd";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
@@ -20,8 +20,10 @@ import HKStockPageContent from "./HKStockPageContent";
 import StockBusinessIntro from "./StockBusinessIntro";
 import StockCharts from "./StockCharts";
 import StockHeaderCard, { type StockHeaderTapeData } from "./StockHeaderCard";
+import StockStickyBar from "./StockStickyBar";
 import StockDetailTabs from "./StockDetailTabs";
 import StockMetrics from "./StockMetrics";
+import { useDocumentTitle } from "../../hooks/useDocumentTitle";
 import "./stock-page.css";
 
 export default function StockPage() {
@@ -88,6 +90,14 @@ function StockPageContent({ code }: { code: string }) {
     ? ((latestPrice - prevClose) / prevClose) * 100
     : null;
 
+  const stockName = infoQuery.data?.name;
+  useDocumentTitle(
+    stockName
+      ? `${stockName} (${code})${changePct != null ? ` ${changePct >= 0 ? "+" : ""}${changePct.toFixed(2)}%` : ""}`
+      : `${code} 股票详情`,
+    { restoreOnUnmount: true },
+  );
+
   const oneYearAgoStr = useMemo(() => yearsAgoDate(1), []);
   const kline1yQuery = useKlineData(code, "daily", "qfq", true, { startDate: oneYearAgoStr }, { liveRefresh: false });
   const fiftyTwoWeekRange = useMemo(() => {
@@ -148,9 +158,37 @@ function StockPageContent({ code }: { code: string }) {
     }
   };
 
+  const [stickyVisible, setStickyVisible] = useState(false);
+  useEffect(() => {
+    const handleScroll = () => {
+      const headerEl = document.getElementById("stock-header-card");
+      if (headerEl) {
+        const rect = headerEl.getBoundingClientRect();
+        if (rect.height > 0 || rect.bottom > 0) {
+          setStickyVisible(rect.bottom <= 58);
+          return;
+        }
+      }
+      setStickyVisible(window.scrollY > 280);
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    handleScroll();
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [code, infoQuery.isLoading]);
+
   return (
     <main className="stock-page" style={pageContainerStyle}>
       {contextHolder}
+      <StockStickyBar
+        code={code}
+        name={stockName}
+        currentPrice={latestPrice}
+        changePct={changePct}
+        isWatched={isWatched}
+        isWatchlistPending={isWatchlistPending}
+        onToggleWatchlist={() => { void handleToggleWatchlist(); }}
+        visible={stickyVisible}
+      />
       <StockWorkspaceNav code={code} />
       <SectionDataState
         isLoading={infoQuery.isLoading}

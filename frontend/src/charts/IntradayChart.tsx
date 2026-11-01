@@ -7,6 +7,7 @@ import { createDebouncedResizeHandler } from "./chartLifecycle";
 import { buildIntradayVisibleRange } from "./intradayTimeRange";
 import { VOLUME_PANE_INDEX, PRICE_PANE_RATIO, applyVolumePaneLayout, getChartPaneThemeConfig } from "./chartPaneLayout";
 import { hexToRgba } from "./utils";
+import { formatVolumeTooltip } from "./klineChartFormatting";
 
 type Props = {
   data: IntradayItem[];
@@ -774,7 +775,11 @@ export default function IntradayChart({
             }}>
               成交量 VOL
             </span>
-            <span className="intraday-chart__volume-stat" style={{ fontSize: "11px", color: c.textMuted, whiteSpace: "nowrap" }}>
+            <span
+              className="intraday-chart__volume-stat"
+              title={formatVolumeTooltip(activePoint?.volume, market)}
+              style={{ fontSize: "11px", color: c.textMuted, whiteSpace: "nowrap" }}
+            >
               量: <strong style={{ color: c.textPrimary, fontFamily: APP_FONT_FAMILY }}>{formatVolume(activePoint?.volume)}</strong>
             </span>
             {activePoint?.amount != null && (

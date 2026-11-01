@@ -177,7 +177,7 @@ export default function RevenueBreakdownSection({
         render: (value: number | null) => <span className="financial-data-table__number">{formatPercentage(value)}</span>,
       } satisfies ColumnType<Row>,
     ];
-  }, [c.down, c.textMuted, c.textPrimary, c.textSecondary, c.up, hasAmounts, isExportingPdf]);
+  }, [c.down, c.primary, c.textMuted, c.textPrimary, c.textSecondary, c.up, hasAmounts, isExportingPdf]);
 
   const totalRows = availableDimensions.reduce(
     (count, { key }) => count + (data?.[key]?.length ?? 0),

@@ -13,6 +13,7 @@ import pandas as pd
 from app.core.concurrency.rate_limiter import call_blocking, sina_semaphore, tdx_semaphore
 from app.core.market import SHANGHAI_TIMEZONE, safe_float
 from app.domain.market import MarketIndices
+from app.financial_data.market.quotes.normalization import VolumeUnit, resolve_adaptive_volume
 from app.financial_data.stock.profile.exchange_master import get_exchange_stock_master
 from app.financial_data.stock.quotes.sources import get_spot_source
 
@@ -150,7 +151,14 @@ def normalize_cn_stocks(frame: pd.DataFrame, trade_date: date, source: str) -> l
             pre_close=pre_close,
             change_amount=safe_float(_first(row, "涨跌额", "change")) or change_amount,
             change_pct=safe_float(_first(row, "涨跌幅", "change_pct", "changepercent")) or calculated_pct,
-            volume=safe_float(_first(row, "成交量", "volume")),
+            volume=resolve_adaptive_volume(
+                safe_float(_first(row, "成交量", "volume")),
+                amount=safe_float(_first(row, "成交额", "amount")),
+                price=close,
+                target_unit=VolumeUnit.SHARES,
+                is_index=False,
+                symbol=code,
+            ),
             amount=safe_float(_first(row, "成交额", "amount")),
             turnover_pct=safe_float(_first(row, "换手率", "turnover_pct", "turnoverrate", "turnover")),
             source=source,
@@ -252,7 +260,14 @@ def normalize_indices(
             pre_close=item.pre_close,
             change_amount=change_amount,
             change_pct=item.change_pct if item.change_pct is not None else calculated_pct,
-            volume=item.volume,
+            volume=resolve_adaptive_volume(
+                item.volume,
+                amount=item.amount,
+                price=close,
+                target_unit=VolumeUnit.SHARES,
+                is_index=True,
+                symbol=item.code,
+            ),
             amount=item.amount,
             source=source,
         ))
@@ -574,7 +589,14 @@ async def fetch_cn_indices(trade_date: date) -> CollectedMarketDailyBars:
             close=item.close,
             pre_close=item.pre_close,
             change_pct=item.change_pct,
-            volume=item.volume,
+            volume=resolve_adaptive_volume(
+                item.volume,
+                amount=item.amount,
+                price=item.close,
+                target_unit=VolumeUnit.SHARES,
+                is_index=True,
+                symbol=symbol,
+            ),
             amount=item.amount,
             source=data.source or "index_kline",
         ))

@@ -28,6 +28,15 @@ export default defineConfig(({ mode }) => {
       chunkSizeWarningLimit: 800,
       rollupOptions: {
         output: {
+          chunkFileNames(chunkInfo) {
+            if (chunkInfo.name === "index" && chunkInfo.facadeModuleId) {
+              const match = chunkInfo.facadeModuleId.match(/\/src\/(pages|features)\/([^/]+)/);
+              if (match) {
+                return `assets/${match[1]}-${match[2].toLowerCase()}-[hash].js`;
+              }
+            }
+            return "assets/[name]-[hash].js";
+          },
           manualChunks(id) {
             if (!id.includes("node_modules")) return;
             // ECharts 与 zrender 保持单向依赖；树图模块不能单独拆分，

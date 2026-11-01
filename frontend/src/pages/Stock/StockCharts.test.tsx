@@ -5,7 +5,8 @@ import type { ChanlunResult } from "../../utils/chanlun";
 import type { KlineItem } from "../../types/stock";
 import StockCharts from "./StockCharts";
 
-const mocks = vi.hoisted(() => ({ kline: vi.fn(), analyze: vi.fn() }));
+const mocks = vi.hoisted(() => ({ kline: vi.fn(), analyze: vi.fn(), isNarrow: false }));
+vi.mock("../../hooks/useMediaQuery", () => ({ useMediaQuery: () => mocks.isNarrow }));
 vi.mock("../../api/queries", () => ({
   useKlineData: mocks.kline,
   useStockIntraday: () => ({ data: { items: [], prev_close: null }, isLoading: false, isFetching: false, error: null, refetch: vi.fn() }),
@@ -176,6 +177,7 @@ describe("stock K-line Chanlun switch", () => {
   });
 
   it("opens fullscreen modal when clicking fullscreen button and renders expanded chart", () => {
+    mocks.isNarrow = false;
     render(<StockCharts code="600519" />);
     const fullscreenBtn = screen.getByRole("button", { name: "全屏查看图表" });
     expect(fullscreenBtn).toBeInTheDocument();
@@ -185,5 +187,16 @@ describe("stock K-line Chanlun switch", () => {
     // One in background card, one in fullscreen modal
     expect(klineCharts.length).toBe(2);
     expect(klineCharts[1]).toHaveAttribute("data-view-key", "600519-daily-qfq-fullscreen");
+  });
+
+  it("adapts fullscreen modal styling and renders correctly on mobile viewport", () => {
+    mocks.isNarrow = true;
+    render(<StockCharts code="600519" />);
+    const fullscreenBtn = screen.getByRole("button", { name: "全屏查看图表" });
+    fireEvent.click(fullscreenBtn);
+    expect(screen.getByText("600519 · K 线图全屏")).toBeInTheDocument();
+    const modalWrap = document.querySelector(".stock-fullscreen-modal");
+    expect(modalWrap).toBeInTheDocument();
+    mocks.isNarrow = false;
   });
 });

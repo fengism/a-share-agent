@@ -11,6 +11,7 @@ from app.core.cache_policies import STOCK_INTRADAY
 from app.core.concurrency.rate_limiter import call_blocking, cls_semaphore, sina_semaphore
 from app.core.concurrency.singleflight import AsyncSingleFlight
 from app.core.market import normalize_code, safe_float
+from app.financial_data.market.quotes.normalization import VolumeUnit, resolve_adaptive_volume
 from app.financial_data.stock.quotes.schemas import IntradayData, IntradayItem
 from app.infrastructure.providers.provider_gateway import provider_gateway
 from app.infrastructure.providers.registry import get_provider
@@ -164,13 +165,23 @@ async def _load_intraday(sym, date: str | None) -> IntradayData:
         change_pct = safe_float(row.get("change_pct"))
         if change_pct is None and prev_close not in (None, 0):
             change_pct = round((price - prev_close) / prev_close * 100, 2)
+        raw_vol = safe_float(row.get("volume"))
+        raw_amt = safe_float(row.get("amount"))
+        volume = resolve_adaptive_volume(
+            raw_vol,
+            amount=raw_amt,
+            price=price,
+            target_unit=VolumeUnit.SHARES,
+            is_index=False,
+            symbol=sym.raw,
+        )
         items.append(
             IntradayItem(
                 time=str(row.get("time", "")),
                 price=price,
                 avg_price=safe_float(row.get("avg_price")),
-                volume=safe_float(row.get("volume")),
-                amount=safe_float(row.get("amount")),
+                volume=volume,
+                amount=raw_amt,
                 change_pct=change_pct,
             )
         )

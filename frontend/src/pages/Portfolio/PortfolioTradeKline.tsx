@@ -305,6 +305,7 @@ export default function PortfolioTradeKline({
             tradeMarkers={markers}
             height={isNarrow ? 480 : 580}
             viewKey={`portfolio-trades-modal:${selectedCode}:${dateRange?.startDate}:${dateRange?.endDate}`}
+            forceRender
           />
         )}
         {selectedTransactions.length > 0 && (

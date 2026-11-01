@@ -13,6 +13,7 @@ from uuid import uuid4
 
 from app.core.exceptions import ResourceConflictError, ResourceNotFoundError
 from app.financial_data.market.quotes.breadth import BreadthRequestLimiter
+from app.financial_data.market.quotes.normalization import VolumeUnit, resolve_adaptive_volume
 from app.financial_data.stock.public import get_exchange_stock_master
 from app.financial_data.stock.quotes.historical import (
     HistoricalBarCandidates,
@@ -301,7 +302,14 @@ def _records_from_history(code: str, name: str, history: HistoricalBarSet) -> li
                 pre_close=pre_close,
                 change_amount=change_amount,
                 change_pct=item.change_pct,
-                volume=item.volume,
+                volume=resolve_adaptive_volume(
+                    item.volume,
+                    amount=item.amount,
+                    price=item.close,
+                    target_unit=VolumeUnit.SHARES,
+                    is_index=False,
+                    symbol=code,
+                ),
                 amount=item.amount,
                 turnover_pct=item.turnover_pct,
                 source=f"history-backfill:{history.source}",

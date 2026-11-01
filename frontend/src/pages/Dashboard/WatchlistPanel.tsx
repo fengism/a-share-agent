@@ -28,6 +28,7 @@ import PreloadLink from "../../components/PreloadLink";
 import { buildWatchlistStockUrl, buildStockAnalysisUrl } from "../../utils/stockLinks";
 import { formatMarketClock } from "../../utils/marketTime";
 import { PriceRangeBar } from "../../components/PriceRangeBar";
+import { openGlobalCopilot, triggerStockAiDiagnosis } from "../../utils/copilotEvents";
 
 const { Text } = Typography;
 const CONDITION_LABELS: Record<WatchlistAlertCondition, string> = {
@@ -168,11 +169,12 @@ export default function WatchlistPanel() {
                     .slice(0, 5)
                     .map((i) => `${i.stock_name}(${i.stock_code})`)
                     .join("、");
-                  navigate(
-                    `/chat?prompt=${encodeURIComponent(
-                      `请对我的自选股组合（${topCodes}）进行今日全景体检，分析各标的资金进出与估值安全边际`,
-                    )}`,
-                  );
+                  const prompt = `请对我的自选股组合（${topCodes}）进行今日全景体检，分析各标的资金进出与估值安全边际`;
+                  if (typeof window !== "undefined" && window.location.pathname.startsWith("/chat")) {
+                    navigate(`/chat?prompt=${encodeURIComponent(prompt)}`);
+                  } else {
+                    openGlobalCopilot(prompt);
+                  }
                 }}
               />
             </Tooltip>
@@ -267,13 +269,7 @@ export default function WatchlistPanel() {
                         type="text"
                         aria-label={`AI体检${item.stock_name}`}
                         icon={<RobotOutlined style={{ color: "var(--c-primary)" }} />}
-                        onClick={() =>
-                          navigate(
-                            `/chat?prompt=${encodeURIComponent(
-                              `请全面深度诊断【${item.stock_name}(${item.stock_code})】的投资价值、核心驱动力、估值水平与主要风险点`,
-                            )}`,
-                          )
-                        }
+                        onClick={() => triggerStockAiDiagnosis(item.stock_code, item.stock_name, navigate)}
                       />
                     </Tooltip>
                     <Tooltip title="查看个股研报">

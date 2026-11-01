@@ -1,8 +1,9 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { WatchlistCardList } from "./WatchlistCardList";
 import type { WatchlistItem } from "../../../types/watchlist";
+import { COPILOT_OPEN_EVENT } from "../../../utils/copilotEvents";
 
 const mockItem: WatchlistItem = {
   id: 1,
@@ -62,5 +63,69 @@ describe("WatchlistCardList", () => {
     const deleteBtn = screen.getByLabelText("移除贵州茅台");
     fireEvent.click(deleteBtn);
     expect(onDelete).toHaveBeenCalledWith(mockItem);
+  });
+
+  it("triggers AI diagnosis drawer event on clicking AI体检 button", () => {
+    const eventHandler = vi.fn();
+    window.addEventListener(COPILOT_OPEN_EVENT, eventHandler);
+
+    render(
+      <MemoryRouter>
+        <WatchlistCardList
+          items={[mockItem]}
+          selectedIds={[]}
+          onToggleSelect={vi.fn()}
+          onSetAlert={vi.fn()}
+          onDelete={vi.fn()}
+          onSelectConcept={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    const aiBtn = screen.getByLabelText("AI体检贵州茅台");
+    fireEvent.click(aiBtn);
+
+    expect(eventHandler).toHaveBeenCalled();
+    const customEvent = eventHandler.mock.calls[0][0] as CustomEvent;
+    expect(customEvent.detail.prompt).toContain("贵州茅台");
+    expect(customEvent.detail.prompt).toContain("600519");
+
+    window.removeEventListener(COPILOT_OPEN_EVENT, eventHandler);
+  });
+
+  it("applies tick flash class when price updates", () => {
+    const { rerender } = render(
+      <MemoryRouter>
+        <WatchlistCardList
+          items={[mockItem]}
+          selectedIds={[]}
+          onToggleSelect={vi.fn()}
+          onSetAlert={vi.fn()}
+          onDelete={vi.fn()}
+          onSelectConcept={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    const priceEl = screen.getByTestId("watchlist-card-price");
+    expect(priceEl.className).toBe("");
+
+    const updatedItem = { ...mockItem, current_price: 1525.0 };
+    act(() => {
+      rerender(
+        <MemoryRouter>
+          <WatchlistCardList
+            items={[updatedItem]}
+            selectedIds={[]}
+            onToggleSelect={vi.fn()}
+            onSetAlert={vi.fn()}
+            onDelete={vi.fn()}
+            onSelectConcept={vi.fn()}
+          />
+        </MemoryRouter>,
+      );
+    });
+
+    expect(priceEl.className).toBe("tick-flash-up");
   });
 });

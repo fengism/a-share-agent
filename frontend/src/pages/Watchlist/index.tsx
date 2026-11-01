@@ -51,8 +51,10 @@ import {
 import ChangeValue from "../../components/ChangeValue";
 import PreloadLink from "../../components/PreloadLink";
 import SectionDataState from "../../components/SectionDataState";
+import { triggerStockAiDiagnosis } from "../../utils/copilotEvents";
 import { useStockSearchController } from "../../hooks/useStockSearchController";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
+import { usePriceFlash } from "../../hooks/usePriceFlash";
 import { useStyles } from "../../styles/ui";
 import type {
   WatchlistAlertCondition,
@@ -343,6 +345,18 @@ function ConceptTags({
   );
 }
 
+function WatchlistPriceCell({ value, changePct }: { value: number | null; changePct: number | null }) {
+  const flashClass = usePriceFlash(value);
+  return (
+    <strong
+      className={`watchlist-page__price is-${marketDirection(changePct)} financial-num ${flashClass}`}
+      style={{ padding: "1px 4px", borderRadius: 4, transition: "background-color 0.3s ease" }}
+    >
+      {formatPrice(value)}
+    </strong>
+  );
+}
+
 export default function WatchlistPage() {
   const { cardStyle, pageContainerStyle, pageDescriptionStyle, pageTitleStyle } = useStyles();
   const isMobile = useMediaQuery("(max-width: 640px)");
@@ -577,9 +591,7 @@ export default function WatchlistPage() {
       fixed: isMobile ? undefined : "left",
       align: "right",
       render: (value: number | null, item) => (
-        <strong className={`watchlist-page__price is-${marketDirection(item.change_pct)} financial-num`}>
-          {formatPrice(value)}
-        </strong>
+        <WatchlistPriceCell value={value} changePct={item.change_pct} />
       ),
     },
     {
@@ -720,13 +732,7 @@ export default function WatchlistPage() {
               size="small"
               aria-label={`AI体检${item.stock_name}`}
               icon={<RobotOutlined style={{ color: "var(--c-primary)" }} />}
-              onClick={() =>
-                navigate(
-                  `/chat?prompt=${encodeURIComponent(
-                    `请深度诊断【${item.stock_name}(${item.stock_code})】的投资价值、核心驱动力、估值水平与主要风险点`,
-                  )}`,
-                )
-              }
+              onClick={() => triggerStockAiDiagnosis(item.stock_code, item.stock_name, navigate)}
             />
           </Tooltip>
           <Tooltip title="查看研报">
@@ -811,6 +817,7 @@ export default function WatchlistPage() {
         }}
         size="small"
         pagination={false}
+        tableLayout="fixed"
         scroll={{ x: isMobile ? 1380 : 1690 }}
         rowClassName={(item) => `watchlist-page__row is-${marketDirection(item.change_pct)}`}
       />

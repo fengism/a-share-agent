@@ -8,8 +8,10 @@ import WorkflowRuntimeBridge from "./WorkflowRuntimeBridge";
 import AppSidebar from "./AppSidebar";
 import RouteLoadingFallback from "./RouteLoadingFallback";
 import UpdateBanner from "./UpdateBanner";
+import NetworkStatusBanner from "./NetworkStatusBanner";
 import GlobalChatCopilot from "./GlobalChatCopilot";
 import { getActiveNavKey } from "./navConfig";
+import { resolveRouteTitle, useDocumentTitle } from "../hooks/useDocumentTitle";
 
 const SIDEBAR_COLLAPSED_KEY = "trade_agent_sidebar_collapsed";
 
@@ -29,6 +31,8 @@ export default function AppLayout() {
   const isMobile = useMediaQuery("(max-width: 768px)");
   const contentRef = useRef<HTMLElement>(null);
   const previousPath = useRef(location.pathname);
+
+  useDocumentTitle(resolveRouteTitle(location.pathname));
 
   const handleCollapse = useCallback((nextCollapsed: boolean) => {
     setCollapsed(nextCollapsed);
@@ -102,6 +106,7 @@ export default function AppLayout() {
           marginLeft: isMobile ? 0 : collapsed ? 68 : 210,
           transition: "margin-left 0.2s",
         }}>
+          <NetworkStatusBanner />
           <UpdateBanner showIdle={false} />
           <AppHeader
             isMobile={isMobile}

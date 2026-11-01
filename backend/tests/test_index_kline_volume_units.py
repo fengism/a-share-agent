@@ -59,12 +59,28 @@ def test_tdx_index_volume_is_normalized_to_shares():
 
 
 def test_tdx_index_uses_bars_with_index_flag():
-    """指数走 bars(index=True)（0.5.1 起显式指数开关），系数与个股同为 100。"""
+    """指数走 bars(index=True)（0.5.1 起显式指数开关），K线成交量经过归一化。"""
     index_src = inspect.getsource(tdxhub_provider.fetch_index_kline)
     assert '"bars"' in index_src
     assert "index=True" in index_src
     assert "volume_multiplier=100" in index_src
-    assert "value * 100" in inspect.getsource(tdxhub_provider.fetch_stock_kline)
+    assert "resolve_adaptive_volume" in inspect.getsource(tdxhub_provider.fetch_stock_kline)
+
+
+def test_tdx_stock_volume_already_in_shares_does_not_multiply_100():
+    """真实 TDX bars_all 返回 vol 已是股时，自适应保持股数，不被误乘 100。"""
+    raw = pd.DataFrame(
+        [{
+            "open": 1400.0, "close": 1410.0, "high": 1420.0, "low": 1390.0,
+            "vol": 2_657_300.0, "volume": 2_657_300.0, "amount": 3_393_315_840.0,
+            "datetime": f"{_TRADING_DAY} 15:00",
+        }]
+    )
+    with patch.object(tdxhub_provider, "_call", return_value=raw):
+        frame = tdxhub_provider.fetch_stock_kline("600519", "20261013", "20261013")
+    volume, amount = float(frame.iloc[-1]["volume"]), float(frame.iloc[-1]["amount"])
+    assert volume == 2_657_300.0
+    _assert_contract(volume, amount, "TDX 个股自适应")
 
 
 def test_tdx_index_kline_requests_prefixed_symbol():

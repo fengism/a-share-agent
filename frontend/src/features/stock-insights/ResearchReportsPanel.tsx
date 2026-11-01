@@ -63,10 +63,10 @@ export default function ResearchReportsPanel({ code }: Props) {
   const { cardStyle, sectionHeaderStyle } = useStyles();
   const reportsQuery = useStockReports(code);
   const data = reportsQuery.data;
-  const items = data?.items ?? [];
+  const items = data?.items;
 
   const consensus = useMemo(() => {
-    if (items.length === 0) return null;
+    if (!items || items.length === 0) return null;
     const buyCount = items.filter((r) => POSITIVE_RATINGS.some((w) => r.rating?.includes(w))).length;
     const buyRatio = (buyCount / items.length) * 100;
     const targetPrices = items.map((r) => r.goal_price).filter((p): p is number => p != null && p > 0);
@@ -83,7 +83,7 @@ export default function ResearchReportsPanel({ code }: Props) {
       errorTitle="研报数据加载失败"
       skeletonRows={6}
       minHeight={280}
-      isEmpty={!reportsQuery.isLoading && items.length === 0}
+      isEmpty={!reportsQuery.isLoading && (!items || items.length === 0)}
       emptyText="最近半年暂无研报数据"
     >
       <div style={{ display: "grid", gap: t.space[4] }}>
@@ -134,7 +134,7 @@ export default function ResearchReportsPanel({ code }: Props) {
             size="small"
             rowKey="id"
             columns={columns}
-            dataSource={items}
+            dataSource={items ?? []}
             pagination={{ pageSize: 10, size: "small", showSizeChanger: false, hideOnSinglePage: true }}
           />
         </Card>

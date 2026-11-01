@@ -9,6 +9,7 @@ from app.constants.market import INDEX_FALLBACKS, TENCENT_STOCK_CONCEPT_URL, TEN
 from app.core.dataframes import rename_columns
 from app.core.market import market_today, normalize_code, safe_float
 from app.domain.stock import StockConcept, StockConceptInfo
+from app.financial_data.market.quotes.normalization import VolumeUnit, resolve_adaptive_volume
 from app.infrastructure.http.client import get_provider_session as _get_session
 
 
@@ -303,18 +304,29 @@ class TencentDataProvider:
                 quoted_at = datetime.strptime(vals[30], "%Y%m%d%H%M%S").isoformat(timespec="seconds")
             except ValueError:
                 pass
+        price = _quote_number(vals[3])
+        raw_volume = _quote_number(vals[6])
+        amount = _quote_number(vals[37], 10000)
+        volume = resolve_adaptive_volume(
+            raw_volume,
+            amount=amount,
+            price=price,
+            target_unit=VolumeUnit.LOTS,
+            is_index=key.startswith(("sh000", "sz399", "bj899")),
+            symbol=code,
+        )
         return {
             "code": code,
             "name": vals[1],
-            "price": _quote_number(vals[3]),
+            "price": price,
             "last_close": _quote_number(vals[4]),
             "open": _quote_number(vals[5]),
-            "volume": _quote_number(vals[6]),
+            "volume": volume,
             "change_amt": _quote_number(vals[31]),
             "change_pct": _quote_number(vals[32]),
             "high": _quote_number(vals[33]),
             "low": _quote_number(vals[34]),
-            "amount": _quote_number(vals[37], 10000),
+            "amount": amount,
             "turnover_pct": _quote_number(vals[38]),
             "pe_ttm": _quote_number(vals[39]),
             "amplitude_pct": _quote_number(vals[43]),

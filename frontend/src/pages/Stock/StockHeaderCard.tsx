@@ -5,6 +5,7 @@ import {
   FileSearchOutlined,
   GlobalOutlined,
   PlusOutlined,
+  RobotOutlined,
   ShareAltOutlined,
   StarFilled,
   ThunderboltOutlined,
@@ -15,6 +16,7 @@ import { useColors, useStyles } from "../../styles/ui";
 import type { StockBasicInfo } from "../../types/stock";
 import { formatNumberWithSeparators } from "../../utils/format";
 import { buildStockAnalysisUrl } from "../../utils/stockLinks";
+import { triggerStockAiDiagnosis } from "../../utils/copilotEvents";
 import StockSnapshotModal from "./StockSnapshotModal";
 
 const { Title, Text } = Typography;
@@ -80,7 +82,7 @@ export default function StockHeaderCard({
   };
 
   return (
-    <Card className="stock-header-card" style={cardStyle} styles={{ body: { padding: 0 } }}>
+    <Card id="stock-header-card" className="stock-header-card" style={cardStyle} styles={{ body: { padding: 0 } }}>
       <span className="stock-header-card__glow" aria-hidden="true" />
       <div className="stock-header-card__content">
         <div className="stock-header-card__identity">
@@ -253,6 +255,13 @@ export default function StockHeaderCard({
             style={{ color: isWatched ? colors.warning : colors.primary }}
           >
             {isWatched ? "已自选" : "加入自选"}
+          </Button>
+          <Button
+            icon={<RobotOutlined style={{ color: colors.primary }} />}
+            aria-label="AI 伴随诊断"
+            onClick={() => triggerStockAiDiagnosis(info.code, info.name, navigate)}
+          >
+            AI 伴随诊断
           </Button>
           <Button
             icon={<ShareAltOutlined />}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { message } from "antd";
 import { useLocation } from "react-router-dom";
 import { useHKStockHistory, useHKStockQuote } from "../../api/queryHooks/hk";
@@ -17,7 +17,9 @@ import StockBusinessIntro from "./StockBusinessIntro";
 import StockCharts from "./StockCharts";
 import StockDetailTabs from "./StockDetailTabs";
 import StockHeaderCard, { type StockHeaderTapeData } from "./StockHeaderCard";
+import StockStickyBar from "./StockStickyBar";
 import StockMetrics from "./StockMetrics";
+import { useDocumentTitle } from "../../hooks/useDocumentTitle";
 
 export default function HKStockPageContent({ code }: { code: string }) {
   const { pageContainerStyle } = useStyles();
@@ -45,6 +47,15 @@ export default function HKStockPageContent({ code }: { code: string }) {
   );
   const isWatchlistPending = addWatchlistItem.isPending || deleteWatchlistItem.isPending;
   const quote = quoteQuery.data;
+
+  const hkName = quote?.name;
+  const hkChangePct = quote?.change_pct;
+  useDocumentTitle(
+    hkName
+      ? `${hkName} (${code})${hkChangePct != null ? ` ${hkChangePct >= 0 ? "+" : ""}${hkChangePct.toFixed(2)}%` : ""}`
+      : `${code} 港股详情`,
+    { restoreOnUnmount: true },
+  );
 
   const handleToggleWatchlist = async () => {
     if (isWatchlistPending) return;
@@ -99,9 +110,38 @@ export default function HKStockPageContent({ code }: { code: string }) {
     };
   }, [quote, fiftyTwoWeekRange]);
 
+  const [stickyVisible, setStickyVisible] = useState(false);
+  useEffect(() => {
+    const handleScroll = () => {
+      const headerEl = document.getElementById("stock-header-card");
+      if (headerEl) {
+        const rect = headerEl.getBoundingClientRect();
+        if (rect.height > 0 || rect.bottom > 0) {
+          setStickyVisible(rect.bottom <= 58);
+          return;
+        }
+      }
+      setStickyVisible(window.scrollY > 280);
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    handleScroll();
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [code, quoteQuery.isLoading]);
+
   return (
     <main className="stock-page" style={pageContainerStyle}>
       {contextHolder}
+      <StockStickyBar
+        code={code}
+        name={hkName}
+        currentPrice={quote?.price}
+        changePct={hkChangePct}
+        market="hk"
+        isWatched={isWatched}
+        isWatchlistPending={isWatchlistPending}
+        onToggleWatchlist={() => { void handleToggleWatchlist(); }}
+        visible={stickyVisible}
+      />
       <StockWorkspaceNav code={code} market="hk" />
 
       {/* ── 顶部行情卡片 ── */}

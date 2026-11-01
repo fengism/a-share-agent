@@ -21,7 +21,7 @@ export default function MobileSidebarDrawer({
       placement="left"
       open={open}
       onClose={onClose}
-      size={240}
+      size={264}
       closable={false}
       styles={{
         body: {
@@ -29,12 +29,13 @@ export default function MobileSidebarDrawer({
           display: "flex",
           flexDirection: "column",
           background: themes[themeKey].siderBg,
-          boxShadow: "4px 0 24px rgba(0, 0, 0, 0.35)",
+          boxShadow: "6px 0 28px rgba(0, 0, 0, 0.4)",
+          paddingTop: "env(safe-area-inset-top, 0px)",
         },
         mask: {
           backdropFilter: "blur(8px)",
           WebkitBackdropFilter: "blur(8px)",
-          background: "rgba(0, 0, 0, 0.45)",
+          background: "rgba(0, 0, 0, 0.5)",
         },
         header: { display: "none" },
       }}

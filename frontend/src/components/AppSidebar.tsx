@@ -1,5 +1,6 @@
 import { lazy, Suspense } from "react";
 import {
+  CloseOutlined,
   LineChartOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
@@ -113,7 +114,7 @@ export default function AppSidebar({
                   <span className="app-sidebar-brand__tag">QUANT TERMINAL</span>
                 </div>
               </button>
-              {!isMobile && (
+              {!isMobile ? (
                 <Tooltip placement="bottom" title="收起侧边栏 (⌘B / Ctrl+B)" mouseEnterDelay={0.3}>
                   <button
                     type="button"
@@ -124,12 +125,24 @@ export default function AppSidebar({
                     <MenuFoldOutlined />
                   </button>
                 </Tooltip>
+              ) : (
+                <button
+                  type="button"
+                  aria-label="关闭侧边栏"
+                  className="al-collapse-btn app-sidebar-brand__close"
+                  onClick={onMobileNavClose}
+                >
+                  <CloseOutlined />
+                </button>
               )}
             </>
           )}
         </div>
 
-        <nav className={`app-sidebar-nav${isCollapsed ? " app-sidebar-nav--collapsed" : ""}`} aria-label="主导航">
+        <nav
+          className={`app-sidebar-nav${isCollapsed ? " app-sidebar-nav--collapsed" : ""}${isMobile ? " app-sidebar-nav--mobile" : ""}`}
+          aria-label="主导航"
+        >
           {isCollapsed
             ? NAV_GROUPS.map((group, groupIdx) => (
                 <div key={group.key} className="app-sidebar-nav__collapsed-group">
@@ -140,15 +153,21 @@ export default function AppSidebar({
             : NAV_GROUPS.map((group) => (
                 <div className="app-sidebar-nav__group" key={group.key}>
                   <div className="app-sidebar-nav__group-title">
-                    {group.icon && <span style={{ marginRight: 6, fontSize: 11, opacity: 0.85 }}>{group.icon}</span>}
-                    {group.label}
+                    {group.icon && (
+                      <span className="app-sidebar-nav__group-icon" aria-hidden="true">
+                        {group.icon}
+                      </span>
+                    )}
+                    <span>{group.label}</span>
                   </div>
                   {group.items.map(renderRoute)}
                 </div>
               ))}
         </nav>
 
-        <div className={`app-sidebar-footer${isCollapsed ? " app-sidebar-footer--collapsed" : ""}`}>
+        <div
+          className={`app-sidebar-footer${isCollapsed ? " app-sidebar-footer--collapsed" : ""}${isMobile ? " app-sidebar-footer--mobile" : ""}`}
+        >
           <Tooltip
             placement="right"
             title={isCollapsed ? "量化雷达: 在线 (⌘B / Ctrl+B 展开)" : "量化雷达: 核心行情服务在线"}

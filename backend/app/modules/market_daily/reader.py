@@ -7,6 +7,7 @@ import logging
 from datetime import date
 
 from app.domain.market import KlineData, KlineItem
+from app.financial_data.market.quotes.normalization import VolumeUnit, resolve_adaptive_volume
 from app.modules.market_daily.models import MarketDailyBar
 from app.modules.market_daily.paths import MARKET_DAILY_DATABASE_PATH
 from app.modules.market_daily.repository import MarketDailyBarRepository
@@ -20,6 +21,14 @@ def _to_kline_item(bar: MarketDailyBar) -> KlineItem:
     amplitude = None
     if bar.pre_close is not None and bar.pre_close > 0 and bar.high is not None and bar.low is not None:
         amplitude = (bar.high - bar.low) / bar.pre_close * 100
+    volume = resolve_adaptive_volume(
+        bar.volume,
+        amount=bar.amount,
+        price=bar.close,
+        target_unit=VolumeUnit.SHARES,
+        is_index=(bar.instrument_type == "index"),
+        symbol=bar.code,
+    )
     return KlineItem(
         code=bar.code,
         date=bar.trade_date.isoformat(),
@@ -27,7 +36,7 @@ def _to_kline_item(bar: MarketDailyBar) -> KlineItem:
         close=bar.close,
         high=bar.high if bar.high is not None else bar.close,
         low=bar.low if bar.low is not None else bar.close,
-        volume=bar.volume or 0,
+        volume=volume or 0,
         amount=bar.amount or 0,
         turnover_pct=bar.turnover_pct,
         amplitude=amplitude,

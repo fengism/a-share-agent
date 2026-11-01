@@ -8,6 +8,7 @@ import IntradayChart from "../../charts/IntradayChart";
 import LazyKlineChart from "../../charts/LazyKlineChart";
 import SectionDataState from "../../components/SectionDataState";
 import { useFullscreenChartHeight } from "../../hooks/useFullscreenChartHeight";
+import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { useStyles } from "../../styles/ui";
 import type { KlineItem } from "../../types/stock";
 import { analyzeChanlun } from "../../utils/chanlun";
@@ -160,6 +161,7 @@ function CNKlinePanel({
           historyLimitReached={historyLimitReached}
           chipDistribution={chipQuery?.data}
           landscapeToolbar={landscapeToolbar}
+          forceRender={Boolean(viewKeySuffix)}
         />
       </SectionDataState>
     </>
@@ -284,6 +286,7 @@ function HKKlinePanel({
           onReachLeftEdge={historyLimitReached ? undefined : onReachLeftEdge}
           historyLimitReached={historyLimitReached}
           landscapeToolbar={landscapeToolbar}
+          forceRender={Boolean(viewKeySuffix)}
         />
       </SectionDataState>
     </>
@@ -323,7 +326,7 @@ function IntradayPanel({
 
   return (
     <>
-      <div className="stock-chart-toolbar" style={{ justifyContent: "space-between" }}>
+      <div className="stock-chart-toolbar stock-chart-toolbar--intraday" style={{ justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, fontSize: "var(--c-font-sm)", color: "var(--c-text-secondary)" }}>
           {latestTime && (
             <span>
@@ -413,6 +416,7 @@ export default function StockCharts({ code, market = "cn", name }: StockChartsPr
   const [period, setPeriod] = useState("daily");
   const [historyYears, setHistoryYears] = useState(1);
   const [expanded, setExpanded] = useState(false);
+  const isMobile = useMediaQuery("(max-width: 768px)");
   const { cardStyle } = useStyles();
   const fullscreenHeight = useFullscreenChartHeight();
 
@@ -564,7 +568,7 @@ export default function StockCharts({ code, market = "cn", name }: StockChartsPr
                 : `${activeView.toUpperCase()} 技术副图全屏`
             }`
           ) : (
-            <div style={{ display: "flex", alignItems: "center", gap: 12, justifyContent: "space-between", paddingRight: 32 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, justifyContent: "space-between", paddingRight: isMobile ? 16 : 32 }}>
               <span style={{ fontWeight: 600 }}>
                 {`${code} · ${
                   activeView === "kline"
@@ -582,9 +586,23 @@ export default function StockCharts({ code, market = "cn", name }: StockChartsPr
         open={expanded}
         onCancel={() => setExpanded(false)}
         footer={null}
-        width={isHK ? "94vw" : "92vw"}
-        style={isHK ? { top: 20 } : undefined}
-        styles={{ body: { height: fullscreenHeight, minHeight: isHK ? 320 : undefined, overflowY: "auto" } }}
+        width={isMobile ? "100vw" : isHK ? "94vw" : "92vw"}
+        className="stock-fullscreen-modal"
+        style={
+          isMobile
+            ? { top: 0, margin: 0, paddingBottom: 0, maxWidth: "100vw" }
+            : isHK
+            ? { top: 20 }
+            : undefined
+        }
+        styles={{
+          body: {
+            height: isMobile ? "calc(100dvh - 56px)" : fullscreenHeight,
+            minHeight: isHK ? 320 : undefined,
+            padding: isMobile ? "6px 8px 12px 8px" : undefined,
+            overflowY: "auto",
+          },
+        }}
         destroyOnHidden
       >
         {activeView === "kline" ? (
