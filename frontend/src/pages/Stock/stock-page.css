@@ -1,7 +1,19 @@
 .stock-page {
   display: grid;
   min-width: 0;
+  max-width: 100%;
   gap: var(--c-space-5);
+}
+
+.stock-chart-card {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.stock-chart-card .ant-card-body {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 .stock-page__overview-grid {
@@ -602,23 +614,9 @@
   .stock-chart-card .ant-card-extra .ant-segmented-group { display: grid; grid-template-columns: repeat(3, 1fr); }
   .stock-chart-toolbar {
     justify-content: flex-start;
-    overflow-x: auto;
-    flex-wrap: nowrap;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    padding: 6px 8px;
-    gap: 8px;
-  }
-  .stock-chart-toolbar::-webkit-scrollbar {
-    display: none;
-  }
-  .stock-chart-toolbar > * {
-    flex-shrink: 0;
-  }
-  .stock-chart-toolbar--intraday {
     flex-wrap: wrap;
-    justify-content: space-between;
-    overflow-x: visible;
+    max-width: 100%;
+    box-sizing: border-box;
   }
 
   /* ── 移动端全屏沉浸看盘模态优化 ── */
@@ -636,6 +634,22 @@
   }
   .stock-fullscreen-modal .ant-modal-header {
     margin-bottom: 8px;
+  }
+  .stock-fullscreen-modal .stock-chart-toolbar {
+    justify-content: flex-start;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding: 6px 8px;
+    gap: 8px;
+    max-width: 100%;
+  }
+  .stock-fullscreen-modal .stock-chart-toolbar::-webkit-scrollbar {
+    display: none;
+  }
+  .stock-fullscreen-modal .stock-chart-toolbar > * {
+    flex-shrink: 0;
   }
 
   /* ── 个股详情底部 Tab 栏移动端响应式与水平滑动优化 ── */
@@ -848,23 +862,21 @@
   position: sticky;
   top: 58px;
   z-index: 95;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  height: 46px;
   margin-top: -46px;
   margin-bottom: 0;
-  height: 0;
   overflow: hidden;
   opacity: 0;
   transform: translateY(-8px);
   pointer-events: none;
-  transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1),
-    transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
-    height 0.25s cubic-bezier(0.16, 1, 0.3, 1),
-    margin-bottom 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .stock-sticky-bar.is-visible {
-  height: 46px;
-  margin-bottom: var(--c-space-3);
-  overflow: visible;
   opacity: 1;
   transform: translateY(0);
   pointer-events: auto;
@@ -876,6 +888,9 @@
   justify-content: space-between;
   gap: var(--c-space-3);
   height: 46px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   padding: 0 var(--c-space-4);
   background: color-mix(in srgb, var(--c-card-bg) 88%, transparent);
   backdrop-filter: blur(14px);
@@ -955,12 +970,12 @@
 
 @media (max-width: 640px) {
   .stock-sticky-bar__container {
-    padding: 0 10px;
-    gap: 8px;
+    padding: 0 8px;
+    gap: 6px;
   }
 
   .stock-sticky-bar__name {
-    max-width: 80px;
+    max-width: 70px;
     font-size: var(--c-font-sm);
   }
 
@@ -968,8 +983,21 @@
     display: none;
   }
 
+  .stock-sticky-bar__quote {
+    gap: 4px;
+  }
+
   .stock-sticky-bar__price {
-    font-size: 15px;
+    font-size: 14px;
+    padding: 0 2px;
+  }
+
+  .stock-sticky-bar__change {
+    font-size: 12px;
+  }
+
+  .stock-sticky-bar__actions {
+    gap: 4px;
   }
 
   .stock-sticky-bar__report-btn {
