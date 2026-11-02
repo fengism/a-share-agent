@@ -348,7 +348,7 @@ function ImportDrawer({
       closable={!busy}
       mask={{ closable: !busy }}
       keyboard={!busy}
-      width="min(640px, 100vw)"
+      size="large"
       destroyOnHidden
     >
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -547,7 +547,7 @@ export default function StockConceptPage() {
       fixed: "left",
       width: 140,
       render: (_, record) => (
-        <Space direction="vertical" size={0}>
+        <Space vertical size={0}>
           <Text strong copyable>
             {record.stock_code}
           </Text>
@@ -720,7 +720,7 @@ export default function StockConceptPage() {
               <Statistic
                 title="最近更新时间"
                 value={formatDateTime(stats?.latest_updated_at)}
-                valueStyle={{ fontSize: 15 }}
+                styles={{ content: { fontSize: 15 } }}
               />
             </Card>
           </Col>

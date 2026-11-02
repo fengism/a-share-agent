@@ -76,6 +76,17 @@ if (typeof window.scrollTo === "function" && !("__scrollToPatched" in window)) {
   window.scrollTo = () => {};
 }
 
+// Node 20+ 在 globalThis 上自带 Node 原生 File/Blob 实现，
+// 而 jsdom 环境下的 FileReader 校验的是 jsdom 自身的 Blob 原型。
+// 当测试用例使用全局 `new File(...)` 传入被测组件时，jsdom 的 FileReader 会抛出：
+// "TypeError: Failed to execute 'readAsDataURL' on 'FileReader': parameter 1 is not of type 'Blob'."
+// 将 jsdom 实例的 File/Blob 同步到 globalThis 保证兼容。
+if (typeof window !== "undefined") {
+  if (window.File) globalThis.File = window.File;
+  if (window.Blob) globalThis.Blob = window.Blob;
+  if (window.FileReader) globalThis.FileReader = window.FileReader;
+}
+
 // Ant Design 5/6 的静态 message / notification 使用 rc-notification 独立根节点与 CSS 动画，
 // 其异步通知生命周期在单元测试脱离当前 act 上下文时会向控制台输出无害的 ForwardRef / Notifications 调度告警。
 // 这里安全过滤该特定内部告警，保留所有真实业务报错。

@@ -287,7 +287,7 @@ function ImportDrawer({
       closable={!busy}
       mask={{ closable: !busy }}
       keyboard={!busy}
-      width="min(640px, 100vw)"
+      size="large"
       destroyOnHidden
       extra={<Button disabled={busy} onClick={close}>关闭</Button>}
     >
@@ -311,7 +311,7 @@ function ImportDrawer({
         </Upload.Dragger>
         {fileState && (
           <Card size="small" className="industry-selected-file">
-            <Space direction="vertical" size={2}>
+            <Space vertical size={2}>
               <Text strong>{fileState.filename}</Text>
               <Text type="secondary">{((upload.selected?.size ?? 0) / 1024 / 1024).toFixed(2)} MB</Text>
             </Space>
@@ -476,7 +476,7 @@ export default function IndustryClassificationPage() {
       fixed: "left",
       width: 140,
       render: (_, record) => (
-        <Space direction="vertical" size={0}>
+        <Space vertical size={0}>
           <Text strong copyable>{record.stock_code}</Text>
           <Text type="secondary">{record.stock_name || "—"}</Text>
         </Space>
@@ -570,7 +570,7 @@ export default function IndustryClassificationPage() {
           <Col xs={12} sm={8} xl={4}><Card><Statistic title="港股" value={status?.stats.market_counts.HK ?? 0} /></Card></Col>
           <Col xs={12} sm={8} xl={4}><Card><Statistic title="海外" value={status?.stats.market_counts.OVERSEAS ?? 0} /></Card></Col>
           <Col xs={12} sm={8} xl={4}><Card><Statistic title="行业层级" value={`${status?.stats.level1_count ?? 0} / ${status?.stats.level2_count ?? 0} / ${status?.stats.level3_count ?? 0}`} suffix={<span className="industry-stat-suffix">一/二/三级</span>} /></Card></Col>
-          <Col xs={12} sm={8} xl={4}><Card><Statistic title="最近更新时间" value={formatDateTime(status?.stats.latest_updated_at)} valueStyle={{ fontSize: 15 }} /></Card></Col>
+          <Col xs={12} sm={8} xl={4}><Card><Statistic title="最近更新时间" value={formatDateTime(status?.stats.latest_updated_at)} styles={{ content: { fontSize: 15 } }} /></Card></Col>
         </Row>
       </SectionDataState>
 

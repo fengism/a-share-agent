@@ -189,7 +189,7 @@ export default function OutboundProxyConfigCard({
               type="warning"
               showIcon
               style={{ marginTop: 8 }}
-              message="当前未选中任何数据源，所有出网请求将保持直连；如需代理请至少勾选一项（海外服务器推荐勾选东财与 AkShare）。"
+              title="当前未选中任何数据源，所有出网请求将保持直连；如需代理请至少勾选一项（海外服务器推荐勾选东财与 AkShare）。"
             />
           )}
           <div style={{ marginTop: 6, fontSize: "var(--c-font-sm)", color: colors.textMuted }}>

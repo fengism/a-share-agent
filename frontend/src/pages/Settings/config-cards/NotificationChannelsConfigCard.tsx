@@ -119,7 +119,7 @@ export default function NotificationChannelsConfigCard({
           <Alert
             type="info"
             showIcon
-            message="交易日自动化收盘推送"
+            title="交易日自动化收盘推送"
             description="交易日 15:30 收盘后，系统可自动将 AI 每日深度复盘报告与全市场题材潜力雷达并发投递到您配置的飞书、钉钉、企微群或个人微信。"
             style={{ marginBottom: 8 }}
           />

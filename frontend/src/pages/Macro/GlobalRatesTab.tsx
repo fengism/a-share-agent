@@ -711,7 +711,7 @@ export default function GlobalRatesTab() {
             title="美元指数 (DXY)"
             value={fx?.dxy?.value ?? "-"}
             precision={2}
-            valueStyle={{ color: (fx?.dxy?.change ?? 0) >= 0 ? c.up : c.down, fontWeight: 600 }}
+            styles={{ content: { color: (fx?.dxy?.change ?? 0) >= 0 ? c.up : c.down, fontWeight: 600 } }}
             prefix={(fx?.dxy?.change ?? 0) >= 0 ? <ArrowUpOutlined /> : <ArrowDownOutlined />}
             suffix={<span style={{ fontSize: 13, marginLeft: 4 }}>{fx?.dxy?.change_pct != null ? `${fx.dxy.change_pct > 0 ? "+" : ""}${fx.dxy.change_pct}%` : ""}</span>}
           />
@@ -724,7 +724,7 @@ export default function GlobalRatesTab() {
             title="美元兑离岸人民币 (USD/CNH)"
             value={fx?.usd_cnh?.value ?? "-"}
             precision={4}
-            valueStyle={{ color: (fx?.usd_cnh?.change ?? 0) >= 0 ? c.down : c.up, fontWeight: 600 }}
+            styles={{ content: { color: (fx?.usd_cnh?.change ?? 0) >= 0 ? c.down : c.up, fontWeight: 600 } }}
             suffix={<span style={{ fontSize: 13, marginLeft: 4 }}>{fx?.usd_cnh?.change_pct != null ? `${fx.usd_cnh.change_pct > 0 ? "+" : ""}${fx.usd_cnh.change_pct}%` : ""}</span>}
           />
           <div style={{ fontSize: 12, color: c.textSecondary, marginTop: 4 }}>外资进出 A 股风向标</div>
@@ -736,7 +736,7 @@ export default function GlobalRatesTab() {
             title="美债 10 年期收益率"
             value={effectiveUs10y ?? "-"}
             precision={2}
-            valueStyle={{ color: "#fa541c", fontWeight: 600 }}
+            styles={{ content: { color: "#fa541c", fontWeight: 600 } }}
             suffix={effectiveUs10y != null ? "%" : undefined}
           />
           <div style={{ fontSize: 12, color: c.textSecondary, marginTop: 4 }}>
@@ -750,7 +750,7 @@ export default function GlobalRatesTab() {
             title="中美 10Y 利差 (中 - 美)"
             value={effectiveSpread10y ?? "-"}
             precision={2}
-            valueStyle={{ color: (effectiveSpread10y ?? 0) >= 0 ? c.up : c.down, fontWeight: 600 }}
+            styles={{ content: { color: (effectiveSpread10y ?? 0) >= 0 ? c.up : c.down, fontWeight: 600 } }}
             suffix={effectiveSpread10y != null ? "%" : undefined}
           />
           <div style={{ fontSize: 12, color: c.textSecondary, marginTop: 4 }}>{effectiveSpreadStatus}</div>
@@ -763,7 +763,7 @@ export default function GlobalRatesTab() {
             value={crude?.sc0?.price ?? "-"}
             precision={1}
             prefix="¥"
-            valueStyle={{ color: (crude?.sc0?.change ?? 0) >= 0 ? c.up : c.down, fontWeight: 600 }}
+            styles={{ content: { color: (crude?.sc0?.change ?? 0) >= 0 ? c.up : c.down, fontWeight: 600 } }}
             suffix={
               <span style={{ fontSize: 13, marginLeft: 4 }}>
                 {crude?.sc0?.change_pct != null ? `${crude.sc0.change_pct > 0 ? "+" : ""}${crude.sc0.change_pct}%` : ""}

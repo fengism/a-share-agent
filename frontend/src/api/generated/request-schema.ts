@@ -10498,6 +10498,8 @@ export interface components {
             overwrite_existing: boolean;
             /** Retryable Failed Instruments */
             retryable_failed_instruments: number;
+            /** Skipped Instruments */
+            readonly skipped_instruments: number;
             /**
              * Start Date
              * Format: date

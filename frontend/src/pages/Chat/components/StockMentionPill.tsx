@@ -79,7 +79,7 @@ export const StockMentionPill = React.memo(function StockMentionPill({
         <Tag color={isHK ? "purple" : "blue"}>{isHK ? "HK" : "CN"}</Tag>
       </div>
 
-      <Space direction="vertical" style={{ width: "100%" }} size={6}>
+      <Space vertical style={{ width: "100%" }} size={6}>
         <Button
           size="small"
           block

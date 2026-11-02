@@ -139,7 +139,7 @@ export default function SystemUpdateCard() {
             type="success"
             showIcon
             icon={<CheckCircleOutlined />}
-            message={isDevelopmentVersion ? "开发环境不支持在线更新" : "当前已是最新版本，无需更新。"}
+            title={isDevelopmentVersion ? "开发环境不支持在线更新" : "当前已是最新版本，无需更新。"}
           />
         )}
 
@@ -148,7 +148,7 @@ export default function SystemUpdateCard() {
             type="warning"
             showIcon
             icon={<ExclamationCircleOutlined />}
-            message={
+            title={
               <div style={{ display: "grid", gap: 8 }}>
                 <div>
                   <strong>发现新版本：</strong>
@@ -184,7 +184,7 @@ export default function SystemUpdateCard() {
             type="info"
             showIcon
             icon={<SyncOutlined spin />}
-            message="正在执行系统更新，拉取新容器镜像并重新编排服务，请耐心等待（完成后将自动刷新页面）..."
+            title="正在执行系统更新，拉取新容器镜像并重新编排服务，请耐心等待（完成后将自动刷新页面）..."
           />
         )}
 
@@ -194,7 +194,7 @@ export default function SystemUpdateCard() {
             showIcon
             closable
             onClose={() => setError(null)}
-            message={error}
+            title={error}
           />
         )}
       </div>

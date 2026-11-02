@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { AssistantMessage } from "./AssistantMessage";
 
@@ -58,7 +58,7 @@ describe("AssistantMessage", () => {
     expect(screen.getByRole("button", { name: /转为量化策略/ })).toBeInTheDocument();
   });
 
-  it("supports copying and downloading response as markdown", () => {
+  it("supports copying and downloading response as markdown", async () => {
     const writeTextSpy = vi.fn().mockResolvedValue(undefined);
     Object.assign(navigator, {
       clipboard: {
@@ -82,7 +82,9 @@ describe("AssistantMessage", () => {
 
     // Test copy
     const copyBtn = screen.getByRole("button", { name: "复制回答" });
-    fireEvent.click(copyBtn);
+    await act(async () => {
+      fireEvent.click(copyBtn);
+    });
     expect(writeTextSpy).toHaveBeenCalledWith("深度研究报告正文");
 
     // Test download markdown
@@ -95,7 +97,9 @@ describe("AssistantMessage", () => {
     // Test export card modal trigger
     const exportCardBtn = screen.getByRole("button", { name: "导出投研长图卡片" });
     expect(exportCardBtn).toBeInTheDocument();
-    fireEvent.click(exportCardBtn);
+    await act(async () => {
+      fireEvent.click(exportCardBtn);
+    });
     expect(screen.getByText("导出投研报告卡片")).toBeInTheDocument();
   });
 

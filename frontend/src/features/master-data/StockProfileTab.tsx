@@ -686,7 +686,7 @@ export default function StockProfileTab() {
             "个股资料详情"
           )
         }
-        width="min(720px, 100vw)"
+        size="large"
         open={detailVisible}
         onClose={() => setDetailVisible(false)}
         extra={
@@ -934,7 +934,7 @@ export default function StockProfileTab() {
           </Button>,
         ]}
       >
-        <Space direction="vertical" style={{ width: "100%" }} size="middle">
+        <Space vertical style={{ width: "100%" }} size="middle">
           <Upload {...importUploadProps}>
             <Button icon={<ImportOutlined />}>选择 CSV / Excel 文件</Button>
           </Upload>
