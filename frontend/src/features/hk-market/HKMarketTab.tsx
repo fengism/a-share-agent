@@ -134,6 +134,9 @@ export default function HKMarketTab({
   const isMobile = useMediaQuery("(max-width: 768px)");
   const chartHeight = isMobile ? 280 : 360;
   const fullscreenHeight = useFullscreenChartHeight();
+  const modalChartHeight = isMobile
+    ? Math.max(260, (typeof window !== "undefined" ? window.innerHeight : 600) - 120)
+    : Math.max(300, fullscreenHeight - 56);
   const indexPeriodControl = (
     <Segmented
       size="small"
@@ -867,14 +870,27 @@ export default function HKMarketTab({
         open={indexChartExpanded}
         onCancel={() => setIndexChartExpanded(false)}
         footer={null}
-        width="min(1200px, calc(100vw - 20px))"
-        centered
+        width={isMobile ? "100vw" : "min(1280px, calc(100vw - 24px))"}
+        className="stock-fullscreen-modal"
+        style={isMobile ? { top: 0, margin: 0, paddingBottom: 0, maxWidth: "100vw" } : undefined}
+        centered={!isMobile}
         destroyOnHidden
-        styles={{ body: { height: fullscreenHeight } }}
+        styles={{
+          body: {
+            height: isMobile ? "calc(100dvh - 56px)" : fullscreenHeight,
+            padding: isMobile ? "6px 8px 12px 8px" : "8px 16px 12px 16px",
+            overflow: "hidden",
+            display: "flex",
+            flexDirection: "column",
+          },
+        }}
       >
+        <div style={{ marginBottom: 8, flexShrink: 0 }}>
+          {indexPeriodControl}
+        </div>
         <LazyKlineChart
           data={chartItems(indexHistoryQuery.data?.items)}
-          height={fullscreenHeight}
+          height={modalChartHeight}
           viewKey={`hk-index-modal-${activeIndex}-${indexPeriod}`}
           landscapeToolbar={indexPeriodControl}
           forceRender
@@ -888,14 +904,27 @@ export default function HKMarketTab({
           open={stockChartExpanded}
           onCancel={() => setStockChartExpanded(false)}
           footer={null}
-          width="min(1200px, calc(100vw - 20px))"
-          centered
+          width={isMobile ? "100vw" : "min(1280px, calc(100vw - 24px))"}
+          className="stock-fullscreen-modal"
+          style={isMobile ? { top: 0, margin: 0, paddingBottom: 0, maxWidth: "100vw" } : undefined}
+          centered={!isMobile}
           destroyOnHidden
-          styles={{ body: { height: fullscreenHeight } }}
+          styles={{
+            body: {
+              height: isMobile ? "calc(100dvh - 56px)" : fullscreenHeight,
+              padding: isMobile ? "6px 8px 12px 8px" : "8px 16px 12px 16px",
+              overflow: "hidden",
+              display: "flex",
+              flexDirection: "column",
+            },
+          }}
         >
+          <div style={{ marginBottom: 8, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", flexShrink: 0 }}>
+            {stockLandscapeToolbar}
+          </div>
           <LazyKlineChart
             data={chartItems(stockHistoryQuery.data?.items)}
-            height={fullscreenHeight}
+            height={modalChartHeight}
             viewKey={`hk-stock-modal-${activeStock.code}-${stockPeriod}-${adjust}`}
             landscapeToolbar={stockLandscapeToolbar}
             forceRender

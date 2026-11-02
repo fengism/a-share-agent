@@ -543,6 +543,9 @@ export default function MarketDailyBarManagerCard({ form, onChange, onSave, isSa
                   <div className="market-daily-job__metrics">
                     <span>成功 <strong>{job.succeeded_instruments}</strong></span>
                     <span>失败 <strong>{job.failed_instruments}</strong></span>
+                    {(job.skipped_instruments ?? Math.max(0, job.completed_instruments - job.succeeded_instruments - job.failed_instruments)) > 0 ? (
+                      <span>停牌跳过 <strong>{job.skipped_instruments ?? Math.max(0, job.completed_instruments - job.succeeded_instruments - job.failed_instruments)}</strong></span>
+                    ) : null}
                     <span>写入 <strong>{job.stored_bars}</strong> 根</span>
                     {job.current_code ? <span>正在处理 <strong>{job.current_code}</strong></span> : null}
                   </div>

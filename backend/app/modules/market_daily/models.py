@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, computed_field, model_validator
 
 from app.core.market import market_today
 
@@ -249,6 +249,11 @@ class MarketDailyBackfillJob(BaseModel):
     started_at: datetime | None = None
     completed_at: datetime | None = None
     updated_at: datetime
+
+    @computed_field
+    @property
+    def skipped_instruments(self) -> int:
+        return max(0, self.completed_instruments - self.succeeded_instruments - self.failed_instruments)
 
 
 class MarketDailyBackfillJobList(BaseModel):

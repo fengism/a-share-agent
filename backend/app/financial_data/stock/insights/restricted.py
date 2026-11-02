@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
@@ -54,13 +55,17 @@ async def get_restricted_shares_lift(code: str) -> dict[str, Any]:
     upcoming_lifts: list[dict[str, Any]] = []
     past_lifts: list[dict[str, Any]] = []
 
+    fetch_failed = False
     try:
-        df = await provider_gateway.call_blocking(
-            "akshare",
-            "fetch_restricted_shares",
-            get_provider("akshare").fetch_restricted_shares,
-            normalized_code,
-            semaphore=akshare_semaphore,
+        df = await asyncio.wait_for(
+            provider_gateway.call_blocking(
+                "akshare",
+                "fetch_restricted_shares",
+                get_provider("akshare").fetch_restricted_shares,
+                normalized_code,
+                semaphore=akshare_semaphore,
+            ),
+            timeout=10.0,
         )
         if df is not None and not df.empty:
             for _, row in df.iterrows():
@@ -95,7 +100,11 @@ async def get_restricted_shares_lift(code: str) -> dict[str, Any]:
                     upcoming_lifts.append(item)
                 else:
                     past_lifts.append(item)
+    except (asyncio.TimeoutError, TimeoutError):
+        fetch_failed = True
+        logger.warning("获取 %s 限售解禁数据超时 (已超过 10s 限额)", normalized_code)
     except Exception as exc:
+        fetch_failed = True
         logger.warning("获取 %s 限售解禁数据失败: %s", normalized_code, exc)
 
     # 排序：未来解禁按日期升序（最近的在前），历史解禁按日期降序
@@ -107,8 +116,9 @@ async def get_restricted_shares_lift(code: str) -> dict[str, Any]:
     total_upcoming_ratio_float = sum(x["ratio_in_float_shares_pct"] or 0 for x in upcoming_lifts)
 
     next_lift = upcoming_lifts[0] if upcoming_lifts else None
-    pressure_level = "无近期解禁风险"
-    if next_lift:
+    if fetch_failed and not upcoming_lifts and not past_lifts:
+        pressure_level = "限售解禁数据源响应超时或不可用，暂无近期解禁风险提示"
+    elif next_lift:
         float_pct = next_lift.get("ratio_in_float_shares_pct") or 0
         if float_pct > 20:
             pressure_level = "极高抛压预警（单次解禁占流通盘超20%）"
@@ -116,6 +126,8 @@ async def get_restricted_shares_lift(code: str) -> dict[str, Any]:
             pressure_level = "中度抛压预警（单次解禁占流通盘5%~20%）"
         else:
             pressure_level = "轻度/正常解禁（占流通盘5%以内）"
+    else:
+        pressure_level = "无近期解禁风险"
 
     result = {
         "code": normalized_code,
@@ -130,5 +142,6 @@ async def get_restricted_shares_lift(code: str) -> dict[str, Any]:
         "recent_past_lifts": past_lifts[:5],
     }
 
-    cache.set(cache_key, result, ttl=_CACHE_TTL_SECONDS)
+    ttl = 60 if fetch_failed else _CACHE_TTL_SECONDS
+    cache.set(cache_key, result, ttl=ttl)
     return result

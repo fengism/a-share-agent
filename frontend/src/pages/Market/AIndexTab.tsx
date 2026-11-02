@@ -26,6 +26,9 @@ export default function AIndexTab() {
   const chartHeight = isMobile ? 280 : 380;
   const [klineExpanded, setKlineExpanded] = useState(false);
   const fullscreenHeight = useFullscreenChartHeight();
+  const modalChartHeight = isMobile
+    ? Math.max(260, (typeof window !== "undefined" ? window.innerHeight : 600) - 120)
+    : Math.max(300, fullscreenHeight - 56);
   const [activeSymbol, setActiveSymbol] = useUrlSearchParam("index", DEFAULT_INDEX_CODE, {
     allowedValues: KEY_MARKET_INDEX_CODES,
   });
@@ -263,32 +266,83 @@ export default function AIndexTab() {
 
       <Modal
         title={
-          <div style={{ display: "flex", alignItems: "center", gap: 12, justifyContent: "space-between", paddingRight: 32, flexWrap: "wrap", minWidth: 0 }}>
-            <span>{`${activeIndex?.name || "大盘指数"} · ${period === "daily" ? "日K" : period === "weekly" ? "周K" : period === "monthly" ? "月K" : "年K"}线全屏`}</span>
-            <span style={{ fontSize: t.font.xs, color: c.textSecondary, fontWeight: "normal" }}>
-              {historyLimitReached
-                ? `已加载近 ${MAX_KLINE_HISTORY_YEARS} 年（上限）`
-                : `近 ${historyYears} 年 · 向左滑动加载更早数据（最多 ${MAX_KLINE_HISTORY_YEARS} 年）`}
-            </span>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, justifyContent: "space-between", paddingRight: isMobile ? 16 : 32, flexWrap: "wrap", minWidth: 0 }}>
+            <span style={{ fontWeight: 600 }}>{`${activeIndex?.name || "大盘指数"} · ${period === "daily" ? "日K" : period === "weekly" ? "周K" : period === "monthly" ? "月K" : "年K"}线全屏`}</span>
           </div>
         }
         open={klineExpanded}
         onCancel={() => setKlineExpanded(false)}
         footer={null}
-        width="min(1200px, calc(100vw - 20px))"
-        centered
+        width={isMobile ? "100vw" : "min(1280px, calc(100vw - 24px))"}
+        className="stock-fullscreen-modal"
+        style={
+          isMobile
+            ? { top: 0, margin: 0, paddingBottom: 0, maxWidth: "100vw" }
+            : undefined
+        }
+        centered={!isMobile}
         destroyOnHidden
-        styles={{ body: { height: fullscreenHeight } }}
+        styles={{
+          body: {
+            height: isMobile ? "calc(100dvh - 56px)" : fullscreenHeight,
+            padding: isMobile ? "6px 8px 12px 8px" : "8px 16px 12px 16px",
+            overflow: "hidden",
+            display: "flex",
+            flexDirection: "column",
+          },
+        }}
       >
-        <LazyKlineChart
-          data={klineItems}
-          height={fullscreenHeight}
-          viewKey={`${activeSymbol}-${period}-fullscreen`}
-          onReachLeftEdge={historyLimitReached ? undefined : handleReachLeftEdge}
-          historyLimitReached={historyLimitReached}
-          landscapeToolbar={periodControl}
-          forceRender
-        />
+        <div
+          className="stock-chart-toolbar"
+          style={{
+            marginBottom: 8,
+            padding: isMobile ? "4px 0" : "6px 0",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 8,
+            flexWrap: "wrap",
+            flexShrink: 0,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <Segmented
+              size="small"
+              aria-label="全屏切换指数"
+              options={mainIndices.map((idx) => ({ label: idx.name, value: idx.code }))}
+              value={activeSymbol}
+              onChange={(val) => setActiveSymbol(String(val))}
+            />
+            {periodControl}
+          </div>
+          <span
+            className="stock-chart-hint"
+            style={{ fontSize: t.font.xs, color: c.textSecondary }}
+          >
+            {historyLimitReached
+              ? `已加载近 ${MAX_KLINE_HISTORY_YEARS} 年（上限）`
+              : `近 ${historyYears} 年 · 向左滑动加载更早数据（最多 ${MAX_KLINE_HISTORY_YEARS} 年）`}
+          </span>
+        </div>
+        <SectionDataState
+          isLoading={klineLoading && !hasKlineData}
+          error={hasKlineData ? undefined : klineError}
+          onRetry={() => refetchKline()}
+          isEmpty={!hasKlineData}
+          emptyText="暂无指数 K 线数据"
+          errorTitle="指数 K 线加载失败"
+          minHeight={modalChartHeight}
+        >
+          <LazyKlineChart
+            data={klineItems}
+            height={modalChartHeight}
+            viewKey={`${activeSymbol}-${period}-fullscreen`}
+            onReachLeftEdge={historyLimitReached ? undefined : handleReachLeftEdge}
+            historyLimitReached={historyLimitReached}
+            landscapeToolbar={periodControl}
+            forceRender
+          />
+        </SectionDataState>
       </Modal>
     </div>
   );

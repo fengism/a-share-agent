@@ -153,6 +153,7 @@ export interface MarketDailyBackfillJob {
   succeeded_instruments: number;
   failed_instruments: number;
   retryable_failed_instruments: number;
+  skipped_instruments?: number;
   average_quality_score: number | null;
   stored_bars: number;
   current_code: string | null;

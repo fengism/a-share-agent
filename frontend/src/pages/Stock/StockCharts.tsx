@@ -419,6 +419,9 @@ export default function StockCharts({ code, market = "cn", name }: StockChartsPr
   const isMobile = useMediaQuery("(max-width: 768px)");
   const { cardStyle } = useStyles();
   const fullscreenHeight = useFullscreenChartHeight();
+  const modalChartHeight = isMobile
+    ? Math.max(260, (typeof window !== "undefined" ? window.innerHeight : 600) - 120)
+    : Math.max(300, fullscreenHeight - 64);
 
   const startDate = useMemo(() => yearsAgoDate(historyYears), [historyYears]);
   const historyLimitReached = historyYears >= MAX_KLINE_HISTORY_YEARS;
@@ -570,7 +573,7 @@ export default function StockCharts({ code, market = "cn", name }: StockChartsPr
           ) : (
             <div style={{ display: "flex", alignItems: "center", gap: 12, justifyContent: "space-between", paddingRight: isMobile ? 16 : 32 }}>
               <span style={{ fontWeight: 600 }}>
-                {`${code} · ${
+                {`${name ? `${name} · ` : ""}${code} · ${
                   activeView === "kline"
                     ? "K 线图全屏"
                     : activeView === "intraday"
@@ -580,6 +583,11 @@ export default function StockCharts({ code, market = "cn", name }: StockChartsPr
                     : activeView.toUpperCase() + " 技术副图全屏"
                 }`}
               </span>
+              {activeView === "kline" && (
+                <span style={{ fontSize: "var(--c-font-xs)", color: "var(--c-text-secondary)", fontWeight: "normal" }}>
+                  {period === "daily" ? "日K" : period === "weekly" ? "周K" : period === "monthly" ? "月K" : "年K"}
+                </span>
+              )}
             </div>
           )
         }
@@ -599,8 +607,10 @@ export default function StockCharts({ code, market = "cn", name }: StockChartsPr
           body: {
             height: isMobile ? "calc(100dvh - 56px)" : fullscreenHeight,
             minHeight: isHK ? 320 : undefined,
-            padding: isMobile ? "6px 8px 12px 8px" : undefined,
-            overflowY: "auto",
+            padding: isMobile ? "6px 8px 12px 8px" : "8px 16px 12px 16px",
+            overflow: "hidden",
+            display: "flex",
+            flexDirection: "column",
           },
         }}
         destroyOnHidden
@@ -615,14 +625,14 @@ export default function StockCharts({ code, market = "cn", name }: StockChartsPr
             historyYears={historyYears}
             onReachLeftEdge={handleReachLeftEdge}
             historyLimitReached={historyLimitReached}
-            height={fullscreenHeight}
+            height={modalChartHeight}
             viewKeySuffix="-fullscreen"
             market={market}
           />
         ) : activeView === "intraday" ? (
-          <IntradayPanel code={code} height={fullscreenHeight} viewKeySuffix="-fullscreen" market={market} />
+          <IntradayPanel code={code} height={modalChartHeight} viewKeySuffix="-fullscreen" market={market} />
         ) : activeView === "macd" || activeView === "rsi" || activeView === "kdj" ? (
-          <div className="stock-macd-panel" style={{ minHeight: fullscreenHeight }}>
+          <div className="stock-macd-panel" style={{ minHeight: modalChartHeight }}>
             <IndicatorSubCharts
               code={code}
               types={["macd", "rsi", "kdj"]}
@@ -634,7 +644,7 @@ export default function StockCharts({ code, market = "cn", name }: StockChartsPr
               historyYears={historyYears}
               onReachLeftEdge={handleReachLeftEdge}
               historyLimitReached={historyLimitReached}
-              height={Math.max(240, fullscreenHeight - 40)}
+              height={modalChartHeight}
             />
           </div>
         ) : (

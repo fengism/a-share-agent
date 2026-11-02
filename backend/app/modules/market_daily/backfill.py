@@ -18,6 +18,7 @@ from app.financial_data.stock.public import get_exchange_stock_master
 from app.financial_data.stock.quotes.historical import (
     HistoricalBarCandidates,
     HistoricalBarSet,
+    HistoricalSourceFailure,
     get_historical_bar_candidates,
 )
 from app.modules.market_daily.models import (
@@ -42,6 +43,7 @@ _BACKFILL_SOURCE_INTERVALS = {
 _FAILURE_DETAIL_LIMIT = 100
 _LEASE_SECONDS = 15 * 60
 _WORKER_CONCURRENCY = 4
+_ITEM_TIMEOUT_SECONDS: float = 60.0
 _MIN_DATE_COVERAGE = 0.95
 _MAX_OHLC_RELATIVE_ERROR = 0.005
 _MAX_VOLUME_MEDIAN_ERROR = 0.02
@@ -60,6 +62,10 @@ class HistoricalSourceConsistencyError(ValueError):
 
 class HistoricalSourceAvailabilityError(RuntimeError):
     """临时上游错误导致无法获得足够的独立数据源。"""
+
+
+class HistoricalInstrumentSuspendedError(Exception):
+    """标的在指定区间内无交易数据（停牌、未上市或全天无成交）。"""
 
 
 @dataclass(frozen=True)
@@ -94,15 +100,16 @@ def _job_from_row(row) -> MarketDailyBackfillJob:
 
 
 def _source_family(source: str) -> str:
-    if source.startswith("tdxhub"):
+    s = source.lower()
+    if "tdx" in s or "通达信" in s:
         return "tdxhub"
-    if source.startswith("tencent"):
+    if "tencent" in s or "腾讯" in s:
         return "tencent"
-    if source.startswith("akshare-sina") or source.startswith("sina-direct"):
+    if "sina" in s or "新浪" in s:
         return "sina"
-    if source.startswith("eastmoney") or source.startswith("akshare-eastmoney"):
+    if "eastmoney" in s or "东方财富" in s or "东财" in s:
         return "eastmoney"
-    if source.startswith("cls"):
+    if "cls" in s or "财联社" in s:
         return "cls"
     return source
 
@@ -220,8 +227,31 @@ def _validate_candidate_quality(history: HistoricalBarSet) -> dict[str, object]:
     }
 
 
+def _is_empty_kline_failure(failure: HistoricalSourceFailure) -> bool:
+    if failure.error_type in {"UpstreamEmptyResponseError", "EmptyResponseError"}:
+        return True
+    msg = (failure.error_message or "").lower()
+    return (
+        "未返回有效 k 线" in msg
+        or "未返回有效k线" in msg
+        or "未返回有效" in msg
+        or "无有效 k 线" in msg
+        or "无有效k线" in msg
+    )
+
+
 def _select_validated_candidate(candidates: HistoricalBarCandidates) -> BackfillValidation:
     if len(candidates.candidates) < 2:
+        if len(candidates.candidates) == 0:
+            empty_families = {
+                _source_family(failure.source_label)
+                for failure in candidates.failures
+                if _is_empty_kline_failure(failure)
+            }
+            if len(empty_families) >= 2:
+                raise HistoricalInstrumentSuspendedError(
+                    f"标的在指定区间停牌或无成交（{len(empty_families)} 个独立数据源确认无K线）"
+                )
         failures = "; ".join(
             f"{failure.source_label}:{failure.error_type}:{failure.error_message}"
             for failure in candidates.failures
@@ -598,9 +628,11 @@ class MarketDailyBackfillService:
         validation: dict[str, object] | None = None,
         failure_kind: str | None = None,
         error: str | None,
+        status: str | None = None,
     ) -> None:
         now = _iso()
-        status = "failed" if error else "succeeded"
+        if status is None:
+            status = "failed" if error else "succeeded"
         with self.repository._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             connection.execute(
@@ -685,15 +717,18 @@ class MarketDailyBackfillService:
         job_id = str(job["job_id"])
         code = str(item["code"])
         try:
-            candidates = await get_historical_bar_candidates(
-                code,
-                date.fromisoformat(job["start_date"]),
-                date.fromisoformat(job["end_date"]),
-                period="daily",
-                adjust="",
-                max_provider_sources=int(job["max_provider_sources"]),
-                max_successes=3,
-                request_limiter=self._limiter,
+            candidates = await asyncio.wait_for(
+                get_historical_bar_candidates(
+                    code,
+                    date.fromisoformat(job["start_date"]),
+                    date.fromisoformat(job["end_date"]),
+                    period="daily",
+                    adjust="",
+                    max_provider_sources=int(job["max_provider_sources"]),
+                    max_successes=2,
+                    request_limiter=self._limiter,
+                ),
+                timeout=_ITEM_TIMEOUT_SECONDS,
             )
             validated = _select_validated_candidate(candidates)
             records = _records_from_history(code, str(item["name"]), validated.primary)
@@ -714,6 +749,30 @@ class MarketDailyBackfillService:
                 validation=validated.details,
                 error=None,
             )
+        except HistoricalInstrumentSuspendedError as exc:
+            logger.info("历史日线回填标的停牌/无成交跳过: job=%s code=%s %s", job_id, code, exc)
+            await asyncio.to_thread(
+                self._finish_item,
+                job_id,
+                code,
+                stored=0,
+                source=None,
+                status="skipped",
+                failure_kind="suspended",
+                validation={"reason": str(exc)},
+                error=None,
+            )
+        except TimeoutError:
+            logger.warning("历史日线回填单票超时 (%.1fs): job=%s code=%s", _ITEM_TIMEOUT_SECONDS, job_id, code)
+            await asyncio.to_thread(
+                self._finish_item,
+                job_id,
+                code,
+                stored=0,
+                source=None,
+                failure_kind=_FAILURE_UPSTREAM,
+                error=f"单票抓取超时 ({_ITEM_TIMEOUT_SECONDS}s)",
+            )
         except asyncio.CancelledError:
             raise
         except Exception as error:  # 单票失败不终止全市场任务
@@ -728,6 +787,54 @@ class MarketDailyBackfillService:
                 error=str(error) or type(error).__name__,
             )
 
+    def _is_cancel_requested(self, job_id: str) -> bool:
+        with self.repository._connect() as connection:
+            row = connection.execute(
+                "SELECT cancel_requested FROM market_daily_backfill_jobs WHERE job_id=?",
+                (job_id,),
+            ).fetchone()
+            return bool(row and row["cancel_requested"])
+
+    def _auto_requeue_retryable(self, job_id: str) -> int:
+        now = _iso()
+        with self.repository._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            count_row = connection.execute(
+                """
+                SELECT COUNT(*) FROM market_daily_backfill_items
+                WHERE job_id=? AND status='failed' AND failure_kind='upstream_unavailable' AND attempts<=1
+                """,
+                (job_id,),
+            ).fetchone()
+            count = int(count_row[0]) if count_row else 0
+            if count == 0:
+                return 0
+            connection.execute(
+                """
+                UPDATE market_daily_backfill_items
+                SET status='pending', stored_bars=0, source=NULL, quality_score=NULL,
+                    validation_json=NULL, failure_kind=NULL, last_error=NULL, updated_at=?
+                WHERE job_id=? AND status='failed' AND failure_kind='upstream_unavailable' AND attempts<=1
+                """,
+                (now, job_id),
+            )
+            connection.execute(
+                """
+                UPDATE market_daily_backfill_jobs SET
+                    completed_instruments=(SELECT COUNT(*) FROM market_daily_backfill_items WHERE job_id=? AND status IN ('succeeded','failed','skipped')),
+                    succeeded_instruments=(SELECT COUNT(*) FROM market_daily_backfill_items WHERE job_id=? AND status='succeeded'),
+                    failed_instruments=(SELECT COUNT(*) FROM market_daily_backfill_items WHERE job_id=? AND status='failed'),
+                    retryable_failed_instruments=(
+                        SELECT COUNT(*) FROM market_daily_backfill_items
+                        WHERE job_id=? AND status='failed' AND failure_kind='upstream_unavailable'
+                    ),
+                    updated_at=?
+                WHERE job_id=?
+                """,
+                (job_id, job_id, job_id, job_id, now, job_id),
+            )
+            return count
+
     async def _process_job(self, job: dict) -> None:
         job_id = str(job["job_id"])
 
@@ -736,6 +843,13 @@ class MarketDailyBackfillService:
                 await self._process_item(job, item)
 
         await asyncio.gather(*(worker() for _ in range(_WORKER_CONCURRENCY)))
+
+        if not await asyncio.to_thread(self._is_cancel_requested, job_id):
+            requeued = await asyncio.to_thread(self._auto_requeue_retryable, job_id)
+            if requeued > 0:
+                logger.info("自动重试 %d 只临时超时失败标的: job=%s", requeued, job_id)
+                await asyncio.gather(*(worker() for _ in range(_WORKER_CONCURRENCY)))
+
         await asyncio.to_thread(self._complete_job, job_id)
 
     async def run_worker(self) -> None:

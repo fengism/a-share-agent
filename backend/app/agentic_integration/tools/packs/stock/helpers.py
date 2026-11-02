@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from app.agentic.tools.application import get_application_tool_handlers
+
+logger = logging.getLogger(__name__)
 
 
 async def iwencai_search(query: str, channel: str = "report", size: int = 20) -> Any:
@@ -246,8 +249,22 @@ async def get_stock_risk_data(code: str) -> Any:
 
 async def get_restricted_shares_lift(code: str) -> Any:
     """获取个股限售解禁日历与抛压监测数据。"""
-    from app.financial_data.stock.insights.restricted import get_restricted_shares_lift as _get_lift
-    return await _get_lift(code=code)
+    try:
+        from app.financial_data.stock.insights.restricted import get_restricted_shares_lift as _get_lift
+        return await _get_lift(code=code)
+    except Exception as exc:
+        logger.warning("Chat 工具 get_restricted_shares_lift 发生未捕获异常: code=%s, err=%s", code, exc)
+        return {
+            "code": code,
+            "has_upcoming_lifts": False,
+            "upcoming_lifts_count": 0,
+            "next_lift_detail": None,
+            "pressure_risk_assessment": f"限售解禁数据暂不可用: {exc}",
+            "total_upcoming_shares": 0,
+            "total_upcoming_ratio_float_pct": 0.0,
+            "upcoming_lifts": [],
+            "recent_past_lifts": [],
+        }
 
 
 async def get_interactive_qa(code: str, keyword: str = "", limit: int = 15) -> Any:

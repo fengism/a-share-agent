@@ -1,3 +1,4 @@
+import asyncio
 from datetime import date
 from pathlib import Path
 
@@ -12,6 +13,7 @@ from app.financial_data.stock.quotes.historical import (
 )
 from app.modules.market_daily import backfill
 from app.modules.market_daily.backfill import (
+    HistoricalInstrumentSuspendedError,
     HistoricalSourceAvailabilityError,
     HistoricalSourceConsistencyError,
     MarketDailyBackfillService,
@@ -310,3 +312,144 @@ def test_backfill_date_validation_uses_market_timezone(monkeypatch: pytest.Monke
 
     request = MarketDailyBackfillRequest(start_date=date(2026, 10, 1), end_date=date(2026, 10, 16))
     assert request.end_date == date(2026, 10, 16)
+
+
+def test_suspended_instrument_empty_responses_raise_suspended_error() -> None:
+    """当多个独立数据源均返回有效空K线时，识别为标的停牌/无成交而非上游异常。"""
+    candidates = HistoricalBarCandidates(
+        candidates=[],
+        failures=[
+            HistoricalSourceFailure(
+                source_label="腾讯财经复权K线",
+                error_type="UpstreamEmptyResponseError",
+                error_message="tencent 未返回有效 K 线",
+            ),
+            HistoricalSourceFailure(
+                source_label="TDX 复权K线",
+                error_type="UpstreamEmptyResponseError",
+                error_message="tdxhub 未返回有效 K 线",
+            ),
+            HistoricalSourceFailure(
+                source_label="东方财富不复权K线直连（fallback）",
+                error_type="UpstreamEmptyResponseError",
+                error_message="eastmoney-direct-fallback 未返回有效 K 线",
+            ),
+        ],
+    )
+    with pytest.raises(HistoricalInstrumentSuspendedError, match="停牌或无成交"):
+        _select_validated_candidate(candidates)
+
+
+@pytest.mark.asyncio
+async def test_process_item_handles_suspended_instrument_as_skipped(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """验证停牌标的不会导致任务失败，而是记为 skipped 且计入完成度。"""
+    repo = MarketDailyBarRepository(tmp_path / "market_daily.sqlite3")
+    service = MarketDailyBackfillService(repo)
+    repo.initialize()
+
+    monkeypatch.setattr(
+        backfill,
+        "get_historical_bar_candidates",
+        lambda *args, **kwargs: _async_value(
+            HistoricalBarCandidates(
+                candidates=[],
+                failures=[
+                    HistoricalSourceFailure(
+                        source_label="腾讯财经复权K线",
+                        error_type="UpstreamEmptyResponseError",
+                        error_message="tencent 未返回有效 K 线",
+                    ),
+                    HistoricalSourceFailure(
+                        source_label="TDX 复权K线",
+                        error_type="UpstreamEmptyResponseError",
+                        error_message="tdxhub 未返回有效 K 线",
+                    ),
+                ],
+            )
+        ),
+    )
+
+    request = MarketDailyBackfillRequest(start_date=date(2026, 10, 8), end_date=date(2026, 10, 8))
+    job = service._create_job(request, _master().records[:1])
+    claimed = service._claim_job()
+    assert claimed is not None
+    await service._process_job(claimed)
+
+    completed = await service.get(job.job_id)
+    assert completed.status == "succeeded"
+    assert completed.completed_instruments == 1
+    assert completed.succeeded_instruments == 0
+    assert completed.failed_instruments == 0
+    assert completed.stored_bars == 0
+
+
+@pytest.mark.asyncio
+async def test_process_item_timeout_records_retryable_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """验证单票抓取超时不会无限挂死 Worker，而是记录为 upstream_unavailable 失败。"""
+    repo = MarketDailyBarRepository(tmp_path / "market_daily.sqlite3")
+    service = MarketDailyBackfillService(repo)
+    repo.initialize()
+
+    async def _hang_forever(*args, **kwargs):
+        await asyncio.sleep(10)
+
+    monkeypatch.setattr(backfill, "get_historical_bar_candidates", _hang_forever)
+    monkeypatch.setattr(backfill, "_ITEM_TIMEOUT_SECONDS", 0.05)
+
+    request = MarketDailyBackfillRequest(start_date=date(2026, 10, 8), end_date=date(2026, 10, 8))
+    job = service._create_job(request, _master().records[:1])
+    claimed = service._claim_job()
+    assert claimed is not None
+    await service._process_job(claimed)
+
+    completed = await service.get(job.job_id)
+    assert completed.status == "failed"
+    assert completed.completed_instruments == 1
+    assert completed.failed_instruments == 1
+    assert completed.retryable_failed_instruments == 1
+    assert "单票抓取超时" in completed.failure_details[0]["error"]
+
+
+@pytest.mark.asyncio
+async def test_auto_retry_recovers_transient_timeout(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """验证第一轮抓取超时失败的标的，在尾部自动重试轮次中若上游恢复，能够自动恢复为成功。"""
+    repo = MarketDailyBarRepository(tmp_path / "market_daily.sqlite3")
+    service = MarketDailyBackfillService(repo)
+    repo.initialize()
+
+    call_count = 0
+
+    async def _fail_then_succeed(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            await asyncio.sleep(1)
+        return HistoricalBarCandidates(
+            candidates=[_history(source="tdxhub"), _history(source="tencent")],
+            failures=[],
+        )
+
+    monkeypatch.setattr(backfill, "get_historical_bar_candidates", _fail_then_succeed)
+    monkeypatch.setattr(backfill, "_ITEM_TIMEOUT_SECONDS", 0.05)
+
+    request = MarketDailyBackfillRequest(start_date=date(2026, 10, 8), end_date=date(2026, 10, 8))
+    job = service._create_job(request, _master().records[:1])
+    claimed = service._claim_job()
+    assert claimed is not None
+    await service._process_job(claimed)
+
+    completed = await service.get(job.job_id)
+    assert completed.status == "succeeded"
+    assert completed.completed_instruments == 1
+    assert completed.succeeded_instruments == 1
+    assert completed.failed_instruments == 0
+    assert completed.skipped_instruments == 0
+    assert call_count == 2
+
+

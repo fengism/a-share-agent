@@ -28,6 +28,7 @@ _MEDIUM_REALTIME_POLICY = ToolPolicy(
 )
 _MEDIUM_QUERY_POLICY = ToolPolicy(cost="medium", cache_ttl_seconds=60)
 _DAILY_POLICY = ToolPolicy(cost="medium", cache_ttl_seconds=900, freshness="daily")
+_RESTRICTED_POLICY = ToolPolicy(cost="medium", cache_ttl_seconds=900, freshness="daily", timeout_seconds=15.0)
 _STATIC_POLICY = ToolPolicy(cache_ttl_seconds=3600, freshness="static")
 _HIGH_COST_POLICY = ToolPolicy(cost="high", cache_ttl_seconds=60)
 
@@ -433,7 +434,7 @@ def _register_risk_tool() -> None:
             },
             "required": ["code"],
         },
-        policy=_DAILY_POLICY,
+        policy=_RESTRICTED_POLICY,
         executor=helpers.get_restricted_shares_lift,
     ))
 

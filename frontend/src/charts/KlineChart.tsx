@@ -268,6 +268,8 @@ export default function KlineChart({
   rowCountRef.current = rows.length;
   const rowsRef = useRef<ChartItem[]>(rows);
   rowsRef.current = rows;
+  const viewKeyRef = useRef(viewKey);
+  viewKeyRef.current = viewKey;
 
   const showHighLowMarkersRef = useRef(showHighLowMarkers);
   showHighLowMarkersRef.current = showHighLowMarkers;
@@ -745,14 +747,28 @@ export default function KlineChart({
 
     const wrapper = wrapperRef.current;
     const brush = brushRef.current;
+    let hadZeroWidth = (chartElRef.current?.clientWidth ?? 0) <= 0;
     const resizeObserver = new ResizeObserver(
       createDebouncedResizeHandler((entry) => {
         const hudHeight = hudRef.current?.clientHeight ?? 32;
         const entryHeight = Math.floor(entry.contentRect.height);
         const plotHeight = entryHeight > 0 ? entryHeight : Math.max(100, height - hudHeight);
-        chart.applyOptions({ width: Math.floor(entry.contentRect.width), height: plotHeight });
+        const entryWidth = Math.floor(entry.contentRect.width);
+        chart.applyOptions({ width: entryWidth, height: plotHeight });
         applyVolumePaneLayout(chart, paneRatio);
         updateLayoutMetrics();
+
+        const currentViewKey = viewKeyRef.current;
+        if (entryWidth > 0 && rowsRef.current.length > 0 && (hadZeroWidth || shouldFitChartContent(fittedViewKeyRef.current, currentViewKey))) {
+          hadZeroWidth = false;
+          if (rowsRef.current.length > 80) {
+            chart.timeScale().setVisibleLogicalRange({ from: rowsRef.current.length - 80, to: rowsRef.current.length + 2 });
+          } else {
+            chart.timeScale().fitContent();
+          }
+          fittedViewKeyRef.current = currentViewKey;
+          setIsZoomed(false);
+        }
       })
     );
     resizeObserver.observe(chartElRef.current);
@@ -1271,6 +1287,14 @@ export default function KlineChart({
         chart.applyOptions({ width: Math.floor(rect.width), height: Math.floor(rect.height) });
         applyVolumePaneLayout(chart, paneRatio);
         updateLayoutMetrics();
+        if (rowsRef.current.length > 0) {
+          if (rowsRef.current.length > 80) {
+            chart.timeScale().setVisibleLogicalRange({ from: rowsRef.current.length - 80, to: rowsRef.current.length + 2 });
+          } else {
+            chart.timeScale().fitContent();
+          }
+          setIsZoomed(false);
+        }
       }
     }, 40);
     return () => clearTimeout(timer);

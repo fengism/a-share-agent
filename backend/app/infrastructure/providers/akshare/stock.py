@@ -138,8 +138,91 @@ def fetch_stock_spot_snapshot() -> pd.DataFrame:
     return ak.stock_zh_a_spot_em()
 
 
-def fetch_restricted_shares(code: str) -> pd.DataFrame:
-    return ak.stock_restricted_release_queue_em(symbol=code)
+_RESTRICTED_REQUEST_TIMEOUT_SECONDS = 8.0
+
+
+def fetch_restricted_shares(code: str, timeout: float = _RESTRICTED_REQUEST_TIMEOUT_SECONDS) -> pd.DataFrame:
+    """获取个股限售解禁批次数据。
+    
+    使用显式超时与重试保护，避免东方财富外部数据接口无超时挂起导致线程阻塞。
+    """
+    import requests
+    from requests.adapters import HTTPAdapter
+    from urllib3.util.retry import Retry
+
+    url = "https://datacenter-web.eastmoney.com/api/data/v1/get"
+    params = {
+        "sortColumns": "FREE_DATE",
+        "sortTypes": "-1",
+        "pageSize": "500",
+        "pageNumber": "1",
+        "reportName": "RPT_LIFT_STAGE",
+        "filter": f'(SECURITY_CODE="{code}")',
+        "columns": "SECURITY_CODE,SECURITY_NAME_ABBR,FREE_DATE,CURRENT_FREE_SHARES,ABLE_FREE_SHARES,"
+        "LIFT_MARKET_CAP,FREE_RATIO,NEW,B20_ADJCHRATE,A20_ADJCHRATE,FREE_SHARES_TYPE,TOTAL_RATIO,"
+        "NON_FREE_SHARES,BATCH_HOLDER_NUM",
+        "source": "WEB",
+        "client": "WEB",
+    }
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
+
+    try:
+        with requests.Session() as session:
+            adapter = HTTPAdapter(max_retries=Retry(total=1, backoff_factor=0.2))
+            session.mount("https://", adapter)
+            session.mount("http://", adapter)
+            response = session.get(url, params=params, headers=headers, timeout=timeout)
+            if response.status_code != 200:
+                logger.warning("fetch_restricted_shares 响应非200状态: code=%s, status=%s", code, response.status_code)
+                return pd.DataFrame()
+            data_json = response.json()
+    except Exception as exc:
+        logger.warning("fetch_restricted_shares 网络或超时异常: code=%s, error=%s", code, exc)
+        return pd.DataFrame()
+
+    result_data = data_json.get("result")
+    if not result_data or not result_data.get("data"):
+        return pd.DataFrame()
+
+    temp_df = pd.DataFrame(result_data["data"])
+    temp_df.reset_index(inplace=True)
+    temp_df["index"] = temp_df["index"] + 1
+
+    column_mapping = {
+        "index": "序号",
+        "FREE_DATE": "解禁时间",
+        "CURRENT_FREE_SHARES": "实际解禁数量",
+        "ABLE_FREE_SHARES": "解禁数量",
+        "LIFT_MARKET_CAP": "实际解禁数量市值",
+        "FREE_RATIO": "占流通市值比例",
+        "B20_ADJCHRATE": "解禁前20日涨跌幅",
+        "A20_ADJCHRATE": "解禁后20日涨跌幅",
+        "FREE_SHARES_TYPE": "限售股类型",
+        "TOTAL_RATIO": "占总市值比例",
+        "NON_FREE_SHARES": "未解禁数量",
+        "BATCH_HOLDER_NUM": "解禁股东数",
+    }
+    for orig, target in column_mapping.items():
+        if orig in temp_df.columns:
+            temp_df.rename(columns={orig: target}, inplace=True)
+
+    if "解禁前一交易日收盘价" not in temp_df.columns:
+        temp_df["解禁前一交易日收盘价"] = None
+
+    for col in ("解禁数量", "实际解禁数量", "未解禁数量", "实际解禁数量市值"):
+        if col in temp_df.columns:
+            temp_df[col] = pd.to_numeric(temp_df[col], errors="coerce") * 10000
+
+    for col in ("占总市值比例", "占流通市值比例", "解禁前20日涨跌幅", "解禁后20日涨跌幅"):
+        if col in temp_df.columns:
+            temp_df[col] = pd.to_numeric(temp_df[col], errors="coerce")
+
+    if "解禁时间" in temp_df.columns:
+        temp_df["解禁时间"] = pd.to_datetime(temp_df["解禁时间"], errors="coerce").dt.date
+
+    return temp_df
 
 
 def fetch_interactive_qa(code: str) -> pd.DataFrame:
