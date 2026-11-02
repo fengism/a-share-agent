@@ -210,9 +210,12 @@ describe("DailyReviewPage", () => {
 
   /** 打开「导出」下拉并点选指定项 */
   async function clickExportItem(label: string | RegExp) {
-    fireEvent.click(screen.getByRole("button", { name: /导出/ }));
     const matcher = typeof label === "string" ? new RegExp(label) : label;
-    const item = await screen.findByRole("menuitem", { name: matcher });
+    let item = screen.queryByRole("menuitem", { name: matcher });
+    if (!item) {
+      fireEvent.click(screen.getByRole("button", { name: /导出/ }));
+      item = await screen.findByRole("menuitem", { name: matcher });
+    }
     fireEvent.click(item);
   }
 

@@ -47,7 +47,7 @@ export default function PreviousCheckCard({ check, accuracy }: PreviousCheckCard
             size={64}
             percent={Math.round(accuracy * 100)}
             strokeColor={c.primary}
-            trailColor="var(--c-border)"
+            railColor="var(--c-border)"
             format={(percent) => <span className="daily-review-check-card__percent">{percent}%</span>}
           />
         ) : (

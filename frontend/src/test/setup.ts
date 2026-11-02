@@ -51,3 +51,27 @@ if (typeof window.scrollTo === "function" && !("__scrollToPatched" in window)) {
   Object.defineProperty(window, "__scrollToPatched", { value: true });
   window.scrollTo = () => {};
 }
+
+// Ant Design 的静态 message / notification 会脱离当前测试的 React 根节点并在 document.body 创建独立 DOM/root，
+// 其异步动画和定时器在测试结束后会触发 React "not wrapped in act(...)" 警告。
+// 在测试环境中提供安全的空实现，避免污染 stderr 或引起测试间状态泄露。
+import { message, notification } from "antd";
+import { vi } from "vitest";
+
+const createNoticeStub = () => {
+  const fn = () => {};
+  fn.then = (resolve?: (val: boolean) => unknown) => Promise.resolve(true).then(resolve);
+  return fn;
+};
+
+const messageTarget = message as unknown as Record<string, unknown>;
+for (const method of ["open", "success", "info", "warning", "error", "loading"] as const) {
+  messageTarget[method] = vi.fn(createNoticeStub);
+}
+messageTarget.destroy = vi.fn();
+
+const notificationTarget = notification as unknown as Record<string, unknown>;
+for (const method of ["open", "success", "info", "warning", "error"] as const) {
+  notificationTarget[method] = vi.fn(createNoticeStub);
+}
+notificationTarget.destroy = vi.fn();

@@ -65,7 +65,7 @@ export default function DailyReviewHero({ review, headline, moodSummary, checkAc
               size={72}
               percent={Math.round(checkAccuracy * 100)}
               strokeColor={c.primary}
-              trailColor="var(--c-border)"
+              railColor="var(--c-border)"
               format={(percent) => <span className="daily-review-hero__check-value">{percent}%</span>}
             />
             <div className="daily-review-hero__check-caption">
