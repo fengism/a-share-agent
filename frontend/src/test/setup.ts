@@ -1,8 +1,10 @@
 import "@testing-library/jest-dom";
 
 const originalGetComputedStyle = window.getComputedStyle.bind(window);
-window.getComputedStyle = ((element: Element, pseudoElt?: string | null) => {
-  const style = originalGetComputedStyle(element, pseudoElt);
+window.getComputedStyle = ((element: Element) => {
+  // jsdom does not implement pseudoElt (e.g. ::-webkit-scrollbar) and logs "Not implemented".
+  // Passing only element avoids the jsdom notImplemented virtual console error.
+  const style = originalGetComputedStyle(element);
   return new Proxy(style, {
     get(target, prop, receiver) {
       if (prop === "getPropertyValue") {

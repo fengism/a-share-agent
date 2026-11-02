@@ -52,7 +52,7 @@ export function AtlasMineModal({
       confirmLoading={mineMutation.isPending}
       okButtonProps={{ disabled: !industryName.trim() }}
       width="min(520px, calc(100vw - 24px))"
-      destroyOnClose
+      destroyOnHidden
     >
       <div style={{ marginBottom: 12, color: colors.textSecondary, fontSize: "var(--c-font-sm)" }}>
         {isAdmin

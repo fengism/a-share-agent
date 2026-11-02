@@ -57,7 +57,7 @@ export function AtlasBatchMineModal({
         ),
       ]}
       width="min(680px, calc(100vw - 24px))"
-      destroyOnClose
+      destroyOnHidden
     >
       <div style={{ color: colors.textSecondary, marginBottom: 16, fontSize: "var(--c-font-sm)", lineHeight: "var(--c-leading-relaxed)" }}>
         系统将自动遍历所有已完成且通过质量门禁的产业链深度研究研报，按时间先后顺序智能增量提取上/中/下游代表公司与业务定位，经 A 股官方名录校验防幻觉后，智能增量合并沉淀到知识库图谱中。

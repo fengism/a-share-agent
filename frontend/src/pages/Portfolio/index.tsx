@@ -154,7 +154,7 @@ export default function PortfolioPage() {
         open={isTransactionDrawerOpen}
         onClose={() => setIsTransactionDrawerOpen(false)}
         width={560}
-        destroyOnClose={false}
+        destroyOnHidden={false}
       >
         <TransactionEntryCard
           ref={transactionEntryRef}
@@ -171,7 +171,7 @@ export default function PortfolioPage() {
           open={isSettingsOpen}
           onCancel={() => setIsSettingsOpen(false)}
           footer={null}
-          destroyOnClose={false}
+          destroyOnHidden={false}
         >
           <PortfolioSettingsCard
             settings={data.settings}

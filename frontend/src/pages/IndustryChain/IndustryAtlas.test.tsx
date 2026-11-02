@@ -1,3 +1,4 @@
+import { forwardRef } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, useLocation } from "react-router-dom";
@@ -84,7 +85,9 @@ vi.mock("@ant-design/icons", () => ({
 }));
 
 vi.mock("echarts-for-react/lib/core", () => ({
-  default: () => <div data-testid="echarts-graph-mock" />,
+  default: forwardRef((_props, ref) => (
+    <div ref={ref as React.ForwardedRef<HTMLDivElement>} data-testid="echarts-graph-mock" />
+  )),
 }));
 
 vi.mock("../../charts/echarts-setup", () => ({

@@ -577,7 +577,7 @@ function AtlasReverseLookup({
   const isMobile = useMediaQuery("(max-width: 576px)");
 
   return (
-    <Card style={cardStyle} bodyStyle={{ padding: isMobile ? "14px 16px" : 20 }}>
+    <Card style={cardStyle} styles={{ body: { padding: isMobile ? "14px 16px" : 20 } }}>
       <div style={{ maxWidth: 600, marginBottom: 16 }}>
         <h3 style={{ fontSize: isMobile ? "var(--c-font-base)" : "var(--c-font-lg)", marginBottom: 8, color: colors.textPrimary }}>
           🔍 从个股反查产业链分布
@@ -870,7 +870,7 @@ function AtlasGlobalGraph({
   };
 
   return (
-    <Card style={cardStyle} bodyStyle={{ padding: isMobile ? 12 : 18 }}>
+    <Card style={cardStyle} styles={{ body: { padding: isMobile ? 12 : 18 } }}>
       {/* 子标签：力导向图谱 / 跨链枢纽龙头榜 / 产业协同矩阵 */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, flexWrap: "wrap", gap: 10 }}>
         <div style={{ width: isMobile ? "100%" : "auto" }}>
@@ -1649,7 +1649,7 @@ function SingleChainGraph({
   const isSmall = (containerWidth || (typeof window !== "undefined" ? window.innerWidth : 800)) < 640;
 
   return (
-    <Card style={cardStyle} bodyStyle={{ padding: isSmall ? 12 : 16 }}>
+    <Card style={cardStyle} styles={{ body: { padding: isSmall ? 12 : 16 } }}>
       {/* 搜索与导出工具栏 */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 10 }}>
         <Input

@@ -30,7 +30,7 @@ export function AtlasImportModal({
       okButtonProps={{ disabled: !content.trim() || importing }}
       confirmLoading={importing}
       width="min(720px, calc(100vw - 24px))"
-      destroyOnClose
+      destroyOnHidden
     >
       <div style={{ marginBottom: 12, color: colors.textSecondary, fontSize: "var(--c-font-sm)" }}>
         {isAdmin
