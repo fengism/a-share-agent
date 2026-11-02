@@ -519,6 +519,36 @@ export default function LlmConfigCard({
           </div>
         </Col>
         <Col span={24}>
+          <div style={{ ...fieldLabelStyle, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span>降级备用模型（429/限流/超额兜底，可选）</span>
+            {form.llm_fallback_model && (
+              <Button
+                type="link"
+                size="small"
+                style={{ padding: 0, height: "auto", fontSize: "var(--c-font-xs)" }}
+                onClick={() => onChange({ llm_fallback_model: "" })}
+              >
+                清空（不降级）
+              </Button>
+            )}
+          </div>
+          <AutoComplete
+            aria-label="降级备用模型"
+            style={{ width: "100%" }}
+            value={form.llm_fallback_model || ""}
+            onChange={(value) => onChange({ llm_fallback_model: value })}
+            options={(fetchedModels ?? recommendedModels).map((m) => ({ value: m }))}
+            filterOption={(input, option) =>
+              String(option?.value ?? "").toLowerCase().includes(input.toLowerCase())
+            }
+            placeholder="主模型 429 quota exceeded 或不可用时自动切换的备用模型；留空则不降级"
+            allowClear
+          />
+          <div style={{ marginTop: 4, fontSize: "var(--c-font-xs)", color: "var(--c-text-muted)" }}>
+            当主模型发生 429 额度超限（Quota Exceeded）、限流或多次重试仍不可用时，系统自动无缝切换到此模型继续执行，避免对话或分析失败中断。与主模型共用 Provider / Base URL / API Key。
+          </div>
+        </Col>
+        <Col span={24}>
           <div style={fieldLabelStyle}>子模型启用任务（可选）</div>
           <Input
             aria-label="子模型任务清单"

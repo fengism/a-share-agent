@@ -73,6 +73,7 @@ class ConfigUpdateRequest(BaseModel):
     llm_base_url: Annotated[str | None, ConfigMeta("private", "llm", synced_global=True)] = None
     llm_model: Annotated[str | None, ConfigMeta("private", "llm", synced_global=True)] = None
     llm_sub_model: Annotated[str | None, ConfigMeta("private", "llm", synced_global=True)] = None
+    llm_fallback_model: Annotated[str | None, ConfigMeta("private", "llm", synced_global=True)] = None
     llm_simple_tasks: Annotated[str | None, ConfigMeta("private", "llm", synced_global=True)] = None
     llm_temperature: Annotated[
         float | None, ConfigMeta("private", "llm", synced_global=True)

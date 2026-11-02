@@ -152,6 +152,78 @@ def _degrade_tools_if_rejected(
     return True
 
 
+def _is_quota_or_rate_limit(error: BaseException) -> bool:
+    """判定是否为 429、Quota Exceeded 或限流类错误。"""
+    status_code = getattr(error, "status_code", None)
+    if status_code is None:
+        response = getattr(error, "response", None)
+        status_code = getattr(response, "status_code", None)
+    if status_code == 429:
+        return True
+    message = str(error).lower()
+    return any(
+        kw in message
+        for kw in (
+            "quota exceeded",
+            "quota_exceeded",
+            "insufficient_quota",
+            "rate limit",
+            "rate_limit",
+            "too many requests",
+            "429",
+            "resource exhausted",
+            "credits exhausted",
+            "balance insufficient",
+        )
+    )
+
+
+def _apply_fallback_model_if_available(
+    error: BaseException,
+    request_kwargs: dict[str, Any],
+    *,
+    settings: Settings,
+    metric_stage: str,
+    transient_attempt: int,
+) -> bool:
+    """当主模型发生 429 额度超限或重试耗尽时，若配置了备用模型则自动降级切换。
+
+    返回 True 表示已切换到 fallback_model 并应重新发起请求。
+    """
+    fallback_model = (getattr(settings, "llm_fallback_model", "") or "").strip()
+    if not fallback_model:
+        return False
+    current_model = str(request_kwargs.get("model", "") or "")
+    if current_model == fallback_model:
+        return False
+
+    is_quota = _is_quota_or_rate_limit(error)
+    attempts_exhausted = transient_attempt >= settings.llm_max_attempts
+    if not (is_quota or attempts_exhausted):
+        return False
+
+    logger.warning(
+        "上游模型 %s 触发降级 (%s)，自动切换到备用模型 %s: stage=%s",
+        current_model,
+        "429/额度耗尽" if is_quota else f"重试耗尽({transient_attempt}次)",
+        fallback_model,
+        metric_stage,
+    )
+    metrics.record_provider_attempt(
+        "llm_chat",
+        operation="fallback_to_model",
+        success=True,
+        duration_ms=0.0,
+    )
+    request_kwargs["model"] = fallback_model
+    capabilities = capabilities_for_settings(settings, model=fallback_model)
+    capabilities = apply_deployment_limits(capabilities, settings)
+    prepared = prepare_completion_kwargs(request_kwargs, capabilities)
+    request_kwargs.clear()
+    request_kwargs.update(prepared)
+    return True
+
+
 async def create_chat_completion(
     client,
     *,
@@ -178,6 +250,7 @@ async def create_chat_completion(
             # 不能吃掉 llm_max_attempts 里给 429/5xx 准备的预算。
             transient_attempt = 0
             tool_retry_used = False
+            fallback_used = False
             while True:
                 transient_attempt += 1
                 try:
@@ -189,6 +262,14 @@ async def create_chat_completion(
                         error, request_kwargs, settings=settings, metric_stage=metric_stage,
                     ):
                         tool_retry_used = True
+                        continue
+                    if not fallback_used and _apply_fallback_model_if_available(
+                        error, request_kwargs, settings=settings, metric_stage=metric_stage,
+                        transient_attempt=transient_attempt,
+                    ):
+                        fallback_used = True
+                        transient_attempt = 0
+                        tool_retry_used = False
                         continue
                     normalized = normalize_retryable_llm_error(error)
                     if (
@@ -292,6 +373,7 @@ async def stream_chat_completion(
         # 与 create_chat_completion 一致：工具降级重试独立于瞬时故障重试预算。
         transient_attempt = 0
         tool_retry_used = False
+        fallback_used = False
         while True:
             transient_attempt += 1
             read_timeout = float(request_timeout) if request_timeout is not None else float(settings.llm_timeout_seconds)
@@ -337,6 +419,18 @@ async def stream_chat_completion(
                 ):
                     # 首块之前才允许重放：已经吐过内容再重试会重复计费/重复输出。
                     tool_retry_used = True
+                    continue
+                if (
+                    not fallback_used
+                    and not yielded_chunk
+                    and _apply_fallback_model_if_available(
+                        exc, request_kwargs, settings=settings, metric_stage=metric_stage,
+                        transient_attempt=transient_attempt,
+                    )
+                ):
+                    fallback_used = True
+                    transient_attempt = 0
+                    tool_retry_used = False
                     continue
                 normalized = (
                     request_timeout_error(

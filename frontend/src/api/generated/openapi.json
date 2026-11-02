@@ -3751,6 +3751,10 @@
             "title": "Llm Extra Body",
             "type": "object"
           },
+          "llm_fallback_model": {
+            "title": "Llm Fallback Model",
+            "type": "string"
+          },
           "llm_generation_max_completion_tokens": {
             "title": "Llm Generation Max Completion Tokens",
             "type": "integer"
@@ -3955,6 +3959,7 @@
           "llm_base_url",
           "llm_model",
           "llm_sub_model",
+          "llm_fallback_model",
           "llm_simple_tasks",
           "llm_temperature",
           "llm_context_length_tokens",
@@ -4967,6 +4972,17 @@
               }
             ],
             "title": "Llm Extra Body"
+          },
+          "llm_fallback_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Llm Fallback Model"
           },
           "llm_generation_max_completion_tokens": {
             "anyOf": [

@@ -44,6 +44,7 @@ export const CARD_SPECS = {
       "llm_base_url",
       "llm_model",
       "llm_sub_model",
+      "llm_fallback_model",
       "llm_simple_tasks",
       "llm_temperature",
       "llm_context_length_tokens",

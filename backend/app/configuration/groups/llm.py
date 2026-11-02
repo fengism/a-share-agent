@@ -34,6 +34,8 @@ class LLMGroup(ConfigGroup):
     # 简单/高频任务（如逐条资讯解读）使用的子模型；留空则复用主模型。
     # 与主模型共用 provider/base_url/api_key，仅替换 model，避免子任务超时。
     llm_sub_model: str = ""
+    # 主模型发生 429 限流、额度超限（quota exceeded）或持续不可用时的自动降级备用模型；留空则不降级。
+    llm_fallback_model: str = ""
     # 允许使用子模型的任务清单（逗号分隔）；留空=全部已接入的任务。
     # 可选值：chat_routing / macro_item / news_analysis / twitter_analysis
     llm_simple_tasks: str = ""

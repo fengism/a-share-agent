@@ -6110,6 +6110,8 @@ export interface components {
             llm_extra_body: {
                 [key: string]: unknown;
             };
+            /** Llm Fallback Model */
+            llm_fallback_model: string;
             /** Llm Generation Max Completion Tokens */
             llm_generation_max_completion_tokens: number;
             /** Llm Generation Timeout Seconds */
@@ -6359,6 +6361,8 @@ export interface components {
             llm_extra_body?: {
                 [key: string]: unknown;
             } | null;
+            /** Llm Fallback Model */
+            llm_fallback_model?: string | null;
             /** Llm Generation Max Completion Tokens */
             llm_generation_max_completion_tokens?: number | null;
             /** Llm Generation Timeout Seconds */

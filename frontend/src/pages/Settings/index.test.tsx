@@ -206,6 +206,7 @@ let config: ConfigData = {
   llm_base_url: "https://api.example.com",
   llm_model: "model",
   llm_sub_model: "",
+  llm_fallback_model: "",
   llm_simple_tasks: "",
   llm_temperature: 0.1,
   feishu_enabled: false,

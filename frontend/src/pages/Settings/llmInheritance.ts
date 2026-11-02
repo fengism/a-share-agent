@@ -15,6 +15,7 @@ export const PERSONAL_LLM_FIELDS = [
   "llm_api_mode",
   "llm_api_version",
   "llm_sub_model",
+  "llm_fallback_model",
   "llm_simple_tasks",
 ] as const;
 
