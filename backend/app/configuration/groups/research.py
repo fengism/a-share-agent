@@ -46,9 +46,10 @@ class ResearchGroup(ConfigGroup):
     user_llm_rate_limit_window: int = Field(default=60, ge=1, le=3600)
     blocking_thread_pool_workers: int = 20
     chat_max_completion_tokens: int = 4096
-    chat_total_timeout_seconds: int = 300
+    chat_total_timeout_seconds: int = Field(default=600, ge=30, le=3600)
+    chat_turn_timeout_seconds: float = Field(default=120.0, ge=10.0, le=600.0)
     chat_heartbeat_seconds: int = 15
-    chat_tool_timeout_seconds: int = 45
+    chat_tool_timeout_seconds: int = Field(default=45, ge=5, le=300)
     # Maximum new calls in an execution batch, not a hard cap on one model turn.
     chat_max_tool_calls_per_round: int = Field(default=16, ge=1, le=32)
     chat_max_tool_calls_total: int = Field(default=32, ge=1, le=128)

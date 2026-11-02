@@ -5997,6 +5997,12 @@ export interface components {
             bot_webhook_max_skew_seconds: number;
             /** Chat Max Tool Calls Total */
             chat_max_tool_calls_total: number;
+            /** Chat Tool Timeout Seconds */
+            chat_tool_timeout_seconds: number;
+            /** Chat Total Timeout Seconds */
+            chat_total_timeout_seconds: number;
+            /** Chat Turn Timeout Seconds */
+            chat_turn_timeout_seconds: number;
             /** Daily Review Prewarm Enabled */
             daily_review_prewarm_enabled: boolean;
             /** Database Backup Include Market Daily */
@@ -6247,6 +6253,12 @@ export interface components {
             bot_webhook_max_skew_seconds?: number | null;
             /** Chat Max Tool Calls Total */
             chat_max_tool_calls_total?: number | null;
+            /** Chat Tool Timeout Seconds */
+            chat_tool_timeout_seconds?: number | null;
+            /** Chat Total Timeout Seconds */
+            chat_total_timeout_seconds?: number | null;
+            /** Chat Turn Timeout Seconds */
+            chat_turn_timeout_seconds?: number | null;
             /** Daily Review Prewarm Enabled */
             daily_review_prewarm_enabled?: boolean | null;
             /** Database Backup Include Market Daily */

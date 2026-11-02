@@ -58,9 +58,12 @@ async def run_chat_agent(
         max_initial_tools=settings.chat_max_initial_tools,
     )
     metrics.record_agentic_event("capability_plan")
+    # 内部预算留出 15 秒安全缓冲给降级展示和清理，避免外层 asyncio.timeout 直接掐断生成器
+    total_timeout = max(10, int(settings.chat_total_timeout_seconds))
+    agent_budget = max(5.0, float(total_timeout) - 15.0)
     execution_context = AgentExecutionContext.from_current(
         settings,
-        total_timeout_seconds=settings.chat_total_timeout_seconds,
+        total_timeout_seconds=agent_budget,
         user_id=get_current_user_id(),
         request_id=get_current_request_id(),
     )

@@ -13,10 +13,13 @@ const baseForm = {
   industry_chain_tool_calls_total: 160,
   industry_chain_repair_tool_calls_total: 80,
   chat_max_tool_calls_total: 32,
+  chat_total_timeout_seconds: 600,
+  chat_turn_timeout_seconds: 120,
+  chat_tool_timeout_seconds: 45,
 };
 
 describe("ResearchBudgetCard", () => {
-  it("renders all ten budget fields with current values", () => {
+  it("renders all thirteen budget fields with current values", () => {
     render(<ResearchBudgetCard form={baseForm} onChange={vi.fn()} onSave={vi.fn()} isSaving={false} />);
 
     expect(screen.getByText("研究预算与超时（全局）")).toBeInTheDocument();
@@ -29,6 +32,9 @@ describe("ResearchBudgetCard", () => {
     expect(screen.getByDisplayValue(160)).toBeInTheDocument();
     expect(screen.getByDisplayValue(80)).toBeInTheDocument();
     expect(screen.getByDisplayValue(32)).toBeInTheDocument();
+    expect(screen.getByDisplayValue(600)).toBeInTheDocument();
+    expect(screen.getByDisplayValue(120)).toBeInTheDocument();
+    expect(screen.getByDisplayValue(45)).toBeInTheDocument();
   });
 
   it("emits the changed field through onChange", () => {
@@ -52,5 +58,8 @@ describe("ResearchBudgetCard", () => {
     expect(screen.getByDisplayValue(5)).toBeInTheDocument();
     expect(screen.getByDisplayValue(160)).toBeInTheDocument();
     expect(screen.getByDisplayValue(80)).toBeInTheDocument();
+    expect(screen.getByDisplayValue(600)).toBeInTheDocument();
+    expect(screen.getByDisplayValue(120)).toBeInTheDocument();
+    expect(screen.getByDisplayValue(45)).toBeInTheDocument();
   });
 });

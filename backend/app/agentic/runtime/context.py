@@ -86,6 +86,12 @@ class AgentExecutionContext:
             deadline=deadline,
         )
 
+    def remaining_time(self) -> float:
+        """剩余可用秒数。未设 deadline 时返回无穷大。"""
+        if self.deadline is None:
+            return float("inf")
+        return max(0.0, self.deadline - time.monotonic())
+
     def deadline_exceeded(self) -> bool:
         """整体 deadline 是否已耗尽。"""
         return self.deadline is not None and time.monotonic() >= self.deadline

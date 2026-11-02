@@ -57,6 +57,27 @@ logger = logging.getLogger(__name__)
 _FAILURE_REASON_ID_SEPARATOR = "（错误编号："
 
 
+def _format_fallback_synthesis(
+    results: dict[str, AgentExecutionResult],
+    coverage_warnings: list[str] | None = None,
+    *,
+    timed_out: bool = False,
+) -> str:
+    """综合阶段超时或时间不足时，优雅拼接展示已完成各维度的详细结论。"""
+    sections: list[str] = []
+    if timed_out:
+        sections.append("> ⚠️ **提示**：综合各维度结论耗时较长触发安全时限，已为您保留各维度的完整分析：\n")
+    else:
+        sections.append("> ℹ️ **提示**：剩余时间不足以生成综合总结，已直接为您汇总各维度的详细分析：\n")
+
+    for result in results.values():
+        if not result.analysis or result.status == "failed":
+            continue
+        sections.append(f"### {result.display_name}\n\n{result.analysis.strip()}\n")
+
+    return "\n".join(sections)
+
+
 def _summarize_failure_reasons(results: dict[str, AgentExecutionResult]) -> str:
     """全部 Agent 失败时，透出可操作的失败原因而非泛化提示。
 
@@ -277,16 +298,46 @@ class Orchestrator:
             return
 
         yield AgentEvent(type="status", content="正在综合各维度结论…")
-        async with aclosing(self._synthesize(
-            message,
-            usable_results,
-            llm_client,
-            model,
-            temperature,
-            coverage_warnings=coverage_warnings,
-        )) as stream:
-            async for event in stream:
-                yield event
+        remaining = (
+            self.execution_context.remaining_time()
+            if self.execution_context is not None
+            else float("inf")
+        )
+        if remaining < 15.0:
+            logger.warning("剩余综合时间不足 (%.1fs)，直接输出各专业维度分析", remaining)
+            yield AgentEvent(
+                type="text",
+                content=_format_fallback_synthesis(usable_results, coverage_warnings),
+            )
+            yield AgentEvent(
+                type="done",
+                status="partial" if coverage_warnings else "completed",
+                warnings=list(dict.fromkeys((coverage_warnings or []) + ["综合分析时间不足，已为您展示各维度的完整分析"])),
+            )
+            return
+
+        try:
+            async with aclosing(self._synthesize(
+                message,
+                usable_results,
+                llm_client,
+                model,
+                temperature,
+                coverage_warnings=coverage_warnings,
+            )) as stream:
+                async for event in stream:
+                    yield event
+        except (TimeoutError, Exception) as exc:
+            logger.warning("多 Agent 综合阶段异常或超时，回退到按维度展示: %s", exc)
+            yield AgentEvent(
+                type="text",
+                content=_format_fallback_synthesis(usable_results, coverage_warnings, timed_out=True),
+            )
+            yield AgentEvent(
+                type="done",
+                status="partial",
+                warnings=list(dict.fromkeys((coverage_warnings or []) + ["综合分析生成超时，已为您展示各维度的完整分析"])),
+            )
 
     async def run(
         self,
@@ -420,7 +471,8 @@ class Orchestrator:
         if not review.should_retry:
             return
         if self.execution_context is not None and (
-            self.execution_context.deadline_exceeded() or self.execution_context.tool_calls_available() <= 0
+            self.execution_context.remaining_time() < 30.0
+            or self.execution_context.tool_calls_available() <= 0
         ):
             yield AgentEvent(type="status", content="剩余分析时间或工具预算不足，不再重跑任务；保留已有结果并说明缺口。")
             return

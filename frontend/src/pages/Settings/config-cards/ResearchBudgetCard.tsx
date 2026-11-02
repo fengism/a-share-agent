@@ -134,7 +134,37 @@ export default function ResearchBudgetCard({
         💬 对话与交互上限
       </div>
       <Row gutter={[24, 16]}>
-        <Col span={24} sm={12}>
+        <Col span={24} sm={6}>
+          <div style={fieldLabelStyle}>对话总超时（秒）</div>
+          <InputNumber
+            min={30}
+            max={3600}
+            value={form.chat_total_timeout_seconds ?? 600}
+            onChange={(value) => onChange({ chat_total_timeout_seconds: value ?? 600 })}
+            style={{ width: "100%" }}
+          />
+        </Col>
+        <Col span={24} sm={6}>
+          <div style={fieldLabelStyle}>单次模型超时（秒）</div>
+          <InputNumber
+            min={10}
+            max={600}
+            value={form.chat_turn_timeout_seconds ?? 120}
+            onChange={(value) => onChange({ chat_turn_timeout_seconds: value ?? 120 })}
+            style={{ width: "100%" }}
+          />
+        </Col>
+        <Col span={24} sm={6}>
+          <div style={fieldLabelStyle}>单个工具超时（秒）</div>
+          <InputNumber
+            min={5}
+            max={300}
+            value={form.chat_tool_timeout_seconds ?? 45}
+            onChange={(value) => onChange({ chat_tool_timeout_seconds: value ?? 45 })}
+            style={{ width: "100%" }}
+          />
+        </Col>
+        <Col span={24} sm={6}>
           <div style={fieldLabelStyle}>Chat 工具调用上限</div>
           <InputNumber
             min={1}
@@ -146,7 +176,7 @@ export default function ResearchBudgetCard({
         </Col>
         <Col span={24}>
           <div style={{ fontSize: "var(--c-font-sm)", color: colors.textMuted }}>
-            保存后立即生效，无需重启。主调研与补证阶段使用独立轮次、时限和工具预算；轮次只是上限，只有证据缺口持续缩小时才继续，无进展会提前停止，避免无意义消耗 Token。
+            保存后立即生效，无需重启。复杂多 Agent 对话建议总超时保持 600 秒以上；单次模型超时避免单个上游请求卡死占满整轮对话时间。
           </div>
         </Col>
       </Row>

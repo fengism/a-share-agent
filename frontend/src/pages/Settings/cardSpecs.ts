@@ -183,6 +183,9 @@ export const CARD_SPECS = {
       "industry_chain_tool_calls_total",
       "industry_chain_repair_tool_calls_total",
       "chat_max_tool_calls_total",
+      "chat_total_timeout_seconds",
+      "chat_turn_timeout_seconds",
+      "chat_tool_timeout_seconds",
     ],
   },
   marketDaily: {

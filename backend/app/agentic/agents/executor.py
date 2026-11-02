@@ -149,14 +149,15 @@ def _bound_tool_context_for_prompt_budget(
 def _llm_request_timeout(
     execution_context: AgentExecutionContext | None, settings: Any
 ) -> float:
-    """本次模型请求可用的单次读写上限：不能活过外层请求预算。
+    """本次模型请求可用的单次读写上限：不能超过单轮上限，也不能活过外层请求预算。
 
-    工具调用早就用 ``bounded_timeout`` 跟着执行上下文的 deadline 收缩了，模型调用却一直
-    按客户端构造时固定的 ``llm_timeout_seconds`` 掐断——最内层的传输限制先触发，失败原因
-    被误报成「读取响应超时」，而实际上只是这次回答还没写完。生成总预算是天花板，外层请求
-    预算（对话总时限）是地板：谁更紧听谁的。
+    工具调用早就用 ``bounded_timeout`` 跟着执行上下文的 deadline 收缩了。单次调用预算
+    取单轮超时（chat_turn_timeout_seconds）与生成总预算（llm_generation_timeout_seconds）
+    的较小值，避免单次卡死吃光整轮对话时间；外层请求预算（对话总时限）是兜底限制：谁更紧听谁的。
     """
-    budget = float(settings.llm_generation_timeout_seconds)
+    turn_cap = float(getattr(settings, "chat_turn_timeout_seconds", 120.0) or 120.0)
+    gen_budget = float(getattr(settings, "llm_generation_timeout_seconds", 1200.0) or 1200.0)
+    budget = min(turn_cap, gen_budget)
     if execution_context is None or execution_context.deadline is None:
         return budget
     return min(budget, max(float(execution_context.bounded_timeout(budget)), 1.0))

@@ -372,6 +372,15 @@ class ConfigUpdateRequest(BaseModel):
     chat_max_tool_calls_total: Annotated[int | None, ConfigMeta("global", "research")] = Field(
         default=None, ge=1, le=128
     )
+    chat_total_timeout_seconds: Annotated[int | None, ConfigMeta("global", "research")] = Field(
+        default=None, ge=30, le=3600
+    )
+    chat_turn_timeout_seconds: Annotated[float | None, ConfigMeta("global", "research")] = Field(
+        default=None, ge=10.0, le=600.0
+    )
+    chat_tool_timeout_seconds: Annotated[int | None, ConfigMeta("global", "research")] = Field(
+        default=None, ge=5, le=300
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -3520,6 +3520,18 @@
             "title": "Chat Max Tool Calls Total",
             "type": "integer"
           },
+          "chat_tool_timeout_seconds": {
+            "title": "Chat Tool Timeout Seconds",
+            "type": "integer"
+          },
+          "chat_total_timeout_seconds": {
+            "title": "Chat Total Timeout Seconds",
+            "type": "integer"
+          },
+          "chat_turn_timeout_seconds": {
+            "title": "Chat Turn Timeout Seconds",
+            "type": "number"
+          },
           "daily_review_prewarm_enabled": {
             "title": "Daily Review Prewarm Enabled",
             "type": "boolean"
@@ -4050,6 +4062,9 @@
           "analysis_llm_timeout_seconds",
           "agent_research_timeout_seconds",
           "chat_max_tool_calls_total",
+          "chat_total_timeout_seconds",
+          "chat_turn_timeout_seconds",
+          "chat_tool_timeout_seconds",
           "provider_defaults",
           "is_admin",
           "inherited_keys"
@@ -4334,6 +4349,45 @@
               }
             ],
             "title": "Chat Max Tool Calls Total"
+          },
+          "chat_tool_timeout_seconds": {
+            "anyOf": [
+              {
+                "maximum": 300.0,
+                "minimum": 5.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chat Tool Timeout Seconds"
+          },
+          "chat_total_timeout_seconds": {
+            "anyOf": [
+              {
+                "maximum": 3600.0,
+                "minimum": 30.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chat Total Timeout Seconds"
+          },
+          "chat_turn_timeout_seconds": {
+            "anyOf": [
+              {
+                "maximum": 600.0,
+                "minimum": 10.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chat Turn Timeout Seconds"
           },
           "daily_review_prewarm_enabled": {
             "anyOf": [

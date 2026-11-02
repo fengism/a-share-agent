@@ -163,13 +163,15 @@ async def create_chat_completion(
     """在全局排队槽位中执行一次非流式 Chat Completion。"""
     settings = call_settings()
     request_kwargs = _prepare_request(client, kwargs, settings=settings, max_completion_tokens=max_completion_tokens)
+    scope_timeout = (
+        min(float(request_timeout), float(settings.llm_generation_timeout_seconds))
+        if request_timeout is not None
+        else float(settings.llm_generation_timeout_seconds)
+    )
     if request_timeout is not None:
-        # 单次读写上限在客户端构造时就固定了（llm_timeout_seconds），不随执行上下文收缩。
-        # 长回答必须显式把它抬到本次调用真正拿到的预算，否则最内层的传输限制会先于
-        # generation_scope 触发，把「预算不够」误报成「读取响应超时」。
-        request_kwargs["timeout"] = max(float(request_timeout), float(settings.llm_timeout_seconds))
+        request_kwargs["timeout"] = float(request_timeout)
     started_at = time.perf_counter()
-    async with generation_scope(settings, timeout_seconds=settings.llm_generation_timeout_seconds), _llm_limiter.slot():
+    async with generation_scope(settings, timeout_seconds=scope_timeout), _llm_limiter.slot():
         queue_wait_ms = (time.perf_counter() - started_at) * 1000
         try:
             # 工具降级重试与瞬时故障重试分开计数：前者每个调用最多一次，
@@ -273,15 +275,18 @@ async def stream_chat_completion(
     """Hold one LLM slot for the stream and retry transient failures before the first chunk."""
     settings = call_settings()
     request_kwargs = _prepare_request(client, kwargs, settings=settings, max_completion_tokens=max_completion_tokens)
+    effective_timeout = (
+        min(float(request_timeout), float(settings.llm_generation_timeout_seconds))
+        if request_timeout is not None
+        else float(settings.llm_generation_timeout_seconds)
+    )
     if request_timeout is not None:
-        # Internal budget name must never reach provider SDKs. OpenAI/LiteLLM
-        # both support the public per-request ``timeout`` option.
-        request_kwargs["timeout"] = max(float(request_timeout), float(settings.llm_timeout_seconds))
+        request_kwargs["timeout"] = float(request_timeout)
     started_at = time.perf_counter()
     usage = None
     ttft_ms = None
     yielded_chunk = False
-    deadline = asyncio.get_running_loop().time() + settings.llm_generation_timeout_seconds
+    deadline = asyncio.get_running_loop().time() + effective_timeout
     async with _llm_limiter.slot(deadline=deadline):
         queue_wait_ms = (time.perf_counter() - started_at) * 1000
         # 与 create_chat_completion 一致：工具降级重试独立于瞬时故障重试预算。
@@ -289,7 +294,7 @@ async def stream_chat_completion(
         tool_retry_used = False
         while True:
             transient_attempt += 1
-            read_timeout = float(settings.llm_timeout_seconds)
+            read_timeout = float(request_timeout) if request_timeout is not None else float(settings.llm_timeout_seconds)
             try:
                 async with _stream_read_guard(deadline, read_timeout):
                     stream = await client.chat.completions.create(**request_kwargs)
