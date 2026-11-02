@@ -31,7 +31,7 @@ export default function AnalysisProgressSteps({ stages, currentStageIndex, statu
     return {
       title: stage?.name || STAGE_NAMES[index] || `阶段 ${index + 1}`,
       status: stepStatus,
-      description,
+      content: description,
     };
   });
 

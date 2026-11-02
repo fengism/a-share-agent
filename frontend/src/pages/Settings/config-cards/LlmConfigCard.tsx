@@ -502,7 +502,7 @@ export default function LlmConfigCard({
               type="warning"
               showIcon
               style={{ marginTop: 8 }}
-              message={
+              title={
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
                   <span>
                     当前子模型 <code>{form.llm_sub_model}</code> 不在已获取的服务端模型列表中，简单任务可能因找不到模型而失败。

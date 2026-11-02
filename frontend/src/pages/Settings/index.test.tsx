@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { message } from "antd";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ConfigData, ConfigUpdate, OutboundProxyType } from "../../types/settings";
 import { useAuthStore } from "../../store/authStore";
@@ -320,6 +321,7 @@ let config: ConfigData = {
 
 describe("SettingsPage Bot config", () => {
   afterEach(() => {
+    message.destroy();
     mocks.mutateConfig.mockReset();
     act(() => useAuthStore.setState({ user: null }));
   });
@@ -503,6 +505,7 @@ describe("SettingsPage Bot config", () => {
     await waitFor(() => expect(screen.getByLabelText("FRED API Key")).toHaveValue("fred-***-key"));
     fireEvent.click(saveButton);
 
+    expect(await screen.findByText("没有需要保存的变更")).toBeInTheDocument();
     expect(mocks.mutateConfig).not.toHaveBeenCalled();
     queryClient.clear();
   });
@@ -532,6 +535,7 @@ describe("SettingsPage Bot config", () => {
     });
     fireEvent.click(saveButton);
 
+    expect(await screen.findByText("没有需要保存的变更")).toBeInTheDocument();
     expect(mocks.mutateConfig).not.toHaveBeenCalled();
     queryClient.clear();
   });
