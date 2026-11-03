@@ -384,6 +384,7 @@ API Key 等敏感配置使用 `CONFIG_ENCRYPTION_KEY` 加密后落库。
 | [数据源与降级机制](docs/data-sources.md) | Provider 清单、多源降级、熔断限流、质量校验 | 数据异常排查 |
 | [故障排查手册](docs/troubleshooting.md) | 按症状组织的排查步骤与处置命令 | 运维排障 |
 | [自动推送与通知配置](docs/push-notifications.md) | 飞书 / 钉钉 / 企微 / 微信服务号接入 | 配置推送 |
+| [国家队监测口径](docs/national-team.md) | ETF 代理指标算法、数据源、覆盖率与静态参考约定 | 改国家队功能 |
 
 ## 免责声明
 

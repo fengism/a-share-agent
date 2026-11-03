@@ -1,0 +1,148 @@
+# 国家队监测（宽基 ETF 代理口径）
+
+> 页面：`/national-team`　接口：`GET /api/market/national-team-etf-holdings?days=30..365`
+> 后端：`backend/app/financial_data/market/quotes/national_team.py`
+> 前端：`frontend/src/pages/NationalTeam/`
+
+## 1. 口径：为什么叫「代理指标」
+
+中央汇金、证金、社保的真实持仓只在定期报告里披露，且滞后一个季度以上。本页面测的是
+**核心宽基 ETF 的份额变化**，把它当作国家队资金行为的代理信号：
+
+```
+单只 ETF 某日净申购(亿元) = (当日份额 - 前一交易日份额) / 1e8 × 当日 ETF 收盘价
+某宽基 某日净申购(亿元)   = 该宽基下所有 ETF 当日净申购之和
+```
+
+因此 ETF 份额变动**不等于**中央汇金持仓变动：申购赎回可能来自公募、私募、保险、
+券商自营或个人投资者。页面顶部与底部均展示 `disclaimer` 与 `methodology`，删掉它们
+会让用户误读数据，不要为了版面删。
+
+## 2. 数据来源与刷新
+
+| 数据 | 来源 | 说明 |
+| --- | --- | --- |
+| 上交所 ETF 份额历史 | 上交所官方接口 | 逐日回填，单次最多补 4 个交易日 |
+| 深交所 ETF 份额历史 | 深交所官方接口 | 按 ≤7 自然日窗口回填，单次最多 8 个窗口 |
+| 当日份额快照 | 深交所直连 → 东方财富备选 | 无业务日期，只作为 `observations` 观察值 |
+| ETF / 指数日 K | 腾讯财经 → `get_kline` / `get_index_kline` | 收盘价与成交额 |
+| 交易日历 | 内部交易日历服务 | 失败时置 `calendar_degraded=True` |
+
+落库位置：`market_data.db` 的 `national_team_etf_shares`、`national_team_etf_backfill_state`、
+`national_team_etf_observations`（见 `app/infrastructure/persistence/national_team_etf_store.py`）。
+
+缓存分三层：
+
+1. `_source_cache`：单次上游响应，TTL 60s，按 `scope:key` 隔离；
+2. `market_cache`：完整响应，`partial` 时 60s、否则 900s，键含 `days` 与交易日窗口；
+3. `_stale_responses`：最近一次成功响应，TTL 1h，用于「旧数据 + 后台刷新」返回。
+
+前端另有 React Query 层：`staleTime` 10 分钟，`partial`/`refreshing` 时 60s 轮询，
+切换时间窗使用 `keepPreviousData` 保留上一份结果（不闪骨架屏）。
+
+启动预热任务：`national_team_price_prewarm`（`app/runtime/lifecycle.py`），只预热行情
+日 K，成功与否不影响启动。
+
+## 3. 覆盖率与「部分数据」
+
+份额缺失是常态（某只 ETF 当日未披露、深交所窗口未回填完、新 ETF 首日无前值）。
+早期实现用「全交集 + 全有或全无」聚合，一只 ETF 缺一天就会让整条指数当天消失、
+所有 KPI 变成 `-`。现在的规则：
+
+### 3.1 指数序列（`_build_index_series`）
+
+- 按**当日实际有数据的成员**聚合，不再取所有成员的日期交集；
+- 每个点位带 `covered_etf_count` / `total_etf_count` / `coverage_ratio`；
+- 覆盖率低于 `_INDEX_MIN_COVERAGE`（0.5）时不生成该日点位，避免用一两只 ETF
+  冒充整条指数；
+- `change_5d_100m` / `change_20d_100m` 由**逐日份额变化累加**得到
+  （`_index_period_change`），不是「期末总份额 − 期初总份额」——后者会把新 ETF
+  上市带来的成员扩容误算成资金流入。
+
+### 3.2 汇总（`build_national_team_response`）
+
+- 各项 KPI 用 `_sum_or_none` 对**可用值**求和，单个缺失不再把整体拖成 `None`；
+- `NationalTeamSummary.coverage_ratio` = 截至日有份额数据的 ETF 数 / 池内 ETF 总数；
+- `NationalTeamSummary.quality`：`complete`（全覆盖）/ `partial`（部分）/ `insufficient`（无数据），
+  前端在「ETF 总份额」卡片上以 `数据完整 / 部分覆盖 / 数据不足` 展示。
+
+> **保持诚实**：覆盖率只描述「截至日有份额的 ETF 比例」，不逐项追踪每个 KPI 自己的
+> 样本完整度。某个 KPI 仍可能是 `-`（例如窗口内缺基线日），此时 `-` 表示「无法计算」，
+> **不代表零变化**。
+
+### 3.3 响应级标志
+
+| 字段 | 含义 |
+| --- | --- |
+| `partial` | 任一 ETF 份额/行情缺失、指数缺失、`stale` 或 `calendar_degraded` |
+| `stale` | 份额截至日 < 预期交易日 |
+| `refreshing` | 有后台刷新任务在跑 |
+| `calendar_degraded` | 交易日历不可用，新鲜度无法确认 |
+| `missing_share_etfs` / `missing_price_etfs` / `missing_indices` | 具体缺口 |
+| `observations` | 无业务日期的当前份额，**不进**历史与资金估算 |
+
+## 4. 派生指标
+
+### 4.1 托底强度指数（`_calculate_support_score`，0–100）
+
+| 因子 | 满分 | 依据 |
+| --- | --- | --- |
+| 资金托底 | 40 | 1 日 / 5 日估算净申购分档 |
+| 板块扩散 | 30 | 当日为正净申购的战术分类占比 |
+| 逆势抗跌 | 30 | 沪深300 当日涨跌 × 净申购方向的组合 |
+
+分档阈值是**固定经验值**，未按牛熊阶段校准，也没有置信度字段。它只适合做横向对比
+与变化方向提示，不适合当成绝对「救市力度」读数。要改成滚动分位数需要先攒够至少
+一年的 `daily_flows` 历史，属于后续工作。
+
+### 4.2 托底点位分布（`_calculate_support_zones`）
+
+对 `csi300` / `sz50` / `csi_a500` 把「当日正净申购」按指数收盘价分箱，输出
+`weighted_avg_cost`（按净申购加权的成本中枢）与各价格区间占比。区间**按价格下界升序**
+输出（`<X` 在最前，`≥X` 在最后），前端据此从低到高渲染进度条。
+
+### 4.3 静态参考数据
+
+`NATIONAL_TEAM_MILESTONES`（历次救市节点）与 `DEFAULT_NATIONAL_TEAM_PORTRAIT`
+（汇金/证金/社保底仓画像）是**人工整理的静态内容**，不随行情更新：
+
+- `portrait.as_of = "2024-12-31"`、`portrait.source` 说明静态整理口径、`portrait.is_static = true`；
+- 前端在画像面板顶部渲染「静态参考 · 截至 2024-12-31」徽标与来源；
+- 更新时改这两处常量并同步 `as_of`，否则页面上会出现「2024 年的数据看起来像今天的结论」。
+
+## 5. 安全约定
+
+- **CSV 导出**统一走 `plugins/…/utils/csv.ts` 的 `escapeCsvCell` / `downloadCsv`：
+  以 `= + - @` 开头的非数值单元格加 `'` 前缀防 Excel 公式注入；负数与带单位金额
+  （`-3.25`、`-12.30 亿元`）保持原样，不能为了防注入把负号也转义掉。
+- **ECharts tooltip** 是 `formatter` 拼 HTML 字符串，所有动态文本必须过
+  `utils/html.ts` 的 `escapeHtml`（序列名、日期、里程碑标题与描述）。
+
+## 6. 前端结构
+
+```
+pages/NationalTeam/
+  index.tsx                 页面编排：状态、筛选、布局
+  components/LazyChart.tsx   进入视口才挂载 ECharts（10+ 图表的首屏成本控制）
+  utils/csv.ts               CSV 转义与下载
+  utils/html.ts              tooltip 文本转义
+  national-team.css          页面样式
+```
+
+约定：
+
+- 图表用 `LazyChart` 包裹，占位高度必须等于真实图表高度，否则懒加载时页面会跳动；
+- 未知指数名（后端新增而 `INDEX_ORDER` 未收录）排序到**末尾**，不能用
+  `Array.indexOf` 的 `-1` 直接比较；
+- 筛选状态（`days` / `view` / `category` / `rotation` / `index` / `q`）全部走 URL，
+  可分享、可回退；
+- 有旧数据时 `refetch` 失败要**保留旧数据 + 顶部 warning**，不能整页替换成错误态。
+
+## 7. 已知限制 / 后续工作
+
+1. 单接口一次返回 22 只 ETF × 至多 365 天全量点位 + 10 条指数序列 + 静态画像；
+   拆分 `overview` / `series` 分层接口可以显著压缩首屏体积。
+2. 无收盘后定时刷新任务，数据新鲜度依赖用户访问触发（仅有启动预热）。
+3. 托底强度指数无历史序列、无置信度、无「信号出现后 5/20 日表现」回测。
+4. 静态画像仍是人工维护，长期应由定期报告 / 十大股东数据生成。
+5. 无 Prometheus 指标（刷新成功率、各源失败数、覆盖率、缓存命中率）。

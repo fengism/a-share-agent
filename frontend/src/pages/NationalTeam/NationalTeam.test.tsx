@@ -497,8 +497,7 @@ describe("NationalTeam page", () => {
 });
 
 
-describe("NationalTeam data quality", () => {
-  it("shows verified source, business date and fetch time on the date tooltip", async () => {
+describe("NationalTeam data quality", () => {  it("shows verified source, business date and fetch time on the date tooltip", async () => {
     mocks.useNationalTeamHoldings.mockReturnValue({
       data: {
         ...data, partial: false,
@@ -552,5 +551,103 @@ describe("NationalTeam data quality", () => {
     fireEvent.click(expandBtns[0]);
 
     expect(screen.getByText(/份额与指数走势大图/)).toBeInTheDocument();
+  });
+
+  it("keeps last good data visible and warns when a refetch fails", () => {
+    mocks.useNationalTeamHoldings.mockReturnValue({
+      data,
+      isLoading: false,
+      isFetching: false,
+      error: new Error("国家队数据加载失败"),
+      refetch: mocks.refetch,
+    });
+
+    renderPage();
+
+    expect(screen.getByText("数据刷新失败，当前展示上次成功结果")).toBeInTheDocument();
+    expect(screen.getByText("国家队数据加载失败")).toBeInTheDocument();
+    // 旧数据仍在页面上，不会被错误页整页替掉。
+    expect(screen.getByText("1,234.56 亿份")).toBeInTheDocument();
+  });
+
+  it("labels the institutional portrait as a static reference with its cut-off date", () => {
+    mocks.useNationalTeamHoldings.mockReturnValue({
+      data: {
+        ...data,
+        portrait: {
+          ...data.portrait,
+          as_of: "2024-12-31",
+          source: "上市公司定期报告与公开公告（静态整理，非实时数据）",
+          is_static: true,
+        },
+        summary: { ...data.summary, quality: "partial" as const, coverage_ratio: 0.5 },
+      },
+      isLoading: false,
+      isFetching: false,
+      error: null,
+      refetch: mocks.refetch,
+    });
+
+    renderPage();
+
+    expect(screen.getByText(/部分覆盖/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("战略机构底仓全景 (汇金/证金/社保)"));
+    const reference = screen.getByTestId("national-team-portrait-reference");
+    expect(reference).toHaveTextContent("静态参考");
+    expect(reference).toHaveTextContent("2024-12-31");
+    expect(reference).toHaveTextContent("静态整理");
+  });
+
+  it("shows per-index coverage when some members are missing from the latest day", () => {
+    mocks.useNationalTeamHoldings.mockReturnValue({
+      data: {
+        ...data,
+        indices: data.indices.map((item, index) => (
+          index === 0
+            ? { ...item, coverage_ratio: 0.75, covered_etf_codes: item.etf_codes.slice(0, 3) }
+            : item
+        )),
+      },
+      isLoading: false,
+      isFetching: false,
+      error: null,
+      refetch: mocks.refetch,
+    });
+
+    renderPage();
+
+    // 中证1000 本身就有 4 只成员、缺 159629；沪深300 现在是第二个 3/4，
+    // 因此按数量断言，避免依赖具体哪张卡片。
+    expect(screen.getAllByText("覆盖 3/4 只")).toHaveLength(2);
+  });
+
+  it("sorts indices it does not know about to the end instead of the front", () => {
+    mocks.useNationalTeamHoldings.mockReturnValue({
+      data: {
+        ...data,
+        indices: [
+          ...data.indices,
+          {
+            ...data.indices[0],
+            index_key: "brand_new",
+            index_name: "新宽基指数",
+            index_code: "999999.SH",
+            etf_codes: [],
+            covered_etf_codes: [],
+          },
+        ],
+      },
+      isLoading: false,
+      isFetching: false,
+      error: null,
+      refetch: mocks.refetch,
+    });
+
+    const { container } = renderPage();
+    const titles = Array.from(container.querySelectorAll(".national-team-index-card__title")).map(
+      (node) => node.textContent,
+    );
+    expect(titles[titles.length - 1]).toBe("新宽基指数");
   });
 });

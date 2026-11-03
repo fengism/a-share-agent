@@ -1,4 +1,4 @@
-import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import { QUERY_CACHE_POLICIES } from "../cachePolicies";
 import { API_TIMEOUTS } from "../client";
@@ -275,6 +275,8 @@ export function useNationalTeamHoldings(days = 120) {
       options: { timeoutMs: API_TIMEOUTS.EXTERNAL },
     }),
     select: asApiModel<NationalTeamResponse>(),
+    // 切换 30/60/120/240/365 天时保留上一份结果，避免整页闪回骨架屏。
+    placeholderData: keepPreviousData,
     staleTime: (query) => query.state.data?.partial || query.state.data?.refreshing
       ? 60_000 : QUERY_CACHE_POLICIES.marketTenMinutes.staleMs,
     refetchInterval: (query) => query.state.data?.partial || query.state.data?.refreshing ? 60_000 : false,

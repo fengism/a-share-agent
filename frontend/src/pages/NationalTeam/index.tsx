@@ -38,6 +38,7 @@ import echarts from "../../charts/echarts-setup";
 import { useNationalTeamHoldings } from "../../api/queries";
 import PreloadLink from "../../components/PreloadLink";
 import SectionDataState from "../../components/SectionDataState";
+import LazyChart from "./components/LazyChart";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { useColors } from "../../styles/ui";
 import { APP_FONT_FAMILY } from "../../theme/typography";
@@ -56,6 +57,8 @@ import type {
   NationalTeamTopHolding,
 } from "../../types/stock";
 import { marketDateStamp } from "../../utils/marketTime";
+import { downloadCsv } from "./utils/csv";
+import { escapeHtml } from "./utils/html";
 import "./national-team.css";
 
 const { Text, Title } = Typography;
@@ -101,6 +104,18 @@ const CATEGORY_OPTIONS = [
   { label: "红利防御", value: "dividend" },
 ];
 
+const QUALITY_LABELS: Record<string, string> = {
+  complete: "数据完整",
+  partial: "部分覆盖",
+  insufficient: "数据不足",
+};
+
+function indexOrder(name: string) {
+  const order = INDEX_ORDER.indexOf(name);
+  // 后端新增指数不在前端名单时排到最后，而不是被 indexOf 的 -1 顶到最前。
+  return order === -1 ? INDEX_ORDER.length : order;
+}
+
 function downloadNationalTeamCsv(etfs: NationalTeamEtfSeries[], asOfDate?: string | null) {
   const headers = [
     "战术分类",
@@ -119,15 +134,6 @@ function downloadNationalTeamCsv(etfs: NationalTeamEtfSeries[], asOfDate?: strin
     "量比",
     "放量异动",
   ];
-
-  const escapeCell = (val: unknown) => {
-    if (val == null) return "";
-    const str = String(val);
-    if (str.includes(",") || str.includes('"') || str.includes("\n") || str.includes("\r")) {
-      return `"${str.replace(/"/g, '""')}"`;
-    }
-    return str;
-  };
 
   const rows = etfs.map((item) => {
     const latestPoint = item.points?.[item.points.length - 1];
@@ -149,20 +155,10 @@ function downloadNationalTeamCsv(etfs: NationalTeamEtfSeries[], asOfDate?: strin
       item.latest_amount_100m != null ? item.latest_amount_100m.toFixed(2) : "",
       item.volume_ratio != null ? item.volume_ratio.toFixed(2) : "",
       item.is_abnormal_volume ? "显著放量" : "正常",
-    ].map(escapeCell).join(",");
+    ];
   });
 
-  const csvContent = "\uFEFF" + [headers.map(escapeCell).join(","), ...rows].join("\r\n");
-  if (typeof window === "undefined" || typeof URL.createObjectURL !== "function") return;
-  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.setAttribute("href", url);
-  link.setAttribute("download", `国家队ETF监测_${asOfDate || marketDateStamp()}.csv`);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  downloadCsv(`国家队ETF监测_${asOfDate || marketDateStamp()}.csv`, [headers, ...rows]);
 }
 
 function formatShares(value: number | null | undefined) {
@@ -212,7 +208,7 @@ function IndexDualAxisChart({ item }: { item: NationalTeamIndexSeries }) {
           const unit = isShare ? "亿份" : "点";
           const formattedVal = formatNumberWithSeparators(entry.value, 2);
           return `<div style="display:flex;justify-content:space-between;align-items:center;gap:20px;margin-top:4px">
-            <span style="display:flex;align-items:center;gap:6px;font-size:12px">${entry.marker}${entry.seriesName}</span>
+            <span style="display:flex;align-items:center;gap:6px;font-size:12px">${entry.marker}${escapeHtml(entry.seriesName)}</span>
             <b style="font-family:var(--c-font-mono);font-size:12px">${formattedVal} ${unit}</b>
           </div>`;
         }).join("");
@@ -235,7 +231,16 @@ function IndexDualAxisChart({ item }: { item: NationalTeamIndexSeries }) {
           </div>`;
         }
 
-        return `<div style="font-weight:600;margin-bottom:4px;font-size:12px;color:${colors.textPrimary}">${params[0].axisValueLabel}</div>${rows}${flowNote}`;
+        // 覆盖率不全的点位与完整点位在图上长得一样，必须在 tooltip 里明确区分，
+        // 否则用户会把「只覆盖 3/4 只 ETF 的合计」当成整条指数的完整数据。
+        if (pt && pt.total_etf_count > 0 && pt.covered_etf_count < pt.total_etf_count) {
+          flowNote += `<div style="display:flex;justify-content:space-between;align-items:center;gap:20px;margin-top:3px;font-size:11px;color:#d48806">
+            <span>成员覆盖不全</span>
+            <span style="font-family:var(--c-font-mono);font-weight:600">${pt.covered_etf_count}/${pt.total_etf_count} 只</span>
+          </div>`;
+        }
+
+        return `<div style="font-weight:600;margin-bottom:4px;font-size:12px;color:${colors.textPrimary}">${escapeHtml(params[0].axisValueLabel)}</div>${rows}${flowNote}`;
       },
     },
     legend: { show: false },
@@ -399,13 +404,15 @@ function IndexDualAxisChart({ item }: { item: NationalTeamIndexSeries }) {
       )}
 
       {points.length ? (
-        <ReactECharts
-          echarts={echarts}
-          option={option}
-          className="national-team-index-card__chart"
-          style={{ width: "100%", height: 215 }}
-          notMerge
-        />
+        <LazyChart height={215}>
+          <ReactECharts
+            echarts={echarts}
+            option={option}
+            className="national-team-index-card__chart"
+            style={{ width: "100%", height: 215 }}
+            notMerge
+          />
+        </LazyChart>
       ) : (
         <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无份额与指数历史" style={{ margin: "32px 0" }} />
       )}
@@ -489,7 +496,7 @@ function DailyFlowStackedChart({
           if (p.value !== 0 && p.value != null) {
             const pColor = valueColor(p.value, colors.up, colors.down, colors.textPrimary);
             rows += `<div style="display:flex;justify-content:space-between;align-items:center;gap:16px;margin-top:3px;font-size:11px">
-              <span style="display:flex;align-items:center;gap:5px">${p.marker}${p.seriesName}</span>
+              <span style="display:flex;align-items:center;gap:5px">${p.marker}${escapeHtml(p.seriesName)}</span>
               <b style="font-family:var(--c-font-mono);color:${pColor}">${formatSigned(p.value, "亿元")}</b>
             </div>`;
           }
@@ -497,12 +504,12 @@ function DailyFlowStackedChart({
 
         const milestoneHtml = milestoneHit
           ? `<div style="margin-top:6px;padding:4px 6px;border-radius:4px;background:rgba(250,173,20,0.12);border:1px solid #faad14;font-size:11px">
-              <div style="color:#d48806;font-weight:600">★ 关键救市节点：${milestoneHit.title}</div>
-              <div style="color:${colors.textSecondary};margin-top:2px;line-height:1.3">${milestoneHit.description}</div>
+              <div style="color:#d48806;font-weight:600">★ 关键救市节点：${escapeHtml(milestoneHit.title)}</div>
+              <div style="color:${colors.textSecondary};margin-top:2px;line-height:1.3">${escapeHtml(milestoneHit.description)}</div>
             </div>`
           : "";
 
-        return `<div style="font-weight:600;margin-bottom:4px;font-size:12px;color:${colors.textPrimary}">${dateStr}</div>
+        return `<div style="font-weight:600;margin-bottom:4px;font-size:12px;color:${colors.textPrimary}">${escapeHtml(dateStr)}</div>
           <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid ${colors.border};font-size:12px">
             <span>当日宽基净申购合计</span>
             <b style="font-family:var(--c-font-mono);color:${totalColor}">${formatSigned(totalFlow, "亿元")}</b>
@@ -587,13 +594,15 @@ function DailyFlowStackedChart({
       }
     >
       <div data-testid="national-team-daily-flow-chart">
-        <ReactECharts
-          echarts={echarts}
-          option={option}
-          data-testid="national-team-daily-flow-echarts"
-          style={{ width: "100%", height: 230 }}
-          notMerge
-        />
+        <LazyChart height={230}>
+          <ReactECharts
+            echarts={echarts}
+            option={option}
+            data-testid="national-team-daily-flow-echarts"
+            style={{ width: "100%", height: 230 }}
+            notMerge
+          />
+        </LazyChart>
       </div>
     </Card>
   );
@@ -870,52 +879,48 @@ function SupportZonesCard({ supportZones }: { supportZones?: NationalTeamSupport
 }
 
 function downloadPortraitCsv(portrait: NationalTeamPortrait) {
-  const escapeCell = (val: unknown) => {
-    if (val == null) return "";
-    const str = String(val);
-    if (str.includes(",") || str.includes('"') || str.includes("\n") || str.includes("\r")) {
-      return `"${str.replace(/"/g, '""')}"`;
-    }
-    return str;
-  };
-
-  const lines: string[] = [];
-  lines.push("国家队战略机构底仓全景数据");
-  lines.push(`披露口径,${portrait.reporting_period || ""}`);
-  lines.push(`预估战略总持股市值(万亿元),${portrait.total_market_value_trillion || ""}`);
-  lines.push("");
+  const rows: unknown[][] = [];
+  rows.push(["国家队战略机构底仓全景数据"]);
+  rows.push(["披露口径", portrait.reporting_period || ""]);
+  rows.push(["静态参考截至", portrait.as_of || ""]);
+  rows.push(["数据来源", portrait.source || ""]);
+  rows.push(["预估战略总持股市值(万亿元)", portrait.total_market_value_trillion || ""]);
+  rows.push([]);
 
   // 1. 机构主体
-  lines.push("机构主体,机构简称,职能定位,预估规模(万亿元),配置核心");
-  for (const e of portrait.entities ?? []) {
-    lines.push([e.name, e.short_name, e.role, e.estimated_aum_trillion, e.focus].map(escapeCell).join(","));
+  rows.push(["机构主体", "机构简称", "职能定位", "预估规模(万亿元)", "配置核心"]);
+  for (const entity of portrait.entities ?? []) {
+    rows.push([entity.name, entity.short_name, entity.role, entity.estimated_aum_trillion, entity.focus]);
   }
-  lines.push("");
+  rows.push([]);
 
   // 2. 行业配置
-  lines.push("行业板块,配置权重(%),持股市值(亿元),代表性标的");
-  for (const a of portrait.industry_allocations ?? []) {
-    lines.push([a.industry, a.weight_pct, a.market_value_100m, (a.representative_stocks ?? []).join(" / ")].map(escapeCell).join(","));
+  rows.push(["行业板块", "配置权重(%)", "持股市值(亿元)", "代表性标的"]);
+  for (const allocation of portrait.industry_allocations ?? []) {
+    rows.push([
+      allocation.industry,
+      allocation.weight_pct,
+      allocation.market_value_100m,
+      (allocation.representative_stocks ?? []).join(" / "),
+    ]);
   }
-  lines.push("");
+  rows.push([]);
 
   // 3. 前十大重仓
-  lines.push("排名,标的代码,标的名称,持股主体,所属行业,占总股本比(%),持股市值(亿元)");
-  (portrait.top_holdings ?? []).forEach((h, idx) => {
-    lines.push([idx + 1, h.code, h.name, h.holder_name, h.industry, h.shareholding_ratio_pct, h.market_value_100m].map(escapeCell).join(","));
+  rows.push(["排名", "标的代码", "标的名称", "持股主体", "所属行业", "占总股本比(%)", "持股市值(亿元)"]);
+  (portrait.top_holdings ?? []).forEach((holding, idx) => {
+    rows.push([
+      idx + 1,
+      holding.code,
+      holding.name,
+      holding.holder_name,
+      holding.industry,
+      holding.shareholding_ratio_pct,
+      holding.market_value_100m,
+    ]);
   });
 
-  const csvContent = "\uFEFF" + lines.join("\r\n");
-  if (typeof window === "undefined" || typeof URL.createObjectURL !== "function") return;
-  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.setAttribute("href", url);
-  link.setAttribute("download", `国家队战略底仓画像_${marketDateStamp()}.csv`);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  downloadCsv(`国家队战略底仓画像_${marketDateStamp()}.csv`, rows);
 }
 
 function NationalTeamPortraitPanel({ portrait }: { portrait?: NationalTeamPortrait }) {
@@ -1008,6 +1013,20 @@ function NationalTeamPortraitPanel({ portrait }: { portrait?: NationalTeamPortra
 
   return (
     <div className="national-team-portrait-panel" data-testid="national-team-portrait-panel">
+      <div
+        data-testid="national-team-portrait-reference"
+        style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 10 }}
+      >
+        <Tag color={p.is_static ? "default" : "green"} style={{ margin: 0, fontSize: 11 }}>
+          {p.is_static ? "静态参考" : "动态数据"} · 截至 {p.as_of || p.reporting_period}
+        </Tag>
+        {p.source && (
+          <Text type="secondary" style={{ fontSize: 11 }}>
+            来源：{p.source}
+          </Text>
+        )}
+      </div>
+
       {/* 实体概览 */}
       <div style={{ marginBottom: 12 }}>
         <Row gutter={[10, 10]}>
@@ -1156,12 +1175,13 @@ export default function NationalTeam() {
   const rotationWindow = Number(rotationWindowParam) as 20 | 5 | 1;
 
   const [selectedFilterIndex, setSelectedFilterIndex] = useUrlSearchParam("index", "ALL");
-  const [searchKeyword, setSearchKeyword] = useState<string>("");
+  // 搜索词逐步输入，用 replace 避免每敲一个字就压一条历史记录（返回键要按十几次）。
+  const [searchKeyword, setSearchKeyword] = useUrlSearchParam("q", "", { replace: true });
   const [showPartialDetails, setShowPartialDetails] = useState<boolean>(false);
   const { data, isLoading, isFetching, error, refetch } = useNationalTeamHoldings(days);
 
   const indices = useMemo(() => [...(data?.indices ?? [])].sort(
-    (a, b) => INDEX_ORDER.indexOf(a.index_name) - INDEX_ORDER.indexOf(b.index_name),
+    (a, b) => indexOrder(a.index_name) - indexOrder(b.index_name),
   ), [data?.indices]);
 
   const filteredIndices = useMemo(() => {
@@ -1547,6 +1567,16 @@ export default function NationalTeam() {
             }
           />
         )}
+
+        {error && hasData && (
+          <Alert
+            className="national-team-partial-alert"
+            type="warning"
+            showIcon
+            title="数据刷新失败，当前展示上次成功结果"
+            description={error instanceof Error ? error.message : "请稍后重试刷新。"}
+          />
+        )}
       </div>
 
       <SectionDataState
@@ -1595,7 +1625,7 @@ export default function NationalTeam() {
                   title="ETF 总份额"
                   value={formatShares(data?.summary?.total_shares_100m)}
                 />
-                <div className="national-team-summary__hint">覆盖 {data?.covered_etf_count ?? 0}/{data?.total_etf_count ?? 22} 只宽基 ETF · 截至 {data?.as_of_date || "-"}</div>
+                <div className="national-team-summary__hint">覆盖 {data?.covered_etf_count ?? 0}/{data?.total_etf_count ?? 22} 只宽基 ETF · {QUALITY_LABELS[data?.summary?.quality ?? "insufficient"]} · 截至 {data?.as_of_date || "-"}</div>
               </Card>
             </Col>
 
