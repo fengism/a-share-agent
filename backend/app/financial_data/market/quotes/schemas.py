@@ -588,6 +588,9 @@ class NationalTeamIndexPoint(BaseModel):
     cumulative_change_100m: float = 0
     index_close: float | None = None
     estimated_net_flow_100m: float | None = None
+    covered_etf_count: int = 0
+    total_etf_count: int = 0
+    coverage_ratio: float = 0.0
 
 
 class NationalTeamIndexSeries(BaseModel):
@@ -597,6 +600,7 @@ class NationalTeamIndexSeries(BaseModel):
     category: str = "core_broad"
     etf_codes: list[str] = Field(default_factory=list)
     covered_etf_codes: list[str] = Field(default_factory=list)
+    coverage_ratio: float = 0.0
     latest_date: str | None = None
     latest_total_shares_100m: float | None = None
     latest_change_1d_100m: float | None = None
@@ -614,6 +618,8 @@ class NationalTeamSummary(BaseModel):
     estimated_net_flow_1d_100m: float | None = None
     estimated_net_flow_5d_100m: float | None = None
     estimated_net_flow_20d_100m: float | None = None
+    coverage_ratio: float = 0.0
+    quality: Literal["complete", "partial", "insufficient"] = "insufficient"
 
 
 class NationalTeamShareObservation(BaseModel):
@@ -696,6 +702,9 @@ class NationalTeamPortrait(BaseModel):
     top_holdings: list[NationalTeamTopHolding] = Field(default_factory=list)
     reporting_period: str = "2024Q3 / 2024年报"
     total_market_value_trillion: float = 3.85
+    as_of: str = ""
+    source: str = ""
+    is_static: bool = True
 
 
 class NationalTeamResponse(BaseModel):

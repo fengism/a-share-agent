@@ -17408,6 +17408,16 @@
       },
       "NationalTeamIndexPoint": {
         "properties": {
+          "coverage_ratio": {
+            "default": 0.0,
+            "title": "Coverage Ratio",
+            "type": "number"
+          },
+          "covered_etf_count": {
+            "default": 0,
+            "title": "Covered Etf Count",
+            "type": "integer"
+          },
           "cumulative_change_100m": {
             "default": 0,
             "title": "Cumulative Change 100M",
@@ -17450,6 +17460,11 @@
             ],
             "title": "Shares Change 100M"
           },
+          "total_etf_count": {
+            "default": 0,
+            "title": "Total Etf Count",
+            "type": "integer"
+          },
           "total_shares_100m": {
             "title": "Total Shares 100M",
             "type": "number"
@@ -17490,6 +17505,11 @@
               }
             ],
             "title": "Change 5D 100M"
+          },
+          "coverage_ratio": {
+            "default": 0.0,
+            "title": "Coverage Ratio",
+            "type": "number"
           },
           "covered_etf_codes": {
             "items": {
@@ -17650,6 +17670,11 @@
       },
       "NationalTeamPortrait": {
         "properties": {
+          "as_of": {
+            "default": "",
+            "title": "As Of",
+            "type": "string"
+          },
           "entities": {
             "items": {
               "$ref": "#/components/schemas/NationalTeamHolderEntity"
@@ -17664,9 +17689,19 @@
             "title": "Industry Allocations",
             "type": "array"
           },
+          "is_static": {
+            "default": true,
+            "title": "Is Static",
+            "type": "boolean"
+          },
           "reporting_period": {
             "default": "2024Q3 / 2024年报",
             "title": "Reporting Period",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
             "type": "string"
           },
           "top_holdings": {
@@ -17929,6 +17964,11 @@
             ],
             "title": "Change 5D 100M"
           },
+          "coverage_ratio": {
+            "default": 0.0,
+            "title": "Coverage Ratio",
+            "type": "number"
+          },
           "estimated_net_flow_1d_100m": {
             "anyOf": [
               {
@@ -17961,6 +18001,16 @@
               }
             ],
             "title": "Estimated Net Flow 5D 100M"
+          },
+          "quality": {
+            "default": "insufficient",
+            "enum": [
+              "complete",
+              "partial",
+              "insufficient"
+            ],
+            "title": "Quality",
+            "type": "string"
           },
           "total_shares_100m": {
             "anyOf": [

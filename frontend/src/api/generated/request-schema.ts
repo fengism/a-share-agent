@@ -11826,6 +11826,16 @@ export interface components {
         /** NationalTeamIndexPoint */
         NationalTeamIndexPoint: {
             /**
+             * Coverage Ratio
+             * @default 0
+             */
+            coverage_ratio?: number;
+            /**
+             * Covered Etf Count
+             * @default 0
+             */
+            covered_etf_count?: number;
+            /**
              * Cumulative Change 100M
              * @default 0
              */
@@ -11838,6 +11848,11 @@ export interface components {
             index_close?: number | null;
             /** Shares Change 100M */
             shares_change_100m?: number | null;
+            /**
+             * Total Etf Count
+             * @default 0
+             */
+            total_etf_count?: number;
             /** Total Shares 100M */
             total_shares_100m: number;
         };
@@ -11852,6 +11867,11 @@ export interface components {
             change_20d_100m?: number | null;
             /** Change 5D 100M */
             change_5d_100m?: number | null;
+            /**
+             * Coverage Ratio
+             * @default 0
+             */
+            coverage_ratio?: number;
             /** Covered Etf Codes */
             covered_etf_codes?: string[];
             /** Estimated Net Flow 1D 100M */
@@ -11905,15 +11925,30 @@ export interface components {
         };
         /** NationalTeamPortrait */
         NationalTeamPortrait: {
+            /**
+             * As Of
+             * @default
+             */
+            as_of?: string;
             /** Entities */
             entities?: components["schemas"]["NationalTeamHolderEntity"][];
             /** Industry Allocations */
             industry_allocations?: components["schemas"]["NationalTeamIndustryAllocation"][];
             /**
+             * Is Static
+             * @default true
+             */
+            is_static?: boolean;
+            /**
              * Reporting Period
              * @default 2024Q3 / 2024年报
              */
             reporting_period?: string;
+            /**
+             * Source
+             * @default
+             */
+            source?: string;
             /** Top Holdings */
             top_holdings?: components["schemas"]["NationalTeamTopHolding"][];
             /**
@@ -12022,12 +12057,23 @@ export interface components {
             change_20d_100m?: number | null;
             /** Change 5D 100M */
             change_5d_100m?: number | null;
+            /**
+             * Coverage Ratio
+             * @default 0
+             */
+            coverage_ratio?: number;
             /** Estimated Net Flow 1D 100M */
             estimated_net_flow_1d_100m?: number | null;
             /** Estimated Net Flow 20D 100M */
             estimated_net_flow_20d_100m?: number | null;
             /** Estimated Net Flow 5D 100M */
             estimated_net_flow_5d_100m?: number | null;
+            /**
+             * Quality
+             * @default insufficient
+             * @enum {string}
+             */
+            quality?: "complete" | "partial" | "insufficient";
             /** Total Shares 100M */
             total_shares_100m?: number | null;
         };

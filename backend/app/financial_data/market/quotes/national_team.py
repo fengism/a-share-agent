@@ -54,6 +54,8 @@ _DISCLAIMER = (
 
 
 _YI = 100_000_000
+# 指数聚合允许缺失部分成员，但覆盖不足一半时不生成点位，避免用极少数 ETF 冒充整条指数。
+_INDEX_MIN_COVERAGE = 0.5
 _SZSE_MAX_WINDOW_DAYS = 7
 _SZSE_MAX_WINDOWS_PER_REFRESH = 8
 _SSE_MAX_DATES_PER_REFRESH = 4
@@ -242,6 +244,35 @@ def _sum_complete(values: list[float | None]) -> float | None:
     return _rounded(sum(value for value in values if value is not None))
 
 
+def _sum_available(values: list[float | None]) -> tuple[float | None, int, int]:
+    """对可用值求和，并返回 (合计, 有值数量, 总数)。
+
+    与 :func:`_sum_complete` 的区别：单个缺失不会把整体拖成 ``None``，调用方可
+    用数量推导覆盖率，在页面上显示“部分合计 + 覆盖比例”，而不是整块 KPI 变成
+    “-”。仅当全部缺失时才返回 ``None``。
+    """
+    present = [value for value in values if value is not None]
+    if not present:
+        return None, 0, len(values)
+    return _rounded(sum(present)), len(present), len(values)
+
+
+def _sum_or_none(values: list[float | None]) -> float | None:
+    """:func:`_sum_available` 的只要合计版。"""
+    return _sum_available(values)[0]
+
+
+def _index_period_change(points: list[NationalTeamIndexPoint], sessions: int) -> float | None:
+    """按指数自身点位求 N 个交易日累计份额变化。
+
+    不能直接用起止总份额相减：成员集合可能随新 ETF 上市变化，相减会把“新增成员”
+    误算成资金流入。改为累加逐日份额变化，成员进出不会制造虚假增量。
+    """
+    if len(points) <= sessions:
+        return None
+    return _sum_complete([point.shares_change_100m for point in points[-sessions:]])
+
+
 def _period_flow(points: list[NationalTeamEtfPoint], dates: list[str], sessions: int) -> float | None:
     if len(dates) <= sessions:
         return None
@@ -326,33 +357,50 @@ def _build_index_series(
     dates: list[str],
 ) -> NationalTeamIndexSeries:
     member_codes = [item.code for item in ETF_POOL.values() if item.index_key == definition.key]
+    member_count = len(member_codes)
     point_maps = {
         item.code: {point.date: point for point in item.points}
         for item in etfs
         if item.index_key == definition.key and item.points
     }
-    # 成员集合固定；某只 ETF 某日缺失时不生成缩小覆盖范围的聚合点。
-    complete_dates = sorted(set.intersection(*(set(mapping) for mapping in point_maps.values()))) if point_maps else []
+    # 按“当日实际有数据的成员”聚合，而不是取所有成员的日期交集：
+    # 一只 ETF 缺一天不应让整条指数当天消失（旧实现会把 1/5/20 日变化全部变成 None）。
+    candidate_dates = sorted({day for mapping in point_maps.values() for day in mapping})
+    allowed_dates = set(dates)
     points: list[NationalTeamIndexPoint] = []
-    first_total: float | None = None
-    for point_date in complete_dates:
-        day_points = [mapping[point_date] for mapping in point_maps.values()]
+    cumulative = 0.0
+    first_emitted = True
+    for point_date in candidate_dates:
+        if allowed_dates and point_date not in allowed_dates:
+            continue
+        day_points = [mapping[point_date] for mapping in point_maps.values() if point_date in mapping]
+        if not day_points:
+            continue
+        covered = len(day_points)
+        coverage = covered / member_count if member_count else 0.0
+        if member_count > 1 and coverage < _INDEX_MIN_COVERAGE:
+            continue
         total = sum(point.shares_100m for point in day_points)
-        if first_total is None:
-            first_total = total
         change = _sum_complete([point.shares_change_100m for point in day_points])
-        flows = [point.estimated_net_flow_100m for point in day_points]
+        flow = _sum_complete([point.estimated_net_flow_100m for point in day_points])
+        if first_emitted:
+            cumulative = 0.0
+            first_emitted = False
+        elif change is not None:
+            cumulative += change
         points.append(
             NationalTeamIndexPoint(
                 date=point_date,
                 total_shares_100m=round(total, 4),
                 shares_change_100m=_rounded(change),
-                cumulative_change_100m=_rounded(total - first_total) or 0,
+                cumulative_change_100m=_rounded(cumulative) or 0,
                 index_close=_rounded(closes.get(point_date)),
-                estimated_net_flow_100m=_sum_complete(flows),
+                estimated_net_flow_100m=_rounded(flow),
+                covered_etf_count=covered,
+                total_etf_count=member_count,
+                coverage_ratio=round(coverage, 4),
             )
         )
-    totals = {point.date: point.total_shares_100m for point in points}
     latest = points[-1] if points else None
     is_current = latest is not None and bool(dates) and latest.date == dates[-1]
     return NationalTeamIndexSeries(
@@ -362,11 +410,12 @@ def _build_index_series(
         category=definition.category,
         etf_codes=member_codes,
         covered_etf_codes=list(point_maps),
+        coverage_ratio=latest.coverage_ratio if latest else 0.0,
         latest_date=latest.date if latest else None,
         latest_total_shares_100m=latest.total_shares_100m if latest else None,
         latest_change_1d_100m=latest.shares_change_100m if is_current else None,
-        change_5d_100m=_period_change(totals, dates, 5),
-        change_20d_100m=_period_change(totals, dates, 20),
+        change_5d_100m=_index_period_change(points, 5),
+        change_20d_100m=_index_period_change(points, 20),
         estimated_net_flow_1d_100m=latest.estimated_net_flow_100m if is_current else None,
         points=points,
     )
@@ -421,6 +470,9 @@ NATIONAL_TEAM_MILESTONES: list[NationalTeamMilestone] = [
 DEFAULT_NATIONAL_TEAM_PORTRAIT = NationalTeamPortrait(
     reporting_period="2024年报 / 2024Q3权威公告",
     total_market_value_trillion=3.85,
+    as_of="2024-12-31",
+    source="上市公司定期报告与公开公告（静态整理，非实时数据）",
+    is_static=True,
     entities=[
         NationalTeamHolderEntity(
             name="中央汇金投资有限责任公司 / 汇金资管",
@@ -702,30 +754,36 @@ def _calculate_support_zones(indices: list[NationalTeamIndexSeries]) -> list[Nat
 
         base = round(min_p / step) * step
         bin_edges = [base + i * step for i in range(5)]
-        bins_data: dict[str, float] = {}
+        bins_data: dict[str, tuple[float, float]] = {}
 
         for pt in positive_points:
             p = pt.index_close or 0.0
             f = pt.estimated_net_flow_100m or 0.0
             if p < bin_edges[1]:
                 lbl = f"<{int(bin_edges[1])}"
+                lower = float("-inf")
             elif p < bin_edges[2]:
                 lbl = f"{int(bin_edges[1])}-{int(bin_edges[2])}"
+                lower = bin_edges[1]
             elif p < bin_edges[3]:
                 lbl = f"{int(bin_edges[2])}-{int(bin_edges[3])}"
+                lower = bin_edges[2]
             elif p < bin_edges[4]:
                 lbl = f"{int(bin_edges[3])}-{int(bin_edges[4])}"
+                lower = bin_edges[3]
             else:
                 lbl = f"≥{int(bin_edges[4])}"
-            bins_data[lbl] = bins_data.get(lbl, 0.0) + f
+                lower = bin_edges[4]
+            bins_data[lbl] = (lower, bins_data.get(lbl, (lower, 0.0))[1] + f)
 
+        # 按价格下界排序，避免 dict 插入顺序把高位区间排到低位区间前面。
         zones = [
             NationalTeamSupportZoneItem(
                 range_label=lbl,
                 net_flow_100m=round(flow, 2),
                 share_pct=round((flow / total_flow * 100), 1) if total_flow > 0 else 0.0,
             )
-            for lbl, flow in bins_data.items()
+            for lbl, (_, flow) in sorted(bins_data.items(), key=lambda item: item[1][0])
         ]
 
         results.append(
@@ -818,16 +876,23 @@ def build_national_team_response(
     ]
     missing_etfs = sorted(set(missing_share_etfs) | set(missing_price_etfs))
     stale = bool(expected_date and (as_of_date is None or as_of_date < expected_date))
+    total_shares = _sum_or_none([item.latest_shares_100m for item in populated])
+    coverage_ratio = round(len(populated) / len(ETF_POOL), 4) if ETF_POOL else 0.0
+    summary_quality: Literal["complete", "partial", "insufficient"] = (
+        "complete" if coverage_ratio >= 1.0 else "partial" if populated else "insufficient"
+    )
     summary = NationalTeamSummary(
-        total_shares_100m=_sum_complete([item.latest_shares_100m for item in populated]),
-        change_1d_100m=_sum_complete([item.latest_change_1d_100m for item in populated]),
-        change_5d_100m=_sum_complete([item.change_5d_100m for item in populated]),
-        change_20d_100m=_sum_complete([item.change_20d_100m for item in populated]),
-        estimated_net_flow_1d_100m=_sum_complete(
+        total_shares_100m=total_shares,
+        change_1d_100m=_sum_or_none([item.latest_change_1d_100m for item in populated]),
+        change_5d_100m=_sum_or_none([item.change_5d_100m for item in populated]),
+        change_20d_100m=_sum_or_none([item.change_20d_100m for item in populated]),
+        estimated_net_flow_1d_100m=_sum_or_none(
             [item.points[-1].estimated_net_flow_100m if item.points else None for item in populated]
         ),
-        estimated_net_flow_5d_100m=_sum_complete([_period_flow(item.points, dates, 5) for item in populated]),
-        estimated_net_flow_20d_100m=_sum_complete([_period_flow(item.points, dates, 20) for item in populated]),
+        estimated_net_flow_5d_100m=_sum_or_none([_period_flow(item.points, dates, 5) for item in populated]),
+        estimated_net_flow_20d_100m=_sum_or_none([_period_flow(item.points, dates, 20) for item in populated]),
+        coverage_ratio=coverage_ratio,
+        quality=summary_quality,
     )
     daily_flows: list[NationalTeamDailyFlow] = []
     for day in dates:
