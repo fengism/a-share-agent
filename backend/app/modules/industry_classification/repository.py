@@ -5,6 +5,7 @@ import sqlite3
 from collections.abc import Iterable, Mapping
 from typing import Any
 
+from app.core.sql import contains_pattern, prefix_pattern
 from app.infrastructure.persistence.connection import get_connection, unit_of_work
 from app.infrastructure.persistence.master_data_repair import backfill_industry_stock_names
 from app.modules.industry_classification.models import IndustryRecordInput
@@ -70,8 +71,8 @@ def list_records(
     params: list[object] = []
     if query:
         normalized = query.strip().upper()
-        where.append("(stock_code LIKE ? OR stock_name LIKE ?)")
-        params.extend((f"{normalized}%", f"%{query.strip()}%"))
+        where.append("(stock_code LIKE ? ESCAPE '\\' OR stock_name LIKE ? ESCAPE '\\')")
+        params.extend((prefix_pattern(normalized), contains_pattern(query.strip())))
     for column, value in (
         ("market_group", market_group),
         ("sw_level1_name", level1),

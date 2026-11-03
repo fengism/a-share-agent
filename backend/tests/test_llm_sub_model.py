@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from contextlib import asynccontextmanager
 
 import pytest
@@ -97,6 +98,37 @@ async def test_sub_model_failure_falls_back_to_main_model(monkeypatch: pytest.Mo
     assert models == ["sub-model", "main-model"]
 
 
+async def test_sub_model_timeout_does_not_fall_back_to_main_model(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """子模型已耗尽生成总时限时不得再回退主模型。
+
+    ``LLMGenerationTimeoutError`` 是 ``Exception`` 子类，会被裸 ``except Exception``
+    吞掉；再拿一份完整预算（默认 1200s）去跑主模型，会把一次调用的墙钟时间
+    直接翻倍到 2400s。超时是确定性失败，重试只是白等。
+    """
+    from app.infrastructure.llm.policy import LLMGenerationTimeoutError
+
+    models: list[str] = []
+
+    class _TimeoutCompletion:
+        async def chat_result(self, messages, temperature=0.1, json_format=False):
+            raise LLMGenerationTimeoutError("生成总时限已耗尽")
+
+    @asynccontextmanager
+    async def fake_streaming(settings: Settings, *, max_tokens: int):
+        models.append(settings.llm_model)
+        yield _TimeoutCompletion()
+
+    monkeypatch.setattr(streaming_module, "streaming_llm_client", fake_streaming)
+
+    settings = _settings(llm_model="main-model", llm_sub_model="sub-model")
+    with pytest.raises(LLMGenerationTimeoutError):
+        await llm_chat([{"role": "user", "content": "hi"}], settings=settings, task="macro_item")
+
+    assert models == ["sub-model"], f"超时后不应再调用主模型，实际 {models}"
+
+
 async def test_no_duplicate_call_when_sub_model_unset(monkeypatch: pytest.MonkeyPatch) -> None:
     """未配置子模型时不会因为回退而重复调用。"""
     models: list[str] = []
@@ -170,3 +202,80 @@ async def test_refine_decision_single_attempt_without_sub_model(monkeypatch: pyt
 
     assert models == ["main-model"]
     assert refined.agents == ["technical", "fundamental"]
+
+
+async def test_fallback_shares_single_generation_budget(monkeypatch: pytest.MonkeyPatch) -> None:
+    """回退主模型必须复用同一份总预算，而不是再拿一整份。
+
+    否则子模型跑到接近时限再失败时，主模型又拿满额预算，
+    单次逻辑调用的墙钟时间会翻倍到 2×``llm_generation_timeout_seconds``。
+    """
+    from app.infrastructure.llm import policy as policy_module
+
+    budgets: list[float] = []
+
+    @asynccontextmanager
+    async def fake_scope(settings: Settings, *, timeout_seconds: float):
+        budgets.append(timeout_seconds)
+        yield
+
+    class _SlowFailCompletion:
+        async def chat_result(self, messages, temperature=0.1, json_format=False):
+            # 模拟子模型耗掉了一部分预算才失败
+            await asyncio.sleep(0.05)
+            raise RuntimeError("sub model down")
+
+    @asynccontextmanager
+    async def fake_streaming(settings: Settings, *, max_tokens: int):
+        if settings.llm_model == "main-model":
+            yield _ManagedCompletion("main-model")
+        else:
+            yield _SlowFailCompletion()
+
+    monkeypatch.setattr(streaming_module, "streaming_llm_client", fake_streaming)
+    monkeypatch.setattr(policy_module, "generation_scope", fake_scope)
+
+    settings = _settings(
+        llm_model="main-model", llm_sub_model="sub-model", llm_generation_timeout_seconds=100.0
+    )
+    text = await llm_chat([{"role": "user", "content": "hi"}], settings=settings, task="macro_item")
+
+    assert text == "ok"
+    assert len(budgets) == 2, f"应有子模型+主模型两次尝试，实际 {budgets}"
+    assert budgets[0] == 100.0
+    # 第二次拿到的是剩余预算，严格小于首次，且仍为正
+    assert 0 < budgets[1] < 100.0, f"回退预算应递减，实际 {budgets}"
+
+
+async def test_fallback_is_skipped_when_budget_exhausted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """预算已耗尽时不回退：再发一次请求只会立刻超时，应透出子模型的真实错误。"""
+    from app.infrastructure.llm import policy as policy_module
+
+    models: list[str] = []
+
+    @asynccontextmanager
+    async def fake_scope(settings: Settings, *, timeout_seconds: float):
+        yield
+
+    class _SlowFailCompletion:
+        async def chat_result(self, messages, temperature=0.1, json_format=False):
+            raise RuntimeError("sub model down")
+
+    @asynccontextmanager
+    async def fake_streaming(settings: Settings, *, max_tokens: int):
+        models.append(settings.llm_model)
+        yield _SlowFailCompletion()
+
+    monkeypatch.setattr(streaming_module, "streaming_llm_client", fake_streaming)
+    monkeypatch.setattr(policy_module, "generation_scope", fake_scope)
+
+    # 预算低于回退门槛（_MIN_FALLBACK_BUDGET_SECONDS=1.0），不足以再发一次请求
+    settings = _settings(
+        llm_model="main-model", llm_sub_model="sub-model", llm_generation_timeout_seconds=0.5
+    )
+    with pytest.raises(RuntimeError, match="sub model down"):
+        await llm_chat([{"role": "user", "content": "hi"}], settings=settings, task="macro_item")
+
+    assert models == ["sub-model"], f"预算耗尽后不应回退，实际 {models}"

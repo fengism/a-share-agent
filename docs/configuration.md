@@ -60,6 +60,63 @@ user_config 表   ─┘        │
 与全局一致时才复用全局 Key，同一规则此前已用于问财自定义地址。`GET /api/config` 的
 `inherited_keys` 会列出仍继承全局的字段，前端据此显示「当前使用管理员配置」并提供「改用管理员配置」。
 
+#### 子模型与备用模型
+
+`LLM_SUB_MODEL`（简单/高频任务）与 `LLM_FALLBACK_MODEL`（自动降级兜底）都**与主模型共用
+provider / base_url / api_key，只替换 `model`**。由此得到两条硬约束：
+
+1. 必须填同一家厂商的模型名，否则请求必然 404/400；
+2. 切换 Provider 时二者会被一并重置（用户在同一次提交里显式给出时除外），否则残留的旧厂商
+   模型名会变成一条"永远失败的兜底路径"。
+
+降级触发条件（`app/infrastructure/llm/completion.py`）：
+| 上游错误 | 是否降级 | 理由 |
+| :--- | :--- | :--- |
+| 429 / 402（限流、额度/余额耗尽） | 立即降级 | 账号级问题，换模型可能立即恢复 |
+| 5xx | 重试预算耗尽后降级 | 主模型路由当前不可用 |
+| 400 / 401 / 403 / 404 / 422 | **不降级** | 请求或凭证本身有误，换模型只会掩盖真实原因 |
+| 超时 / 取消 | **不降级** | 备用模型可能更慢，且上层已有总时限预算 |
+
+**子模型回退主模型**（`LLM_SUB_MODEL` 走不通时）共享同一套降级判据，但多两条约束：
+
+- 子模型已经把生成总时限（`LLM_GENERATION_TIMEOUT_SECONDS`，默认 1200s）用完时，**不再回退主模型**。
+  超时是确定性失败，重试只是白等。
+- 子模型与主模型**共用同一份生成总预算**：主模型只能拿到剩余时间；剩余不足 1s 时直接透出子模型的
+  真实错误，不再发起注定立刻超时的请求。
+
+额度判定只认 HTTP 状态码与明确的限流措辞，**不做裸 `429` 子串匹配**——上游 400 消息里出现
+`max_tokens 14290 exceeds` 这类数字很常见。
+
+降级时会为备用模型**从同一个连接池租一个客户端**（池键含 `model`，因此不会与主客户端抢同一条目），
+能力位与请求整形也按新模型重算——直接改 `model` 字段会让 SDK 封装层的 `expected_model` 校验
+报 `LLMConfigurationError`。池化而不是每次新建，是因为 429 恰恰成批出现、系统已经吃紧的时候，
+反复重做 DNS/TCP/TLS 握手只会雪上加霜。
+
+降级是**尽力而为**：只有请求能装进备用模型时才真的切换。若备用模型缺主模型支持的能力（例如工具调用），
+重新整形会失败，此时**放弃降级并保留原始错误**（同时记 `fallback_incompatible` 指标），
+而不是把手里的 429 偷换成“当前模型网关未启用工具调用能力”。
+
+#### 降级的可观测性
+
+降级链路的计数都带 `operation` 维度，并通过 Prometheus 导出为
+`a_share_provider_operation_{attempts,successes,failures,fallback_attempts}_total{provider,operation}`：
+
+| `operation` | 含义 |
+| --- | --- |
+| `completion` / `stream` | 常规调用 |
+| `fallback_to_model` | 成功切换到备用模型 |
+| `fallback_unavailable` | 备用模型客户端构建失败，放弃降级 |
+| `fallback_incompatible` | 备用模型装不下请求（如缺工具调用），放弃降级 |
+| `tools_unsupported` | 模型不支持工具调用，降级重试 |
+
+`fallback_attempts` 在三类 `fallback_*` 上都会 +1，聚合的 `a_share_provider_fallback_attempts_total`
+因此等于「所有想降级的次数」，可直接拿来做告警：
+
+```promql
+# 备用模型配置有问题（构建失败或装不下请求），需要人工介入
+sum by (operation) (increase(a_share_provider_operation_failures_total{operation=~"fallback_unavailable|fallback_incompatible"}[1h])) > 0
+```
+
 > [!IMPORTANT]
 > **私密字段的"空串"是删除指令**：`PUT /api/config` 里某个私密字段传空串，表示删除该用户的个人覆盖
 > （`user_config` 直接删行），而不是写入空值。它与 `overlay_private` 跳过空值的结果等价，但不留死数据。

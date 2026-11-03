@@ -190,11 +190,18 @@ function waitForReconnect(delayMs: number, signal: AbortSignal): Promise<void> {
       reject(new DOMException("aborted", "AbortError"));
       return;
     }
-    const timer = window.setTimeout(resolve, delayMs);
-    signal.addEventListener("abort", () => {
+    // 定时器正常到点时必须主动摘掉 abort 监听器：长连接断线重连次数无上限
+    // （每次有进展都会重置 reconnectAttempts），每个监听器都会永久挂在
+    // 同一个 signal 上，累积到一定量后 abort 会触发几百个无效回调。
+    const onAbort = () => {
       window.clearTimeout(timer);
       reject(new DOMException("aborted", "AbortError"));
-    }, { once: true });
+    };
+    const timer = window.setTimeout(() => {
+      signal.removeEventListener("abort", onAbort);
+      resolve();
+    }, delayMs);
+    signal.addEventListener("abort", onAbort, { once: true });
   });
 }
 

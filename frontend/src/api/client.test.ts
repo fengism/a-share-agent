@@ -105,3 +105,101 @@ describe("api client request lifecycle", () => {
     expect(requestInit?.headers).toMatchObject({ "X-CSRF-Token": "csrf-token" });
   });
 });
+
+describe("api client download timeout", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    setToken(null);
+    setUnauthorizedHandler(null);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("aborts a hung PDF download instead of waiting forever", async () => {
+    // 回归背景：apiDownload/apiDownloadPost 过去直接用 options.signal（默认 undefined），
+    // 后端渲染卡住时 fetch 会一直挂着，用户既等不到结果也无法取消。
+    let fetchSignal: AbortSignal | undefined;
+    vi.stubGlobal("fetch", vi.fn((_url, init) => {
+      fetchSignal = init?.signal as AbortSignal;
+      // 真实 fetch 在 signal 中止时会 reject；桩也必须这样，否则 pending 永远悬挂。
+      return new Promise<Response>((_resolve, reject) => {
+        fetchSignal?.addEventListener(
+          "abort",
+          () => reject(new DOMException("aborted", "AbortError")),
+          { once: true },
+        );
+      });
+    }));
+
+    const { apiDownload } = await import("./client");
+    const pending = apiDownload("/analysis/123/export-pdf", "report.pdf");
+    const assertion = expect(pending).rejects.toBeInstanceOf(ApiTimeoutError);
+
+    await vi.advanceTimersByTimeAsync(API_TIMEOUTS.LONG_RUNNING);
+    await assertion;
+    expect(fetchSignal?.aborted).toBe(true);
+  });
+
+  it("aborts a hung POST download too", async () => {
+    let fetchSignal: AbortSignal | undefined;
+    vi.stubGlobal("fetch", vi.fn((_url, init) => {
+      fetchSignal = init?.signal as AbortSignal;
+      return new Promise<Response>((_resolve, reject) => {
+        fetchSignal?.addEventListener(
+          "abort",
+          () => reject(new DOMException("aborted", "AbortError")),
+          { once: true },
+        );
+      });
+    }));
+
+    const { apiDownloadPost } = await import("./client");
+    const pending = apiDownloadPost("/industry-chain/export-pdf", { a: 1 }, "r.pdf");
+    const assertion = expect(pending).rejects.toBeInstanceOf(ApiTimeoutError);
+
+    await vi.advanceTimersByTimeAsync(API_TIMEOUTS.LONG_RUNNING);
+    await assertion;
+    expect(fetchSignal?.aborted).toBe(true);
+  });
+
+  it("honours an explicit timeoutMs for downloads", async () => {
+    vi.stubGlobal("fetch", vi.fn((_url, init) => new Promise<Response>((_resolve, reject) => {
+      (init?.signal as AbortSignal | undefined)?.addEventListener(
+        "abort",
+        () => reject(new DOMException("aborted", "AbortError")),
+        { once: true },
+      );
+    })));
+    const { apiDownload } = await import("./client");
+    const pending = apiDownload("/x", "f.pdf", undefined, { timeoutMs: 1000 });
+    const assertion = expect(pending).rejects.toBeInstanceOf(ApiTimeoutError);
+
+    await vi.advanceTimersByTimeAsync(1000);
+    await assertion;
+  });
+
+  it("still propagates a caller abort on downloads", async () => {
+    let fetchSignal: AbortSignal | undefined;
+    vi.stubGlobal("fetch", vi.fn((_url, init) => {
+      fetchSignal = init?.signal as AbortSignal;
+      return new Promise<Response>((_resolve, reject) => {
+        fetchSignal?.addEventListener(
+          "abort",
+          () => reject(new DOMException("aborted", "AbortError")),
+          { once: true },
+        );
+      });
+    }));
+    const { apiDownload } = await import("./client");
+    const caller = new AbortController();
+    const pending = apiDownload("/x", "f.pdf", undefined, { signal: caller.signal });
+    const assertion = expect(pending).rejects.toBeDefined();
+
+    caller.abort();
+    await assertion;
+    expect(fetchSignal?.aborted).toBe(true);
+  });
+});

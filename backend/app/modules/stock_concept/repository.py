@@ -7,6 +7,7 @@ from collections import Counter
 from collections.abc import Iterable
 from typing import Any
 
+from app.core.sql import contains_pattern, prefix_pattern
 from app.infrastructure.persistence.concept_stats import apply_concept_deltas, concept_delta, rebuild_concept_counts
 from app.infrastructure.persistence.connection import get_connection, unit_of_work
 from app.modules.master_data_revision import check_revision, record_revision
@@ -59,8 +60,8 @@ def list_records(
     params: list[object] = []
     if query:
         normalized = query.strip().upper()
-        where.append("(stock_code LIKE ? OR stock_name LIKE ?)")
-        params.extend((f"{normalized}%", f"%{query.strip()}%"))
+        where.append("(stock_code LIKE ? ESCAPE '\\' OR stock_name LIKE ? ESCAPE '\\')")
+        params.extend((prefix_pattern(normalized), contains_pattern(query.strip())))
     if market_group:
         where.append("market_group = ?")
         params.append(market_group)
@@ -195,11 +196,11 @@ def get_all_concepts(query: str = "", limit: int = 500) -> list[dict[str, Any]]:
         rows = connection.execute(
             """
             SELECT name, stock_count FROM stock_concepts
-            WHERE name LIKE ?
+            WHERE name LIKE ? ESCAPE '\\'
             ORDER BY stock_count DESC, name ASC
             LIMIT ?
             """,
-            (f"%{query.strip()}%", limit),
+            (contains_pattern(query.strip()), limit),
         ).fetchall()
     else:
         rows = connection.execute(

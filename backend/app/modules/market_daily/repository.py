@@ -924,15 +924,59 @@ class _ConnectionScope:
 _local = threading.local()
 _close_lock = threading.Lock()
 _init_lock = threading.Lock()
-_open_connections: list[sqlite3.Connection] = []
+# 用 dict 保存全局注册表，线程退出时按 id 精确摘除。
+_open_connections: dict[int, sqlite3.Connection] = {}
 _connection_locks: dict[int, threading.RLock] = {}
 _initialized_paths: set[str] = set()
+
+
+class _ThreadConnectionBundle:
+    """单线程持有的日线库连接，线程退出时自动关闭并注销。
+
+    与 ``app.infrastructure.persistence.connection`` 同因同解：
+    ``ThreadPoolExecutor`` 用 ``with`` 包起来时 worker 线程用完即销毁，而连接
+    只登记在 ``_open_connections`` 里就再没人关闭。``sqlite3.Connection`` 不
+    支持 weakref，但线程结束时 CPython 会清空该线程的 ``threading.local`` 数据，
+    从而释放仅被 local 引用的本对象并触发 ``__del__``。
+
+    所有操作必须幂等：``close_all_connections()`` 可能已经先关过。
+    """
+
+    __slots__ = ("connections",)
+
+    def __init__(self) -> None:
+        self.connections: dict[str, sqlite3.Connection] = {}
+
+    def __del__(self) -> None:
+        connections = list(self.connections.values())
+        if not connections:
+            return
+        self.connections.clear()
+        try:
+            with _close_lock:
+                for connection in connections:
+                    _open_connections.pop(id(connection), None)
+                    _connection_locks.pop(id(connection), None)
+        except (RuntimeError, TypeError) as error:
+            # 仅在解释器关闭阶段可能出现（锁/模块已不可用）；进程即将退出，
+            # 注册表已无意义，但不能静默。
+            logging.getLogger(__name__).debug("日线库线程连接退出时摘除注册表失败: %s", error)
+        for connection in connections:
+            try:
+                if connection.in_transaction:
+                    connection.rollback()
+            except sqlite3.Error:
+                pass
+            try:
+                connection.close()
+            except sqlite3.Error:
+                pass
 
 
 def close_all_connections() -> None:
     """关闭所有复用的连接并清空初始化标记（进程退出或文件被替换后调用）。"""
     with _close_lock:
-        connections = list(_open_connections)
+        connections = list(_open_connections.values())
         _open_connections.clear()
         _initialized_paths.clear()
         locks = {id(conn): _connection_locks.pop(id(conn), None) for conn in connections}
@@ -953,6 +997,10 @@ def close_all_connections() -> None:
                 connection.close()
             except Exception as error:  # noqa: BLE001 - 关闭清理不应抛出
                 logging.getLogger(__name__).debug("关闭日线库连接失败: %s", error)
+    # 保留 ``_local.connections`` 名字：现有读取方无需改动。
+    bundle = getattr(_local, "bundle", None)
+    if bundle is not None:
+        bundle.connections.clear()
     _local.connections = {}
 
 
@@ -964,10 +1012,12 @@ class MarketDailyBarRepository:
 
     def _connection(self) -> sqlite3.Connection:
         key = str(self.path)
-        connections = getattr(_local, "connections", None)
-        if connections is None:
-            connections = {}
-            _local.connections = connections
+        bundle = getattr(_local, "bundle", None)
+        if bundle is None:
+            bundle = _ThreadConnectionBundle()
+            _local.bundle = bundle
+            _local.connections = bundle.connections
+        connections = bundle.connections
         connection = connections.get(key)
         if connection is not None:
             try:
@@ -993,7 +1043,7 @@ class MarketDailyBarRepository:
             connection.execute("PRAGMA busy_timeout=10000")
             connections[key] = connection
             with _close_lock:
-                _open_connections.append(connection)
+                _open_connections[id(connection)] = connection
                 _connection_locks[id(connection)] = threading.RLock()
         return connection
 

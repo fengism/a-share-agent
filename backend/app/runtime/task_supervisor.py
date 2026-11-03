@@ -10,7 +10,11 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from app.runtime.task_health import monitor_long_running_task, register_background_task
+from app.runtime.task_health import (
+    mark_task_disabled_by_config,
+    monitor_long_running_task,
+    register_background_task,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -159,6 +163,9 @@ class BackgroundTaskSupervisor:
                 result = await asyncio.gather(task, return_exceptions=True)
                 if self._tasks.get(spec.name) is task:
                     self._tasks.pop(spec.name, None)
+                # 配置停用是预期状态：标清楚，readiness 才不会把
+                # bot_enabled=false 这类正常配置当成故障。
+                mark_task_disabled_by_config(spec.name)
                 error = result[0]
                 if isinstance(error, BaseException) and not isinstance(error, asyncio.CancelledError):
                     logger.error(

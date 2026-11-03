@@ -24,6 +24,12 @@ def new_task_health() -> dict:
         "last_duration_ms": None,
         "role": "local",
         "unexpected_exit": False,
+        # 「按配置停用」与「崩溃退出」都会把 status 写成 stopped，两者对
+        # readiness 的含义相反：前者是预期状态，后者是故障。用独立标记区分，
+        # 避免 bot_enabled=false 这类正常配置把就绪探测永久拉挂。
+        "disabled_by_config": False,
+        # 「已按正常路径退出」（关闭/取消），与崩溃区分。
+        "cancelled_cleanly": False,
         "restart_count": 0,
         "consecutive_restarts": 0,
         "last_restart_at": None,
@@ -39,6 +45,8 @@ def register_background_task(
 ) -> dict:
     entry = background_task_health.setdefault(name, new_task_health())
     entry["unexpected_exit"] = False
+    entry["disabled_by_config"] = False
+    entry["cancelled_cleanly"] = False
     if critical:
         _critical_background_tasks.add(name)
     else:
@@ -48,6 +56,35 @@ def register_background_task(
     else:
         _readiness_background_tasks.discard(name)
     return entry
+
+
+def mark_task_disabled_by_config(name: str) -> None:
+    """标记任务因配置禁用而停止：这是预期状态，不应拉垮就绪探测。"""
+    entry = background_task_health.get(name)
+    if entry is None:
+        return
+    entry["status"] = "stopped"
+    entry["disabled_by_config"] = True
+    entry["unexpected_exit"] = False
+    entry["next_run"] = None
+
+
+def mark_task_cancelled(name: str) -> None:
+    """进程内正常取消（如应用关闭）：不算故障，也不冒充配置禁用。
+
+    保留 ``status=stopped`` 供人排查，但清掉故障计数并由 ``cancelled_cleanly``
+    说明原因——否则应用正常关闭期间就绪探测会抛 503，把「正在退出」误报成
+    「服务坏了」。
+    """
+    entry = background_task_health.get(name)
+    if entry is None:
+        return
+    entry["status"] = "stopped"
+    entry["disabled_by_config"] = False
+    entry["cancelled_cleanly"] = True
+    entry["consecutive_errors"] = 0
+    entry["consecutive_restarts"] = 0
+    entry["unexpected_exit"] = False
 
 
 def critical_background_tasks() -> frozenset[str]:
@@ -78,6 +115,9 @@ def monitor_long_running_task(
 
     def on_done(completed: asyncio.Task[None]) -> None:
         if completed.cancelled():
+            # 正常取消（应用关闭 / 配置停用）不是故障；记录原因，
+            # 避免健康快照永远停在 starting。
+            mark_task_cancelled(name)
             return
         error = completed.exception()
         entry["unexpected_exit"] = True
@@ -110,10 +150,17 @@ def task_snapshot() -> dict[str, dict]:
             "last_duration_ms": info.get("last_duration_ms"),
             "role": info.get("role", "local"),
             "unexpected_exit": bool(info.get("unexpected_exit", False)),
+            "disabled_by_config": bool(info.get("disabled_by_config", False)),
+            "cancelled_cleanly": bool(info.get("cancelled_cleanly", False)),
             "restart_count": info.get("restart_count", 0),
             "consecutive_restarts": info.get("consecutive_restarts", 0),
             "last_restart_at": info.get("last_restart_at"),
             "last_restart_error": info.get("last_restart_error"),
+            # critical 与 readiness_required 是两种不同的运维动作：
+            # critical 决定「值不值得告警」，readiness_required 决定「要不要摘掉流量」。
+            # 两者都导出，否则 critical 标记就没任何消费方。
+            "critical": name in _critical_background_tasks,
+            "readiness_required": name in _readiness_background_tasks,
         }
         for name, info in background_task_health.items()
     }

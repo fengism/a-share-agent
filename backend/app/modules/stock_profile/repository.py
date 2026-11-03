@@ -4,6 +4,7 @@ import sqlite3
 from collections.abc import Iterable
 from typing import Any
 
+from app.core.sql import contains_pattern, prefix_pattern
 from app.infrastructure.persistence.connection import get_connection, unit_of_work
 from app.modules.master_data_revision import MasterDataConflictError, check_revision, record_revision
 from app.modules.stock_profile.models import StockBasicProfileInput
@@ -57,8 +58,8 @@ def list_records(
 
     if query:
         normalized = query.strip().upper()
-        where.append("(stock_code LIKE ? OR stock_name LIKE ?)")
-        params.extend((f"{normalized}%", f"%{query.strip()}%"))
+        where.append("(stock_code LIKE ? ESCAPE '\\' OR stock_name LIKE ? ESCAPE '\\')")
+        params.extend((prefix_pattern(normalized), contains_pattern(query.strip())))
 
     if market_group:
         where.append("market_group = ?")

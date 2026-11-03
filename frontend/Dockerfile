@@ -1,5 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
+# Node 版本与仓库根 .nvmrc / CI 的 setup-node 保持一致（升版时三处同改）
 FROM node:22-alpine AS build
 
 WORKDIR /app

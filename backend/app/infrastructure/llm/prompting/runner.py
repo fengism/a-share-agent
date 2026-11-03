@@ -12,7 +12,6 @@ from app.configuration import Settings, get_effective_settings
 from app.core.metrics import metrics
 from app.domain.llm import LLMFailureMarker
 from app.domain.prompting import PromptTrace
-from app.infrastructure.llm.adapters import LLMClient
 from app.infrastructure.llm.policy import generation_scope
 from app.infrastructure.llm.prompting.spec import PromptContext, PromptSpec
 from app.infrastructure.llm.streaming import StreamingLLMClient, streaming_llm_client
@@ -55,18 +54,16 @@ def _trace(
 
 async def run_structured_prompt(
     spec: PromptSpec[OutputT], context: PromptContext, *, settings: Settings | None = None,
-    client: LLMClient | None = None, temperature: float | None = None,
+    temperature: float | None = None,
     async_client: StreamingLLMClient | None = None,
     timeout_seconds: float | None = None, max_tokens: int | None = None,
 ) -> PromptRun[OutputT]:
-    if client is not None and async_client is not None:
-        raise ValueError("Specify only one LLM client")
     settings = settings or get_effective_settings()
     timeout = settings.llm_generation_timeout_seconds if timeout_seconds is None else timeout_seconds
     async with generation_scope(settings, timeout_seconds=timeout):
-        if client is not None or async_client is not None:
+        if async_client is not None:
             return await _run_structured_prompt(
-                spec, context, settings=settings, client=client,
+                spec, context, settings=settings,
                 temperature=temperature, async_client=async_client,
             )
         async with streaming_llm_client(
@@ -82,16 +79,13 @@ async def _run_structured_prompt(
     context: PromptContext,
     *,
     settings: Settings | None = None,
-    client: LLMClient | None = None,
     temperature: float | None = None,
     async_client: StreamingLLMClient | None = None,
 ) -> PromptRun[OutputT]:
     """渲染、执行并校验一个结构化 Prompt，失败时按规格执行修复重试。"""
-    if client is not None and async_client is not None:
-        raise ValueError("Specify only one LLM client")
     effective_temperature = spec.temperature if temperature is None else temperature
     messages = spec.render(context)
-    trace = _trace(spec, messages, str(getattr(async_client or client, "model", "")), effective_temperature)
+    trace = _trace(spec, messages, str(getattr(async_client, "model", "")), effective_temperature)
     raw_response = ""
     parse_error: Exception | None = None
     prompt_tokens = 0
@@ -124,7 +118,6 @@ async def _run_structured_prompt(
                     temperature=request_temperature,
                     json_format=True,
                     settings=settings,
-                    client=client,
                 )
             raw_response = completion.text
         except Exception as error:

@@ -8,9 +8,19 @@
 | :--- | :--- | :--- |
 | Python | 3.11+ | 后端运行时；开发依赖由 `uv` 管理 |
 | uv | 最新 | `backend/pyproject.toml` + `uv.lock` 锁定依赖 |
-| Node.js | 22 | 前端构建与测试 |
-| npm | 10+ | 与 Node 22 自带版本一致 |
+| Node.js | 22 | 前端构建与测试；以仓库根 `.nvmrc` 为准（CI / Dockerfile 同源） |
+| npm | 10+ | `frontend/package.json#packageManager` 已声明；本项目只用 npm |
 | 可选：Docker | 20.10+ | 只在需要容器化验证时使用 |
+
+> [!WARNING]
+> **前端依赖必须用 `npm ci` 按 `frontend/package-lock.json` 安装**，不要用 pnpm/yarn。
+> 仓库只维护这一份锁文件；用其他包管理器装出的 `node_modules` 与锁文件版本不一致时，
+> 会出现一批只在本地复现的失败（antd / testing-library 等小版本差异就足以让快照与
+> 交互断言挂掉）。遇到“别人都能过、只有我挂”先跑：
+>
+> ```bash
+> cd frontend && rm -rf node_modules && npm ci
+> ```
 
 > [!NOTE]
 > 后端**必须**用 `uv run` 执行（`cd backend && uv run pytest`）。系统自带的 `python3` 通常缺少
@@ -98,6 +108,28 @@ cd frontend && npx playwright install chromium  # 前端 E2E 与 README 配图�
   `frontend/scripts/check-market-time.mjs` 会拦住这类写法（分时图等用 `getUTC*` 自洽的地方在允许名单里）。
 - **CSV 导出**：导出单元格一律经 `app/core/csv_export.py` 的 `csv_safe_row` 处理，
   阻断 `=cmd|…` 这类公式注入；新增导出接口时不要裸用 `writer.writerow([...])`。
+- **错误消息不得带内部细节**：`ApplicationError` 的 `message` 会原样进 HTTP 响应
+  （`app/api/errors.py` 的处理器只追加 `error_id`，**不做脱敏**）。因此 5xx 的文案必须是
+  固定中文提示，不要拼 `str(exc)`、URL、参数或 SQL；底层原因靠 `raise ... from exc`
+  保留到服务端日志。`tests/test_error_message_leak_guard.py` 会扫描
+  「`except Exception as exc` 后把 `exc` 拼进用户可见消息」的写法。
+  （按类型精确捕获的领域异常——如 `LLMConfigurationError`——其 message 本就是给用户看的提示，不在此约束内。）
+- **前端 Hook 依赖**：`react-hooks/exhaustive-deps` 在 `frontend/eslint.config.js` 里已从插件的
+  默认 `warn` 升为 **`error`**。CI 跑的是不带 `--max-warnings` 的 `eslint .`，`warn` 不会阻断流水线，
+  而漏写依赖数组会导致 stale closure（读到上一次渲染的 state/props，极难复现）。
+
+### 前端请求超时
+
+`frontend/src/api/client.ts` 里所有请求都必须经 `createAbortScope(signal, timeoutMs)` 拿
+`AbortSignal`，不要直接把 `options.signal` 交给 `fetch`。原因：下载类接口（PDF 渲染、CSV 导出）
+既不传 `signal` 又曾不经超时包装，后端卡住时 `await fetch` 会挂到页面关闭——用户既等不到结果
+也无法取消。
+
+- `apiRequest` 默认超时 `API_TIMEOUTS.DEFAULT`（20s），可按调用点用 `timeoutMs` 覆盖
+  （如 `SCREENER` / `LONG_RUNNING` 为 300s）。
+- `apiDownload` / `apiDownloadPost` 默认 `API_TIMEOUTS.LONG_RUNNING`（300s，要留给 PDF 渲染）。
+- `await response.blob()` 也必须落在同一个 scope 里，否则重定向头已返回、body 卡住的情况仍会挂死。
+- scope 的 `dispose()` 要放 `finally`；`isTimeout()` 用来把 `AbortError` 转成 `ApiTimeoutError`。
 
 另外两条账号域约定（靠 code review + 测试保证，尚未脚本化）：
 
@@ -161,6 +193,12 @@ cd frontend && npx playwright install chromium  # 前端 E2E 与 README 配图�
   访问日志对健康检查/轮询路径已降噪到 DEBUG，排查时把日志级别调回 INFO 以上即可。
 - **数据库**：四个 SQLite 库都在 `backend/data/`（容器内 `/app/data`），
   结构与迁移见 `backend/app/infrastructure/persistence/migrations.py`。
+- **连接生命周期**：SQLite 连接按「线程 + 库」复用（WAL 模式支持多连接并发读写），
+  连接由每线程一个 `_ThreadConnectionBundle` 持有。线程结束时 CPython 会清空该线程的
+  `threading.local` 数据，从而释放 bundle 并触发 `__del__` 自动 `close()` + 从全局注册表
+  摘除。这一点很重要：项目里多处 provider 用 `with ThreadPoolExecutor(...)` 做并发抓取，
+  worker 线程用完即销毁；若连接只登记在全局注册表里，线程死后就再没人能关闭它们。
+  `close_connection()` / `close_all_connections()` 仍是显式关闭通道，与自动回收幂等共存。
 
 ## 八、提交与发布约定
 

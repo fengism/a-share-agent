@@ -55,6 +55,14 @@ def render_prometheus_metrics(
         for field in ("attempts", "successes", "failures", "fallback_attempts"):
             lines.append(_sample(f"a_share_provider_{field}_total", values.get(field, 0), provider=provider))
 
+    # 按 operation 拆分的同组指标。降级失败（fallback_unavailable /
+    # fallback_incompatible）只出现在这一维度，不导出就无法对它做告警。
+    for provider, operations in snapshot.get("provider_operations", {}).items():
+        for operation, values in operations.items():
+            labels = {"provider": provider, "operation": operation}
+            for field in ("attempts", "successes", "failures", "fallback_attempts"):
+                lines.append(_sample(f"a_share_provider_operation_{field}_total", values.get(field, 0), **labels))
+
     for prompt, models in snapshot.get("llm", {}).get("prompts", {}).items():
         for model, values in models.items():
             labels = {"prompt": prompt, "model": model}
@@ -134,6 +142,32 @@ def render_prometheus_metrics(
         lines.append(_sample("a_share_background_task_consecutive_restarts", task.get("consecutive_restarts", 0), **labels))
         lines.append(_sample("a_share_background_task_consecutive_errors", task.get("consecutive_errors", 0), **labels))
         lines.append(_sample("a_share_background_task_unexpected_exit", task.get("unexpected_exit", False), **labels))
+        # 与就绪探测使用同一套「停用 ≠ 故障」语义：告警规则写
+        # `consecutive_errors > N and disabled_by_config == 0 and cancelled_cleanly == 0`
+        # 就能避开「按配置关闭」带来的误告警——否则关掉 bot/twitter 这类
+        # 可选功能后，运维会收到一堆假故障。
+        lines.append(_sample("a_share_background_task_disabled_by_config", task.get("disabled_by_config", False), **labels))
+        lines.append(_sample("a_share_background_task_cancelled_cleanly", task.get("cancelled_cleanly", False), **labels))
+        # 让告警能只看关键任务。`critical` 之前只是个没消费方
+        # 的标记：快照和指标里都没有，运维无从区分「关键任务挂了」和
+        # 「预热任务挂了」。
+        lines.append(
+            _sample(
+                "a_share_background_task_critical",
+                task.get("critical", False),
+                **labels,
+            )
+        )
+        # 非 leader 副本不跑周期任务，所以 consecutive_errors 永远是 0。
+        # 没有这个维度就分不清「真的健康」与「从来没轮到它」。
+        # 值 = role 不是 standby：leader 与 local（不走选主的每个副本）都算活跃。
+        lines.append(
+            _sample(
+                "a_share_background_task_replica_active",
+                task.get("role") != "standby",
+                **labels,
+            )
+        )
 
     for database, backup in sorted(backups.items()):
         labels = {"database": database}

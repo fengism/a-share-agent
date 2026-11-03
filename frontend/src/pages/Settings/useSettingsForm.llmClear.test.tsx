@@ -251,3 +251,31 @@ describe("「改用管理员配置」的提交补丁", () => {
     expect(patch).toEqual({ llm_model: "gpt-4o-mini", llm_temperature: 0.2 });
   });
 });
+
+describe("切换 Provider 时的字段重置", () => {
+  const providerConfig = {
+    provider_defaults: {
+      deepseek: { label: "DeepSeek", api_mode: "openai", base_url: "https://api.deepseek.com/v1", model: "deepseek-reasoner" },
+      openai: { label: "OpenAI", api_mode: "openai", base_url: "https://api.openai.com/v1", model: "gpt-4o" },
+    },
+    is_admin: true,
+    inherited_keys: [],
+    llm_provider: "deepseek",
+    llm_base_url: "https://api.deepseek.com/v1",
+    llm_model: "deepseek-reasoner",
+    llm_sub_model: "deepseek-chat",
+    llm_fallback_model: "deepseek-chat",
+  } as unknown as ConfigData;
+
+  it("换厂商时清空备用模型，避免把旧厂商模型名发给新厂商", () => {
+    const saveConfig = vi.fn();
+    const { result } = renderHook(() => useSettingsForm(providerConfig, saveConfig, false), { wrapper });
+
+    act(() => {
+      result.current.handleProviderChange("openai");
+    });
+
+    expect(result.current.form.llm_provider).toBe("openai");
+    expect(result.current.form.llm_fallback_model).toBe("");
+  });
+});

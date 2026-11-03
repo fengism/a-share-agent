@@ -45,7 +45,17 @@ class UpstreamEmptyResponseError(UpstreamUnavailableError):
 
 
 def build_internal_error(message: str) -> tuple[str, str]:
-    """生成可供用户反馈的错误编号与脱敏提示。"""
+    """给一条**已经面向用户写好**的提示追加可回报的错误编号。
+
+    注意这里**不做脱敏**：``message`` 会原样出现在 HTTP 响应里。调用方必须
+    自己保证该文本可公开——不要拼 ``str(exc)``、URL、参数、SQL、类名等内部细节，
+    那些交给日志（``exc_info`` / ``from exc`` 已保留因果链）。
+
+    Param:
+        message: 准备展示给终端用户的原文，需自行保证不含内部实现细节。
+    Return:
+        ``(error_id, 用户可见文本)``。
+    """
     error_id = uuid4().hex[:12]
     return error_id, f"{message}（错误编号：{error_id}）"
 

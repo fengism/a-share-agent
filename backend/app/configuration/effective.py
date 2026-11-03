@@ -71,6 +71,10 @@ def overlay_private(base: Settings, overrides: dict) -> Settings:
             merged.llm_api_mode = defaults["api_mode"]
         if "llm_api_version" not in patch:
             merged.llm_api_version = defaults.get("api_version", "")
+        # 备用模型与主模型共用 base_url/api_key，旧厂商模型名在新厂商必然 404/400，
+        # 留着它就是一条永远失败的兜底路径。换厂商时统一清空，由用户重新指定。
+        if "llm_fallback_model" not in patch:
+            merged.llm_fallback_model = ""
 
     # 用户未独立配置个人 API Key 时，**只有端点仍然是管理员那套**才复用管理员 Key。
     #

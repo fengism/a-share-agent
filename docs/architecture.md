@@ -83,6 +83,132 @@ performance 5/10/20 日前瞻复盘
 保证索引与文件一致。
 
 
+## 后台任务（`app/runtime`）
+
+所有长驻任务由 `BackgroundTaskSupervisor` 托管，统一执行入口是
+`task_scheduler.run_periodic`（启动抖动 → 选主 → 执行 → 指数退避）。
+声明集中在 `lifecycle.build_background_task_specs`。
+
+### 三类任务，三种多副本语义
+
+| 类型 | 多副本行为 | 原因 |
+|---|---|---|
+| 启动预热（`run_supervised_once`） | 每副本各跑一遍 | 写进程内缓存，共享没意义 |
+| 长驻周期任务 | 仅 leader 执行（`leader_election=True`） | 避免 N 倍上游压力与重复写库 |
+| 队列 Worker | 每个副本都跑 | `claim_next(owner_id)` 原子领取 + 租约，天然分片 |
+
+选主用 SQLite 租约（`TaskLeaderLease`，默认 60s，心跳每 `lease/3` 续租）。
+未拿到租约的副本处于 `role=standby`，这是**预期状态**，不是故障。
+
+### 三个状态字段，别混用
+
+`status` 是给人看的字符串，同一个值可能对应完全相反的语义，所以另有标记：
+
+| 字段 | 含义 | 对 readiness 的影响 |
+|---|---|---|
+| `disabled_by_config` | `enabled` 谓词为假，任务被 supervisor 停掉（如 `bot_enabled=false`） | 视为健康 |
+| `cancelled_cleanly` | 正常关闭/取消（应用退出、reconcile 停用） | 视为健康 |
+| `unexpected_exit` | 任务自己异常退出或意外结束 | 判为不健康 |
+
+> **为什么不能只看 `status`**：配置停用和崩溃退出都会把 `status` 写成 `stopped`。
+> 早期版本直接按 `status == "stopped"` 判定，一旦给条件任务接上 readiness，
+> 关掉 `bot_enabled` 就会让 `/api/health/ready` 永久 503，容器被 Docker 判为不健康。
+
+### readiness 与指标的分工
+
+`readiness_required=True` 只给**「不跑就无法提供服务」**的任务开：目前是
+`quant_job_worker` 与 `workflow_job_worker`（不跑则用户提交的任务无限排队）。
+
+**不要**给 `database_backup`、`wal_checkpoint`、各类 prewarm 开——它们属于运维健康，
+挂了不影响 HTTP 请求，接到 readiness 上会让一次备份抖动摘掉全部流量。这类任务靠
+Prometheus 告警：`a_share_background_task_consecutive_errors{task=...}`。
+
+#### `critical` 与 `readiness_required` 不是同一件事
+
+两个字段常被误认为重叠，实际是两个**独立运维动作**：
+
+| 字段 | 回答的问题 | 消费方 |
+|---|---|---|
+| `critical` | 挂了**要不要告警** | `a_share_background_task_critical` 指标 |
+| `readiness_required` | 挂了**要不要从负载均衡摘流量** | `/api/health/ready` |
+
+四种组合都合法，且现网都有实例：
+
+- `critical=True, readiness_required=True`：`quant_job_worker`、`workflow_job_worker`
+  ——用户任务会无限排队，既要告警也要摘流量。
+- `critical=True, readiness_required=False`：`database_backup`、`wal_checkpoint`、
+  `twitter_feed`、`industry_mapping_refresh`、`quant_strategy_reload`、`bot_job_worker`
+  ——该告警，但挂了不影响读行情，不能摘流量。
+- `critical=False, readiness_required=False`：各类 prewarm 与行情刷新。
+- `critical=False, readiness_required=True`：没有实例，也不建议——摘了流量却没告警，
+  等于悄悄降级。
+
+`critical` 曾经只是个没消费方的标记（快照和指标里都没有），运维无法回答「这个任务
+挂了要紧吗」。现在两个标志都进 `task_snapshot()` 并导出为指标；告警只想看关键任务时：
+
+```promql
+# 只看关键任务的故障，忽略预热/行情刷新的抖动
+(a_share_background_task_consecutive_errors{task=~".+"} > 3)
+  and on(task) a_share_background_task_critical == 1
+  and on(task) a_share_background_task_disabled_by_config == 0
+  and on(task) a_share_background_task_cancelled_cleanly == 0
+  and on(task) a_share_background_task_replica_active == 1
+```
+
+告警规则要排除预期停止，否则关掉可选功能会收到假故障：
+
+```promql
+a_share_background_task_consecutive_errors{task=~".+"} > 3
+  and on(task) a_share_background_task_disabled_by_config == 0
+  and on(task) a_share_background_task_cancelled_cleanly == 0
+  and on(task) a_share_background_task_replica_active == 1
+```
+
+ `replica_active` 那一行不能省：standby 副本不跑周期任务，`consecutive_errors`
+永远是 0，不区分会把「从没轮到它」当成「一切正常」。
+
+`/api/health/ready` 返回体的 `background_tasks` 会带上全部状态字段，便于人工排查。
+
+### 槽位循环必须自己报失败
+
+job worker 的槽位循环写成 `except Exception: ... continue`（故意不退出，靠上层
+reconcile 重新拉起），这意味着**它永远不会产生 `unexpected_exit`**。如果只靠
+“任务退出”这类信号判断健康，一个每轮都失败的 Worker 在快照里与正常无异，
+readiness 会一直 200——接上了也是白接。
+
+所以槽位循环必须显式调用 `_record_slot_failure` / `_record_slot_success`：
+
+```python
+except Exception as error:
+    logger.exception(...)
+    _record_slot_failure(QUANT_JOB_HEALTH_NAME, type(error).__name__)
+    continue
+_record_slot_success(QUANT_JOB_HEALTH_NAME)
+```
+
+同理，`_PeriodicState.record_error` 也会清掉 `cancelled_cleanly`。新增后台任务时
+若采用 catch-all 循环，务必同样上报，否则健康状态会静默失真。
+
+### reconcile 不要“顺手”清计数
+
+`run_bot_job_worker` 外层有个 reconcile 循环负责重启死掉的槽位。它曾经有一行
+`elif health["status"] == "error": health["consecutive_errors"] = 0`，本意是
+「这一轮没有槽位退出 → 恢复正常」。但槽位循环是 catch-all，**正常情况下永远
+不会退出**，于是每轮 reconcile 都走这个分支，把槽位刚上报的失败计数清零：
+
+```
+bot worker 每轮都失败，而快照一直显示 errors=0 / status=running
+```
+
+规则：失败计数只能由「真正观察到失败」的地方清除（槽位轮询成功、周期任务成功），
+外层循环不得根据「没有崩溃」推断「没有出错」。
+
+### 失败路径也要退避
+
+槽位失败后必须 `idle_backoff.next_delay(...)`，不能用固定的短 sleep。否则上游
+抽搽两三秒就能把 `consecutive_errors` 推过阈值（默认 3），把一次瞬时抖动放大成
+readiness 503——而 Docker healthcheck 会据此把容器摘掉。
+
 ## Agentic 边界（`app/agentic`）
 
 目标：核心执行链路可在不改业务代码的前提下抽取为独立包。详细清单见

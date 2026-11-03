@@ -66,7 +66,11 @@ async def _fetch_hk_industry_comparison_remote(code: str) -> HKIndustryCompariso
             semaphore=ths_semaphore,
         )
     except Exception as exc:
-        raise UpstreamUnavailableError(f"同花顺港股行业对比接口暂不可用: {exc}") from exc
+        # 不把 str(exc) 拼进用户可见消息：ApplicationError 的 message 会原样
+        # 返回给客户端（application_error_handler 只追加错误编号，不做脱敏），
+        # 而上游异常常含请求 URL、接口参数甚至内部类名/SQL。完整原因由
+        # ``from exc`` 保留并落到服务端日志。
+        raise UpstreamUnavailableError("同花顺港股行业对比接口暂不可用") from exc
 
     norm_code = normalize_hk_code(code)
     periods = raw.get("periods") or []

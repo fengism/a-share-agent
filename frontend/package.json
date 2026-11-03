@@ -3,6 +3,11 @@
   "private": true,
   "version": "0.7.1",
   "type": "module",
+  "packageManager": "npm@11.19.0",
+  "engines": {
+    "node": ">=22.0.0",
+    "npm": ">=10.0.0"
+  },
   "scripts": {
     "api:check": "node scripts/check-api-generated.mjs",
     "api:export": "cd ../backend && uv run --frozen python -m app.scripts.export_openapi ../frontend/src/api/generated/openapi.json",

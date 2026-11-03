@@ -142,6 +142,34 @@ _TOOL_SCHEMA_HINTS = (
 
 _TOOL_STATUS_CODES = frozenset({400, 422})
 
+#: 沿 ``__cause__`` 链最多穿透的包装层数。SDK 常把 HTTP 错误包 2~3 层
+#: （APIConnectionError -> httpx 异常 -> openai.HTTPStatusError），留 8 层余量足够。
+_MAX_CAUSE_DEPTH = 8
+
+
+def llm_error_status_code(error: BaseException) -> int | None:
+    """沿 ``__cause__`` 链取第一个整数 HTTP 状态码，取不到返回 ``None``。
+
+    整条链上**一个都没有**时才返回 ``None``；只要某一层带了状态码就返回它，
+    因为外层包装的那层才是真正的失败原因。openai / litellm 的异常把状态码放在
+    ``status_code``，部分 httpx/自定义异常放在 ``response.status_code``，两者都认。
+
+    判定重试与降级时**只看状态码，不做子串匹配**：错误文本里的 ``429`` 可能是
+    ``max_tokens 14290 exceeds`` 之类完全无关的数字。
+    """
+    current: BaseException | None = error
+    for _ in range(_MAX_CAUSE_DEPTH):
+        if current is None:
+            return None
+        status_code = getattr(current, "status_code", None)
+        if isinstance(status_code, int):
+            return status_code
+        response_code = getattr(getattr(current, "response", None), "status_code", None)
+        if isinstance(response_code, int):
+            return response_code
+        current = current.__cause__
+    return None
+
 
 def is_tool_rejection_message(text: str) -> bool:
     """错误文本是否是"网关不支持工具调用"。"""

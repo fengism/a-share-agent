@@ -150,3 +150,119 @@ def test_persistence_operations_and_history_indexes() -> None:
         'a_share_persistence_operation_busy_failures_total{database="main",operation="write"} 2'
     ) in text
     assert 'a_share_history_index_ready{kind="daily_review"} 1' in text
+
+
+def test_provider_operations_are_exported_with_operation_label() -> None:
+    """降级失败只出现在 operation 维度，必须导出才可告警。"""
+    text = _render(
+        {
+            "provider_operations": {
+                "llm_chat": {
+                    "fallback_unavailable": {
+                        "attempts": 2, "failures": 2, "fallback_attempts": 2,
+                    },
+                    "fallback_incompatible": {
+                        "attempts": 1, "failures": 1, "fallback_attempts": 1,
+                    },
+                    "fallback_to_model": {
+                        "attempts": 5, "successes": 5, "fallback_attempts": 5,
+                    },
+                }
+            }
+        }
+    )
+    assert (
+        'a_share_provider_operation_fallback_attempts_total'
+        '{operation="fallback_unavailable",provider="llm_chat"} 2' in text
+    )
+    assert (
+        'a_share_provider_operation_failures_total'
+        '{operation="fallback_incompatible",provider="llm_chat"} 1' in text
+    )
+    assert (
+        'a_share_provider_operation_successes_total'
+        '{operation="fallback_to_model",provider="llm_chat"} 5' in text
+    )
+    # 缺失的字段按 0 补齐，保持序列稳定
+    assert (
+        'a_share_provider_operation_successes_total'
+        '{operation="fallback_unavailable",provider="llm_chat"} 0' in text
+    )
+
+
+def test_provider_operations_absent_emits_no_series() -> None:
+    text = _render({"providers": {"eastmoney": {"attempts": 1}}})
+    assert "a_share_provider_operation_" not in text
+
+
+def test_background_task_stop_reason_is_exported_as_labels() -> None:
+    """停用/取消标记必须导出，否则告警无法区分「配置关闭」与「真的崩了」。"""
+    text = _render(
+        background_tasks={
+            "twitter_feed": {
+                "consecutive_errors": 0,
+                "disabled_by_config": True,
+                "cancelled_cleanly": False,
+            },
+            "quant_job_worker": {
+                "consecutive_errors": 4,
+                "disabled_by_config": False,
+                "cancelled_cleanly": False,
+            },
+        }
+    )
+    assert 'a_share_background_task_disabled_by_config{task="twitter_feed"} 1' in text
+    assert 'a_share_background_task_disabled_by_config{task="quant_job_worker"} 0' in text
+    assert 'a_share_background_task_cancelled_cleanly{task="twitter_feed"} 0' in text
+
+
+def test_background_task_stop_reason_defaults_to_zero_when_absent() -> None:
+    """老快照没有这两个字段时不能凭空出现序列，也不能报错。"""
+    text = _render(background_tasks={"daily_refresh": {"consecutive_errors": 1}})
+    assert 'a_share_background_task_disabled_by_config{task="daily_refresh"} 0' in text
+    assert 'a_share_background_task_cancelled_cleanly{task="daily_refresh"} 0' in text
+
+
+def test_background_task_replica_active_distinguishes_standby() -> None:
+    """standby 副本不跑周期任务，errors 恒 0；不给维度就分不清「健康」与「没轮到」。"""
+    text = _render(
+        background_tasks={
+            "market_daily_bar_refresh": {"role": "leader", "consecutive_errors": 0},
+            "database_backup": {"role": "standby", "consecutive_errors": 0},
+            "quant_job_worker": {"role": "local", "consecutive_errors": 1},
+        }
+    )
+    assert 'a_share_background_task_replica_active{task="market_daily_bar_refresh"} 1' in text
+    assert 'a_share_background_task_replica_active{task="database_backup"} 0' in text
+    # 不走选主的任务（每个副本都跑）同样算活跃
+    assert 'a_share_background_task_replica_active{task="quant_job_worker"} 1' in text
+
+
+def test_background_task_replica_active_defaults_to_active() -> None:
+    """老快照没有 role 字段时，按 active 处理（不能凭空报成 standby）。"""
+    text = _render(background_tasks={"legacy": {"consecutive_errors": 0}})
+    assert 'a_share_background_task_replica_active{task="legacy"} 1' in text
+
+
+def test_background_task_critical_flag_is_exported() -> None:
+    """critical 决定「值不值得告警」，readiness_required 决定「要不要摘流量」。
+
+    两者是独立运维动作：备份/预热挂了不该摘流量，但该告警。缺了这个维度，
+    运维无法把关键任务和预热任务区分开。
+    """
+    text = _render(
+        background_tasks={
+            "quant_job_worker": {"critical": True, "readiness_required": True},
+            "wal_checkpoint": {"critical": True, "readiness_required": False},
+            "macro_analysis_prewarm": {"critical": False, "readiness_required": False},
+        }
+    )
+    assert 'a_share_background_task_critical{task="quant_job_worker"} 1' in text
+    assert 'a_share_background_task_critical{task="wal_checkpoint"} 1' in text
+    assert 'a_share_background_task_critical{task="macro_analysis_prewarm"} 0' in text
+
+
+def test_background_task_critical_defaults_to_zero() -> None:
+    """没标 critical 的任务一律按非关键处理，不能凭空升级告警级别。"""
+    text = _render(background_tasks={"legacy": {}})
+    assert 'a_share_background_task_critical{task="legacy"} 0' in text

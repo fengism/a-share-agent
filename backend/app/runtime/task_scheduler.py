@@ -38,6 +38,9 @@ class _PeriodicState:
         self.entry["status"] = "error"
         self.entry["last_error"] = type(error).__name__
         self.entry["consecutive_errors"] = self.consecutive_errors
+        # 又在报错了，旧的「上一次是正常结束」标记不再成立；否则连着失败的任务
+        # 会同时带着 cancelled_cleanly=True，让 readiness 与告警规则都读错。
+        self.entry["cancelled_cleanly"] = False
         if duration_ms is not None:
             self.entry["last_duration_ms"] = duration_ms
         return float(min(

@@ -287,6 +287,9 @@ def build_background_task_specs(
             factory=quant_job_worker,
             long_running=True,
             critical=True,
+            # 无条件启用，且不跑就没人消费量化回测队列（用户提交的任务会无限排队），
+            # 属于「不跑则服务不可用」的类型，接入就绪探测。
+            readiness_required=True,
             restart_on_exit=True,
             start_message="量化回测任务 Worker 已启动",
         ),
@@ -295,6 +298,7 @@ def build_background_task_specs(
             factory=workflow_job_worker,
             long_running=True,
             critical=True,
+            readiness_required=True,
             restart_on_exit=True,
             start_message="分析 Workflow 持久化任务 Worker 已启动",
         ),

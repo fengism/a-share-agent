@@ -6,8 +6,8 @@ import asyncio
 import inspect
 import logging
 import time
-from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager
+from collections.abc import AsyncGenerator, Awaitable, Callable
+from contextlib import AsyncExitStack, asynccontextmanager
 from typing import Any
 
 import httpx
@@ -16,7 +16,7 @@ from openai import APITimeoutError
 from app.configuration import get_settings
 from app.configuration.schema import Settings
 from app.core.metrics import metrics
-from app.domain.llm import looks_like_tools_unsupported
+from app.domain.llm import LLMConfigurationError, llm_error_status_code, looks_like_tools_unsupported
 from app.infrastructure.llm import tool_support
 from app.infrastructure.llm.adapters import (
     LLMRetryableError,
@@ -88,12 +88,40 @@ _RATE_LIMIT_RETRY_BASE_SECONDS = 2.0
 
 def _compute_retry_delay(normalized: Exception, attempt: int) -> float:
     """计算重试延迟：针对 429 限流使用更大的退避等待（2s, 4s...），其他临时错误沿用 0.25s。"""
-    is_rate_limit = getattr(normalized, "status_code", None) == 429 or "429" in str(normalized)
+    is_rate_limit = llm_error_status_code(normalized) == 429
     base = _RATE_LIMIT_RETRY_BASE_SECONDS if is_rate_limit else _STREAM_RETRY_BASE_SECONDS
     return float(base * (2 ** (attempt - 1)))
 
 
 _llm_limiter = _AdaptiveConcurrencyLimiter()
+
+
+def _fallback_settings(settings: Settings, model: str) -> Settings:
+    """按备用模型派生设置（只改 model，其余端点/凭证不变）。"""
+    derived: Settings = settings.model_copy(update={"llm_model": model})
+    return derived
+
+
+def _pooled_fallback_client(
+    settings: Settings, stack: AsyncExitStack,
+) -> Callable[[str], Awaitable[Any]]:
+    """租一个备用模型的运行时客户端，用完由 ``stack`` 归还连接池。
+
+    直接新建 ``AsyncOpenAI`` 会为每次降级重做 DNS/TCP/TLS 握手，而 429 恰恰是
+    成批出现、系统已经吃紧的时候。改用与主路径相同的池（池键含 model），降级
+    客户端因此能复用连接，也不会与主客户端抢同一个池条目。
+    """
+
+    async def build(model: str) -> Any:
+        # 延迟导入避免 completion -> runtime -> ... 的模块级循环依赖。
+        from app.infrastructure.llm.runtime import borrow_async_openai_chat_runtime
+
+        runtime = await stack.enter_async_context(
+            borrow_async_openai_chat_runtime(_fallback_settings(settings, model))
+        )
+        return runtime.client
+
+    return build
 
 
 def _prepare_request(
@@ -111,7 +139,44 @@ def _prepare_request(
         request["max_tokens"] = settings.chat_max_completion_tokens
     if request.get("stream") and capabilities.stream_include_usage:
         request.setdefault("stream_options", {"include_usage": True})
-    return prepare_completion_kwargs(request, capabilities)
+    prepared: dict[str, Any] = prepare_completion_kwargs(request, capabilities)
+    return prepared
+
+
+def _prepare_fallback_request(
+    client: Any,
+    request_kwargs: dict[str, Any],
+    *,
+    settings: Settings,
+    max_completion_tokens: int | None,
+    metric_stage: str,
+) -> dict[str, Any] | None:
+    """按备用模型重新整形请求；新模型装不下原请求时返回 ``None`` 放弃降级。
+
+    降级是尽力而为的兜底，**绝不能比不降级更差**。备用模型可能不支持工具调用、
+    严格 JSON Schema 等主模型支持的能力，此时 ``prepare_completion_kwargs`` 会抛
+    ``LLMConfigurationError``；如果放任它向上抛，用户看到的会是"当前模型网关未启用
+    工具调用能力"，而真正的失败原因（429 限流）被完全掩盖。
+    """
+    try:
+        return _prepare_request(
+            client, request_kwargs, settings=settings, max_completion_tokens=max_completion_tokens,
+        )
+    except LLMConfigurationError as config_error:
+        logger.warning(
+            "备用模型不支持原请求所需的参数，放弃降级并保留原错误: stage=%s reason=%s",
+            metric_stage,
+            str(config_error),
+        )
+        metrics.record_provider_attempt(
+            "llm_chat",
+            operation="fallback_incompatible",
+            success=False,
+            duration_ms=0.0,
+            error_type="LLMConfigurationError",
+            fallback=True,
+        )
+        return None
 
 
 def _degrade_tools_if_rejected(
@@ -153,13 +218,18 @@ def _degrade_tools_if_rejected(
 
 
 def _is_quota_or_rate_limit(error: BaseException) -> bool:
-    """判定是否为 429、Quota Exceeded 或限流类错误。"""
-    status_code = getattr(error, "status_code", None)
-    if status_code is None:
-        response = getattr(error, "response", None)
-        status_code = getattr(response, "status_code", None)
+    """判定是否为配额/限流类错误（额度耗尽或频率受限）。
+
+    只认「状态码」或「明确的配额/限流措辞」，不再拿裸 ``429`` 做子串匹配：
+    上游 400 消息里出现 ``max_tokens 14290 exceeds`` 这类数字很常见，误判会让
+    我们自己的参数错误被当成限流而切到备用模型。
+    """
+    status_code = llm_error_status_code(error)
     if status_code == 429:
         return True
+    if status_code is not None:
+        # 402（余额不足）同样是账号级额度问题，换模型可能救回来。
+        return status_code == 402
     message = str(error).lower()
     return any(
         kw in message
@@ -167,45 +237,106 @@ def _is_quota_or_rate_limit(error: BaseException) -> bool:
             "quota exceeded",
             "quota_exceeded",
             "insufficient_quota",
+            "insufficient quota",
             "rate limit",
             "rate_limit",
             "too many requests",
-            "429",
             "resource exhausted",
+            "resource_exhausted",
             "credits exhausted",
             "balance insufficient",
         )
     )
 
 
-def _apply_fallback_model_if_available(
+def _is_fallback_eligible(error: BaseException, *, normalized: Exception) -> bool:
+    """该错误是否值得切换到备用模型。
+
+    只有「账号级额度/限流」与「上游瞬时故障」两类：前者换模型可能立刻恢复，
+    后者说明主模型路由当前不可用。以下**不**降级，因为换模型只会把问题推迟
+    并掩盖真实原因：
+
+    * 400/401/403/404/422：请求本身或凭证/权限/模型名有误，备用模型同样会失败；
+    * 超时与取消：备用模型可能更慢，且上层已有总时限预算。
+    """
+    if _is_quota_or_rate_limit(error):
+        return True
+    status_code = llm_error_status_code(error)
+    if status_code is not None:
+        # 5xx 等「上游自己挂了」的错误可以尝试备用模型；其余 4xx 一律不降级。
+        return status_code >= 500
+    return isinstance(normalized, LLMRetryableError) and not isinstance(normalized, TimeoutError)
+
+
+async def _apply_fallback_model_if_available(
     error: BaseException,
     request_kwargs: dict[str, Any],
     *,
     settings: Settings,
     metric_stage: str,
     transient_attempt: int,
-) -> bool:
-    """当主模型发生 429 额度超限或重试耗尽时，若配置了备用模型则自动降级切换。
+    fallback_client_factory: Callable[[str], Awaitable[Any]] | None = None,
+) -> Any | None:
+    """主模型额度/限流耗尽或上游不可用时，返回 ``llm_fallback_model`` 的客户端。
 
-    返回 True 表示已切换到 fallback_model 并应重新发起请求。
-    """
+    返回新客户端时，调用方必须换掉后续请求用的 client 并**重新整形请求参数**；
+    不需要降级（未配置/不可重试/已在备用模型上）时返回 None。
+
+    为什么必须换客户端而不是只改 ``model`` 字段：SDK 封装层在
+    ``prepare_completion_kwargs(..., expected_model=self._model)`` 处校验
+    「请求模型 == 客户端模型」，只改 kwargs 会让降级请求必然抛
+    ``LLMConfigurationError``；同时能力位（temperature/tools/令牌上限）也是按
+    客户端模型派生的，两套策略不一致会再次触发同一类错误。
+"""
     fallback_model = (getattr(settings, "llm_fallback_model", "") or "").strip()
-    if not fallback_model:
-        return False
+    if not fallback_model or fallback_client_factory is None:
+        return None
     current_model = str(request_kwargs.get("model", "") or "")
-    if current_model == fallback_model:
-        return False
 
-    is_quota = _is_quota_or_rate_limit(error)
-    attempts_exhausted = transient_attempt >= settings.llm_max_attempts
-    if not (is_quota or attempts_exhausted):
-        return False
+    normalized = normalize_retryable_llm_error(error if isinstance(error, Exception) else Exception(str(error)))
+    if not _is_fallback_eligible(error, normalized=normalized):
+        return None
+    # 额度/限流属于账号级问题，立刻切换；其余瞬时故障等重试预算耗尽再降级。
+    if not _is_quota_or_rate_limit(error) and transient_attempt < settings.llm_max_attempts:
+        return None
+
+    if current_model == fallback_model:
+        # 典型误配：简单任务已切到 llm_sub_model，而 llm_fallback_model 正好填了同一个模型。
+        # 不改配置校验（存量部署可能已经这么写），只在真正需要兜底时提示。
+        logger.warning(
+            "备用模型与当前模型相同(%s)，本次无法降级；请把 LLM_FALLBACK_MODEL 设为另一个模型: stage=%s",
+            fallback_model,
+            metric_stage,
+        )
+        return None
+
+    try:
+        fallback_client = await fallback_client_factory(fallback_model)
+    except Exception as build_error:
+        # 备用模型配置非法（例如路由未启用工具能力）不能连累主链路：放弃降级，
+        # 让原始错误照常向上抛，降级只是尽力而为的兜底。
+        logger.warning(
+            "备用模型 %s 无法构建客户端，放弃降级: stage=%s error_type=%s",
+            fallback_model,
+            metric_stage,
+            type(build_error).__name__,
+        )
+        metrics.record_provider_attempt(
+            "llm_chat",
+            operation="fallback_unavailable",
+            success=False,
+            duration_ms=0.0,
+            error_type=type(build_error).__name__,
+            # 与 fallback_to_model / fallback_incompatible 保持一致：三者都属于
+            # “想降级但没降成”，必须计入同一个 fallback 总量，否则监控会漏数。
+            fallback=True,
+        )
+        return None
 
     logger.warning(
         "上游模型 %s 触发降级 (%s)，自动切换到备用模型 %s: stage=%s",
         current_model,
-        "429/额度耗尽" if is_quota else f"重试耗尽({transient_attempt}次)",
+        "429/额度耗尽" if _is_quota_or_rate_limit(error) else f"上游故障({type(error).__name__})",
         fallback_model,
         metric_stage,
     )
@@ -214,14 +345,10 @@ def _apply_fallback_model_if_available(
         operation="fallback_to_model",
         success=True,
         duration_ms=0.0,
+        fallback=True,
     )
     request_kwargs["model"] = fallback_model
-    capabilities = capabilities_for_settings(settings, model=fallback_model)
-    capabilities = apply_deployment_limits(capabilities, settings)
-    prepared = prepare_completion_kwargs(request_kwargs, capabilities)
-    request_kwargs.clear()
-    request_kwargs.update(prepared)
-    return True
+    return fallback_client
 
 
 async def create_chat_completion(
@@ -243,43 +370,62 @@ async def create_chat_completion(
     if request_timeout is not None:
         request_kwargs["timeout"] = float(request_timeout)
     started_at = time.perf_counter()
-    async with generation_scope(settings, timeout_seconds=scope_timeout), _llm_limiter.slot():
-        queue_wait_ms = (time.perf_counter() - started_at) * 1000
+    queue_wait_ms = 0.0
+    # 降级租到的运行时统一由 exit stack 归还连接池：成功/异常/取消都不会泄漏。
+    async with AsyncExitStack() as fallback_stack:
         try:
-            # 工具降级重试与瞬时故障重试分开计数：前者每个调用最多一次，
-            # 不能吃掉 llm_max_attempts 里给 429/5xx 准备的预算。
-            transient_attempt = 0
-            tool_retry_used = False
-            fallback_used = False
-            while True:
-                transient_attempt += 1
-                try:
-                    response = await client.chat.completions.create(**request_kwargs)
-                    validate_chat_completion_response(response)
-                    break
-                except Exception as error:
-                    if not tool_retry_used and _degrade_tools_if_rejected(
-                        error, request_kwargs, settings=settings, metric_stage=metric_stage,
-                    ):
-                        tool_retry_used = True
-                        continue
-                    if not fallback_used and _apply_fallback_model_if_available(
-                        error, request_kwargs, settings=settings, metric_stage=metric_stage,
-                        transient_attempt=transient_attempt,
-                    ):
-                        fallback_used = True
-                        transient_attempt = 0
-                        tool_retry_used = False
-                        continue
-                    normalized = normalize_retryable_llm_error(error)
-                    if (
-                        not isinstance(normalized, LLMRetryableError)
-                        or transient_attempt >= settings.llm_max_attempts
-                    ):
-                        if normalized is error:
-                            raise
-                        raise normalized from error
-                    await asyncio.sleep(_compute_retry_delay(normalized, transient_attempt))
+            async with generation_scope(settings, timeout_seconds=scope_timeout), _llm_limiter.slot():
+                queue_wait_ms = (time.perf_counter() - started_at) * 1000
+                # 工具降级重试与瞬时故障重试分开计数：前者每个调用最多一次，
+                # 不能吃掉 llm_max_attempts 里给 429/5xx 准备的预算。
+                transient_attempt = 0
+                tool_retry_used = False
+                fallback_attempted = False
+                while True:
+                    transient_attempt += 1
+                    try:
+                        response = await client.chat.completions.create(**request_kwargs)
+                        validate_chat_completion_response(response)
+                        break
+                    except Exception as error:
+                        if not tool_retry_used and _degrade_tools_if_rejected(
+                            error, request_kwargs, settings=settings, metric_stage=metric_stage,
+                        ):
+                            tool_retry_used = True
+                            continue
+                        if not fallback_attempted:
+                            new_client = await _apply_fallback_model_if_available(
+                                error, request_kwargs, settings=settings, metric_stage=metric_stage,
+                                transient_attempt=transient_attempt,
+                                fallback_client_factory=_pooled_fallback_client(settings, fallback_stack),
+                            )
+                            if new_client is not None:
+                                # 客户端已租到，降级机会就此用完：即使整形失败也不再重试降级。
+                                fallback_attempted = True
+                                # 客户端换了，能力位与请求整形必须按新模型重算。
+                                # 整形可能因备用模型缺能力而失败，此时放弃降级、保留原错误。
+                                reshaped = _prepare_fallback_request(
+                                    new_client, request_kwargs, settings=settings,
+                                    max_completion_tokens=max_completion_tokens,
+                                    metric_stage=metric_stage,
+                                )
+                                if reshaped is not None:
+                                    client = new_client
+                                    request_kwargs = reshaped
+                                    if request_timeout is not None:
+                                        request_kwargs["timeout"] = float(request_timeout)
+                                    transient_attempt = 0
+                                    tool_retry_used = False
+                                    continue
+                        normalized = normalize_retryable_llm_error(error)
+                        if (
+                            not isinstance(normalized, LLMRetryableError)
+                            or transient_attempt >= settings.llm_max_attempts
+                        ):
+                            if normalized is error:
+                                raise
+                            raise normalized from error
+                        await asyncio.sleep(_compute_retry_delay(normalized, transient_attempt))
         except asyncio.CancelledError:
             duration_ms = (time.perf_counter() - started_at) * 1000
             metrics.record_llm_prompt(
@@ -368,124 +514,141 @@ async def stream_chat_completion(
     ttft_ms = None
     yielded_chunk = False
     deadline = asyncio.get_running_loop().time() + effective_timeout
-    async with _llm_limiter.slot(deadline=deadline):
-        queue_wait_ms = (time.perf_counter() - started_at) * 1000
-        # 与 create_chat_completion 一致：工具降级重试独立于瞬时故障重试预算。
-        transient_attempt = 0
-        tool_retry_used = False
-        fallback_used = False
-        while True:
-            transient_attempt += 1
-            read_timeout = float(request_timeout) if request_timeout is not None else float(settings.llm_timeout_seconds)
-            try:
-                async with _stream_read_guard(deadline, read_timeout):
-                    stream = await client.chat.completions.create(**request_kwargs)
+    # 降级租到的运行时统一由 exit stack 归还连接池。
+    async with AsyncExitStack() as fallback_stack:
+        async with _llm_limiter.slot(deadline=deadline):
+            queue_wait_ms = (time.perf_counter() - started_at) * 1000
+            # 与 create_chat_completion 一致：工具降级重试独立于瞬时故障重试预算。
+            transient_attempt = 0
+            tool_retry_used = False
+            fallback_attempted = False
+            while True:
+                transient_attempt += 1
+                read_timeout = float(request_timeout) if request_timeout is not None else float(settings.llm_timeout_seconds)
                 try:
-                    iterator = aiter(stream)
-                    while True:
-                        try:
-                            async with _stream_read_guard(deadline, read_timeout):
-                                chunk = await anext(iterator)
-                        except StopAsyncIteration:
-                            break
-                        yielded_chunk = True
-                        if ttft_ms is None:
-                            ttft_ms = (time.perf_counter() - started_at) * 1000
-                        usage = extract_usage(chunk) or usage
-                        yield chunk
-                finally:
-                    await _close_provider_stream(stream)
-                break
-            except asyncio.CancelledError:
-                duration_ms = (time.perf_counter() - started_at) * 1000
-                metrics.record_llm_prompt(
-                    metric_stage,
-                    str(request_kwargs.get("model", "")),
-                    success=False,
-                    duration_ms=duration_ms,
-                    queue_wait_ms=queue_wait_ms,
-                    ttft_ms=ttft_ms,
-                    cancelled=True,
-                    error_type="CancelledError",
-                )
-                raise
-            except Exception as exc:
-                if (
-                    not tool_retry_used
-                    and not yielded_chunk
-                    and _degrade_tools_if_rejected(
-                        exc, request_kwargs, settings=settings, metric_stage=metric_stage,
+                    async with _stream_read_guard(deadline, read_timeout):
+                        stream = await client.chat.completions.create(**request_kwargs)
+                    try:
+                        iterator = aiter(stream)
+                        while True:
+                            try:
+                                async with _stream_read_guard(deadline, read_timeout):
+                                    chunk = await anext(iterator)
+                            except StopAsyncIteration:
+                                break
+                            yielded_chunk = True
+                            if ttft_ms is None:
+                                ttft_ms = (time.perf_counter() - started_at) * 1000
+                            usage = extract_usage(chunk) or usage
+                            yield chunk
+                    finally:
+                        await _close_provider_stream(stream)
+                    break
+                except asyncio.CancelledError:
+                    duration_ms = (time.perf_counter() - started_at) * 1000
+                    metrics.record_llm_prompt(
+                        metric_stage,
+                        str(request_kwargs.get("model", "")),
+                        success=False,
+                        duration_ms=duration_ms,
+                        queue_wait_ms=queue_wait_ms,
+                        ttft_ms=ttft_ms,
+                        cancelled=True,
+                        error_type="CancelledError",
                     )
-                ):
-                    # 首块之前才允许重放：已经吐过内容再重试会重复计费/重复输出。
-                    tool_retry_used = True
-                    continue
-                if (
-                    not fallback_used
-                    and not yielded_chunk
-                    and _apply_fallback_model_if_available(
-                        exc, request_kwargs, settings=settings, metric_stage=metric_stage,
-                        transient_attempt=transient_attempt,
+                    raise
+                except Exception as exc:
+                    if (
+                        not tool_retry_used
+                        and not yielded_chunk
+                        and _degrade_tools_if_rejected(
+                            exc, request_kwargs, settings=settings, metric_stage=metric_stage,
+                        )
+                    ):
+                        # 首块之前才允许重放：已经吐过内容再重试会重复计费/重复输出。
+                        tool_retry_used = True
+                        continue
+                    if (
+                        not fallback_attempted
+                        and not yielded_chunk
+                    ):
+                        new_client = await _apply_fallback_model_if_available(
+                            exc, request_kwargs, settings=settings, metric_stage=metric_stage,
+                            transient_attempt=transient_attempt,
+                            fallback_client_factory=_pooled_fallback_client(settings, fallback_stack),
+                        )
+                        if new_client is not None:
+                            # 客户端已租到，降级机会就此用完：即使整形失败也不再重试降级。
+                            fallback_attempted = True
+                            # 客户端换了，能力位与请求整形必须按新模型重算。
+                            # 整形可能因备用模型缺能力而失败，此时放弃降级、保留原错误。
+                            reshaped = _prepare_fallback_request(
+                                new_client, request_kwargs, settings=settings,
+                                max_completion_tokens=max_completion_tokens,
+                                metric_stage=metric_stage,
+                            )
+                            if reshaped is not None:
+                                client = new_client
+                                request_kwargs = reshaped
+                                if request_timeout is not None:
+                                    request_kwargs["timeout"] = float(request_timeout)
+                                transient_attempt = 0
+                                tool_retry_used = False
+                                continue
+                    normalized = (
+                        request_timeout_error(
+                            exc, settings=settings, elapsed_seconds=time.perf_counter() - started_at,
+                        )
+                        if isinstance(exc, (TimeoutError, APITimeoutError, httpx.TimeoutException))
+                        and not isinstance(exc, LLMGenerationTimeoutError)
+                        else normalize_retryable_llm_error(exc)
                     )
-                ):
-                    fallback_used = True
-                    transient_attempt = 0
-                    tool_retry_used = False
-                    continue
-                normalized = (
-                    request_timeout_error(
-                        exc, settings=settings, elapsed_seconds=time.perf_counter() - started_at,
+                    can_retry = (
+                        isinstance(normalized, LLMRetryableError)
+                        and not yielded_chunk
+                        and transient_attempt < settings.llm_max_attempts
                     )
-                    if isinstance(exc, (TimeoutError, APITimeoutError, httpx.TimeoutException))
-                    and not isinstance(exc, LLMGenerationTimeoutError)
-                    else normalize_retryable_llm_error(exc)
-                )
-                can_retry = (
-                    isinstance(normalized, LLMRetryableError)
-                    and not yielded_chunk
-                    and transient_attempt < settings.llm_max_attempts
-                )
-                if can_retry:
-                    delay = _compute_retry_delay(normalized, transient_attempt)
+                    if can_retry:
+                        delay = _compute_retry_delay(normalized, transient_attempt)
+                        metrics.record_provider_attempt(
+                            "llm_chat",
+                            operation="stream",
+                            success=False,
+                            duration_ms=(time.perf_counter() - started_at) * 1000,
+                            error_type=type(normalized).__name__,
+                        )
+                        logger.info(
+                            "LLM流式上游临时失败，准备重试: model=%s attempt=%s/%s delay=%.2fs error_type=%s",
+                            request_kwargs.get("model", ""),
+                            transient_attempt,
+                            settings.llm_max_attempts,
+                            delay,
+                            type(normalized).__name__,
+                        )
+                        async with _request_deadline(deadline):
+                            await asyncio.sleep(delay)
+                        continue
+
+                    duration_ms = (time.perf_counter() - started_at) * 1000
                     metrics.record_provider_attempt(
                         "llm_chat",
                         operation="stream",
                         success=False,
-                        duration_ms=(time.perf_counter() - started_at) * 1000,
+                        duration_ms=duration_ms,
                         error_type=type(normalized).__name__,
                     )
-                    logger.info(
-                        "LLM流式上游临时失败，准备重试: model=%s attempt=%s/%s delay=%.2fs error_type=%s",
-                        request_kwargs.get("model", ""),
-                        transient_attempt,
-                        settings.llm_max_attempts,
-                        delay,
-                        type(normalized).__name__,
+                    metrics.record_llm_prompt(
+                        metric_stage,
+                        str(request_kwargs.get("model", "")),
+                        success=False,
+                        duration_ms=duration_ms,
+                        queue_wait_ms=queue_wait_ms,
+                        ttft_ms=ttft_ms,
+                        error_type=type(normalized).__name__,
                     )
-                    async with _request_deadline(deadline):
-                        await asyncio.sleep(delay)
-                    continue
-
-                duration_ms = (time.perf_counter() - started_at) * 1000
-                metrics.record_provider_attempt(
-                    "llm_chat",
-                    operation="stream",
-                    success=False,
-                    duration_ms=duration_ms,
-                    error_type=type(normalized).__name__,
-                )
-                metrics.record_llm_prompt(
-                    metric_stage,
-                    str(request_kwargs.get("model", "")),
-                    success=False,
-                    duration_ms=duration_ms,
-                    queue_wait_ms=queue_wait_ms,
-                    ttft_ms=ttft_ms,
-                    error_type=type(normalized).__name__,
-                )
-                if normalized is exc:
-                    raise
-                raise normalized from exc
+                    if normalized is exc:
+                        raise
+                    raise normalized from exc
 
     duration_ms = (time.perf_counter() - started_at) * 1000
     metrics.record_provider_attempt(

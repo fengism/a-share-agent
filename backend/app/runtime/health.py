@@ -98,7 +98,16 @@ async def operational_snapshots() -> OperationalSnapshot:
 
 def _critical_task_is_healthy(task: dict, *, max_consecutive_failures: int) -> bool:
     if not task:
-        return False
+        # 登记表里没有这条：任务在当前副本从未启动（配置禁用，或本进程不是主节点）。
+        # 这属于「不适用」而非「故障」，不能据此摘流量。
+        return True
+    if task.get("disabled_by_config", False):
+        # 按配置停用是预期状态。与下面的 stopped 区分开：两者 status 相同，
+        # 但对就绪的含义相反。
+        return True
+    if task.get("cancelled_cleanly", False):
+        # 正常关闭/取消：不是故障（应用正在退出，不该报 503）。
+        return True
     if task.get("unexpected_exit", False):
         return False
     if task.get("status") == "stopped":

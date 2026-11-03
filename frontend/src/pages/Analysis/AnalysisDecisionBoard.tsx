@@ -1,7 +1,7 @@
-import { useState } from "react";
 import { AlertOutlined, CheckOutlined, CopyOutlined, MessageOutlined, RiseOutlined } from "@ant-design/icons";
 import { Button, message } from "antd";
 import { useNavigate } from "react-router-dom";
+import { useCopyFeedback } from "../../hooks/useCopyFeedback";
 import { renderWithCitations } from "../../features/investment-research/citationRendering";
 import type { AnalysisResult } from "../../types/stock";
 import { getAnalysisFollowUps, getConditionalAction } from "./analysisDecision";
@@ -29,7 +29,7 @@ export default function AnalysisDecisionBoard({
   embedded?: boolean;
 }) {
   const navigate = useNavigate();
-  const [copied, setCopied] = useState(false);
+  const { copied, markCopied } = useCopyFeedback(2000);
   const legacyAction = getConditionalAction(result.signal);
   const researchActions = result.research_framework?.actions;
   const structuredAction = researchActions ? NEW_INVESTOR_ACTIONS[researchActions.new_investor_action] : null;
@@ -56,9 +56,8 @@ export default function AnalysisDecisionBoard({
         document.execCommand("copy");
         document.body.removeChild(textarea);
       }
-      setCopied(true);
+      markCopied();
       message.success("已复制投资备忘至剪贴板");
-      setTimeout(() => setCopied(false), 2000);
     } catch {
       message.error("复制失败，请手动选取复制");
     }

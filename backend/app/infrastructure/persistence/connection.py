@@ -33,11 +33,65 @@ _storage_migration_done = False
 # + commit）不安全，事务会相互交错。WAL 模式原生支持多连接并发读写，因此改为
 # 线程本地连接——每个线程的事务由 SQLite 自身隔离，无需全局写锁。
 _local = threading.local()
-_all_connections: list[sqlite3.Connection] = []
+# 用 dict 而非 list 保存全局注册表：线程退出时按 id 精确摘除，避免 remove() 的
+# O(n) 扫描，也避免同一连接被重复登记。
+_all_connections: dict[int, sqlite3.Connection] = {}
 _connection_names: dict[int, str] = {}
 _connection_locks: dict[int, threading.RLock] = {}
 _registry_lock = threading.Lock()
 _connection_generation = 0
+
+
+class _ThreadConnectionBundle:
+    """单线程持有的 SQLite 连接集合，线程退出时自动关闭并注销。
+
+    背景：``ThreadPoolExecutor`` 用 ``with`` 包起来时（本项目有 10+ 处
+    provider 这样调用），worker 线程用完即销毁。线程本地连接原本只登记在
+    ``_all_connections`` 里，线程死了也没人再能关闭它们——每调用一次就泄漏
+    一个连接，而每个连接带 8 MB 页缓存（``PRAGMA cache_size=-8000``）。
+
+    修复手段：``sqlite3.Connection`` 不支持 weakref（无法用 ``WeakSet``），也
+    没有线程退出回调；但 CPython 在线程结束时会清空 ``threading.local`` 中该
+    线程的数据，从而释放只被 local 引用的本对象，触发 ``__del__``。
+
+    注意所有操作必须幂等：``close_connection()`` 可能已经先关过这些连接。
+    """
+
+    __slots__ = ("connections",)
+
+    def __init__(self) -> None:
+        self.connections: dict[str, sqlite3.Connection] = {}
+
+    def __del__(self) -> None:
+        connections = list(self.connections.values())
+        if not connections:
+            return
+        self.connections.clear()
+        try:
+            with _registry_lock:
+                for conn in connections:
+                    _all_connections.pop(id(conn), None)
+                    _connection_names.pop(id(conn), None)
+                    _connection_locks.pop(id(conn), None)
+        except (RuntimeError, TypeError) as error:
+            # 仅在解释器关闭阶段可能出现（锁/模块已不可用）；此时进程即将退出，
+            # 注册表已无意义，不必惊慌，但不能静默。
+            logger.debug("线程连接退出时摘除注册表失败: %s", error)
+        for conn in connections:
+            try:
+                if conn.in_transaction:
+                    conn.rollback()
+            except sqlite3.Error:
+                pass
+            try:
+                conn.close()
+            except sqlite3.Error:
+                pass
+        logger.debug(
+            "SQLite 线程连接随所属线程退出已回收: count=%s thread=%s",
+            len(connections),
+            threading.get_ident(),
+        )
 
 
 def _legacy_and_target_pairs(data_dir: Path, db_dir: Path) -> list[tuple[Path, Path]]:
@@ -121,11 +175,15 @@ def get_connection(database: DatabaseName = "market") -> sqlite3.Connection:
     Return:
         SQLite 连接对象（每个线程独立，WAL 模式下可安全并发）。
     """
-    connections = getattr(_local, "connections", None)
-    if connections is None or getattr(_local, "generation", -1) != _connection_generation:
-        connections = {}
-        _local.connections = connections
+    bundle = getattr(_local, "bundle", None)
+    if bundle is None or getattr(_local, "generation", -1) != _connection_generation:
+        bundle = _ThreadConnectionBundle()
+        _local.bundle = bundle
+        # 保留 ``_local.connections`` 这个名字，现有读取方无需改动；两者共用同一
+        # 个 dict 实例，bundle 被回收时内容随之清空。
+        _local.connections = bundle.connections
         _local.generation = _connection_generation
+    connections = bundle.connections
     conn = connections.get(database)
     if conn is None:
         path = database_path(database)
@@ -140,7 +198,7 @@ def get_connection(database: DatabaseName = "market") -> sqlite3.Connection:
         conn.row_factory = sqlite3.Row
         connections[database] = conn
         with _registry_lock:
-            _all_connections.append(conn)
+            _all_connections[id(conn)] = conn
             _connection_names[id(conn)] = database
             _connection_locks[id(conn)] = threading.RLock()
         logger.debug(
@@ -305,7 +363,7 @@ def close_connection():
     """关闭所有线程的 SQLite 连接并重置。"""
     global _connection_generation
     with _registry_lock:
-        conns = list(_all_connections)
+        conns = list(_all_connections.values())
         _all_connections.clear()
         for conn in conns:
             _connection_names.pop(id(conn), None)
@@ -381,6 +439,11 @@ def close_connection():
                 conn.close()
             except Exception as exc:
                 logger.warning('关闭 SQLite 连接失败: %s', exc)
+    # 清空本线程 bundle 的内容（不替换 bundle 对象本身，避免旧 bundle 的
+    # __del__ 在代际切换后又去摘除已清理的连接）。
+    bundle = getattr(_local, "bundle", None)
+    if bundle is not None:
+        bundle.connections.clear()
     _local.connections = {}
     _local.generation = _connection_generation
     _local.savepoint_counter = 0

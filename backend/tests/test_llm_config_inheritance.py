@@ -70,6 +70,24 @@ def test_switching_provider_without_key_clears_inherited_key() -> None:
     assert merged.llm_api_key == ""
 
 
+def test_switching_provider_clears_inherited_fallback_model() -> None:
+    """换厂商时必须清掉备用模型：它与主模型共用 base_url/api_key，
+    旧厂商模型名在新厂商只会 404/400，留着就是一条永远失败的兜底路径。"""
+    base = _global_base(llm_fallback_model="gpt-4o-mini")
+    merged = overlay_private(base, {"llm_provider": "deepseek"})
+
+    assert merged.llm_provider == "deepseek"
+    assert merged.llm_fallback_model == ""
+
+
+def test_explicit_fallback_model_survives_provider_switch() -> None:
+    """用户在本次提交里明确给了备用模型时不要覆盖用户的意图。"""
+    base = _global_base(llm_fallback_model="gpt-4o-mini")
+    merged = overlay_private(base, {"llm_provider": "deepseek", "llm_fallback_model": "deepseek-chat"})
+
+    assert merged.llm_fallback_model == "deepseek-chat"
+
+
 def test_custom_endpoint_with_own_key_is_allowed() -> None:
     base = _global_base()
     merged = overlay_private(

@@ -163,6 +163,10 @@ export function useSettingsForm(
         if (!form.llm_sub_model || form.llm_sub_model === oldPair?.sub) {
           patch.llm_sub_model = pair?.sub || "";
         }
+        // 备用模型与主模型共用 base_url/api_key，旧厂商的模型名在新厂商一定
+        // 404/400。留着它等于给自己埋一条"永远失败的兜底路径"，所以换厂商即清空，
+        // 由用户在新厂商下重新指定（留空 = 不启用降级）。
+        patch.llm_fallback_model = "";
       }
 
       updateForm(patch);

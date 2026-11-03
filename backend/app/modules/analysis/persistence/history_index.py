@@ -5,6 +5,7 @@ import logging
 from collections.abc import Callable, Iterable, Iterator
 from pathlib import Path
 
+from app.core.sql import contains_pattern
 from app.infrastructure.persistence.connection import get_connection
 from app.infrastructure.persistence.history_index import HistoryIndexCoordinator
 
@@ -162,8 +163,10 @@ def query_history(
         params.append(code)
     normalized_query = (query or "").strip().casefold()
     if normalized_query:
-        filters.append("(LOWER(h.stock_code) LIKE ? OR LOWER(h.stock_name) LIKE ?)")
-        pattern = f"%{normalized_query}%"
+        filters.append(
+            "(LOWER(h.stock_code) LIKE ? ESCAPE '\\' OR LOWER(h.stock_name) LIKE ? ESCAPE '\\')"
+        )
+        pattern = contains_pattern(normalized_query)
         params.extend((pattern, pattern))
     filters.append(
         """(

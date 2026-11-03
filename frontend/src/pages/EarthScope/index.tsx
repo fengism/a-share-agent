@@ -15,6 +15,7 @@ import {
   SafetyCertificateOutlined,
   ThunderboltOutlined,
 } from "@ant-design/icons";
+import { useCopyFeedback } from "../../hooks/useCopyFeedback";
 import { Link } from "react-router-dom";
 import "./earthscope.css";
 
@@ -194,7 +195,7 @@ export default function EarthScopeLanding() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [annualBilling, setAnnualBilling] = useState(true);
   const [activeApiExample, setActiveApiExample] = useState<ApiExampleKey>("scenes");
-  const [copied, setCopied] = useState(false);
+  const { copied, markCopied, resetCopied } = useCopyFeedback(1600);
   const [openFaq, setOpenFaq] = useState(0);
   const activeExample = apiExamples[activeApiExample];
 
@@ -205,8 +206,7 @@ export default function EarthScopeLanding() {
 
   const copyExample = async () => {
     await navigator.clipboard?.writeText(activeExample.code);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1600);
+    markCopied();
   };
 
   return (
@@ -315,7 +315,7 @@ export default function EarthScopeLanding() {
                 <button
                   className={activeApiExample === key ? "is-active" : ""}
                   key={key}
-                  onClick={() => { setActiveApiExample(key); setCopied(false); }}
+                  onClick={() => { setActiveApiExample(key); resetCopied(); }}
                   type="button"
                 >
                   <span>{example.method}</span>{example.label}

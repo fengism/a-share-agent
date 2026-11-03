@@ -16,6 +16,35 @@ export interface ApiRequestOptions {
   timeoutMs?: number;
 }
 
+/**
+ * 把调用方的 signal 与「本地超时」合并成一个可中止的 controller。
+ *
+ * 下载类请求（PDF 渲染、CSV 导出）过去完全没接超时：后端卡住时
+ * `await fetch` 会挂到页面关闭，用户既等不到结果也无法取消。
+ */
+function createAbortScope(signal: AbortSignal | undefined, timeoutMs: number) {
+  const controller = new AbortController();
+  let timedOut = false;
+
+  if (signal?.aborted) {
+    controller.abort(signal.reason);
+  } else {
+    signal?.addEventListener("abort", () => controller.abort(signal.reason), { once: true });
+  }
+
+  const timer = window.setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, timeoutMs);
+
+  return {
+    signal: controller.signal,
+    /** 抛错时判断是不是本地超时导致的 abort。 */
+    isTimeout: () => timedOut,
+    dispose: () => window.clearTimeout(timer),
+  };
+}
+
 export type ApiQueryParams = Record<string, string | number | boolean | null | undefined>;
 
 export class ApiTimeoutError extends Error {
@@ -77,26 +106,14 @@ async function apiRequest<T>(
     if (csrfToken) headers["X-CSRF-Token"] = csrfToken;
   }
 
-  const controller = new AbortController();
-  const timeoutMs = options.timeoutMs ?? API_TIMEOUTS.DEFAULT;
-  let timedOut = false;
-  const abortFromCaller = () => controller.abort(options.signal?.reason);
-  if (options.signal?.aborted) {
-    abortFromCaller();
-  } else {
-    options.signal?.addEventListener("abort", abortFromCaller, { once: true });
-  }
-  const timer = window.setTimeout(() => {
-    timedOut = true;
-    controller.abort();
-  }, timeoutMs);
+  const scope = createAbortScope(options.signal, options.timeoutMs ?? API_TIMEOUTS.DEFAULT);
 
   try {
     const response = await fetch(fullUrl, {
       method,
       headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,
-      signal: controller.signal,
+      signal: scope.signal,
       credentials: "include",
     });
     const elapsed = Math.round(performance.now() - startTime);
@@ -114,11 +131,10 @@ async function apiRequest<T>(
     if (isDev) console.log(`[API] ${method} ${path} 成功 (${elapsed}ms)`);
     return response.json() as Promise<T>;
   } catch (error) {
-    if (timedOut) throw new ApiTimeoutError(timeoutMs);
+    if (scope.isTimeout()) throw new ApiTimeoutError(options.timeoutMs ?? API_TIMEOUTS.DEFAULT);
     throw error;
   } finally {
-    window.clearTimeout(timer);
-    options.signal?.removeEventListener("abort", abortFromCaller);
+    scope.dispose();
   }
 }
 
@@ -136,6 +152,30 @@ export function apiPut<T>(path: string, body?: unknown, options?: ApiRequestOpti
 
 export function apiDelete<T>(path: string, options?: ApiRequestOptions): Promise<T> {
   return apiRequest<T>("DELETE", path, undefined, undefined, options);
+}
+
+/** 从 Content-Disposition 解析文件名，支持 RFC 5987 的 ``filename*=UTF-8''``。 */
+function resolveFilename(disposition: string | null, fallback: string): string {
+  if (!disposition) return fallback;
+  const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utf8Match?.[1]) return decodeURIComponent(utf8Match[1]);
+  const match = disposition.match(/filename="?([^";]+)"?/i);
+  return match?.[1] ?? fallback;
+}
+
+function saveBlob(blob: Blob, disposition: string | null, fallbackFilename: string): void {
+  const blobUrl = window.URL.createObjectURL(blob);
+  try {
+    const anchor = document.createElement("a");
+    anchor.href = blobUrl;
+    anchor.download = resolveFilename(disposition, fallbackFilename);
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+  } finally {
+    // 即使 click 抛错也要归还 URL，否则 blob 会一直占着内存。
+    window.URL.revokeObjectURL(blobUrl);
+  }
 }
 
 export async function apiDownload(
@@ -157,41 +197,35 @@ export async function apiDownload(
   const token = getToken();
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
-  const response = await fetch(fullUrl, {
-    method: "GET",
-    headers,
-    credentials: "include",
-    signal: options.signal,
-  });
+  const timeoutMs = options.timeoutMs ?? API_TIMEOUTS.LONG_RUNNING;
+  const scope = createAbortScope(options.signal, timeoutMs);
+  let response: Response;
+  let blob: Blob;
+  try {
+    response = await fetch(fullUrl, {
+      method: "GET",
+      headers,
+      credentials: "include",
+      signal: scope.signal,
+    });
 
-  if (!response.ok) {
-    if (response.status === 401) notifyUnauthorized();
-    const errorBody = await response.json().catch(() => ({}));
-    const parsedError = parseApiError(errorBody, `下载失败: ${response.status}`);
-    throw new ApiError(response.status, path, parsedError.message, parsedError);
-  }
-
-  const blob = await response.blob();
-  let filename = fallbackFilename;
-  const disposition = response.headers.get("Content-Disposition");
-  if (disposition) {
-    const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i);
-    if (utf8Match?.[1]) {
-      filename = decodeURIComponent(utf8Match[1]);
-    } else {
-      const match = disposition.match(/filename="?([^";]+)"?/i);
-      if (match?.[1]) filename = match[1];
+    if (!response.ok) {
+      if (response.status === 401) notifyUnauthorized();
+      const errorBody = await response.json().catch(() => ({}));
+      const parsedError = parseApiError(errorBody, `下载失败: ${response.status}`);
+      throw new ApiError(response.status, path, parsedError.message, parsedError);
     }
+
+    // blob() 也受同一个 signal 约束，所以卡住的下载能一起超时。
+    blob = await response.blob();
+  } catch (error) {
+    if (scope.isTimeout()) throw new ApiTimeoutError(timeoutMs);
+    throw error;
+  } finally {
+    scope.dispose();
   }
 
-  const blobUrl = window.URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = blobUrl;
-  anchor.download = filename;
-  document.body.appendChild(anchor);
-  anchor.click();
-  document.body.removeChild(anchor);
-  window.URL.revokeObjectURL(blobUrl);
+  saveBlob(blob, response.headers.get("Content-Disposition"), fallbackFilename);
 }
 
 export async function apiDownloadPost(
@@ -210,40 +244,33 @@ export async function apiDownloadPost(
   const csrfToken = getCsrfToken();
   if (csrfToken) headers["X-CSRF-Token"] = csrfToken;
 
-  const response = await fetch(fullUrl, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(body),
-    credentials: "include",
-    signal: options.signal,
-  });
+  const timeoutMs = options.timeoutMs ?? API_TIMEOUTS.LONG_RUNNING;
+  const scope = createAbortScope(options.signal, timeoutMs);
+  let response: Response;
+  let blob: Blob;
+  try {
+    response = await fetch(fullUrl, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+      credentials: "include",
+      signal: scope.signal,
+    });
 
-  if (!response.ok) {
-    if (response.status === 401) notifyUnauthorized();
-    const errorBody = await response.json().catch(() => ({}));
-    const parsedError = parseApiError(errorBody, `下载失败: ${response.status}`);
-    throw new ApiError(response.status, path, parsedError.message, parsedError);
-  }
-
-  const blob = await response.blob();
-  let filename = fallbackFilename;
-  const disposition = response.headers.get("Content-Disposition");
-  if (disposition) {
-    const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i);
-    if (utf8Match?.[1]) {
-      filename = decodeURIComponent(utf8Match[1]);
-    } else {
-      const match = disposition.match(/filename="?([^";]+)"?/i);
-      if (match?.[1]) filename = match[1];
+    if (!response.ok) {
+      if (response.status === 401) notifyUnauthorized();
+      const errorBody = await response.json().catch(() => ({}));
+      const parsedError = parseApiError(errorBody, `下载失败: ${response.status}`);
+      throw new ApiError(response.status, path, parsedError.message, parsedError);
     }
+
+    blob = await response.blob();
+  } catch (error) {
+    if (scope.isTimeout()) throw new ApiTimeoutError(timeoutMs);
+    throw error;
+  } finally {
+    scope.dispose();
   }
 
-  const blobUrl = window.URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = blobUrl;
-  anchor.download = filename;
-  document.body.appendChild(anchor);
-  anchor.click();
-  document.body.removeChild(anchor);
-  window.URL.revokeObjectURL(blobUrl);
+  saveBlob(blob, response.headers.get("Content-Disposition"), fallbackFilename);
 }

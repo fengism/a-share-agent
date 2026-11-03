@@ -9,6 +9,7 @@ import {
   ThunderboltOutlined,
 } from "@ant-design/icons";
 import { Button, Modal, Tag, Typography, message } from "antd";
+import { useCopyFeedback } from "../../hooks/useCopyFeedback";
 import { useColors, useTokens } from "../../styles/ui";
 import type { StockBasicInfo } from "../../types/stock";
 import { formatNumberWithSeparators } from "../../utils/format";
@@ -48,7 +49,7 @@ export default function StockSnapshotModal({
   const t = useTokens();
   const cardRef = useRef<HTMLDivElement>(null);
   const [isExporting, setIsExporting] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const { copied, markCopied } = useCopyFeedback(2000);
 
   const isHK = market === "hk";
   const currencySymbol = isHK ? "HK$" : "¥";
@@ -95,9 +96,8 @@ export default function StockSnapshotModal({
           await navigator.clipboard.write([
             new ClipboardItem({ "image/png": blob }),
           ]);
-          setCopied(true);
+          markCopied();
           void message.success("个股速览卡片已复制到剪贴板，可直接粘贴分享！");
-          setTimeout(() => setCopied(false), 2000);
         } catch {
           void message.info("当前浏览器环境不支持直接复制图片，请使用保存图片");
         }

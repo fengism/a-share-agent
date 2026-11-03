@@ -180,7 +180,15 @@ LLM_BASE_URL=https://open.bigmodel.cn/api/paas/v4
 LLM_MODEL=GLM-4.7-Flash
 LLM_TEMPERATURE=0.1
 LLM_TIMEOUT_SECONDS=300
+# 可选：简单/高频任务用的子模型；留空复用主模型
+LLM_SUB_MODEL=
+# 可选：主模型 429/额度耗尽或上游 5xx 时自动降级的备用模型；留空不降级
+LLM_FALLBACK_MODEL=
 ```
+
+`LLM_SUB_MODEL` 与 `LLM_FALLBACK_MODEL` 都与主模型**共用 provider / base_url / api_key**，
+只替换 `model`，因此必须填同一家厂商的模型名。降级只在账号级额度/限流（429、402）与
+上游 5xx 时触发；400/401/403/404 等请求或凭证错误不会切换，以免掩盖真实原因。
 
 管理员可在前端「系统设置」动态修改全局配置；登录用户也可配置自己的 API Key 实现额度与模型隔离。
 管理员保存的模型与推送通道配置会自动同步为全局基线，供无用户上下文的常驻后台任务复用。

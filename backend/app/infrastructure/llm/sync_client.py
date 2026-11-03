@@ -11,11 +11,16 @@ from app.configuration.runtime import get_effective_settings
 from app.configuration.schema import Settings
 from app.infrastructure.llm import adapters, spec
 from app.infrastructure.llm.capabilities import LLMCapabilities
+from app.infrastructure.llm.policy import LLMGenerationTimeoutError
 from app.infrastructure.llm.pool import SyncResourcePool
 
 logger = logging.getLogger(__name__)
 
 _POOL_MAXSIZE = 16
+
+# 回退主模型前要求的最小剩余预算：低于该值说明本次生成的时限已基本用尽，
+# 再发一次请求只会立刻超时，不如直接透出子模型的真实错误。
+_MIN_FALLBACK_BUDGET_SECONDS = 1.0
 
 
 class _OpenAICompatibleClient(adapters.OpenAICompatibleClient):
@@ -120,7 +125,6 @@ async def llm_chat(
     temperature: float = 0.1,
     json_format: bool = False,
     settings: Settings | None = None,
-    client: adapters.LLMClient | None = None,
     simple: bool = False,
     task: str | None = None,
 ) -> str:
@@ -130,7 +134,6 @@ async def llm_chat(
             temperature=temperature,
             json_format=json_format,
             settings=settings,
-            client=client,
             simple=simple,
             task=task,
         )
@@ -142,31 +145,62 @@ async def llm_chat_result(
     temperature: float = 0.1,
     json_format: bool = False,
     settings: Settings | None = None,
-    client: adapters.LLMClient | None = None,
     simple: bool = False,
     task: str | None = None,
 ) -> adapters.LLMCompletion:
-    """执行一次对话调用；切到子模型的简单任务在子模型失败时回退主模型重试一次。"""
+    """执行一次对话调用；切到子模型的简单任务在子模型失败时回退主模型重试一次。
+
+    回退共享**同一份**生成总预算：``deadline`` 只在入口算一次，两次尝试按剩余时间
+    递减。否则子模型用到 1199s 再撞上非超时错误时，主模型会再拿一份完整预算，
+    单次逻辑调用的墙钟时间就变成 2×``llm_generation_timeout_seconds``。
+    """
     base = settings or get_effective_settings()
     effective = spec.apply_task_model(base, simple=simple, task=task)
-    if client is not None or effective is base:
-        # 显式注入 client 或未启用子模型：无回退可言，直接调用一次。
+    if effective is base:
+        # 未启用子模型：无回退可言，直接调用一次。
         return await _llm_chat_once(
-            messages, temperature=temperature, json_format=json_format, settings=effective, client=client
+            messages, temperature=temperature, json_format=json_format, settings=effective
         )
+
+    loop = asyncio.get_running_loop()
+    budget = float(base.llm_generation_timeout_seconds)
+    deadline = loop.time() + budget
     try:
         return await _llm_chat_once(
-            messages, temperature=temperature, json_format=json_format, settings=effective, client=None
+            messages, temperature=temperature, json_format=json_format, settings=effective,
+            budget_seconds=budget,
         )
-    except Exception:
+    except LLMGenerationTimeoutError:
+        # 子模型已经把本次生成的总时限用完了。超时是确定性失败，重试只是白等：
+        # 立即向上抛，让调用方走自己的降级。
         logger.warning(
-            "子模型调用失败，回退主模型 sub_model=%s task=%s",
+            "子模型已耗尽生成总时限，不再回退主模型: sub_model=%s task=%s",
             effective.llm_model,
             task or ("simple" if simple else ""),
+        )
+        raise
+    except Exception as exc:
+        remaining = deadline - loop.time()
+        if remaining <= _MIN_FALLBACK_BUDGET_SECONDS:
+            # 预算已基本耗尽，再发一次请求只会立刻超时，不如直接透出真实错误。
+            logger.warning(
+                "生成总预算已耗尽（剩余 %.1fs），不再回退主模型: sub_model=%s task=%s error_type=%s",
+                max(remaining, 0.0),
+                effective.llm_model,
+                task or ("simple" if simple else ""),
+                type(exc).__name__,
+            )
+            raise
+        logger.warning(
+            "子模型调用失败，回退主模型 sub_model=%s task=%s 剩余预算=%.1fs",
+            effective.llm_model,
+            task or ("simple" if simple else ""),
+            remaining,
             exc_info=True,
         )
         return await _llm_chat_once(
-            messages, temperature=temperature, json_format=json_format, settings=base, client=None
+            messages, temperature=temperature, json_format=json_format, settings=base,
+            budget_seconds=remaining,
         )
 
 
@@ -176,17 +210,14 @@ async def _llm_chat_once(
     temperature: float,
     json_format: bool,
     settings: Settings,
-    client: adapters.LLMClient | None,
+    budget_seconds: float | None = None,
 ) -> adapters.LLMCompletion:
+    """真实调用：统一走 ``streaming_llm_client``，因此共享限流、重试与降级保护。"""
     from app.infrastructure.llm.policy import generation_scope
     from app.infrastructure.llm.streaming import streaming_llm_client
 
-    async with generation_scope(settings, timeout_seconds=settings.llm_generation_timeout_seconds):
-        if client is not None:
-            # Legacy injection only: Python cannot forcibly stop a caller-owned thread.
-            return await asyncio.to_thread(
-                client.chat_result, messages, temperature=temperature, json_format=json_format,
-            )
+    timeout = float(settings.llm_generation_timeout_seconds) if budget_seconds is None else budget_seconds
+    async with generation_scope(settings, timeout_seconds=timeout):
         async with streaming_llm_client(settings, max_tokens=settings.llm_generation_max_completion_tokens) as managed:
             return await managed.chat_result(messages, temperature=temperature, json_format=json_format)
 

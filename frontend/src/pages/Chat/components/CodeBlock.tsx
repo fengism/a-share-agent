@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React from "react";
 import { CheckOutlined, CopyOutlined } from "@ant-design/icons";
+import { useCopyFeedback } from "../../../hooks/useCopyFeedback";
 import { Button, Tooltip } from "antd";
 
 interface CodeBlockProps extends React.HTMLAttributes<HTMLPreElement> {
@@ -7,7 +8,7 @@ interface CodeBlockProps extends React.HTMLAttributes<HTMLPreElement> {
 }
 
 export const CodeBlock: React.FC<CodeBlockProps> = ({ children, ...props }) => {
-  const [copied, setCopied] = useState(false);
+  const { copied, markCopied } = useCopyFeedback(1600);
 
   let language = "";
   let codeText = "";
@@ -33,8 +34,7 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({ children, ...props }) => {
     if (!codeText) return;
     try {
       await navigator.clipboard.writeText(codeText);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1600);
+      markCopied();
     } catch {
       // ignore
     }

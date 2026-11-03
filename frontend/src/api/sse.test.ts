@@ -77,6 +77,10 @@ describe("durable workflow SSE", () => {
 
   it("reconnects with the last persisted event cursor", async () => {
     vi.useFakeTimers();
+    // 重连等待结束时必须摘掉 abort 监听器：长连接每次有进展都会重置重连计数，
+    // 若不摘除，监听器会永久累积在同一个 AbortSignal 上。
+    const abortAddSpy = vi.spyOn(AbortSignal.prototype, "addEventListener");
+    const abortRemoveSpy = vi.spyOn(AbortSignal.prototype, "removeEventListener");
     mockSubmission();
     const result = { name: "人工智能" };
     const progress = vi.fn();
@@ -124,6 +128,13 @@ describe("durable workflow SSE", () => {
     const reconnectHeaders = fetchMock.mock.calls[1][1]?.headers as Record<string, string>;
     expect(reconnectHeaders["Last-Event-ID"]).toBe("1:1");
     expect(progress.mock.calls.map(([event]) => event.type)).toEqual(["stage_started", "complete"]);
+
+    const added = abortAddSpy.mock.calls.filter(([type]) => type === "abort").length;
+    const removed = abortRemoveSpy.mock.calls.filter(([type]) => type === "abort").length;
+    expect(added).toBeGreaterThan(0);
+    expect(removed).toBe(added);
+    abortAddSpy.mockRestore();
+    abortRemoveSpy.mockRestore();
   });
 
   it("cancels the remote job before aborting the active stream", async () => {

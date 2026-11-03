@@ -7,7 +7,11 @@ from dataclasses import dataclass
 from app.configuration import get_settings
 from app.modules.bot.public import process_next_bot_job
 from app.modules.quant.public import process_next_quant_job
-from app.runtime.task_health import background_task_health, new_task_health
+from app.runtime.task_health import (
+    background_task_health,
+    mark_task_cancelled,
+    new_task_health,
+)
 from app.runtime.task_scheduler import BACKGROUND_TASK_OWNER_ID
 from app.runtime.workflow_worker import process_next_workflow_job
 
@@ -42,7 +46,32 @@ class IdlePollBackoff:
         self._last_delay = 0.0
 
 
+def _record_slot_failure(health_name: str, error_type: str) -> None:
+    """记一次轮询失败。
+
+    Worker 的槽位循环是 ``except Exception: continue``（故意不退出），所以任务
+    永远不会变成 ``unexpected_exit``，也就不会触发重启类信号。如果不同步累加
+    ``consecutive_errors``，一个每轮都失败的 Worker 从健康角度看与正常无异，
+    ``/api/health/ready`` 会一直报 200。
+    """
+    entry = background_task_health.setdefault(health_name, new_task_health())
+    entry["status"] = "error"
+    entry["last_error"] = error_type
+    entry["consecutive_errors"] = int(entry.get("consecutive_errors", 0)) + 1
+    # 失败即说明它没在正常服务，旧的正常结束标记不再成立。
+    entry["cancelled_cleanly"] = False
+
+
+def _record_slot_success(health_name: str) -> None:
+    """记一次轮询成功，清掉失败计数（与 run_periodic 的 record_success 一致）。"""
+    entry = background_task_health.setdefault(health_name, new_task_health())
+    entry["status"] = "running"
+    entry["last_error"] = None
+    entry["consecutive_errors"] = 0
+
+
 async def _run_bot_job_worker_slot(owner_id: str) -> None:
+    idle_backoff = IdlePollBackoff()
     while True:
         settings = get_settings()
         if not settings.bot_enabled:
@@ -55,11 +84,18 @@ async def _run_bot_job_worker_slot(owner_id: str) -> None:
             )
         except asyncio.CancelledError:
             raise
-        except Exception:
+        except Exception as error:
             logger.exception("Bot Worker 轮询失败")
-            processed = False
-        if not processed:
-            await asyncio.sleep(max(0.1, settings.bot_job_poll_seconds))
+            _record_slot_failure(BOT_JOB_HEALTH_NAME, type(error).__name__)
+            # 失败也要退避：否则上游抽搽几秒就能把失败次数瞬间推过阈值，
+            # 把一个瞬时故障放大成 readiness 503。
+            await asyncio.sleep(idle_backoff.next_delay(settings.bot_job_poll_seconds))
+            continue
+        _record_slot_success(BOT_JOB_HEALTH_NAME)
+        if processed:
+            idle_backoff.reset()
+        else:
+            await asyncio.sleep(idle_backoff.next_delay(settings.bot_job_poll_seconds))
 
 
 async def run_bot_job_worker() -> None:
@@ -77,8 +113,12 @@ async def run_bot_job_worker() -> None:
                 await asyncio.gather(*completed_tasks, return_exceptions=True) if completed_tasks else []
             )
             if completed_results:
-                health["status"] = "error"
-                health["consecutive_errors"] += len(completed_results)
+                # 槽位已死：这是真正的 pod 级故障（槽位循环本身是 catch-all，
+                # 正常情况下不会退出）。计数由这里累加，健康上报交给下面的
+                # 重启逻辑；槽位内的轮询失败则由 _record_slot_failure 累加。
+                health["consecutive_errors"] = int(health.get("consecutive_errors", 0)) + len(
+                    completed_results
+                )
                 for index, result in zip(completed, completed_results):
                     if isinstance(result, asyncio.CancelledError):
                         error_type = "CancelledError"
@@ -95,10 +135,7 @@ async def run_bot_job_worker() -> None:
                         error_type = "UnexpectedExit"
                         logger.error("Bot Worker 槽位意外结束，将自动重启: slot=%s", index)
                     health["last_error"] = error_type
-            elif health["status"] == "error":
-                health["status"] = "running"
-                health["last_error"] = None
-                health["consecutive_errors"] = 0
+                health["status"] = "error"
 
             removed = [index for index in workers if index > concurrency]
             removed_tasks = [workers.pop(index) for index in removed]
@@ -130,7 +167,9 @@ async def run_bot_job_worker() -> None:
             task.cancel()
         if workers:
             await asyncio.gather(*workers.values(), return_exceptions=True)
-        health["status"] = "stopped"
+        # 走到 finally 不一定是故障：正常取消（应用关闭/配置停用）也会进这里。
+        # 用专用标记保持「取消」与「崩溃」的区分，避免就绪探测误判。
+        mark_task_cancelled(BOT_JOB_HEALTH_NAME)
 
 
 async def run_quant_job_worker() -> None:
@@ -143,18 +182,16 @@ async def run_quant_job_worker() -> None:
                 processed = await process_next_quant_job(QUANT_JOB_OWNER_ID)
             except Exception as error:
                 logger.exception("量化 Worker 轮询失败")
-                health["status"] = "error"
-                health["last_error"] = type(error).__name__
-                await asyncio.sleep(1)
+                _record_slot_failure(QUANT_JOB_HEALTH_NAME, type(error).__name__)
+                await asyncio.sleep(idle_backoff.next_delay(_QUANT_JOB_POLL_SECONDS))
                 continue
-            health["status"] = "running"
-            health["last_error"] = None
+            _record_slot_success(QUANT_JOB_HEALTH_NAME)
             if processed:
                 idle_backoff.reset()
             else:
                 await asyncio.sleep(idle_backoff.next_delay(_QUANT_JOB_POLL_SECONDS))
     except asyncio.CancelledError:
-        health["status"] = "stopped"
+        mark_task_cancelled(QUANT_JOB_HEALTH_NAME)
         raise
     except Exception as error:
         health["status"] = "error"
@@ -172,10 +209,12 @@ async def _run_workflow_job_worker_slot(owner_id: str, shutdown_event: asyncio.E
             )
         except asyncio.CancelledError:
             raise
-        except Exception:
+        except Exception as error:
             logger.exception("Workflow Worker 槽位轮询失败: owner=%s", owner_id)
-            await asyncio.sleep(1)
+            _record_slot_failure(WORKFLOW_JOB_HEALTH_NAME, type(error).__name__)
+            await asyncio.sleep(idle_backoff.next_delay(1.0))
             continue
+        _record_slot_success(WORKFLOW_JOB_HEALTH_NAME)
         if processed:
             idle_backoff.reset()
         else:
@@ -211,7 +250,7 @@ async def run_workflow_job_worker() -> None:
             await asyncio.sleep(1)
     except asyncio.CancelledError:
         shutdown_event.set()
-        health["status"] = "stopped"
+        mark_task_cancelled(WORKFLOW_JOB_HEALTH_NAME)
         raise
     except Exception as error:
         health["status"] = "error"
