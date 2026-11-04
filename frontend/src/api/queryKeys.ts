@@ -52,6 +52,7 @@ export const queryKeys = {
     volume: (startDate?: string, endDate?: string) =>
       ["marketVolume", startDate ?? "", endDate ?? ""] as const,
     nationalTeam: (days: number) => ["nationalTeam", days] as const,
+    nationalTeamOverview: (days: number) => ["nationalTeamOverview", days] as const,
     breadth: ["marketBreadth"] as const,
     priceAnomaly: (pageNo: number, pageSize: number) =>
       ["marketPriceAnomaly", pageNo, pageSize] as const,

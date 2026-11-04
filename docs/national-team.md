@@ -228,6 +228,19 @@ pages/NationalTeam/
   相同，已有测试卡死这一点；
 - 缓存里始终存**完整**响应：若把两种模式分别缓存，容量翻倍且互相抢占。
 
+### 7.1 轻量概览接口
+
+首页信号卡只需要结论，不需要 22 只 ETF 与 10 条指数序列，因此另有：
+
+```
+GET /api/market/national-team/overview?days=30..365
+```
+
+只返回 `summary`、`support_score`、近 30 日 `support_score_history`、覆盖率与
+新鲜度标量（`partial` / `stale` / `calendar_degraded` / `refreshing`）。它复用同一份
+完整响应缓存，裁剪发生在 `build_national_team_overview()`，不额外采集数据。
+首页 `/` 的「国家队托底信号」卡调用的就是它，详情页仍用完整接口。
+
 ## 8. HTTP 缓存
 
 接口返回 `ETag` 与 `Cache-Control`：

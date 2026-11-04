@@ -28,6 +28,7 @@ from app.financial_data.market.public import (
     MarketVolumeResponse,
     MarketWindResponse,
     MarketWindStocksResponse,
+    NationalTeamOverview,
     NationalTeamResponse,
     NorthboundHistoryResponse,
     ThsHotPlate,
@@ -59,6 +60,9 @@ from app.financial_data.market.public import get_market_wind as get_market_wind_
 from app.financial_data.market.public import get_market_wind_stocks as get_market_wind_stocks_service
 from app.financial_data.market.public import (
     get_national_team_etf_holdings as get_national_team_etf_holdings_service,
+)
+from app.financial_data.market.public import (
+    get_national_team_overview as get_national_team_overview_service,
 )
 from app.financial_data.market.public import get_northbound_history as get_northbound_history_service
 from app.financial_data.market.public import get_sector_stocks_history as get_sector_stocks_history_service
@@ -183,6 +187,14 @@ async def get_national_team_etf_holdings(
     response.headers["ETag"] = etag
     response.headers["Cache-Control"] = cache_control
     return result
+
+
+@router.get("/national-team/overview", response_model=NationalTeamOverview)
+async def get_national_team_overview(
+    days: int = Query(120, ge=30, le=365, description="返回最近自然日数量，30-365"),
+):
+    """国家队首屏概览：只返回结论与标量，供首页信号卡等轻量场景使用。"""
+    return await get_national_team_overview_service(days)
 
 
 def _national_team_etag(result: NationalTeamResponse, include_etf_points: bool) -> str:

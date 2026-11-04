@@ -30,6 +30,7 @@ from app.financial_data.market.quotes.schemas import (
     NationalTeamIndexSeries,
     NationalTeamIndustryAllocation,
     NationalTeamMilestone,
+    NationalTeamOverview,
     NationalTeamPortrait,
     NationalTeamResponse,
     NationalTeamShareObservation,
@@ -1856,6 +1857,37 @@ async def get_national_team_etf_holdings(
     """
     response = await _resolve_response(days)
     return response if include_etf_points else without_etf_points(response)
+
+
+async def get_national_team_overview(days: int = 120) -> NationalTeamOverview:
+    """返回只含结论与标量的首屏概览，复用完整响应缓存。"""
+    return build_national_team_overview(await _resolve_response(days))
+
+
+def build_national_team_overview(
+    response: NationalTeamResponse,
+    *,
+    history_days: int = 30,
+) -> NationalTeamOverview:
+    """从完整响应裁剪出首页信号卡需要的字段。"""
+    history = response.support_score_history[-history_days:] if history_days > 0 else []
+    return NationalTeamOverview(
+        source=response.source,
+        fetched_at=response.fetched_at,
+        as_of_date=response.as_of_date,
+        expected_date=response.expected_date,
+        partial=response.partial,
+        stale=response.stale,
+        calendar_degraded=response.calendar_degraded,
+        refreshing=response.refreshing,
+        covered_etf_count=response.covered_etf_count,
+        total_etf_count=response.total_etf_count,
+        # 拷贝一份，避免调用方拿到缓存对象后意外修改。
+        summary=response.summary.model_copy(deep=True),
+        support_score=response.support_score.model_copy(deep=True),
+        support_score_history=[point.model_copy(deep=True) for point in history],
+        disclaimer=response.disclaimer,
+    )
 
 
 async def _resolve_response(days: int) -> NationalTeamResponse:

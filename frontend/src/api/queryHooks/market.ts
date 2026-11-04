@@ -20,6 +20,7 @@ import type {
   MarketLimitUpLadder,
   MarketMainline,
   MarketMargin,
+  NationalTeamOverview,
   NationalTeamResponse,
   MarketBreadth,
   NorthboundHistory,
@@ -279,6 +280,21 @@ export function useNationalTeamHoldings(days = 120) {
     select: asApiModel<NationalTeamResponse>(),
     // 切换 30/60/120/240/365 天时保留上一份结果，避免整页闪回骨架屏。
     placeholderData: keepPreviousData,
+    staleTime: (query) => query.state.data?.partial || query.state.data?.refreshing
+      ? 60_000 : QUERY_CACHE_POLICIES.marketTenMinutes.staleMs,
+    refetchInterval: (query) => query.state.data?.partial || query.state.data?.refreshing ? 60_000 : false,
+    refetchIntervalInBackground: false,
+  });
+}
+
+export function useNationalTeamOverview(days = 120) {
+  return useQuery({
+    queryKey: queryKeys.market.nationalTeamOverview(days),
+    queryFn: () => openApiGet("/api/market/national-team/overview", {
+      query: { days },
+      options: { timeoutMs: API_TIMEOUTS.EXTERNAL },
+    }),
+    select: asApiModel<NationalTeamOverview>(),
     staleTime: (query) => query.state.data?.partial || query.state.data?.refreshing
       ? 60_000 : QUERY_CACHE_POLICIES.marketTenMinutes.staleMs,
     refetchInterval: (query) => query.state.data?.partial || query.state.data?.refreshing ? 60_000 : false,

@@ -58,6 +58,7 @@ import type {
   NationalTeamTopHolding,
 } from "../../types/stock";
 import { marketDateStamp } from "../../utils/marketTime";
+import { buildSparklinePath } from "../../utils/sparkline";
 import { downloadCsv } from "./utils/csv";
 import { escapeHtml } from "./utils/html";
 import "./national-team.css";
@@ -608,32 +609,6 @@ function DailyFlowStackedChart({
   );
 }
 
-function buildScoreSparkline(history: NationalTeamSupportHistoryPoint[]) {
-  const points = history.slice(-30);
-  if (points.length < 2) return null;
-  const width = 168;
-  const height = 28;
-  const scores = points.map((point) => point.score);
-  const min = Math.min(...scores);
-  const max = Math.max(...scores);
-  const span = Math.max(1, max - min);
-  const step = width / (points.length - 1);
-  const path = points
-    .map((point, index) => {
-      const x = index * step;
-      const y = height - ((point.score - min) / span) * height;
-      return `${index === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(" ");
-  return {
-    path,
-    width,
-    height,
-    count: points.length,
-    delta: points[points.length - 1].score - points[0].score,
-  };
-}
-
 function SupportScoreRadarCard({
   supportScore,
   history,
@@ -642,7 +617,10 @@ function SupportScoreRadarCard({
   history?: NationalTeamSupportHistoryPoint[];
 }) {
   const colors = useColors();
-  const sparkline = useMemo(() => buildScoreSparkline(history ?? []), [history]);
+  const sparkline = useMemo(
+    () => buildSparklinePath((history ?? []).slice(-30).map((point) => point.score), 168, 28),
+    [history],
+  );
   if (!supportScore) return null;
 
   const score = supportScore.score;

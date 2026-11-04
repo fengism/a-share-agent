@@ -154,6 +154,40 @@ vi.mock("../../api/queries", () => ({
     };
   },
   useMarketMainline: () => mocks.mainlineQuery,
+  useNationalTeamOverview: () => ({
+    data: {
+      source: "上交所/深交所/东方财富",
+      fetched_at: "2026-08-21T16:30:00+08:00",
+      as_of_date: "2026-08-21",
+      expected_date: "2026-08-21",
+      partial: false,
+      stale: false,
+      calendar_degraded: false,
+      refreshing: false,
+      covered_etf_count: 22,
+      total_etf_count: 22,
+      summary: {
+        estimated_net_flow_1d_100m: 12.5,
+        estimated_net_flow_5d_100m: 40,
+      },
+      support_score: {
+        score: 68.5,
+        status: "active",
+        label: "积极托底",
+        confidence: 0.9,
+      },
+      support_score_history: [
+        { date: "2026-08-17", score: 55, status: "moderate", confidence: 0.9, coverage_ratio: 1 },
+        { date: "2026-08-18", score: 58, status: "moderate", confidence: 0.9, coverage_ratio: 1 },
+        { date: "2026-08-21", score: 68.5, status: "active", confidence: 0.9, coverage_ratio: 1 },
+      ],
+      disclaimer: "ETF 份额变化仅是代理指标。",
+    },
+    isLoading: false,
+    isFetching: false,
+    error: null,
+    refetch: vi.fn(),
+  }),
   useMarketWind: () => ({
     data: {
       source: "财联社",
@@ -239,6 +273,22 @@ describe("Dashboard", () => {
     expect(screen.getByRole("heading", { name: "市场总览" })).toBeInTheDocument();
     expect(screen.queryByText("行业强弱")).not.toBeInTheDocument();
     expect(screen.queryByText("热门概念")).not.toBeInTheDocument();
+  });
+
+  it("shows the national team signal summary with a link to the detail page", () => {
+    render(
+      <MemoryRouter>
+        <Dashboard />
+      </MemoryRouter>,
+    );
+
+    const card = screen.getByTestId("dashboard-national-team-signal");
+    expect(within(card).getByText("国家队托底信号")).toBeInTheDocument();
+    expect(within(card).getByText("积极托底")).toBeInTheDocument();
+    expect(screen.getByTestId("dashboard-national-team-confidence")).toHaveTextContent("置信度 90%");
+    expect(within(card).getByText(/1 日净申购 \+12.5 亿/)).toBeInTheDocument();
+    expect(within(card).getByText(/覆盖 22\/22 只 ETF/)).toBeInTheDocument();
+    expect(screen.getByLabelText("查看国家队监测详情")).toHaveAttribute("href", "/national-team");
   });
 
   it("switches the displayed leader stocks when a market wind plate is clicked", async () => {

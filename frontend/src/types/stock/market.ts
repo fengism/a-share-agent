@@ -762,5 +762,6 @@ export type NationalTeamIndustryAllocation = components["schemas"]["NationalTeam
 export type NationalTeamTopHolding = components["schemas"]["NationalTeamTopHolding"];
 export type NationalTeamPortrait = components["schemas"]["NationalTeamPortrait"];
 export type NationalTeamResponse = components["schemas"]["NationalTeamResponse"];
+export type NationalTeamOverview = components["schemas"]["NationalTeamOverview"];
 export type MarketVolumeSeriesItem = components["schemas"]["MarketVolumeSeriesItem"];
 export type MarketVolumeResponse = components["schemas"]["MarketVolumeResponse"];

@@ -17679,6 +17679,95 @@
         "title": "NationalTeamMilestone",
         "type": "object"
       },
+      "NationalTeamOverview": {
+        "description": "国家队首屏概览：只含结论与标量，不带 ETF/指数点位序列。\n\n用于首页信号卡等“只想看一眼结论”的场景，避免拉取整份 300+ KiB 响应。",
+        "properties": {
+          "as_of_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of Date"
+          },
+          "calendar_degraded": {
+            "default": false,
+            "title": "Calendar Degraded",
+            "type": "boolean"
+          },
+          "covered_etf_count": {
+            "default": 0,
+            "title": "Covered Etf Count",
+            "type": "integer"
+          },
+          "disclaimer": {
+            "default": "",
+            "title": "Disclaimer",
+            "type": "string"
+          },
+          "expected_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Date"
+          },
+          "fetched_at": {
+            "title": "Fetched At",
+            "type": "string"
+          },
+          "partial": {
+            "default": false,
+            "title": "Partial",
+            "type": "boolean"
+          },
+          "refreshing": {
+            "default": false,
+            "title": "Refreshing",
+            "type": "boolean"
+          },
+          "source": {
+            "default": "上交所/深交所/东方财富",
+            "title": "Source",
+            "type": "string"
+          },
+          "stale": {
+            "default": false,
+            "title": "Stale",
+            "type": "boolean"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/NationalTeamSummary"
+          },
+          "support_score": {
+            "$ref": "#/components/schemas/NationalTeamSupportScore"
+          },
+          "support_score_history": {
+            "items": {
+              "$ref": "#/components/schemas/NationalTeamSupportHistoryPoint"
+            },
+            "title": "Support Score History",
+            "type": "array"
+          },
+          "total_etf_count": {
+            "default": 22,
+            "title": "Total Etf Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "fetched_at"
+        ],
+        "title": "NationalTeamOverview",
+        "type": "object"
+      },
       "NationalTeamPortrait": {
         "properties": {
           "as_of": {
@@ -38783,6 +38872,59 @@
           }
         ],
         "summary": "Get National Team Etf Holdings",
+        "tags": [
+          "market"
+        ]
+      }
+    },
+    "/api/market/national-team/overview": {
+      "get": {
+        "description": "国家队首屏概览：只返回结论与标量，供首页信号卡等轻量场景使用。",
+        "operationId": "get_national_team_overview_api_market_national_team_overview_get",
+        "parameters": [
+          {
+            "description": "返回最近自然日数量，30-365",
+            "in": "query",
+            "name": "days",
+            "required": false,
+            "schema": {
+              "default": 120,
+              "description": "返回最近自然日数量，30-365",
+              "maximum": 365,
+              "minimum": 30,
+              "title": "Days",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NationalTeamOverview"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get National Team Overview",
         "tags": [
           "market"
         ]

@@ -688,3 +688,62 @@ def test_daily_flows_keep_early_days_when_a_member_stops_updating():
     assert response.covered_etf_count == 3
     assert response.support_score_history[1].coverage_ratio == pytest.approx(0.1818)
     assert response.support_score_history[2].coverage_ratio == pytest.approx(0.1364)
+
+
+def test_overview_strips_series_and_caps_history():
+    from app.financial_data.market.quotes.national_team import build_national_team_overview
+
+    dates = [f"2026-08-{day:02d}" for day in range(1, 32)] + [
+        f"2026-09-{day:02d}" for day in range(1, 32)
+    ]
+    members = ["510300", "510310", "510330", "159919"]
+    response = build_national_team_response(
+        share_history={
+            code: {day: 100_000_000 + index * 1_000_000 for index, day in enumerate(dates)}
+            for code in members
+        },
+        etf_close_history={code: {day: 3.5 for day in dates} for code in members},
+        index_close_history={"csi300": {day: 3800.0 for day in dates}},
+        fetched_at="2026-09-30T18:00:00+08:00",
+        requested_days=60,
+        expected_trading_dates=dates,
+    )
+
+    overview = build_national_team_overview(response, history_days=10)
+
+    assert len(overview.support_score_history) == 10
+    assert overview.support_score_history[-1].date == response.support_score_history[-1].date
+    assert overview.support_score.score == response.support_score.score
+    assert overview.summary.total_shares_100m == response.summary.total_shares_100m
+    assert overview.covered_etf_count == response.covered_etf_count
+    assert overview.disclaimer == response.disclaimer
+
+    # 概览必须与缓存里的完整响应脱钩，改它不能反向污染缓存对象。
+    overview.summary.total_shares_100m = 0.0
+    assert response.summary.total_shares_100m != 0.0
+
+
+def test_get_national_team_overview_reuses_full_response(monkeypatch):
+    from app.financial_data.market.quotes import national_team as nt
+
+    dates = ["2026-09-15", "2026-09-16"]
+    members = ["510300", "510310", "510330", "159919"]
+    full = build_national_team_response(
+        share_history={code: {dates[0]: 100_000_000, dates[1]: 110_000_000} for code in members},
+        etf_close_history={code: {dates[0]: 3.5, dates[1]: 3.6} for code in members},
+        index_close_history={"csi300": {dates[0]: 3800.0, dates[1]: 3850.0}},
+        fetched_at="2026-09-16T18:00:00+08:00",
+        requested_days=30,
+        expected_trading_dates=dates,
+    )
+    calls: list[int] = []
+
+    async def fake_resolve(days):
+        calls.append(days)
+        return full
+
+    monkeypatch.setattr(nt, "_resolve_response", fake_resolve)
+
+    overview = asyncio.run(nt.get_national_team_overview(120))
+    assert calls == [120]
+    assert overview.support_score.score == full.support_score.score

@@ -2610,6 +2610,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/market/national-team/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get National Team Overview
+         * @description 国家队首屏概览：只返回结论与标量，供首页信号卡等轻量场景使用。
+         */
+        get: operations["get_national_team_overview_api_market_national_team_overview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/market/news-analysis": {
         parameters: {
             query?: never;
@@ -11924,6 +11944,64 @@ export interface components {
              * @enum {string}
              */
             type: "statement" | "intervention" | "policy" | "liquidity";
+        };
+        /**
+         * NationalTeamOverview
+         * @description 国家队首屏概览：只含结论与标量，不带 ETF/指数点位序列。
+         *
+         *     用于首页信号卡等“只想看一眼结论”的场景，避免拉取整份 300+ KiB 响应。
+         */
+        NationalTeamOverview: {
+            /** As Of Date */
+            as_of_date?: string | null;
+            /**
+             * Calendar Degraded
+             * @default false
+             */
+            calendar_degraded: boolean;
+            /**
+             * Covered Etf Count
+             * @default 0
+             */
+            covered_etf_count: number;
+            /**
+             * Disclaimer
+             * @default
+             */
+            disclaimer: string;
+            /** Expected Date */
+            expected_date?: string | null;
+            /** Fetched At */
+            fetched_at: string;
+            /**
+             * Partial
+             * @default false
+             */
+            partial: boolean;
+            /**
+             * Refreshing
+             * @default false
+             */
+            refreshing: boolean;
+            /**
+             * Source
+             * @default 上交所/深交所/东方财富
+             */
+            source: string;
+            /**
+             * Stale
+             * @default false
+             */
+            stale: boolean;
+            summary?: components["schemas"]["NationalTeamSummary"];
+            support_score?: components["schemas"]["NationalTeamSupportScore"];
+            /** Support Score History */
+            support_score_history?: components["schemas"]["NationalTeamSupportHistoryPoint"][];
+            /**
+             * Total Etf Count
+             * @default 22
+             */
+            total_etf_count: number;
         };
         /** NationalTeamPortrait */
         NationalTeamPortrait: {
@@ -21506,6 +21584,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NationalTeamResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_national_team_overview_api_market_national_team_overview_get: {
+        parameters: {
+            query?: {
+                /** @description 返回最近自然日数量，30-365 */
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NationalTeamOverview"];
                 };
             };
             /** @description 统一错误响应 */

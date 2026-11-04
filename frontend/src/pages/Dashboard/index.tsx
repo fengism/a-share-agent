@@ -37,6 +37,7 @@ import MarketOverviewBoard from "../../components/MarketOverviewBoard";
 import MarketWindBoard from "../../components/MarketWindBoard";
 import { marketDateStamp } from "../../utils/marketTime";
 import WatchlistPanel from "./WatchlistPanel";
+import NationalTeamSignalCard from "./NationalTeamSignalCard";
 import "./dashboard.css";
 
 const { Text } = Typography;
@@ -575,6 +576,9 @@ export default function Dashboard() {
       </div>
       <div className="dashboard-layout" data-mobile-view={mobileView}>
         <section className="dashboard-main" aria-label="首页中间内容">
+          <section aria-label="国家队托底信号">
+            <NationalTeamSignalCard />
+          </section>
           <section className="dashboard-market-board" aria-label="首页市场看板">
             <MarketOverviewBoard showRankings={false} onNavigate={(tab) => navigate(`/market?tab=${tab}`)} />
           </section>

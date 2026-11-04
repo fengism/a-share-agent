@@ -721,6 +721,28 @@ class NationalTeamPortrait(BaseModel):
     is_static: bool = True
 
 
+class NationalTeamOverview(BaseModel):
+    """国家队首屏概览：只含结论与标量，不带 ETF/指数点位序列。
+
+    用于首页信号卡等“只想看一眼结论”的场景，避免拉取整份 300+ KiB 响应。
+    """
+
+    source: str = "上交所/深交所/东方财富"
+    fetched_at: str
+    as_of_date: str | None = None
+    expected_date: str | None = None
+    partial: bool = False
+    stale: bool = False
+    calendar_degraded: bool = False
+    refreshing: bool = False
+    covered_etf_count: int = 0
+    total_etf_count: int = 22
+    summary: NationalTeamSummary = Field(default_factory=NationalTeamSummary)
+    support_score: NationalTeamSupportScore = Field(default_factory=NationalTeamSupportScore)
+    support_score_history: list[NationalTeamSupportHistoryPoint] = Field(default_factory=list)
+    disclaimer: str = ""
+
+
 class NationalTeamResponse(BaseModel):
     source: str = "上交所/深交所/东方财富"
     fetched_at: str

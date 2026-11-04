@@ -11,6 +11,7 @@ import {
   useIndustryRankings,
   useMarketIndices,
   useNationalTeamHoldings,
+  useNationalTeamOverview,
   useMarketIndexIntraday,
   useMarketEmotion,
   useMarketLimitHistory,
@@ -606,6 +607,22 @@ describe("useNationalTeamHoldings refresh policy", () => {
     expect(vi.mocked(apiGet)).toHaveBeenCalledWith(
       "/market/national-team-etf-holdings",
       { days: 120, include_etf_points: false },
+      expect.objectContaining({ timeoutMs: API_TIMEOUTS.EXTERNAL }),
+    );
+    unmount();
+    client.clear();
+  });
+
+  it("fetches the lightweight overview without ETF or index series", async () => {
+    vi.mocked(apiGet).mockResolvedValue({ partial: false, refreshing: false });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = ({ children }: PropsWithChildren) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+    const { result, unmount } = renderHook(() => useNationalTeamOverview(120), { wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(vi.mocked(apiGet)).toHaveBeenCalledWith(
+      "/market/national-team/overview",
+      { days: 120 },
       expect.objectContaining({ timeoutMs: API_TIMEOUTS.EXTERNAL }),
     );
     unmount();
