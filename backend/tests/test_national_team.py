@@ -1,3 +1,7 @@
+import asyncio
+import time
+from datetime import datetime
+
 import pytest
 
 from app.financial_data.market.quotes.national_team import (
@@ -247,3 +251,160 @@ def test_support_zones_are_sorted_by_price_even_when_dates_descend():
     assert labels[0].startswith("<")
     assert labels[-1].startswith("≥")
     assert labels == sorted(labels, key=lambda label: float("-inf") if label.startswith("<") else float(label.lstrip("≥").split("-")[0]))
+
+
+def test_national_team_snapshot_reports_refresh_counters():
+    from app.financial_data.market.quotes.national_team import (
+        _record_collection,
+        _record_source_failure,
+        national_team_snapshot,
+    )
+
+    before = national_team_snapshot()
+    started = time.monotonic()
+    response = build_national_team_response(
+        share_history={},
+        etf_close_history={},
+        index_close_history={},
+        fetched_at="2026-09-16T18:00:00+08:00",
+        requested_days=30,
+        expected_trading_dates=["2026-09-16"],
+    )
+    _record_collection("test-trigger", started=started, response=response)
+    _record_collection("test-trigger", started=started, error=RuntimeError("boom"))
+    _record_source_failure("sse")
+
+    after = national_team_snapshot()
+    assert after["attempts_total"] == before["attempts_total"] + 2  # type: ignore[operator]
+    assert after["failures_total"] == before["failures_total"] + 1  # type: ignore[operator]
+    trigger_counts = after["by_trigger"]["test-trigger"]  # type: ignore[index]
+    assert trigger_counts["attempts"] - before["by_trigger"].get("test-trigger", {}).get("attempts", 0) == 2  # type: ignore[index,union-attr]
+    assert after["last_error"] == "RuntimeError"
+    # 只记异常类名，避免把上游消息里的 URL / 参数带进 /metrics。
+    assert "boom" not in str(after["last_error"])
+    assert after["source_failures"]["sse"] >= 1  # type: ignore[index]
+
+
+def test_refresh_skips_outside_after_close_window(monkeypatch):
+    from app.core.timezones import SHANGHAI_TIMEZONE
+    from app.financial_data.market.quotes import national_team as nt
+
+    async def fail_if_called(*_, **__):
+        raise AssertionError("窗口外不应触发采集")
+
+    monkeypatch.setattr(nt, "_shared_response", fail_if_called)
+    monkeypatch.setattr(nt, "_load_expected_trading_dates", fail_if_called)
+
+    before_open = datetime(2026, 9, 16, 10, 30, tzinfo=SHANGHAI_TIMEZONE)
+    assert asyncio.run(nt.refresh_national_team_after_close(now=before_open)) == "skipped_before_close"
+
+    late_night = datetime(2026, 9, 16, 19, 0, tzinfo=SHANGHAI_TIMEZONE)
+    assert asyncio.run(nt.refresh_national_team_after_close(now=late_night)) == "skipped_after_window"
+
+
+def test_refresh_skips_non_trading_day(monkeypatch):
+    from app.core.timezones import SHANGHAI_TIMEZONE
+    from app.financial_data.market.quotes import national_team as nt
+
+    async def no_trading_day(start, now):
+        return (["2026-09-14", "2026-09-15"], False)
+
+    async def fail_if_called(*_, **__):
+        raise AssertionError("非交易日不应触发采集")
+
+    monkeypatch.setattr(nt, "_load_expected_trading_dates", no_trading_day)
+    monkeypatch.setattr(nt, "_shared_response", fail_if_called)
+    monkeypatch.setitem(nt._refresh_metrics, "scheduled_completed_date", "")
+
+    moment = datetime(2026, 9, 16, 16, 30, tzinfo=SHANGHAI_TIMEZONE)
+    assert asyncio.run(nt.refresh_national_team_after_close(now=moment)) == "skipped_not_trading_day"
+
+
+def test_refresh_marks_complete_only_when_as_of_date_matches(monkeypatch):
+    from app.core.timezones import SHANGHAI_TIMEZONE
+    from app.financial_data.market.quotes import national_team as nt
+
+    day = "2026-09-16"
+    # 交易所份额发布常晚于 16:00：as_of 还停在昨天时必须判定为「未完成」，
+    # 否则当天永远不会再补一次。
+    partial = build_national_team_response(
+        share_history={"510300": {"2026-09-15": 100_000_000}},
+        etf_close_history={"510300": {"2026-09-15": 3.5}},
+        index_close_history={},
+        fetched_at="2026-09-16T16:10:00+08:00",
+        requested_days=30,
+        expected_trading_dates=["2026-09-15", day],
+    )
+    completed = build_national_team_response(
+        share_history={code: {"2026-09-15": 100_000_000, day: 100_000_000} for code in nt.ETF_POOL},
+        etf_close_history={code: {"2026-09-15": 3.5, day: 3.5} for code in nt.ETF_POOL},
+        index_close_history={key: {"2026-09-15": 3500.0, day: 3500.0} for key in nt.INDEX_POOL},
+        fetched_at="2026-09-16T17:10:00+08:00",
+        requested_days=30,
+        expected_trading_dates=["2026-09-15", day],
+    )
+    responses = [partial, completed]
+
+    async def trading_day(start, now):
+        return (["2026-09-15", day], False)
+
+    async def fake_response(*_, **__):
+        return responses.pop(0)
+
+    monkeypatch.setattr(nt, "_load_expected_trading_dates", trading_day)
+    monkeypatch.setattr(nt, "_shared_response", fake_response)
+    monkeypatch.setitem(nt._refresh_metrics, "scheduled_completed_date", "")
+
+    moment = datetime(2026, 9, 16, 16, 30, tzinfo=SHANGHAI_TIMEZONE)
+    assert asyncio.run(nt.refresh_national_team_after_close(now=moment)) == "retry_partial"
+    assert nt._refresh_metrics["scheduled_completed_date"] == ""
+    assert asyncio.run(nt.refresh_national_team_after_close(now=moment)) == "refreshed"
+    assert nt._refresh_metrics["scheduled_completed_date"] == day
+    # 同一业务日完成后不再重复采集。
+    assert asyncio.run(nt.refresh_national_team_after_close(now=moment)) == "skipped_completed"
+
+
+def test_refresh_force_bypasses_response_cache(monkeypatch):
+    from app.financial_data.market.quotes import national_team as nt
+
+    calls: list[tuple[str, bool]] = []
+
+    async def fake_collect(days, *, trigger="request", force=False):
+        calls.append((trigger, force))
+        return build_national_team_response(
+            share_history={},
+            etf_close_history={},
+            index_close_history={},
+            fetched_at="2026-09-16T17:00:00+08:00",
+            requested_days=30,
+            expected_trading_dates=["2026-09-16"],
+        )
+
+    monkeypatch.setattr(nt, "_collect_response", fake_collect)
+    # 缓存里有旧值也不能被复用，否则定时刷新等于没刷。
+    nt.market_cache.set(nt._response_cache_key(120), {"stale": True}, ttl=600)
+
+    asyncio.run(nt._shared_response(120, trigger="scheduled", force=True))
+
+    assert calls == [("scheduled", True)]
+
+
+def test_lifecycle_registers_after_close_refresh_task() -> None:
+    """收盘后刷新必须真的挂在生命周期上，且不能被误接到 readiness。"""
+    import inspect
+    from unittest.mock import MagicMock
+
+    from app.runtime import lifecycle
+
+    params = inspect.signature(lifecycle.build_background_task_specs).parameters
+    assert "national_team_snapshot_refresh" in params
+    assert "national_team_snapshot_refresh" in inspect.signature(lifecycle.application_lifespan).parameters
+
+    specs = lifecycle.build_background_task_specs(**{name: MagicMock() for name in params})
+    spec = next(item for item in specs if item.name == "national_team_snapshot_refresh")
+
+    assert spec.long_running is True
+    assert spec.restart_on_exit is True
+    # 行情刷新挂了不影响 HTTP 请求，接 readiness 会让一次抖动摘掉全部流量。
+    assert spec.readiness_required is False
+    assert spec.critical is False

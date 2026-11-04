@@ -418,6 +418,29 @@ async def twitter_health_check() -> bool:
         return False
 
 
+async def refresh_national_team_snapshot_periodic() -> None:
+    """收盘后把国家队监测快照主动补齐一次（仅 leader 执行）。
+
+    轮询本身很轻（只在 16:00–18:00 窗口内触发采集，每个业务日只完成一次），因此
+    5 分钟的轮询成本可以忽略；真正的网络请求次数与“用户恰好在收盘后打开页面”
+    基本一致，但把冷启动成本从首个访客挪到了后台。
+
+    不接入 readiness：它挂了不影响 HTTP 请求，只需告警。
+    """
+    from app.financial_data.market.quotes.national_team import refresh_national_team_after_close
+
+    async def iteration() -> None:
+        await refresh_national_team_after_close()
+
+    await task_scheduler.run_periodic(
+        name="national_team_snapshot_refresh",
+        coro_factory=iteration,
+        interval_seconds=300,
+        leader_election=True,
+        retry_base_seconds=30,
+    )
+
+
 async def refresh_market_daily_bars_periodic() -> None:
     """盘后归档独立历史日线；实时行情由实时查询链负责，不写入此库。"""
     from app.modules.market_daily.service import market_daily_bar_service

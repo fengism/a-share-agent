@@ -266,3 +266,41 @@ def test_background_task_critical_defaults_to_zero() -> None:
     """没标 critical 的任务一律按非关键处理，不能凭空升级告警级别。"""
     text = _render(background_tasks={"legacy": {}})
     assert 'a_share_background_task_critical{task="legacy"} 0' in text
+
+
+def test_national_team_metrics_are_rendered_with_trigger_and_source_labels() -> None:
+    snapshot = {
+        "national_team": {
+            "attempts_total": 7,
+            "failures_total": 2,
+            "last_duration_ms": 1234.5,
+            "last_success_timestamp": 1700000000.0,
+            "coverage_ratio": 0.875,
+            "partial": 1,
+            "stale": 0,
+            "covered_etf_count": 21,
+            "total_etf_count": 24,
+            "by_trigger": {
+                "scheduled": {"attempts": 5, "failures": 1},
+                "request": {"attempts": 2, "failures": 1},
+            },
+            "source_failures": {"sse": 3, "szse_history": 1},
+        }
+    }
+
+    rendered = _render(snapshot)
+
+    assert "a_share_national_team_refresh_attempts_total 7" in rendered
+    assert "a_share_national_team_refresh_failures_total 2" in rendered
+    assert "a_share_national_team_coverage_ratio 0.875" in rendered
+    assert "a_share_national_team_partial 1" in rendered
+    assert "a_share_national_team_covered_etfs 21" in rendered
+    assert "a_share_national_team_total_etfs 24" in rendered
+    assert 'a_share_national_team_refresh_by_trigger_attempts_total{trigger="scheduled"} 5' in rendered
+    assert 'a_share_national_team_refresh_by_trigger_failures_total{trigger="request"} 1' in rendered
+    assert 'a_share_national_team_source_failures_total{scope="sse"} 3' in rendered
+
+
+def test_national_team_metrics_are_absent_when_snapshot_missing() -> None:
+    # 未启用该模块时不要凭空输出一堆 0，否则告警规则很难写。
+    assert "a_share_national_team_" not in _render({})

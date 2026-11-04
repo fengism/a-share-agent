@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import threading
+import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
@@ -83,6 +85,92 @@ _active_tasks: set[asyncio.Task] = set()
 _stopping = False
 T = TypeVar("T")
 
+#: 收盘后自动刷新使用的默认窗口，与前端默认的 120 天保持一致。
+_DEFAULT_REFRESH_DAYS = 120
+#: 自动刷新只看收盘后这段时间，避免全天候选上游叠加压力。
+_AFTER_CLOSE_START_HOUR = 16
+_AFTER_CLOSE_END_HOUR = 18
+
+
+# ---------------------------------------------------------------------------
+# 观测数据
+#
+# 国家队页面的刷新质量无从从外部观察：数据缺失了、上游挂了、覆盖率下降都在日志里
+# 混在其他请求中间。这里记录一份进程内计数，由 /metrics 导出（见 app/core/prometheus.py）。
+# ---------------------------------------------------------------------------
+_metrics_lock = threading.Lock()
+_refresh_metrics: dict[str, object] = {
+    "attempts_total": 0,
+    "failures_total": 0,
+    "last_duration_ms": 0.0,
+    "last_success_timestamp": 0.0,
+    "last_error": "",
+    "last_trigger": "",
+    "by_trigger": {},
+    "source_failures": {},
+    "coverage_ratio": 0.0,
+    "partial": 0,
+    "covered_etf_count": 0,
+    "total_etf_count": 0,
+    "as_of_date": "",
+    "stale": 0,
+    "scheduled_business_date": "",
+    "scheduled_completed_date": "",
+}
+
+
+def national_team_snapshot() -> dict[str, object]:
+    """返回国家队刷新与数据质量的当前快照，供 Prometheus 导出。"""
+    with _metrics_lock:
+        return {
+            **{key: value for key, value in _refresh_metrics.items() if key not in {"by_trigger", "source_failures"}},
+            "by_trigger": {
+                trigger: dict(counts)
+                for trigger, counts in cast(dict, _refresh_metrics["by_trigger"]).items()
+            },
+            "source_failures": dict(cast(dict, _refresh_metrics["source_failures"])),
+        }
+
+
+def _record_source_failure(scope: str) -> None:
+    with _metrics_lock:
+        failures = cast(dict[str, int], _refresh_metrics["source_failures"])
+        failures[scope] = failures.get(scope, 0) + 1
+
+
+def _record_collection(
+    trigger: str,
+    *,
+    started: float,
+    response: NationalTeamResponse | None = None,
+    error: BaseException | None = None,
+) -> None:
+    """记录一次完整采集的成败与数据质量。"""
+    duration_ms = round((time.monotonic() - started) * 1000, 2)
+    with _metrics_lock:
+        _refresh_metrics["attempts_total"] = int(_refresh_metrics["attempts_total"]) + 1
+        _refresh_metrics["last_duration_ms"] = duration_ms
+        _refresh_metrics["last_trigger"] = trigger
+        by_trigger = cast(dict[str, dict[str, int]], _refresh_metrics["by_trigger"])
+        counts = by_trigger.setdefault(trigger, {"attempts": 0, "failures": 0})
+        counts["attempts"] += 1
+        if error is not None:
+            _refresh_metrics["failures_total"] = int(_refresh_metrics["failures_total"]) + 1
+            counts["failures"] += 1
+            # 只保留异常类名：完整消息可能带 URL、参数等内部细节。
+            _refresh_metrics["last_error"] = type(error).__name__
+            return
+        if response is None:
+            return
+        _refresh_metrics["last_error"] = ""
+        _refresh_metrics["last_success_timestamp"] = time.time()
+        _refresh_metrics["coverage_ratio"] = response.summary.coverage_ratio
+        _refresh_metrics["partial"] = int(response.partial)
+        _refresh_metrics["stale"] = int(response.stale)
+        _refresh_metrics["covered_etf_count"] = response.covered_etf_count
+        _refresh_metrics["total_etf_count"] = response.total_etf_count
+        _refresh_metrics["as_of_date"] = response.as_of_date or ""
+
 
 def _calendar_window(moment: datetime) -> tuple[date, bool]:
     local = moment.astimezone(SHANGHAI_TIMEZONE)
@@ -120,6 +208,7 @@ async def _source_request(scope: str, key: str, loader: Callable[[], Awaitable[T
                 # 本地拥塞不是上游故障；冷却拒绝也不能续期，避免持续请求阻止恢复。
                 if upstream_started:
                     _source_cooldowns.set(scope, True, ttl=10)
+                    _record_source_failure(scope)
                 raise
             _source_cache.set(cache_key, result, ttl=60)
             return result
@@ -146,6 +235,9 @@ def initialize_national_team_refresh() -> None:
     _active_tasks.clear()
     _refresh_cooldowns.clear()
     _source_cooldowns.clear()
+    with _metrics_lock:
+        _refresh_metrics["scheduled_business_date"] = ""
+        _refresh_metrics["scheduled_completed_date"] = ""
     _stopping = False
 
 
@@ -1505,15 +1597,42 @@ def _response_window(days: int, now: datetime) -> tuple[date, date]:
     return end - timedelta(days=days - 1), end
 
 
-async def _collect_response(days: int = 120) -> NationalTeamResponse:
-    """返回核心宽基 ETF 份额与指数价格的国家队代理监测视图。"""
+async def _collect_response(days: int = 120, *, trigger: str = "request", force: bool = False) -> NationalTeamResponse:
+    """返回核心宽基 ETF 份额与指数价格的国家队代理监测视图。
+
+    Param:
+        days: 监测窗口自然日数，会被裁剪到 30–365。
+        trigger: 采集来源（``request`` / ``scheduled`` / ``prewarm``），只用于指标分维。
+        force: 为真时跳过响应缓存，仍写入。定时刷新必须越过缓存，否则会拿回
+            ``partial`` 时写入的 60s 旧值，刷新等于没刷。
+    """
     days = max(30, min(days, 365))
     now = datetime.now(SHANGHAI_TIMEZONE)
     cache_key = _response_cache_key(days, now)
-    cached = market_cache.get(cache_key)
-    if cached is not None:
-        return NationalTeamResponse.model_validate(cached)
+    if not force:
+        cached = market_cache.get(cache_key)
+        if cached is not None:
+            return NationalTeamResponse.model_validate(cached)
 
+    started = time.monotonic()
+    try:
+        result = await _collect_response_uncached(days, now=now, cache_key=cache_key)
+    except asyncio.CancelledError:
+        # 关闭时的取消不是刷新失败，计进 failures 会误导读数。
+        raise
+    except BaseException as error:
+        _record_collection(trigger, started=started, error=error)
+        raise
+    _record_collection(trigger, started=started, response=result)
+    return result
+
+
+async def _collect_response_uncached(
+    days: int,
+    *,
+    now: datetime,
+    cache_key: str,
+) -> NationalTeamResponse:
     start, end = _response_window(days, now)
     (expected_trading_dates, calendar_degraded), (etf_closes, index_closes, etf_amounts) = await asyncio.gather(
         _load_expected_trading_dates(start, now),
@@ -1571,7 +1690,7 @@ async def _collect_response(days: int = 120) -> NationalTeamResponse:
     return result
 
 
-async def _shared_response(days: int) -> NationalTeamResponse:
+async def _shared_response(days: int, *, trigger: str = "request", force: bool = False) -> NationalTeamResponse:
     if _stopping:
         raise asyncio.CancelledError
 
@@ -1579,10 +1698,13 @@ async def _shared_response(days: int) -> NationalTeamResponse:
         task = asyncio.current_task()
         _active_tasks.add(task)
         try:
-            return await _collect_response(days)
+            return await _collect_response(days, trigger=trigger, force=force)
         finally:
             _active_tasks.discard(task)
 
+    if force:
+        # 强制刷新不能走 singleflight 的缓存位，否则会拿回同一个未刷新的飞行结果。
+        return await load()
     return await _response_flight.do(_response_cache_key(days), load)
 
 
@@ -1669,3 +1791,68 @@ async def prewarm_national_team_prices() -> None:
         *[load_index(key, definition) for key, definition in INDEX_POOL.items()],
         *[load_etf(code) for code in ETF_POOL],
     )
+
+
+async def refresh_national_team_after_close(now: datetime | None = None) -> str:
+    """收盘后把默认窗口的监测快照主动补齐一次。
+
+    此前数据只在用户访问时才刷新：没人打开页面，收盘后的份额就永远缺席；而当天
+    第一个访客要自己承担冷启动的 22 只 ETF + 10 个指数行情拉取。
+
+    只在 16:00–18:00 窗口内动作，且每个业务日只完成一次：
+
+    - 判断“完成”看的是 ``as_of_date == 当日 且 not partial``。交易所份额发布常
+      晚于 16:00，若只看“跑过一次”就标记完成，当天永远不会再补；
+    - 18:00 后不再尝试，避免非交易日/节假日全天反复请求上游；
+    - 失败不做额外退避，由外层 5 分钟轮询节奏自然限流，底层源级冷却已拦得很密。
+
+    Return:
+        一个稳定的状态标签，便于测试与日志：``skipped_before_close`` /
+        ``skipped_after_window`` / ``skipped_not_trading_day`` /
+        ``skipped_completed`` / ``refreshed`` / ``retry_partial`` / ``failed``。
+    """
+    moment = now or datetime.now(SHANGHAI_TIMEZONE)
+    business_date, _released = _calendar_window(moment)
+    if moment.hour < _AFTER_CLOSE_START_HOUR:
+        return "skipped_before_close"
+    if moment.hour >= _AFTER_CLOSE_END_HOUR:
+        return "skipped_after_window"
+
+    day_text = business_date.isoformat()
+    with _metrics_lock:
+        if _refresh_metrics["scheduled_completed_date"] == day_text:
+            return "skipped_completed"
+        _refresh_metrics["scheduled_business_date"] = day_text
+
+    expected_dates, calendar_degraded = await _load_expected_trading_dates(
+        business_date - timedelta(days=7),
+        moment,
+    )
+    if calendar_degraded or day_text not in expected_dates:
+        # 宁可不刷，也不要在非交易日把同一份数据反复拉一遍。
+        return "skipped_not_trading_day"
+
+    try:
+        response = await _shared_response(_DEFAULT_REFRESH_DAYS, trigger="scheduled", force=True)
+    except Exception as error:
+        logger.warning("国家队收盘后刷新失败 error=%r", error)
+        return "failed"
+
+    if response.partial or response.as_of_date != day_text:
+        logger.info(
+            "国家队收盘后刷新未完成，等待份额发布 as_of=%s expected=%s partial=%s",
+            response.as_of_date,
+            day_text,
+            response.partial,
+        )
+        return "retry_partial"
+
+    with _metrics_lock:
+        _refresh_metrics["scheduled_completed_date"] = day_text
+    logger.info(
+        "国家队收盘后刷新完成 as_of=%s covered=%s/%s",
+        response.as_of_date,
+        response.covered_etf_count,
+        response.total_etf_count,
+    )
+    return "refreshed"

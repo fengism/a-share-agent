@@ -116,6 +116,42 @@ def render_prometheus_metrics(
                 _sample(f"a_share_market_snapshot_{field}", values.get(field, 0), **labels)
             )
 
+    # 国家队：刷新成败、数据覆盖率与新鲜度。全在后台静默进行，没有指标就只能靠用户
+    # 反馈“页面是空的”。
+    national_team = snapshot.get("national_team", {})
+    if national_team:
+        lines.append(_sample("a_share_national_team_refresh_attempts_total", national_team.get("attempts_total", 0)))
+        lines.append(_sample("a_share_national_team_refresh_failures_total", national_team.get("failures_total", 0)))
+        lines.append(_sample("a_share_national_team_refresh_duration_milliseconds", national_team.get("last_duration_ms", 0)))
+        lines.append(_sample("a_share_national_team_coverage_ratio", national_team.get("coverage_ratio", 0)))
+        lines.append(_sample("a_share_national_team_partial", national_team.get("partial", 0)))
+        lines.append(_sample("a_share_national_team_stale", national_team.get("stale", 0)))
+        lines.append(_sample("a_share_national_team_covered_etfs", national_team.get("covered_etf_count", 0)))
+        lines.append(_sample("a_share_national_team_total_etfs", national_team.get("total_etf_count", 0)))
+        lines.append(
+            _sample(
+                "a_share_national_team_last_success_timestamp_seconds",
+                national_team.get("last_success_timestamp", 0),
+            )
+        )
+        for trigger, counts in national_team.get("by_trigger", {}).items():
+            lines.append(
+                _sample(
+                    "a_share_national_team_refresh_by_trigger_attempts_total",
+                    counts.get("attempts", 0),
+                    trigger=trigger,
+                )
+            )
+            lines.append(
+                _sample(
+                    "a_share_national_team_refresh_by_trigger_failures_total",
+                    counts.get("failures", 0),
+                    trigger=trigger,
+                )
+            )
+        for scope, count in national_team.get("source_failures", {}).items():
+            lines.append(_sample("a_share_national_team_source_failures_total", count, scope=scope))
+
     workflow = snapshot.get("workflow", {})
     for kind, events in workflow.get("events", {}).items():
         for event, count in events.items():

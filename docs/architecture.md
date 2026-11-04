@@ -119,9 +119,9 @@ performance 5/10/20 日前瞻复盘
 `readiness_required=True` 只给**「不跑就无法提供服务」**的任务开：目前是
 `quant_job_worker` 与 `workflow_job_worker`（不跑则用户提交的任务无限排队）。
 
-**不要**给 `database_backup`、`wal_checkpoint`、各类 prewarm 开——它们属于运维健康，
-挂了不影响 HTTP 请求，接到 readiness 上会让一次备份抖动摘掉全部流量。这类任务靠
-Prometheus 告警：`a_share_background_task_consecutive_errors{task=...}`。
+**不要**给 `database_backup`、`wal_checkpoint`、各类 prewarm、`national_team_snapshot_refresh`
+开——它们属于运维健康，挂了不影响 HTTP 请求，接到 readiness 上会让一次备份抖动摘掉
+全部流量。这类任务靠 Prometheus 告警：`a_share_background_task_consecutive_errors{task=...}`。
 
 #### `critical` 与 `readiness_required` 不是同一件事
 
@@ -139,7 +139,8 @@ Prometheus 告警：`a_share_background_task_consecutive_errors{task=...}`。
 - `critical=True, readiness_required=False`：`database_backup`、`wal_checkpoint`、
   `twitter_feed`、`industry_mapping_refresh`、`quant_strategy_reload`、`bot_job_worker`
   ——该告警，但挂了不影响读行情，不能摘流量。
-- `critical=False, readiness_required=False`：各类 prewarm 与行情刷新。
+- `critical=False, readiness_required=False`：各类 prewarm、行情刷新与
+  `national_team_snapshot_refresh`。
 - `critical=False, readiness_required=True`：没有实例，也不建议——摘了流量却没告警，
   等于悄悄降级。
 

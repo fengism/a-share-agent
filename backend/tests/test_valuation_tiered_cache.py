@@ -132,6 +132,7 @@ def test_lifecycle_registers_stock_valuation_snapshot_refresh() -> None:
         quant_strategy_reload=MagicMock(),
         quant_job_worker=MagicMock(),
         workflow_job_worker=MagicMock(),
+        national_team_snapshot_refresh=MagicMock(),
     )
     names = {s.name for s in specs}
     assert "stock_valuation_snapshot_refresh" in names

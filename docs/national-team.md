@@ -43,6 +43,58 @@
 启动预热任务：`national_team_price_prewarm`（`app/runtime/lifecycle.py`），只预热行情
 日 K，成功与否不影响启动。
 
+### 2.1 收盘后自动刷新
+
+`national_team_snapshot_refresh`（`app/runtime/background_tasks.py`）每 5 分钟轮询一次，
+但**只在 16:00–18:00 窗口内、交易日、且当日尚未完成时**才真正采集：
+
+- 轮询本身几乎零成本（与 `/ready` 同级的常数检查），真正的上游请求次数与「用户恰好
+  在收盘后打开页面」时一致，但把冷启动成本从首个访客挤到了后台；
+- 判定「完成」看的是 `as_of_date == 当日 且 not partial`。交易所份额发布常晚于 16:00，
+  若只看「跑过一次」就标记完成，当天永远不会再补；
+- 18:00 后不再尝试，避免非交易日/节假日全天反复请求上游；
+- `leader_election=True`：多副本只让 leader 刷，不会 N 倍打上游。
+- **不接入 readiness**：它挂了不影响 HTTP 请求，接了会让一次行情抖动摘掉流量。
+
+### 2.2 Prometheus 指标
+
+`national_team_snapshot()`（`app/runtime/health.py` → `application_metrics["national_team"]`
+→ `app/core/prometheus.py`）导出：
+
+| 指标 | 含义 |
+| --- | --- |
+| `a_share_national_team_refresh_attempts_total` | 采集次数（含定时/请求触发） |
+| `a_share_national_team_refresh_failures_total` | 采集失败次数（取消不计） |
+| `a_share_national_team_refresh_duration_milliseconds` | 最近一次采集耗时 |
+| `a_share_national_team_coverage_ratio` | 最近一次成功的 ETF 覆盖率 |
+| `a_share_national_team_partial` / `_stale` | 最近一次结果是否不完整 / 陈旧 |
+| `a_share_national_team_covered_etfs` / `_total_etfs` | 覆盖数 / 池内总数 |
+| `a_share_national_team_last_success_timestamp_seconds` | 最近一次成功时间 |
+| `a_share_national_team_refresh_by_trigger_{attempts,failures}_total{trigger}` | 按触发源（`request`/`scheduled`）拆分 |
+| `a_share_national_team_source_failures_total{scope}` | 按数据源（`sse`/`szse_history`/…）拆分的失败数 |
+
+`last_error` 只存**异常类名**，不带消息：上游报错文本里常有 URL 与请求参数，
+不能进 `/metrics`。
+
+告警示例：
+
+```promql
+# 覆盖率持续偏低：多数 ETF 份额没抓到，页面结论会失真
+(a_share_national_team_coverage_ratio < 0.8)
+  and on() (a_share_national_team_refresh_attempts_total > 0)
+
+# 持续刷新失败
+increase(a_share_national_team_refresh_failures_total[30m]) > 3
+
+# 某个数据源变砖（与 provider 指标一起吃，能定位到具体源）
+increase(a_share_national_team_source_failures_total{scope="szse_history"}[1h]) > 5
+```
+
+**注意**：定时刷新失败**不会**体现在
+`a_share_background_task_consecutive_errors{task="national_team_snapshot_refresh"}` 上。
+轮询循环刻意不抛异常（否则一次上游抖动就会被 supervisor 重启），因此任务健康度
+恒为健康，真正的失败信号只在上面这三个国家队专属计数里。
+
 ## 3. 覆盖率与「部分数据」
 
 份额缺失是常态（某只 ETF 当日未披露、深交所窗口未回填完、新 ETF 首日无前值）。
@@ -142,7 +194,6 @@ pages/NationalTeam/
 
 1. 单接口一次返回 22 只 ETF × 至多 365 天全量点位 + 10 条指数序列 + 静态画像；
    拆分 `overview` / `series` 分层接口可以显著压缩首屏体积。
-2. 无收盘后定时刷新任务，数据新鲜度依赖用户访问触发（仅有启动预热）。
-3. 托底强度指数无历史序列、无置信度、无「信号出现后 5/20 日表现」回测。
-4. 静态画像仍是人工维护，长期应由定期报告 / 十大股东数据生成。
-5. 无 Prometheus 指标（刷新成功率、各源失败数、覆盖率、缓存命中率）。
+2. 托底强度指数无历史序列、无置信度、无「信号出现后 5/20 日表现」回测。
+3. 静态画像仍是人工维护，长期应由定期报告 / 十大股东数据生成。
+4. 响应无 ETag / `Cache-Control`，缓存只靠进程内 TTL 与前端 React Query。

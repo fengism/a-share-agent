@@ -109,6 +109,7 @@ def build_background_task_specs(
     quant_strategy_reload: AsyncTaskFactory,
     quant_job_worker: AsyncTaskFactory,
     workflow_job_worker: AsyncTaskFactory,
+    national_team_snapshot_refresh: AsyncTaskFactory,
 ) -> tuple[BackgroundTaskSpec, ...]:
     return (
         BackgroundTaskSpec(
@@ -155,6 +156,16 @@ def build_background_task_specs(
                 national_team_price_prewarm,
             ),
             start_message="国家队行情缓存预热任务已启动",
+        ),
+        BackgroundTaskSpec(
+            name="national_team_snapshot_refresh",
+            factory=national_team_snapshot_refresh,
+            long_running=True,
+            # 挂了不影响读行情，不接入 readiness（接了会让一次行情抖动摘掉流量）；
+            # 靠 a_share_national_team_* 指标告警。
+            critical=False,
+            restart_on_exit=True,
+            start_message="国家队收盘后快照刷新任务已启动",
         ),
         BackgroundTaskSpec(
             name="industry_mapping_refresh",
@@ -327,6 +338,7 @@ async def application_lifespan(
     quant_strategy_reload: AsyncTaskFactory,
     quant_job_worker: AsyncTaskFactory,
     workflow_job_worker: AsyncTaskFactory,
+    national_team_snapshot_refresh: AsyncTaskFactory,
     settings_effects_shutdown: AsyncTaskFactory,
     javascript_runtime_initializer: Callable[[], None] = initialize_javascript_runtime,
     history_index_initializer: Callable[[], None] = ensure_history_indexes,
@@ -421,6 +433,7 @@ async def application_lifespan(
         hk_stock_search_prewarm=prewarm_hk_stock_search_index,
         us_macro_prewarm=prewarm_us_macro_data,
         national_team_price_prewarm=prewarm_national_team_prices,
+        national_team_snapshot_refresh=national_team_snapshot_refresh,
         industry_mapping_refresh=industry_mapping_refresh,
         wal_checkpoint=wal_checkpoint,
         database_backup=database_backup,
