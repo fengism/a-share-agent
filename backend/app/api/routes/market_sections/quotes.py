@@ -1,8 +1,9 @@
 """市场行情与资金流 HTTP API。"""
 
+import hashlib
 from datetime import date as Date
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request, Response
 
 from app.api.auth.dependencies import require_admin
 from app.core.market import normalize_code
@@ -161,6 +162,8 @@ async def get_market_breadth(
     response_model=NationalTeamResponse,
 )
 async def get_national_team_etf_holdings(
+    request: Request,
+    response: Response,
     days: int = Query(120, ge=30, le=365, description="返回最近自然日数量，30-365"),
     include_etf_points: bool = Query(
         True,
@@ -171,7 +174,58 @@ async def get_national_team_etf_holdings(
     ),
 ):
     """获取核心宽基 ETF 份额变化与国家队持仓代理监测。"""
-    return await get_national_team_etf_holdings_service(days, include_etf_points=include_etf_points)
+    result = await get_national_team_etf_holdings_service(days, include_etf_points=include_etf_points)
+    etag = _national_team_etag(result, include_etf_points)
+    cache_control = _national_team_cache_control(result)
+    if _etag_matches(request.headers.get("if-none-match"), etag):
+        # 304 必须带上同样的缓存头，否则中间缓存会以为这个响应不可缓存。
+        return Response(status_code=304, headers={"ETag": etag, "Cache-Control": cache_control})
+    response.headers["ETag"] = etag
+    response.headers["Cache-Control"] = cache_control
+    return result
+
+
+def _national_team_etag(result: NationalTeamResponse, include_etf_points: bool) -> str:
+    """根据影响响应体的字段生成弱 ETag。
+
+    不直接 hash 整份 JSON：国家队响应可达数百 KiB，每次请求都序列化一遍只为算
+    ETag 不划算。这里取所有会随请求变化的标量——数据本身的更新只体现在
+    ``fetched_at`` 上，动态标志单独列出即可。
+    """
+    parts = "|".join(
+        (
+            result.fetched_at,
+            result.as_of_date or "",
+            result.expected_date or "",
+            str(result.partial),
+            str(result.refreshing),
+            str(result.stale),
+            str(result.calendar_degraded),
+            str(include_etf_points),
+        )
+    )
+    return '"' + hashlib.sha256(parts.encode("utf-8")).hexdigest()[:32] + '"'
+
+
+def _national_team_cache_control(result: NationalTeamResponse) -> str:
+    """浏览器端缓存时长不得超过后端缓存：partial 60s，完整结果 300s。"""
+    max_age = 60 if result.partial or result.refreshing else 300
+    return f"private, max-age={max_age}"
+
+
+def _etag_matches(if_none_match: str | None, etag: str) -> bool:
+    """支持逗号分隔的 If-None-Match，以及弱校验前缀 W/。"""
+    if not if_none_match:
+        return False
+    for candidate in if_none_match.split(","):
+        normalized = candidate.strip()
+        if normalized == "*":
+            return True
+        if normalized.startswith("W/"):
+            normalized = normalized[2:]
+        if normalized == etag:
+            return True
+    return False
 
 
 @router.get("/price-anomaly", response_model=MarketPriceAnomalyResponse)

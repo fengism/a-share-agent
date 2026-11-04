@@ -143,9 +143,19 @@ increase(a_share_national_team_source_failures_total{scope="szse_history"}[1h]) 
 | 板块扩散 | 30 | 当日为正净申购的战术分类占比 |
 | 逆势抗跌 | 30 | 沪深300 当日涨跌 × 净申购方向的组合 |
 
-分档阈值是**固定经验值**，未按牛熊阶段校准，也没有置信度字段。它只适合做横向对比
-与变化方向提示，不适合当成绝对「救市力度」读数。要改成滚动分位数需要先攒够至少
-一年的 `daily_flows` 历史，属于后续工作。
+分档阈值是**固定经验值**，未按牛熊阶段校准。它只适合做横向对比与变化方向提示，
+不适合当成绝对「救市力度」读数。要改成滚动分位数需要先攒够至少一年的
+`daily_flows` 历史，属于后续工作。
+
+分数旁边还有一个**置信度**（`confidence`，0–1）：
+
+```
+confidence = 覆盖率 × 新鲜度 × 日历可用性
+           = (populated / ETF_POOL) × (stale ? 0.35 : 1) × (calendar_degraded ? 0.7 : 1)
+```
+
+分数本身**不因低置信度打折**（否则同一盘面会随覆盖率忽高忽低），低置信度由前端
+用「置信度 xx%」标签与 tooltip 提示。低于 50% 时文案直接写「请勿据此单独决策」。
 
 ### 4.2 托底点位分布（`_calculate_support_zones`）
 
@@ -206,12 +216,22 @@ pages/NationalTeam/
   相同，已有测试卡死这一点；
 - 缓存里始终存**完整**响应：若把两种模式分别缓存，容量翻倍且互相抢占。
 
-## 8. 已知限制 / 后续工作
+## 8. HTTP 缓存
+
+接口返回 `ETag` 与 `Cache-Control`：
+
+- `ETag` 由 `fetched_at`、`as_of_date`、`partial` / `refreshing` / `stale` /
+  `calendar_degraded`、`include_etf_points` 等影响响应体的标量拼成，不 hash 整份
+  JSON（响应可达数百 KiB，每次请求序列化只为算 ETag 不划算）；
+- 请求带 `If-None-Match` 且匹配时返回 **304**，并携带同样的缓存头；
+- `Cache-Control: private, max-age=60`（partial/refreshing）或 `max-age=300`（完整），
+  浏览器端缓存不得超过后端缓存。
+
+## 9. 已知限制 / 后续工作
 
 1. 指数序列（10 条 × N 天）无法按需获取，仍是全量返回；拆分
    `overview` / `series` 分层接口可以进一步压缩首屏。
 2. `daily_flows[].flows_by_index` 前端未使用（按宽基的当日资金流，与指数序列重复），
    可考虑一并门控。
-3. 托底强度指数无历史序列、无置信度、无「信号出现后 5/20 日表现」回测。
+3. 托底强度指数已有置信度，但无历史序列、无「信号出现后 5/20 日表现」回测。
 4. 静态画像仍是人工维护，长期应由定期报告 / 十大股东数据生成。
-5. 响应无 ETag / `Cache-Control`，缓存只靠进程内 TTL 与前端 React Query。

@@ -12092,6 +12092,11 @@ export interface components {
              */
             breadth_factor?: number;
             /**
+             * Confidence
+             * @default 0
+             */
+            confidence?: number;
+            /**
              * Description
              * @default
              */

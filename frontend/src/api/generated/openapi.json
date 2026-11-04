@@ -18050,6 +18050,11 @@
             "title": "Breadth Factor",
             "type": "number"
           },
+          "confidence": {
+            "default": 0.0,
+            "title": "Confidence",
+            "type": "number"
+          },
           "description": {
             "default": "",
             "title": "Description",

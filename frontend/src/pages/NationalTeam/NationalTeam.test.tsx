@@ -118,6 +118,7 @@ const data = {
     net_flow_factor: 25.5,
     breadth_factor: 22.0,
     divergence_factor: 21.0,
+    confidence: 0.86,
   },
   milestones: [
     {
@@ -446,6 +447,7 @@ describe("NationalTeam page", () => {
     expect(screen.getByText("国家队托底雷达")).toBeInTheDocument();
     expect(screen.getByText("69")).toBeInTheDocument();
     expect(screen.getByText("积极托底")).toBeInTheDocument();
+    expect(screen.getByTestId("national-team-support-confidence")).toHaveTextContent("置信度 86%");
     expect(screen.getByText(/资金托底因子/)).toBeInTheDocument();
     expect(screen.getByText("25.5 / 40")).toBeInTheDocument();
 
@@ -462,6 +464,23 @@ describe("NationalTeam page", () => {
     expect(screen.getByText("3600 点")).toBeInTheDocument();
     expect(screen.getByText("安全垫 +6.94%")).toBeInTheDocument();
     expect(screen.getByText("3400-3600")).toBeInTheDocument();
+  });
+
+  it("surfaces low confidence when coverage is poor", () => {
+    mocks.useNationalTeamHoldings.mockReturnValue({
+      data: {
+        ...data,
+        support_score: { ...data.support_score, confidence: 0.3 },
+      },
+      isLoading: false,
+      isFetching: false,
+      error: null,
+      refetch: mocks.refetch,
+    });
+
+    renderPage();
+
+    expect(screen.getByTestId("national-team-support-confidence")).toHaveTextContent("置信度 30%");
   });
 
   it("renders ETF volume and abnormal volume tags", () => {

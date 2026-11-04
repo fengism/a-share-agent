@@ -648,6 +648,9 @@ class NationalTeamSupportScore(BaseModel):
     net_flow_factor: float = 0.0
     breadth_factor: float = 0.0
     divergence_factor: float = 0.0
+    #: 0–1，由 ETF 覆盖率与数据新鲜度推导。分数本身不变，但低置信度时不应
+    #: 被当成确定结论使用。
+    confidence: float = 0.0
 
 
 class NationalTeamSupportZoneItem(BaseModel):

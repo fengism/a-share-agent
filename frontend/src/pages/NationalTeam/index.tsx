@@ -612,6 +612,15 @@ function SupportScoreRadarCard({ supportScore }: { supportScore?: NationalTeamSu
   if (!supportScore) return null;
 
   const score = supportScore.score;
+  const confidence = supportScore.confidence ?? 0;
+  const confidencePct = Math.round(confidence * 100);
+  const confidenceColor = confidence >= 0.8 ? "green" : confidence >= 0.5 ? "gold" : "red";
+  const confidenceHint =
+    confidence >= 0.8
+      ? "ETF 覆盖率与数据新鲜度良好。"
+      : confidence >= 0.5
+      ? "部分 ETF 份额或行情缺失，结论仅供参考。"
+      : "样本覆盖不足或数据陈旧，请勿据此单独决策。";
   const statusColors = {
     strong: { bg: "rgba(245, 34, 45, 0.12)", border: "#f5222d", text: "#f5222d", tag: "red" },
     active: { bg: "rgba(250, 140, 22, 0.12)", border: "#fa8c16", text: "#fa8c16", tag: "orange" },
@@ -655,6 +664,15 @@ function SupportScoreRadarCard({ supportScore }: { supportScore?: NationalTeamSu
                 <Tag color={statusColors.tag} style={{ margin: 0, fontWeight: 600, fontSize: 11 }}>
                   {supportScore.label}
                 </Tag>
+                <Tooltip title={confidenceHint}>
+                  <Tag
+                    color={confidenceColor}
+                    style={{ margin: 0, fontSize: 10, lineHeight: "16px", padding: "0 4px" }}
+                    data-testid="national-team-support-confidence"
+                  >
+                    置信度 {confidencePct}%
+                  </Tag>
+                </Tooltip>
               </div>
               <Text type="secondary" style={{ fontSize: 11, display: "block", marginTop: 4, lineHeight: 1.4 }}>
                 {supportScore.description || "综合测算资金流入、板块覆盖度与抗跌偏离。"}

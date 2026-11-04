@@ -718,8 +718,15 @@ def _calculate_support_score(
     summary: NationalTeamSummary,
     daily_flows: list[NationalTeamDailyFlow],
     indices: list[NationalTeamIndexSeries],
+    *,
+    stale: bool = False,
+    calendar_degraded: bool = False,
 ) -> NationalTeamSupportScore:
-    """计算国家队托底护盘强度指数（0-100）。"""
+    """计算国家队托底护盘强度指数（0-100）与置信度（0-1）。
+
+    分数本身是固定阈值的经验模型，**不随数据质量打折**：打折会让同一盘面在不同
+    覆盖率下忽高忽低。数据质量单独通过 ``confidence`` 表达，由前端提示用户。
+    """
     flow_1d = summary.estimated_net_flow_1d_100m or 0.0
     flow_5d = summary.estimated_net_flow_5d_100m or 0.0
 
@@ -795,7 +802,30 @@ def _calculate_support_score(
         net_flow_factor=round(net_flow_factor, 1),
         breadth_factor=breadth_factor,
         divergence_factor=round(divergence_factor, 1),
+        confidence=_support_confidence(
+            summary,
+            stale=stale,
+            calendar_degraded=calendar_degraded,
+        ),
     )
+
+
+def _support_confidence(
+    summary: NationalTeamSummary,
+    *,
+    stale: bool,
+    calendar_degraded: bool,
+) -> float:
+    """由覆盖率与新鲜度推导托底评分的置信度。
+
+    - 覆盖率：只有一部分 ETF 有份额时，资金因子与扩散因子都不可靠；
+    - ``stale``：份额停在上一交易日，评的是“昨天”的盘面；
+    - ``calendar_degraded``：连今天是不是交易日都无法确认，进一步打折。
+    """
+    coverage = max(0.0, min(1.0, summary.coverage_ratio))
+    freshness = 0.35 if stale else 1.0
+    calendar = 0.7 if calendar_degraded else 1.0
+    return round(coverage * freshness * calendar, 2)
 
 
 def _calculate_support_zones(indices: list[NationalTeamIndexSeries]) -> list[NationalTeamSupportZone]:
@@ -1024,7 +1054,13 @@ def build_national_team_response(
                 flows_by_category=day_flows_by_category,
             )
         )
-    support_score = _calculate_support_score(summary, daily_flows, indices)
+    support_score = _calculate_support_score(
+        summary,
+        daily_flows,
+        indices,
+        stale=stale,
+        calendar_degraded=calendar_degraded,
+    )
     support_zones = _calculate_support_zones(indices)
     return NationalTeamResponse(
         fetched_at=fetched_at,

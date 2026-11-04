@@ -489,3 +489,143 @@ def test_get_national_team_holdings_trims_only_when_asked(monkeypatch):
     assert any(item.points for item in kept.etfs)
     assert all(item.points == [] for item in stripped.etfs)
     assert stripped.summary.total_shares_100m == kept.summary.total_shares_100m
+
+
+def test_support_score_confidence_reflects_coverage_and_freshness():
+    from app.financial_data.market.quotes.national_team import ETF_POOL, INDEX_POOL
+
+    dates = ["2026-09-15", "2026-09-16"]
+
+    def build(*, expected_dates, codes):
+        return build_national_team_response(
+            share_history={
+                code: {dates[0]: 100_000_000, dates[1]: 110_000_000}
+                for code in codes
+            },
+            etf_close_history={
+                code: {dates[0]: 3.5, dates[1]: 3.6}
+                for code in codes
+            },
+            index_close_history={
+                key: {dates[0]: 3500.0, dates[1]: 3520.0}
+                for key in INDEX_POOL
+            },
+            fetched_at="2026-09-16T18:00:00+08:00",
+            requested_days=30,
+            expected_trading_dates=expected_dates,
+        )
+
+    complete = build(expected_dates=dates, codes=list(ETF_POOL))
+    assert complete.summary.coverage_ratio == pytest.approx(1.0)
+    assert complete.support_score.confidence == pytest.approx(1.0)
+    # 分数本身不受置信度影响。
+    assert complete.support_score.score > 0
+
+    # 份额停在上一交易日：评的是“昨天”的盘面。
+    stale = build(expected_dates=[*dates, "2026-09-17"], codes=list(ETF_POOL))
+    assert stale.stale is True
+    assert stale.support_score.confidence == pytest.approx(0.35)
+
+    # 只有两只 ETF 有数据：覆盖不足，置信度应显著降低。
+    sparse = build(expected_dates=dates, codes=["510300", "510310"])
+    assert sparse.summary.coverage_ratio < 0.2
+    assert sparse.support_score.confidence < 0.2
+
+
+def _http_request(headers: list[tuple[bytes, bytes]] | None = None):
+    from starlette.requests import Request
+
+    return Request(
+        {
+            "type": "http",
+            "http_version": "1.1",
+            "method": "GET",
+            "scheme": "http",
+            "path": "/api/market/national-team-etf-holdings",
+            "raw_path": b"/api/market/national-team-etf-holdings",
+            "query_string": b"",
+            "headers": headers or [],
+            "client": ("127.0.0.1", 1234),
+            "server": ("testserver", 80),
+        }
+    )
+
+
+def test_national_team_route_sets_etag_and_returns_304(monkeypatch):
+    from starlette.responses import Response
+
+    from app.api.routes.market_sections import quotes as quotes_route
+
+    dates = ["2026-09-15", "2026-09-16"]
+    members = ["510300", "510310", "510330", "159919"]
+    payload = build_national_team_response(
+        share_history={code: {dates[0]: 100_000_000, dates[1]: 110_000_000} for code in members},
+        etf_close_history={code: {dates[0]: 3.5, dates[1]: 3.6} for code in members},
+        index_close_history={"csi300": {dates[0]: 3800.0, dates[1]: 3850.0}},
+        fetched_at="2026-09-16T18:00:00+08:00",
+        requested_days=30,
+        expected_trading_dates=dates,
+    )
+    seen: list[bool] = []
+
+    async def fake_service(days, *, include_etf_points=True):
+        seen.append(include_etf_points)
+        return payload
+
+    monkeypatch.setattr(quotes_route, "get_national_team_etf_holdings_service", fake_service)
+
+    response = Response()
+    result = asyncio.run(
+        quotes_route.get_national_team_etf_holdings(
+            _http_request(), response, days=120, include_etf_points=False
+        )
+    )
+    assert result is payload
+    assert seen == [False]
+    etag = response.headers["etag"]
+    assert etag.startswith('"') and etag.endswith('"')
+    assert response.headers["cache-control"].startswith("private, max-age=")
+
+    not_modified = asyncio.run(
+        quotes_route.get_national_team_etf_holdings(
+            _http_request([(b"if-none-match", etag.encode())]),
+            Response(),
+            days=120,
+            include_etf_points=False,
+        )
+    )
+    assert isinstance(not_modified, Response)
+    assert not_modified.status_code == 304
+    assert not_modified.headers["etag"] == etag
+    # 304 也必须带缓存头，否则中间缓存会以为不可缓存。
+    assert "cache-control" in not_modified.headers
+
+
+def test_national_team_etag_matches_weak_and_comma_separated_values():
+    from app.api.routes.market_sections.quotes import _etag_matches
+
+    etag = '"abc123"'
+    assert _etag_matches(None, etag) is False
+    assert _etag_matches(etag, etag) is True
+    assert _etag_matches(f'"other", {etag}', etag) is True
+    assert _etag_matches(f'W/{etag}', etag) is True
+    assert _etag_matches("*", etag) is True
+    assert _etag_matches('"different"', etag) is False
+
+
+def test_national_team_cache_control_shortens_when_partial():
+    from app.api.routes.market_sections.quotes import _national_team_cache_control
+
+    dates = ["2026-09-15", "2026-09-16"]
+    full = build_national_team_response(
+        share_history={code: {dates[0]: 100_000_000, dates[1]: 110_000_000} for code in ETF_POOL},
+        etf_close_history={code: {dates[0]: 3.5, dates[1]: 3.6} for code in ETF_POOL},
+        index_close_history={key: {dates[0]: 3500.0, dates[1]: 3520.0} for key in INDEX_POOL},
+        fetched_at="2026-09-16T18:00:00+08:00",
+        requested_days=30,
+        expected_trading_dates=dates,
+    )
+    assert _national_team_cache_control(full) == "private, max-age=300"
+
+    partial = full.model_copy(update={"partial": True})
+    assert _national_team_cache_control(partial) == "private, max-age=60"
