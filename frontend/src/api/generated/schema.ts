@@ -11801,6 +11801,8 @@ export interface components {
             latest_change_1d_100m?: number | null;
             /** Latest Date */
             latest_date?: string | null;
+            /** Latest Estimated Net Flow 100M */
+            latest_estimated_net_flow_100m?: number | null;
             /** Latest Shares 100M */
             latest_shares_100m?: number | null;
             /** Name */
@@ -11975,6 +11977,11 @@ export interface components {
             daily_flows?: components["schemas"]["NationalTeamDailyFlow"][];
             /** Disclaimer */
             disclaimer: string;
+            /**
+             * Etf Points Included
+             * @default true
+             */
+            etf_points_included: boolean;
             /** Etfs */
             etfs?: components["schemas"]["NationalTeamEtfSeries"][];
             /** Expected Date */
@@ -21454,6 +21461,8 @@ export interface operations {
             query?: {
                 /** @description 返回最近自然日数量，30-365 */
                 days?: number;
+                /** @description 是否返回每只 ETF 的完整点位序列。ETF 表格只需最新一天的标量（latest_estimated_net_flow_100m），传 false 约省 65% 响应体积。 */
+                include_etf_points?: boolean;
             };
             header?: never;
             path?: never;

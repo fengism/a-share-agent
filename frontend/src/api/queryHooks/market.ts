@@ -271,7 +271,9 @@ export function useNationalTeamHoldings(days = 120) {
   return useQuery({
     queryKey: queryKeys.market.nationalTeam(days),
     queryFn: () => openApiGet("/api/market/national-team-etf-holdings", {
-      query: { days },
+      // ETF 表格只用最新一天的标量，不要每只 ETF 的整段点位：那是约 65% 的响应
+      // 体积（实测 902 KiB → 313 KiB），前端一个字都用不到。
+      query: { days, include_etf_points: false },
       options: { timeoutMs: API_TIMEOUTS.EXTERNAL },
     }),
     select: asApiModel<NationalTeamResponse>(),

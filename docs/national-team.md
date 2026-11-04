@@ -1,6 +1,6 @@
 # 国家队监测（宽基 ETF 代理口径）
 
-> 页面：`/national-team`　接口：`GET /api/market/national-team-etf-holdings?days=30..365`
+> 页面：`/national-team`　接口：`GET /api/market/national-team-etf-holdings?days=30..365&include_etf_points=true`
 > 后端：`backend/app/financial_data/market/quotes/national_team.py`
 > 前端：`frontend/src/pages/NationalTeam/`
 
@@ -190,10 +190,28 @@ pages/NationalTeam/
   可分享、可回退；
 - 有旧数据时 `refetch` 失败要**保留旧数据 + 顶部 warning**，不能整页替换成错误态。
 
-## 7. 已知限制 / 后续工作
+## 7. 响应体积
 
-1. 单接口一次返回 22 只 ETF × 至多 365 天全量点位 + 10 条指数序列 + 静态画像；
-   拆分 `overview` / `series` 分层接口可以显著压缩首屏体积。
-2. 托底强度指数无历史序列、无置信度、无「信号出现后 5/20 日表现」回测。
-3. 静态画像仍是人工维护，长期应由定期报告 / 十大股东数据生成。
-4. 响应无 ETag / `Cache-Control`，缓存只靠进程内 TTL 与前端 React Query。
+单接口默认返回 22 只 ETF × 至多 365 天的完整点位序列 + 10 条指数序列 + 静态画像，
+实测 120 天窗口下 JSON 约 **902 KiB**（gzip 后 29 KiB）。其中 ETF 的 `points` 占
+约 **65%**：前端表格与 CSV 只用最新一天的标量。
+
+因此接口带 `include_etf_points`（默认 `true`，向后兼容）：
+
+- 传 `false` 时 `etfs[].points` 置空，标量字段（含
+  `latest_estimated_net_flow_100m`）全保留；实测降至 **313 KiB**；
+- 响应里的 `etf_points_included` 标明本次是否被裁剪，前端可据此自检；
+- 裁剪位在 `without_etf_points()`，且在 **所有聚合算完之后**：`summary` /
+  `daily_flows` / `support_score` / `support_zones` / 指数序列在两种模式下必须完全
+  相同，已有测试卡死这一点；
+- 缓存里始终存**完整**响应：若把两种模式分别缓存，容量翻倍且互相抢占。
+
+## 8. 已知限制 / 后续工作
+
+1. 指数序列（10 条 × N 天）无法按需获取，仍是全量返回；拆分
+   `overview` / `series` 分层接口可以进一步压缩首屏。
+2. `daily_flows[].flows_by_index` 前端未使用（按宽基的当日资金流，与指数序列重复），
+   可考虑一并门控。
+3. 托底强度指数无历史序列、无置信度、无「信号出现后 5/20 日表现」回测。
+4. 静态画像仍是人工维护，长期应由定期报告 / 十大股东数据生成。
+5. 响应无 ETag / `Cache-Control`，缓存只靠进程内 TTL 与前端 React Query。

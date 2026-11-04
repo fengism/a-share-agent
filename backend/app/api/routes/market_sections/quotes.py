@@ -162,9 +162,16 @@ async def get_market_breadth(
 )
 async def get_national_team_etf_holdings(
     days: int = Query(120, ge=30, le=365, description="返回最近自然日数量，30-365"),
+    include_etf_points: bool = Query(
+        True,
+        description=(
+            "是否返回每只 ETF 的完整点位序列。ETF 表格只需最新一天的标量"
+            "（latest_estimated_net_flow_100m），传 false 约省 65% 响应体积。"
+        ),
+    ),
 ):
     """获取核心宽基 ETF 份额变化与国家队持仓代理监测。"""
-    return await get_national_team_etf_holdings_service(days)
+    return await get_national_team_etf_holdings_service(days, include_etf_points=include_etf_points)
 
 
 @router.get("/price-anomaly", response_model=MarketPriceAnomalyResponse)

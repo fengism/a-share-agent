@@ -17328,6 +17328,17 @@
             ],
             "title": "Latest Date"
           },
+          "latest_estimated_net_flow_100m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Estimated Net Flow 100M"
+          },
           "latest_shares_100m": {
             "anyOf": [
               {
@@ -17753,6 +17764,11 @@
           "disclaimer": {
             "title": "Disclaimer",
             "type": "string"
+          },
+          "etf_points_included": {
+            "default": true,
+            "title": "Etf Points Included",
+            "type": "boolean"
           },
           "etfs": {
             "items": {
@@ -38672,6 +38688,18 @@
               "minimum": 30,
               "title": "Days",
               "type": "integer"
+            }
+          },
+          {
+            "description": "是否返回每只 ETF 的完整点位序列。ETF 表格只需最新一天的标量（latest_estimated_net_flow_100m），传 false 约省 65% 响应体积。",
+            "in": "query",
+            "name": "include_etf_points",
+            "required": false,
+            "schema": {
+              "default": true,
+              "description": "是否返回每只 ETF 的完整点位序列。ETF 表格只需最新一天的标量（latest_estimated_net_flow_100m），传 false 约省 65% 响应体积。",
+              "title": "Include Etf Points",
+              "type": "boolean"
             }
           }
         ],

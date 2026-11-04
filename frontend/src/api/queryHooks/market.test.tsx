@@ -594,4 +594,21 @@ describe("useNationalTeamHoldings refresh policy", () => {
     unmount();
     client.clear();
   });
+
+  it("asks the backend to skip the 22 x N ETF point series", async () => {
+    vi.mocked(apiGet).mockResolvedValue({ partial: false, refreshing: false });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = ({ children }: PropsWithChildren) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+    const { result, unmount } = renderHook(() => useNationalTeamHoldings(120), { wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    // ETF 表格只用最新一天的标量；带上整段 points 会多传约 65% 的体积。
+    expect(vi.mocked(apiGet)).toHaveBeenCalledWith(
+      "/market/national-team-etf-holdings",
+      { days: 120, include_etf_points: false },
+      expect.objectContaining({ timeoutMs: API_TIMEOUTS.EXTERNAL }),
+    );
+    unmount();
+    client.clear();
+  });
 });

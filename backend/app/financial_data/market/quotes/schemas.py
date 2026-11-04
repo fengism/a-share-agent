@@ -576,6 +576,7 @@ class NationalTeamEtfSeries(BaseModel):
     change_5d_100m: float | None = None
     change_20d_100m: float | None = None
     latest_amount_100m: float | None = None
+    latest_estimated_net_flow_100m: float | None = None
     volume_ratio: float | None = None
     is_abnormal_volume: bool = False
     points: list[NationalTeamEtfPoint] = Field(default_factory=list)
@@ -719,6 +720,7 @@ class NationalTeamResponse(BaseModel):
     calendar_degraded: bool = False
     refreshing: bool = False
     observations: list[NationalTeamShareObservation] = Field(default_factory=list)
+    etf_points_included: bool = True
     missing_share_etfs: list[str] = Field(default_factory=list)
     missing_price_etfs: list[str] = Field(default_factory=list)
     missing_indices: list[str] = Field(default_factory=list)

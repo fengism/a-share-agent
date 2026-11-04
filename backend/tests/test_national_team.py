@@ -408,3 +408,84 @@ def test_lifecycle_registers_after_close_refresh_task() -> None:
     # 行情刷新挂了不影响 HTTP 请求，接 readiness 会让一次抖动摘掉全部流量。
     assert spec.readiness_required is False
     assert spec.critical is False
+
+
+def test_without_etf_points_keeps_aggregation_and_scalars():
+    """裁剪 ETF points 只能影响序列本身，绝不能改变汇总口径或标量字段。"""
+    from app.financial_data.market.quotes.national_team import without_etf_points
+
+    dates = ["2026-09-15", "2026-09-16"]
+    members = ["510300", "510310", "510330", "159919"]
+    share_history = {code: {dates[0]: 100_000_000, dates[1]: 110_000_000} for code in members}
+    close_history = {code: {dates[0]: 3.5, dates[1]: 3.6} for code in members}
+    amount_history = {code: {dates[0]: 10.0, dates[1]: 20.0} for code in members}
+
+    full = build_national_team_response(
+        share_history=share_history,
+        etf_close_history=close_history,
+        etf_amount_history=amount_history,
+        index_close_history={"csi300": {dates[0]: 3800.0, dates[1]: 3850.0}},
+        fetched_at="2026-09-16T18:00:00+08:00",
+        requested_days=30,
+        expected_trading_dates=dates,
+    )
+    trimmed = without_etf_points(full)
+
+    assert full.etf_points_included is True
+    assert trimmed.etf_points_included is False
+    assert all(item.points == [] for item in trimmed.etfs)
+    # 原始响应不能被就地改写（它同时被写进缓存）。
+    assert all(item.points for item in full.etfs if item.code in members)
+
+    # 汇总、资金流、评分、点位分布与指数序列必须完全一致。
+    assert trimmed.summary == full.summary
+    assert trimmed.support_score == full.support_score
+    assert trimmed.support_zones == full.support_zones
+    assert [flow.total_flow_100m for flow in trimmed.daily_flows] == [
+        flow.total_flow_100m for flow in full.daily_flows
+    ]
+    assert [item.points for item in trimmed.indices] == [item.points for item in full.indices]
+
+    # 表格与 CSV 依赖的标量必须一个不少。
+    for original, stripped in zip(full.etfs, trimmed.etfs, strict=True):
+        assert stripped.latest_shares_100m == original.latest_shares_100m
+        assert stripped.latest_change_1d_100m == original.latest_change_1d_100m
+        assert stripped.change_20d_100m == original.change_20d_100m
+        assert stripped.latest_amount_100m == original.latest_amount_100m
+        assert stripped.volume_ratio == original.volume_ratio
+        assert stripped.is_abnormal_volume == original.is_abnormal_volume
+        # 净申购改成标量字段，前端不必再读 points[-1]。
+        assert stripped.latest_estimated_net_flow_100m == original.latest_estimated_net_flow_100m
+
+    member = next(item for item in trimmed.etfs if item.code == "510300")
+    # 0.1 亿份 × 3.6 元
+    assert member.latest_estimated_net_flow_100m == pytest.approx(0.36)
+    assert member.points == []
+
+
+def test_get_national_team_holdings_trims_only_when_asked(monkeypatch):
+    """缓存里存完整响应，include_etf_points 只影响这一次序列化。"""
+    from app.financial_data.market.quotes import national_team as nt
+
+    dates = ["2026-09-15", "2026-09-16"]
+    members = ["510300", "510310", "510330", "159919"]
+    full = build_national_team_response(
+        share_history={code: {dates[0]: 100_000_000, dates[1]: 110_000_000} for code in members},
+        etf_close_history={code: {dates[0]: 3.5, dates[1]: 3.6} for code in members},
+        index_close_history={"csi300": {dates[0]: 3800.0, dates[1]: 3850.0}},
+        fetched_at="2026-09-16T18:00:00+08:00",
+        requested_days=30,
+        expected_trading_dates=dates,
+    )
+
+    async def fake_resolve(days):
+        return full.model_copy(deep=True)
+
+    monkeypatch.setattr(nt, "_resolve_response", fake_resolve)
+
+    stripped = asyncio.run(nt.get_national_team_etf_holdings(120, include_etf_points=False))
+    kept = asyncio.run(nt.get_national_team_etf_holdings(120))
+
+    assert any(item.points for item in kept.etfs)
+    assert all(item.points == [] for item in stripped.etfs)
+    assert stripped.summary.total_shares_100m == kept.summary.total_shares_100m

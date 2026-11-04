@@ -69,6 +69,8 @@ const etfs = [
   change_5d_100m: 2.4,
   change_20d_100m: 5.6,
   latest_amount_100m: order === 0 ? 32.5 : 5.0,
+  // 后端 include_etf_points=false 时不再返回 points，表格靠这个标量字段。
+  latest_estimated_net_flow_100m: order === 0 ? 12.5 : -2.5,
   volume_ratio: order === 0 ? 2.5 : 1.1,
   is_abnormal_volume: order === 0,
   points: [],
@@ -469,6 +471,15 @@ describe("NationalTeam page", () => {
     expect(screen.getAllByText("量比").length).toBeGreaterThan(0);
     expect(screen.getByText("32.5亿")).toBeInTheDocument();
     expect(screen.getAllByText("放量 2.5x").length).toBeGreaterThan(0);
+  });
+
+  it("renders estimated net flow from the scalar field without needing ETF points", () => {
+    // include_etf_points=false 时 etfs[].points 为空，净申购必须仍能渲染。
+    expect(data.etfs.every((item) => item.points.length === 0)).toBe(true);
+    renderPage();
+
+    expect(screen.getAllByText("+12.50 亿元").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("-2.50 亿元").length).toBeGreaterThan(0);
   });
 
   it("switches to strategic institutional bottom-holding portrait view", () => {

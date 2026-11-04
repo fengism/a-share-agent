@@ -436,6 +436,9 @@ def _build_etf_series(
         change_5d_100m=_period_change(share_values, dates, 5),
         change_20d_100m=_period_change(share_values, dates, 20),
         latest_amount_100m=latest_amount_100m,
+        # 表格与 CSV 只需要最新一天的估算净申购，单独给一个标量字段，
+        # 就不必为它把整段 points 序列传给前端（占总体积约 65%）。
+        latest_estimated_net_flow_100m=latest.estimated_net_flow_100m if latest else None,
         volume_ratio=volume_ratio,
         is_abnormal_volume=is_abnormal_volume,
         points=points,
@@ -1597,6 +1600,22 @@ def _response_window(days: int, now: datetime) -> tuple[date, date]:
     return end - timedelta(days=days - 1), end
 
 
+def without_etf_points(response: NationalTeamResponse) -> NationalTeamResponse:
+    """去掉每只 ETF 的点位序列，约省 65% 响应体积。
+
+    前端 ETF 表格与 CSV 只需要最新一天的标量（已由
+    ``latest_estimated_net_flow_100m`` 提供），22 只 × N 天的 ``points``
+    全部传输、全部 JSON 解析，但只用最后一个元素。
+
+    **缓存里存完整响应**，裁剪只在序列化前做：否则 ``include_etf_points``
+    的两个取值会分裂成两份缓存，容量翻倍且互相抢占。
+    """
+    trimmed = response.model_copy(deep=False)
+    trimmed.etfs = [item.model_copy(update={"points": []}) for item in response.etfs]
+    trimmed.etf_points_included = False
+    return trimmed
+
+
 async def _collect_response(days: int = 120, *, trigger: str = "request", force: bool = False) -> NationalTeamResponse:
     """返回核心宽基 ETF 份额与指数价格的国家队代理监测视图。
 
@@ -1725,7 +1744,23 @@ def _start_refresh(days: int) -> None:
     _refresh_tasks[key] = asyncio.create_task(refresh(), name=f"national-team-refresh-{days}")
 
 
-async def get_national_team_etf_holdings(days: int = 120) -> NationalTeamResponse:
+async def get_national_team_etf_holdings(
+    days: int = 120,
+    *,
+    include_etf_points: bool = True,
+) -> NationalTeamResponse:
+    """返回国家队代理监测视图。
+
+    Param:
+        days: 监测窗口自然日数，会被裁剪到 30–365。
+        include_etf_points: 是否带上每只 ETF 的完整点位序列。前端表格只用最新一天的
+            标量，传 ``False`` 约省 65% 体积；缓存始终存完整响应。
+    """
+    response = await _resolve_response(days)
+    return response if include_etf_points else without_etf_points(response)
+
+
+async def _resolve_response(days: int) -> NationalTeamResponse:
     days = max(30, min(days, 365))
     cached = market_cache.get(_response_cache_key(days))
     if cached is not None:

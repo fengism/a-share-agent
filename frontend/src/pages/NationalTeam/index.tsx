@@ -136,8 +136,7 @@ function downloadNationalTeamCsv(etfs: NationalTeamEtfSeries[], asOfDate?: strin
   ];
 
   const rows = etfs.map((item) => {
-    const latestPoint = item.points?.[item.points.length - 1];
-    const flow1d = latestPoint?.estimated_net_flow_100m;
+    const flow1d = item.latest_estimated_net_flow_100m;
     const catLabel = CATEGORY_TAG_LABELS[item.category || "core_broad"]?.label || "核心大盘";
     return [
       catLabel,
@@ -1337,14 +1336,10 @@ export default function NationalTeam() {
       key: "estimated_net_flow_1d",
       width: isMobile ? 110 : 130,
       align: "right",
-      sorter: (a, b) => {
-        const flowA = a.points?.[a.points.length - 1]?.estimated_net_flow_100m ?? 0;
-        const flowB = b.points?.[b.points.length - 1]?.estimated_net_flow_100m ?? 0;
-        return flowA - flowB;
-      },
+      sorter: (a, b) =>
+        (a.latest_estimated_net_flow_100m ?? 0) - (b.latest_estimated_net_flow_100m ?? 0),
       render: (_, item) => {
-        const latestPoint = item.points?.[item.points.length - 1];
-        const flow = latestPoint?.estimated_net_flow_100m;
+        const flow = item.latest_estimated_net_flow_100m;
         const color = valueColor(flow, colors.up, colors.down, colors.textSecondary);
         const bg = (flow ?? 0) > 0 ? colors.upBg : (flow ?? 0) < 0 ? colors.downBg : "transparent";
         return (
