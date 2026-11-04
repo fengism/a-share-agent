@@ -629,3 +629,62 @@ def test_national_team_cache_control_shortens_when_partial():
 
     partial = full.model_copy(update={"partial": True})
     assert _national_team_cache_control(partial) == "private, max-age=60"
+
+
+def test_support_score_history_replays_each_day_with_same_factors():
+    from app.financial_data.market.quotes.national_team import ETF_POOL, INDEX_POOL
+
+    dates = ["2026-09-14", "2026-09-15", "2026-09-16"]
+    shares = {code: {dates[0]: 100_000_000, dates[1]: 105_000_000, dates[2]: 115_000_000} for code in ETF_POOL}
+    closes = {code: {dates[0]: 3.4, dates[1]: 3.5, dates[2]: 3.6} for code in ETF_POOL}
+    response = build_national_team_response(
+        share_history=shares,
+        etf_close_history=closes,
+        index_close_history={
+            key: {dates[0]: 3400.0, dates[1]: 3450.0, dates[2]: 3420.0} for key in INDEX_POOL
+        },
+        fetched_at="2026-09-16T18:00:00+08:00",
+        requested_days=30,
+        expected_trading_dates=dates,
+    )
+
+    history = response.support_score_history
+    assert [point.date for point in history] == dates
+    # 最新一天的历史分必须与实时分一致：两套路径不能算出不同结论。
+    assert history[-1].score == response.support_score.score
+    assert history[-1].status == response.support_score.status
+    assert history[-1].confidence == response.support_score.confidence
+    assert all(0.0 <= point.score <= 100.0 for point in history)
+    assert all(0.0 <= point.confidence <= 1.0 for point in history)
+    # 应该是随时间变化的曲线，而不是把今天的分数向前填充。
+    assert len({point.score for point in history}) > 1
+
+
+def test_daily_flows_keep_early_days_when_a_member_stops_updating():
+    """某只 ETF 最新一天缺失时，它之前的真实资金流不应被一起抹掉。"""
+    dates = ["2026-09-14", "2026-09-15", "2026-09-16"]
+    share_history = {
+        "510300": {dates[0]: 100_000_000, dates[1]: 110_000_000, dates[2]: 120_000_000},
+        "510310": {dates[0]: 100_000_000, dates[1]: 110_000_000},
+        "510330": {dates[0]: 100_000_000, dates[1]: 110_000_000, dates[2]: 120_000_000},
+        "159919": {dates[0]: 100_000_000, dates[1]: 110_000_000, dates[2]: 120_000_000},
+    }
+    close_history = {
+        code: {dates[0]: 3.4, dates[1]: 3.5, dates[2]: 3.6} for code in share_history
+    }
+    response = build_national_team_response(
+        share_history=share_history,
+        etf_close_history=close_history,
+        index_close_history={"csi300": {dates[0]: 3700.0, dates[1]: 3800.0, dates[2]: 3850.0}},
+        fetched_at="2026-09-16T18:00:00+08:00",
+        requested_days=30,
+        expected_trading_dates=dates,
+    )
+
+    # 第二天四只 ETF 都有 0.1 亿份的增量，全部应计入。
+    assert response.daily_flows[1].total_flow_100m == pytest.approx(4 * 0.1 * 3.5)
+    # 第三天 510310 没有数据，只汇总剩下三只。
+    assert response.daily_flows[2].total_flow_100m == pytest.approx(3 * 0.1 * 3.6)
+    assert response.covered_etf_count == 3
+    assert response.support_score_history[1].coverage_ratio == pytest.approx(0.1818)
+    assert response.support_score_history[2].coverage_ratio == pytest.approx(0.1364)

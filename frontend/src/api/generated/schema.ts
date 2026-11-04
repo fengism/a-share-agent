@@ -12029,6 +12029,8 @@ export interface components {
             stale: boolean;
             summary?: components["schemas"]["NationalTeamSummary"];
             support_score?: components["schemas"]["NationalTeamSupportScore"];
+            /** Support Score History */
+            support_score_history?: components["schemas"]["NationalTeamSupportHistoryPoint"][];
             /** Support Zones */
             support_zones?: components["schemas"]["NationalTeamSupportZone"][];
             /**
@@ -12083,6 +12085,28 @@ export interface components {
             quality: "complete" | "partial" | "insufficient";
             /** Total Shares 100M */
             total_shares_100m?: number | null;
+        };
+        /**
+         * NationalTeamSupportHistoryPoint
+         * @description 某一交易日的托底评分。用现有序列回算，不需要额外落库。
+         */
+        NationalTeamSupportHistoryPoint: {
+            /** Confidence */
+            confidence: number;
+            /**
+             * Coverage Ratio
+             * @default 0
+             */
+            coverage_ratio: number;
+            /** Date */
+            date: string;
+            /** Score */
+            score: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "neutral" | "moderate" | "active" | "strong";
         };
         /** NationalTeamSupportScore */
         NationalTeamSupportScore: {

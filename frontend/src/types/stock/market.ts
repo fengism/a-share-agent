@@ -753,6 +753,7 @@ export type NationalTeamIndexSeries = components["schemas"]["NationalTeamIndexSe
 export type NationalTeamSummary = components["schemas"]["NationalTeamSummary"];
 export type NationalTeamDailyFlow = components["schemas"]["NationalTeamDailyFlow"];
 export type NationalTeamSupportScore = components["schemas"]["NationalTeamSupportScore"];
+export type NationalTeamSupportHistoryPoint = components["schemas"]["NationalTeamSupportHistoryPoint"];
 export type NationalTeamSupportZone = components["schemas"]["NationalTeamSupportZone"];
 export type NationalTeamSupportZoneItem = components["schemas"]["NationalTeamSupportZoneItem"];
 export type NationalTeamMilestone = components["schemas"]["NationalTeamMilestone"];

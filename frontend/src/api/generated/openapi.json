@@ -17878,6 +17878,13 @@
           "support_score": {
             "$ref": "#/components/schemas/NationalTeamSupportScore"
           },
+          "support_score_history": {
+            "items": {
+              "$ref": "#/components/schemas/NationalTeamSupportHistoryPoint"
+            },
+            "title": "Support Score History",
+            "type": "array"
+          },
           "support_zones": {
             "items": {
               "$ref": "#/components/schemas/NationalTeamSupportZone"
@@ -18041,6 +18048,46 @@
           }
         },
         "title": "NationalTeamSummary",
+        "type": "object"
+      },
+      "NationalTeamSupportHistoryPoint": {
+        "description": "某一交易日的托底评分。用现有序列回算，不需要额外落库。",
+        "properties": {
+          "confidence": {
+            "title": "Confidence",
+            "type": "number"
+          },
+          "coverage_ratio": {
+            "default": 0.0,
+            "title": "Coverage Ratio",
+            "type": "number"
+          },
+          "date": {
+            "title": "Date",
+            "type": "string"
+          },
+          "score": {
+            "title": "Score",
+            "type": "number"
+          },
+          "status": {
+            "enum": [
+              "neutral",
+              "moderate",
+              "active",
+              "strong"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "date",
+          "score",
+          "status",
+          "confidence"
+        ],
+        "title": "NationalTeamSupportHistoryPoint",
         "type": "object"
       },
       "NationalTeamSupportScore": {

@@ -52,6 +52,7 @@ import type {
   NationalTeamIndexSeries,
   NationalTeamMilestone,
   NationalTeamPortrait,
+  NationalTeamSupportHistoryPoint,
   NationalTeamSupportScore,
   NationalTeamSupportZone,
   NationalTeamTopHolding,
@@ -607,8 +608,41 @@ function DailyFlowStackedChart({
   );
 }
 
-function SupportScoreRadarCard({ supportScore }: { supportScore?: NationalTeamSupportScore }) {
+function buildScoreSparkline(history: NationalTeamSupportHistoryPoint[]) {
+  const points = history.slice(-30);
+  if (points.length < 2) return null;
+  const width = 168;
+  const height = 28;
+  const scores = points.map((point) => point.score);
+  const min = Math.min(...scores);
+  const max = Math.max(...scores);
+  const span = Math.max(1, max - min);
+  const step = width / (points.length - 1);
+  const path = points
+    .map((point, index) => {
+      const x = index * step;
+      const y = height - ((point.score - min) / span) * height;
+      return `${index === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+  return {
+    path,
+    width,
+    height,
+    count: points.length,
+    delta: points[points.length - 1].score - points[0].score,
+  };
+}
+
+function SupportScoreRadarCard({
+  supportScore,
+  history,
+}: {
+  supportScore?: NationalTeamSupportScore;
+  history?: NationalTeamSupportHistoryPoint[];
+}) {
   const colors = useColors();
+  const sparkline = useMemo(() => buildScoreSparkline(history ?? []), [history]);
   if (!supportScore) return null;
 
   const score = supportScore.score;
@@ -719,6 +753,44 @@ function SupportScoreRadarCard({ supportScore }: { supportScore?: NationalTeamSu
           </Row>
         </Col>
       </Row>
+      {sparkline && (
+        <div
+          data-testid="national-team-score-sparkline"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            marginTop: 10,
+            paddingTop: 8,
+            borderTop: `1px dashed ${colors.border}`,
+            fontSize: 11,
+            color: colors.textSecondary,
+          }}
+        >
+          <span style={{ whiteSpace: "nowrap" }}>托底评分走势</span>
+          <svg
+            width={sparkline.width}
+            height={sparkline.height}
+            viewBox={`0 0 ${sparkline.width} ${sparkline.height}`}
+            role="img"
+            aria-label={`近 ${sparkline.count} 个交易日托底评分走势`}
+            style={{ overflow: "visible", flexShrink: 0 }}
+          >
+            <path
+              d={sparkline.path}
+              fill="none"
+              stroke={sparkline.delta >= 0 ? "#f5222d" : "#00b96b"}
+              strokeWidth={1.5}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
+          </svg>
+          <span style={{ fontFamily: "var(--c-font-mono)", whiteSpace: "nowrap" }}>
+            {sparkline.count} 日 {sparkline.delta >= 0 ? "+" : ""}
+            {sparkline.delta.toFixed(1)}
+          </span>
+        </div>
+      )}
     </Card>
   );
 }
@@ -1624,7 +1696,10 @@ export default function NationalTeam() {
             {/* 国家队托底护盘强度雷达 */}
             {data?.support_score && (
               <div style={{ marginBottom: 10 }}>
-                <SupportScoreRadarCard supportScore={data.support_score} />
+                <SupportScoreRadarCard
+                  supportScore={data.support_score}
+                  history={data.support_score_history}
+                />
               </div>
             )}
 

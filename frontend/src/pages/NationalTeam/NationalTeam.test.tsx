@@ -120,6 +120,12 @@ const data = {
     divergence_factor: 21.0,
     confidence: 0.86,
   },
+  support_score_history: [
+    { date: "2026-09-10", score: 52.0, status: "moderate" as const, confidence: 0.9, coverage_ratio: 1.0 },
+    { date: "2026-09-11", score: 55.0, status: "moderate" as const, confidence: 0.9, coverage_ratio: 1.0 },
+    { date: "2026-09-12", score: 61.0, status: "active" as const, confidence: 0.86, coverage_ratio: 1.0 },
+    { date: "2026-09-15", score: 68.5, status: "active" as const, confidence: 0.86, coverage_ratio: 1.0 },
+  ],
   milestones: [
     {
       date: "2024-02-06",
@@ -448,6 +454,7 @@ describe("NationalTeam page", () => {
     expect(screen.getByText("69")).toBeInTheDocument();
     expect(screen.getByText("积极托底")).toBeInTheDocument();
     expect(screen.getByTestId("national-team-support-confidence")).toHaveTextContent("置信度 86%");
+    expect(screen.getByTestId("national-team-score-sparkline")).toHaveTextContent("4 日 +16.5");
     expect(screen.getByText(/资金托底因子/)).toBeInTheDocument();
     expect(screen.getByText("25.5 / 40")).toBeInTheDocument();
 

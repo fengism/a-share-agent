@@ -653,6 +653,16 @@ class NationalTeamSupportScore(BaseModel):
     confidence: float = 0.0
 
 
+class NationalTeamSupportHistoryPoint(BaseModel):
+    """某一交易日的托底评分。用现有序列回算，不需要额外落库。"""
+
+    date: str
+    score: float
+    status: Literal["neutral", "moderate", "active", "strong"]
+    confidence: float
+    coverage_ratio: float = 0.0
+
+
 class NationalTeamSupportZoneItem(BaseModel):
     range_label: str
     net_flow_100m: float
@@ -734,6 +744,7 @@ class NationalTeamResponse(BaseModel):
     summary: NationalTeamSummary = Field(default_factory=NationalTeamSummary)
     daily_flows: list[NationalTeamDailyFlow] = Field(default_factory=list)
     support_score: NationalTeamSupportScore = Field(default_factory=NationalTeamSupportScore)
+    support_score_history: list[NationalTeamSupportHistoryPoint] = Field(default_factory=list)
     support_zones: list[NationalTeamSupportZone] = Field(default_factory=list)
     milestones: list[NationalTeamMilestone] = Field(default_factory=list)
     portrait: NationalTeamPortrait = Field(default_factory=NationalTeamPortrait)

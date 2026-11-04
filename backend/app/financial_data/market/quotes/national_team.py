@@ -34,6 +34,7 @@ from app.financial_data.market.quotes.schemas import (
     NationalTeamResponse,
     NationalTeamShareObservation,
     NationalTeamSummary,
+    NationalTeamSupportHistoryPoint,
     NationalTeamSupportScore,
     NationalTeamSupportZone,
     NationalTeamSupportZoneItem,
@@ -714,6 +715,16 @@ DEFAULT_NATIONAL_TEAM_PORTRAIT = NationalTeamPortrait(
 )
 
 
+def _score_status(score: float) -> Literal["neutral", "moderate", "active", "strong"]:
+    if score >= 80.0:
+        return "strong"
+    if score >= 60.0:
+        return "active"
+    if score >= 40.0:
+        return "moderate"
+    return "neutral"
+
+
 def _calculate_support_score(
     summary: NationalTeamSummary,
     daily_flows: list[NationalTeamDailyFlow],
@@ -776,21 +787,18 @@ def _calculate_support_score(
         divergence_factor = 15.0
 
     total_score = round(min(100.0, max(0.0, net_flow_factor + breadth_factor + divergence_factor)), 1)
+    status = _score_status(total_score)
 
-    if total_score >= 80.0:
-        status: Literal["neutral", "moderate", "active", "strong"] = "strong"
+    if status == "strong":
         label = "强力救市"
         description = "核心与成长宽基出现逆势大额承接，全市场托底意愿极其强烈。"
-    elif total_score >= 60.0:
-        status = "active"
+    elif status == "active":
         label = "积极托底"
         description = "主力资金在重点战略宽基上呈现持续净买入，有效构筑下方防线。"
-    elif total_score >= 40.0:
-        status = "moderate"
+    elif status == "moderate":
         label = "常规调仓"
         description = "各板块申赎处于正常配置区间，资金进出相对均衡，未见超常规干预。"
     else:
-        status = "neutral"
         label = "市场自发"
         description = "ETF 申赎主要由市场机构与散户自发驱动，国家队资金处于观望与蓄力状态。"
 
@@ -826,6 +834,58 @@ def _support_confidence(
     freshness = 0.35 if stale else 1.0
     calendar = 0.7 if calendar_degraded else 1.0
     return round(coverage * freshness * calendar, 2)
+
+
+def _build_support_history(
+    daily_flows: list[NationalTeamDailyFlow],
+    indices: list[NationalTeamIndexSeries],
+    etfs: list[NationalTeamEtfSeries],
+) -> list[NationalTeamSupportHistoryPoint]:
+    """用已算出的序列回算每个交易日的托底评分，不额外落库。
+
+    每一天都用“当天及以前”的切片重跑同一套因子，而不是拿今天的分数向前填充：
+    否则走势图只会是一条水平线。切片是按日滚动的，所以 5 日资金因子、沪深300
+    两日涨跌都会自然随时间移动。
+    """
+    if not daily_flows:
+        return []
+
+    total_etfs = len(ETF_POOL) or 1
+    coverage_by_date: dict[str, int] = {}
+    for item in etfs:
+        for point in item.points:
+            coverage_by_date[point.date] = coverage_by_date.get(point.date, 0) + 1
+
+    history: list[NationalTeamSupportHistoryPoint] = []
+    for index, flow in enumerate(daily_flows):
+        covered = coverage_by_date.get(flow.date, 0)
+        # 没有任何成员数据、也没有可归因资金流的日子不进走势图，避免伪造 0 分。
+        if covered == 0 and flow.total_flow_100m is None:
+            continue
+        coverage = round(covered / total_etfs, 4)
+        window = daily_flows[max(0, index - 4) : index + 1]
+        summary = NationalTeamSummary(
+            estimated_net_flow_1d_100m=flow.total_flow_100m,
+            estimated_net_flow_5d_100m=_sum_or_none([item.total_flow_100m for item in window]),
+            coverage_ratio=coverage,
+        )
+        sliced_indices = [
+            series.model_copy(
+                update={"points": [point for point in series.points if point.date <= flow.date]}
+            )
+            for series in indices
+        ]
+        score = _calculate_support_score(summary, daily_flows[: index + 1], sliced_indices)
+        history.append(
+            NationalTeamSupportHistoryPoint(
+                date=flow.date,
+                score=score.score,
+                status=score.status,
+                confidence=score.confidence,
+                coverage_ratio=coverage,
+            )
+        )
+    return history
 
 
 def _calculate_support_zones(indices: list[NationalTeamIndexSeries]) -> list[NationalTeamSupportZone]:
@@ -1028,7 +1088,7 @@ def build_national_team_response(
         has_day_flow = False
         has_day_change = False
 
-        for etf in populated:
+        for etf in etfs:
             for pt in etf.points:
                 if pt.date == day:
                     if pt.estimated_net_flow_100m is not None:
@@ -1061,6 +1121,7 @@ def build_national_team_response(
         stale=stale,
         calendar_degraded=calendar_degraded,
     )
+    support_score_history = _build_support_history(daily_flows, indices, etfs)
     support_zones = _calculate_support_zones(indices)
     return NationalTeamResponse(
         fetched_at=fetched_at,
@@ -1082,6 +1143,7 @@ def build_national_team_response(
         summary=summary,
         daily_flows=daily_flows,
         support_score=support_score,
+        support_score_history=support_score_history,
         support_zones=support_zones,
         milestones=NATIONAL_TEAM_MILESTONES,
         portrait=portrait or DEFAULT_NATIONAL_TEAM_PORTRAIT,
