@@ -3,6 +3,7 @@ import { Badge, Button, Card, Col, Row, Space, Tag, Typography } from "antd";
 import { DatabaseOutlined, DownOutlined, SyncOutlined, UpOutlined, WarningOutlined } from "@ant-design/icons";
 import { useColors } from "../../../styles/ui";
 import type { NationalTeamResponse } from "../../../types/stock";
+import { formatMarketDateTime } from "../../../utils/marketTime";
 
 const { Text } = Typography;
 
@@ -101,7 +102,7 @@ export default function NationalTeamDataStatusPanel({
                 <ul style={{ margin: 0, paddingLeft: 18, color: colors.textSecondary, fontSize: 11, lineHeight: "1.6" }}>
                   <li><strong>上交所 / 深交所官方接口</strong>：日频 ETF 份额增减（一级市场申购赎回汇总代理）</li>
                   <li><strong>公开行情适配器</strong>：收盘价、日度成交额、基准指数收盘点位</li>
-                  <li><strong>采集时间</strong>：{data.fetched_at ? new Date(data.fetched_at).toLocaleString("zh-CN") : "-"}</li>
+                  <li><strong>采集时间</strong>：{formatMarketDateTime(data.fetched_at)}</li>
                 </ul>
               </div>
             </Col>
