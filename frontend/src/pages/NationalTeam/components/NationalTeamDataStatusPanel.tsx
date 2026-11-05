@@ -32,10 +32,10 @@ export default function NationalTeamDataStatusPanel({
       style={{
         borderRadius: 8,
         border: "1px solid var(--c-border)",
-        background: "var(--c-bg-card)",
-        marginBottom: 12,
+        background: "var(--c-bg-subtle, rgba(128, 128, 128, 0.03))",
+        marginBottom: 10,
       }}
-      styles={{ body: { padding: "8px 14px" } }}
+      styles={{ body: { padding: "6px 12px" } }}
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>

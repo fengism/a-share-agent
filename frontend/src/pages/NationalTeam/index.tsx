@@ -1203,6 +1203,7 @@ export default function NationalTeam() {
   // 搜索词逐步输入，用 replace 避免每敲一个字就压一条历史记录（返回键要按十几次）。
   const [searchKeyword, setSearchKeyword] = useUrlSearchParam("q", "", { replace: true });
   const [showPartialDetails, setShowPartialDetails] = useState<boolean>(false);
+  const [chartsCollapsed, setChartsCollapsed] = useState<boolean>(false);
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [previewStock, setPreviewStock] = useState<{ code: string; name: string } | null>(null);
   const [starredCodes, setStarredCodes] = useState<string[]>(() => {
@@ -1942,77 +1943,144 @@ export default function NationalTeam() {
               </>
             )}
 
+            {/* 快速直达锚点与折叠控制条 (在 etf 下展示) */}
+            {activeTab === "etf" && (
+              <div
+                className="national-team-etf-subnav"
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                  gap: 8,
+                  marginBottom: 10,
+                  padding: "6px 12px",
+                  background: "var(--c-bg-subtle, rgba(128, 128, 128, 0.04))",
+                  borderRadius: 8,
+                  border: "1px solid var(--c-border)",
+                }}
+              >
+                <Space size={6} wrap align="center">
+                  <span style={{ fontSize: 12, color: colors.textSecondary, fontWeight: 500 }}>快速直达：</span>
+                  <Button
+                    size="small"
+                    style={{ fontSize: 12 }}
+                    onClick={() => {
+                      document.getElementById("national-team-table-section")?.scrollIntoView({ behavior: "smooth" });
+                    }}
+                  >
+                    📋 ETF 监测明细表 ({filteredEtfs.length})
+                  </Button>
+                  <Button
+                    size="small"
+                    style={{ fontSize: 12 }}
+                    onClick={() => {
+                      setChartsCollapsed(false);
+                      setTimeout(() => {
+                        document.getElementById("national-team-charts-section")?.scrollIntoView({ behavior: "smooth" });
+                      }, 50);
+                    }}
+                  >
+                    📊 宽基双轴走势 ({filteredIndices.length})
+                  </Button>
+                  <Button
+                    size="small"
+                    style={{ fontSize: 12 }}
+                    onClick={() => {
+                      document.getElementById("national-team-rotation-section")?.scrollIntoView({ behavior: "smooth" });
+                    }}
+                  >
+                    🔄 跨宽基结构轮动
+                  </Button>
+                </Space>
+                <Button
+                  size="small"
+                  type="link"
+                  onClick={() => setChartsCollapsed((prev) => !prev)}
+                  style={{ fontSize: 12, padding: 0 }}
+                >
+                  {chartsCollapsed ? (
+                    <>展开双轴走势图 <DownOutlined style={{ fontSize: 10, marginLeft: 2 }} /></>
+                  ) : (
+                    <>收起走势图直达大表 <UpOutlined style={{ fontSize: 10, marginLeft: 2 }} /></>
+                  )}
+                </Button>
+              </div>
+            )}
+
             {/* 结构轮动卡片 (在 etf 或 all 下展示) */}
             {(activeTab === "etf" || activeTab === "all") && (
-              <Card
-                className="national-team-rotation"
-                title={
-                  <div className="national-team-rotation__header-left">
-                    <span className="national-team-rotation__title-text">{`结构轮动 · ${rotationWindow} 日份额变化`}</span>
-                    <span className="national-team-rotation__subtitle">跨宽基资金动向相对强弱</span>
-                  </div>
-                }
-                extra={
-                  <Segmented
-                    size="small"
-                    value={rotationWindow}
-                    options={[
-                      { label: "20 日", value: 20 },
-                      { label: "5 日", value: 5 },
-                      { label: "1 日", value: 1 },
-                    ]}
-                    onChange={(val) => setRotationWindowParam(String(val))}
-                    className="national-team-segmented"
-                  />
-                }
-              >
-                <div className="national-team-rotation__list">
-                  {rotation.map((item, index) => {
-                    const currentVal = rotationWindow === 1
-                      ? item.latest_change_1d_100m
-                      : rotationWindow === 5
-                      ? item.change_5d_100m
-                      : item.change_20d_100m;
-                    const hasValue = currentVal != null;
-                    const barWidth = Math.max(6, Math.min(100, Math.round((Math.abs(currentVal ?? 0) / maxAbsRotation) * 100)));
-                    const isPositive = (currentVal ?? 0) >= 0;
-                    const rankClass = hasValue && index < 3 ? `national-team-rotation__rank--${index + 1}` : "";
+              <div id="national-team-rotation-section" style={{ marginBottom: 12 }}>
+                <Card
+                  className="national-team-rotation"
+                  title={
+                    <div className="national-team-rotation__header-left">
+                      <span className="national-team-rotation__title-text">{`结构轮动 · ${rotationWindow} 日份额变化`}</span>
+                      <span className="national-team-rotation__subtitle">跨宽基资金动向相对强弱</span>
+                    </div>
+                  }
+                  extra={
+                    <Segmented
+                      size="small"
+                      value={rotationWindow}
+                      options={[
+                        { label: "20 日", value: 20 },
+                        { label: "5 日", value: 5 },
+                        { label: "1 日", value: 1 },
+                      ]}
+                      onChange={(val) => setRotationWindowParam(String(val))}
+                      className="national-team-segmented"
+                    />
+                  }
+                >
+                  <div className="national-team-rotation__list">
+                    {rotation.map((item, index) => {
+                      const currentVal = rotationWindow === 1
+                        ? item.latest_change_1d_100m
+                        : rotationWindow === 5
+                        ? item.change_5d_100m
+                        : item.change_20d_100m;
+                      const hasValue = currentVal != null;
+                      const barWidth = Math.max(6, Math.min(100, Math.round((Math.abs(currentVal ?? 0) / maxAbsRotation) * 100)));
+                      const isPositive = (currentVal ?? 0) >= 0;
+                      const rankClass = hasValue && index < 3 ? `national-team-rotation__rank--${index + 1}` : "";
 
-                    return (
-                      <div className="national-team-rotation__item" key={item.index_key}>
-                        <span className={`national-team-rotation__rank ${rankClass}`}>{hasValue ? index + 1 : "-"}</span>
-                        <div className="national-team-rotation__info">
-                          <span className="national-team-rotation__name">{item.index_name}</span>
-                          <span className="national-team-rotation__code">{item.index_code}</span>
+                      return (
+                        <div className="national-team-rotation__item" key={item.index_key}>
+                          <span className={`national-team-rotation__rank ${rankClass}`}>{hasValue ? index + 1 : "-"}</span>
+                          <div className="national-team-rotation__info">
+                            <span className="national-team-rotation__name">{item.index_name}</span>
+                            <span className="national-team-rotation__code">{item.index_code}</span>
+                          </div>
+                          <div className="national-team-rotation__bar" aria-hidden="true">
+                            {hasValue && currentVal !== 0 && <span
+                              style={{
+                                width: `${barWidth}%`,
+                                background: isPositive
+                                  ? `linear-gradient(90deg, ${colors.up}88, ${colors.up})`
+                                  : `linear-gradient(90deg, ${colors.down}88, ${colors.down})`,
+                              }}
+                            />}
+                          </div>
+                          <Text className="national-team-rotation__val" style={{ color: valueColor(currentVal, colors.up, colors.down, colors.textSecondary) }}>
+                            {hasValue ? formatSigned(currentVal) : "数据不足"}
+                          </Text>
                         </div>
-                        <div className="national-team-rotation__bar" aria-hidden="true">
-                          {hasValue && currentVal !== 0 && <span
-                            style={{
-                              width: `${barWidth}%`,
-                              background: isPositive
-                                ? `linear-gradient(90deg, ${colors.up}88, ${colors.up})`
-                                : `linear-gradient(90deg, ${colors.down}88, ${colors.down})`,
-                            }}
-                          />}
-                        </div>
-                        <Text className="national-team-rotation__val" style={{ color: valueColor(currentVal, colors.up, colors.down, colors.textSecondary) }}>
-                          {hasValue ? formatSigned(currentVal) : "数据不足"}
-                        </Text>
-                      </div>
-                    );
-                  })}
-                </div>
-                <div className="national-team-rotation__footer">
-                  <Text type="secondary" className="national-team-rotation__note">
-                    排名反映纳入 ETF 的份额净变化，不代表真实持仓排名；数据不足时不参与排名。
-                  </Text>
-                </div>
-              </Card>
+                      );
+                    })}
+                  </div>
+                  <div className="national-team-rotation__footer">
+                    <Text type="secondary" className="national-team-rotation__note">
+                      排名反映纳入 ETF 的份额净变化，不代表真实持仓排名；数据不足时不参与排名。
+                    </Text>
+                  </div>
+                </Card>
+              </div>
             )}
 
             {/* 宽基图表矩阵：整洁紧凑的网格卡片 (在 etf 或 all 下展示) */}
             {(activeTab === "etf" || activeTab === "all") && (
-              <>
+              <div id="national-team-charts-section" style={{ marginBottom: 14 }}>
                 <div className="national-team-section-heading">
                   <div className="national-team-section-heading__left">
                     <Title level={2} className="national-team-section-heading__title">宽基份额与指数走势</Title>
@@ -2029,17 +2097,36 @@ export default function NationalTeam() {
                       className="national-team-segmented"
                     />
                     <Tag color="blue" className="national-team-section-heading__tag">双轴 · {days} 天</Tag>
+                    {activeTab === "etf" && (
+                      <Button
+                        size="small"
+                        type="link"
+                        onClick={() => setChartsCollapsed((prev) => !prev)}
+                        style={{ fontSize: 12, padding: "0 4px" }}
+                      >
+                        {chartsCollapsed ? "展开" : "收起"}
+                      </Button>
+                    )}
                   </div>
                 </div>
 
-                <div className="national-team-chart-grid">
-                  {filteredIndices.map((item) => (
-                    <LazyChart height={340} placeholderClassName="national-team-index-card-placeholder" key={item.index_key}>
-                      <IndexDualAxisChart item={item} days={days} />
-                    </LazyChart>
-                  ))}
-                </div>
-              </>
+                {!chartsCollapsed || activeTab === "all" ? (
+                  <div className="national-team-chart-grid">
+                    {filteredIndices.map((item) => (
+                      <LazyChart height={340} placeholderClassName="national-team-index-card-placeholder" key={item.index_key}>
+                        <IndexDualAxisChart item={item} days={days} />
+                      </LazyChart>
+                    ))}
+                  </div>
+                ) : (
+                  <Card size="small" style={{ textAlign: "center", padding: "12px 0", background: "var(--c-bg-subtle, rgba(128, 128, 128, 0.02))", borderStyle: "dashed" }}>
+                    <Space size={10}>
+                      <Text type="secondary">已收起 {filteredIndices.length} 张宽基双轴图表，点击快速展开</Text>
+                      <Button size="small" onClick={() => setChartsCollapsed(false)}>展开图表</Button>
+                    </Space>
+                  </Card>
+                )}
+              </div>
             )}
 
             {/* 四大板块概览卡片 (在 etf 或 all 下展示) */}
@@ -2052,7 +2139,7 @@ export default function NationalTeam() {
 
             {/* ETF 监测明细表格 (在 etf 或 all 下展示) */}
             {(activeTab === "etf" || activeTab === "all") && (
-              <div className="national-team-table-wrapper">
+              <div id="national-team-table-section" className="national-team-table-wrapper">
                 <div className="national-team-section-heading national-team-section-heading--table">
                   <div className="national-team-section-heading__left">
                     <Title level={2} className="national-team-section-heading__title">ETF 监测明细</Title>
@@ -2122,23 +2209,29 @@ export default function NationalTeam() {
               </div>
             )}
 
-            {/* 底部规范化口径与方法面板 (常驻) */}
-            <Card className="national-team-methodology" size="small">
-              <Space align="start" size={12}>
-                <SafetyCertificateOutlined className="national-team-methodology__icon" style={{ color: colors.primary }} />
-                <div className="national-team-methodology__content">
-                  <div className="national-team-methodology__header">
-                    <Text strong>估算方法与口径规范：</Text>
-                    <Text type="secondary">{data?.methodology || "ETF 当日份额变化 × ETF 当日收盘价，逐只计算后按宽基汇总。"}</Text>
-                  </div>
-                  <div className="national-team-methodology__footer">
-                    <Text type="secondary">
-                      特别提示：ETF 份额变动为全市场一级市场申购赎回代理汇总结果，包含各类公募、私募、保险及散户资金；成交额为二级市场交易额，严禁将成交额误称为“真实资金净流入”。
-                    </Text>
-                  </div>
-                </div>
-              </Space>
-            </Card>
+            {/* 底部规范化口径与方法提示 (轻量化流线型，去除笨重 Card 边框与冗余 padding) */}
+            <div
+              className="national-team-methodology"
+              data-testid="national-team-methodology"
+              style={{
+                marginTop: 8,
+                padding: "8px 14px",
+                borderRadius: 8,
+                border: "1px dashed var(--c-border)",
+                background: "var(--c-bg-subtle, rgba(128, 128, 128, 0.02))",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", fontSize: 11, color: colors.textSecondary }}>
+                <SafetyCertificateOutlined className="national-team-methodology__icon" style={{ color: colors.primary, fontSize: 13 }} />
+                <span className="national-team-methodology__header">
+                  <Text strong style={{ fontSize: 11, color: colors.textPrimary }}>估算方法与口径规范：</Text>
+                  <span>{data?.methodology || "ETF 当日份额变化 × ETF 当日收盘价，逐只计算后按宽基汇总。"}</span>
+                </span>
+                <span className="national-team-methodology__footer" style={{ opacity: 0.8 }}>
+                  · 特别提示：ETF 份额变动为全市场一级市场申购赎回代理汇总结果，非中央汇金真实持仓；二级市场成交额严禁误称为真实净流入。
+                </span>
+              </div>
+            </div>
           </>
         )}
   </SectionDataState>
