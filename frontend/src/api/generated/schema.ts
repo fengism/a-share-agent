@@ -21885,7 +21885,7 @@ export interface operations {
                 include_etf_points?: boolean;
                 /** @description 是否返回指数点位序列。传 false 时指数标量仍保留，图表改用/national-team/index-series 单独获取，可让首屏先渲染表格与结论。 */
                 include_index_points?: boolean;
-                /** @description 是否返回 daily_flows[].flows_by_index；前端只用 flows_by_category。 */
+                /** @description 是否返回 daily_flows[].flows_by_index；供前端宽基日度资金流向热力矩阵使用。 */
                 include_flow_breakdown?: boolean;
             };
             header?: never;

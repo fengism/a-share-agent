@@ -39462,13 +39462,13 @@
             }
           },
           {
-            "description": "是否返回 daily_flows[].flows_by_index；前端只用 flows_by_category。",
+            "description": "是否返回 daily_flows[].flows_by_index；供前端宽基日度资金流向热力矩阵使用。",
             "in": "query",
             "name": "include_flow_breakdown",
             "required": false,
             "schema": {
               "default": true,
-              "description": "是否返回 daily_flows[].flows_by_index；前端只用 flows_by_category。",
+              "description": "是否返回 daily_flows[].flows_by_index；供前端宽基日度资金流向热力矩阵使用。",
               "title": "Include Flow Breakdown",
               "type": "boolean"
             }
