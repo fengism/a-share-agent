@@ -20,6 +20,7 @@ import type {
   NationalTeamIntradayObservation,
 } from "../../../types/stock";
 import { downloadCsv } from "../utils/csv";
+import LazyChart from "./LazyChart";
 
 export interface NationalTeamIntradayMonitorProps {
   intraday?: NationalTeamIntradayObservation;
@@ -728,12 +729,16 @@ export default function NationalTeamIntradayMonitor({
             extra={<span style={{ fontSize: 11, color: colors.textSecondary }}>双轴联动 · 1分钟聚合</span>}
           >
             <div style={{ height: 280 }}>
-              <ReactECharts
-                data-testid="national-team-intraday-minute-chart"
-                option={minuteOption}
-                style={{ height: "100%", width: "100%" }}
-                opts={{ renderer: "canvas" }}
-              />
+              <LazyChart height={280}>
+                <ReactECharts
+                  echarts={echarts}
+                  data-testid="national-team-intraday-minute-chart"
+                  option={minuteOption}
+                  style={{ height: "100%", width: "100%" }}
+                  opts={{ renderer: "canvas" }}
+                  notMerge
+                />
+              </LazyChart>
             </div>
           </Card>
         </Col>
@@ -750,12 +755,16 @@ export default function NationalTeamIntradayMonitor({
             extra={<span style={{ fontSize: 11, color: colors.textSecondary }}>今日 vs 昨日 vs 20日均值</span>}
           >
             <div style={{ height: 280 }}>
-              <ReactECharts
-                data-testid="national-team-intraday-cum-chart"
-                option={cumOption}
-                style={{ height: "100%", width: "100%" }}
-                opts={{ renderer: "canvas" }}
-              />
+              <LazyChart height={280}>
+                <ReactECharts
+                  echarts={echarts}
+                  data-testid="national-team-intraday-cum-chart"
+                  option={cumOption}
+                  style={{ height: "100%", width: "100%" }}
+                  opts={{ renderer: "canvas" }}
+                  notMerge
+                />
+              </LazyChart>
             </div>
           </Card>
         </Col>
@@ -797,12 +806,16 @@ export default function NationalTeamIntradayMonitor({
             }
           >
             <div style={{ height: 260 }}>
-              <ReactECharts
-                data-testid="national-team-intraday-typical-chart"
-                option={typicalOption}
-                style={{ height: "100%", width: "100%" }}
-                opts={{ renderer: "canvas" }}
-              />
+              <LazyChart height={260}>
+                <ReactECharts
+                  echarts={echarts}
+                  data-testid="national-team-intraday-typical-chart"
+                  option={typicalOption}
+                  style={{ height: "100%", width: "100%" }}
+                  opts={{ renderer: "canvas" }}
+                  notMerge
+                />
+              </LazyChart>
             </div>
           </Card>
         </Col>
@@ -896,12 +909,16 @@ export default function NationalTeamIntradayMonitor({
             </div>
           )}
           <div style={{ height: 250 }}>
-            <ReactECharts
-              data-testid="national-team-intraday-signal-chart"
-              option={volumeSignalOption}
-              style={{ height: "100%", width: "100%" }}
-              opts={{ renderer: "canvas" }}
-            />
+            <LazyChart height={250}>
+              <ReactECharts
+                echarts={echarts}
+                data-testid="national-team-intraday-signal-chart"
+                option={volumeSignalOption}
+                style={{ height: "100%", width: "100%" }}
+                opts={{ renderer: "canvas" }}
+                notMerge
+              />
+            </LazyChart>
           </div>
         </Card>
       ) : null}

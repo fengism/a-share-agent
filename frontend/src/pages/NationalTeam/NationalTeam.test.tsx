@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -28,19 +29,33 @@ vi.mock("echarts-for-react/lib/core", () => ({
         symbolSize?: number;
       }>;
     };
+    echarts?: unknown;
     [key: string]: unknown;
-  }) => (
-    <div
-      data-testid={(rest["data-testid"] as string) || "national-team-chart"}
-      data-title={option.title?.text}
-      data-y-axes={Array.isArray(option.yAxis) ? option.yAxis.length : (option.yAxis ? 1 : 0)}
-      data-legend-visible={String(option.legend?.show !== false)}
-      data-series-colors={option.series?.map((series) => series.lineStyle?.color).join(",")}
-      data-series-line-types={option.series?.map((series) => series.lineStyle?.type).join(",")}
-      data-series-show-symbol={option.series?.map((series) => String(series.showSymbol)).join(",")}
-      data-series-symbol-size={option.series?.map((series) => String(series.symbolSize)).join(",")}
-    />
-  ),
+  }) => {
+    useEffect(() => {
+      if (!rest.echarts) {
+        throw new TypeError("Cannot read properties of undefined (reading 'init')");
+      }
+      return () => {
+        if (!rest.echarts) {
+          throw new TypeError("Cannot read properties of undefined (reading 'dispose')");
+        }
+      };
+    }, [rest.echarts]);
+
+    return (
+      <div
+        data-testid={(rest["data-testid"] as string) || "national-team-chart"}
+        data-title={option.title?.text}
+        data-y-axes={Array.isArray(option.yAxis) ? option.yAxis.length : (option.yAxis ? 1 : 0)}
+        data-legend-visible={String(option.legend?.show !== false)}
+        data-series-colors={option.series?.map((series) => series.lineStyle?.color).join(",")}
+        data-series-line-types={option.series?.map((series) => series.lineStyle?.type).join(",")}
+        data-series-show-symbol={option.series?.map((series) => String(series.showSymbol)).join(",")}
+        data-series-symbol-size={option.series?.map((series) => String(series.symbolSize)).join(",")}
+      />
+    );
+  },
 }));
 
 const renderPage = (ui = <NationalTeam />, initialEntries = ["/?tab=all"]) =>
@@ -806,14 +821,19 @@ describe("NationalTeam data quality", () => {  it("shows verified source, busine
       }
     });
 
-    it("switches across sub-tabs: flow -> radar -> etf -> flow", () => {
+    it("switches across sub-tabs: flow -> intraday -> radar -> etf -> flow", () => {
       renderPage(<NationalTeam />, ["/"]);
 
-      // Switch to Radar tab
+      // Switch to Intraday tab (renders multiple ECharts)
+      fireEvent.click(screen.getByText("⏱️ 盘中分钟观测"));
+      expect(screen.getByTestId("national-team-intraday-minute-chart")).toBeInTheDocument();
+
+      // Switch from Intraday tab to Radar tab (unmounts intraday charts, verifies no dispose error)
       fireEvent.click(screen.getByText("🛡️ 托底信号雷达"));
       expect(screen.getByTestId("national-team-support-radar")).toBeInTheDocument();
       expect(screen.getByTestId("national-team-milestones")).toBeInTheDocument();
       expect(screen.getByTestId("national-team-support-zones")).toBeInTheDocument();
+      expect(screen.queryByTestId("national-team-intraday-minute-chart")).not.toBeInTheDocument();
       expect(screen.queryByTestId("national-team-flow-heatmap-table")).not.toBeInTheDocument();
 
       // Switch to ETF details tab
