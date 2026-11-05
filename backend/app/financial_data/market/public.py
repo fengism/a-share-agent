@@ -36,6 +36,7 @@ from app.financial_data.market.quotes.concept_linkage import (
     get_concept_constituents,
     get_concept_index,
     list_concepts,
+    resolve_canonical_concept_name,
 )
 from app.financial_data.market.quotes.customs import get_customs_trade_data
 from app.financial_data.market.quotes.dragon_tiger import get_dragon_tiger_detail, get_dragon_tiger_list
@@ -153,6 +154,7 @@ __all__ = [
     "get_concept_constituents",
     "get_concept_index",
     "list_concepts",
+    "resolve_canonical_concept_name",
     "get_dragon_tiger_detail",
     "get_dragon_tiger_list",
     "get_hot_stocks",

@@ -37,6 +37,15 @@ class _FakeConnection:
                     for code, name, concepts in self._mapping_rows
                 ]
             )
+        if "LIKE" in sql:
+            pattern = str(params[0]).replace("%", "") if params else ""
+            matches = [
+                {"name": name, "stock_count": count}
+                for name, count in self._concept_rows
+                if pattern in name
+            ]
+            matches.sort(key=lambda item: item["stock_count"], reverse=True)
+            return _FakeCursor(matches)
         names = set(params or ())
         return _FakeCursor(
             [{"name": name, "stock_count": count} for name, count in self._concept_rows if name in names]
@@ -340,4 +349,45 @@ def test_get_concept_constituents_degrades_on_timeout(monkeypatch: pytest.Monkey
     assert result["total"] == 1
     assert result["items"][0]["code"] == "000002"
     assert result["items"][0]["price"] is None
+
+
+def test_resolve_canonical_concept_name_photovoltaic_and_aliases(monkeypatch: pytest.MonkeyPatch) -> None:
+    """今日主线的宏观题材「光伏」应能自动解析为同花顺概念名「光伏概念」。"""
+    _patch_connection(
+        monkeypatch,
+        mapping_rows=[],
+        concept_rows=[
+            ("光伏概念", 602),
+            ("芯片概念", 927),
+            ("低空经济", 502),
+        ],
+    )
+
+    # 1. 常见别名/后缀映射
+    assert module.resolve_canonical_concept_name("光伏") == "光伏概念"
+    assert module.resolve_canonical_concept_name("芯片") == "芯片概念"
+    # 2. 精确匹配
+    assert module.resolve_canonical_concept_name("低空经济") == "低空经济"
+    # 3. 彻底不存在的概念原样返回
+    assert module.resolve_canonical_concept_name("不存在概念") == "不存在概念"
+
+
+def test_get_concept_constituents_resolves_alias(monkeypatch: pytest.MonkeyPatch) -> None:
+    """访问未带'概念'后缀的「光伏」时，通过别名解析为「光伏概念」并返回成分股。"""
+    _patch_connection(
+        monkeypatch,
+        mapping_rows=[
+            ("600519.SH", "贵州茅台", '["光伏概念"]'),
+        ],
+        concept_rows=[
+            ("光伏概念", 602),
+        ],
+    )
+    _patch_local_closes(monkeypatch, {})
+
+    result = asyncio.run(module.get_concept_constituents("光伏", quote_codes=[]))
+
+    assert result["concept"] == "光伏概念"
+    assert result["total"] == 1
+    assert result["items"][0]["code"] == "600519"
 

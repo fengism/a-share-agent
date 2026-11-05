@@ -233,9 +233,101 @@ def get_concept_daily_changes() -> dict[str, ConceptDailyChange]:
     return result
 
 
+_COMMON_CONCEPT_ALIASES: dict[str, str] = {
+    "光伏": "光伏概念",
+    "芯片": "芯片概念",
+    "半导体": "半导体",
+    "新能源车": "新能源汽车",
+    "新能源汽车": "新能源汽车",
+    "锂电": "锂电池概念",
+    "锂电池": "锂电池概念",
+    "白酒": "白酒概念",
+    "机器人": "机器人概念",
+    "商业航天": "商业航天",
+    "航天": "商业航天",
+    "算力": "东数西算(算力)",
+    "AI算力": "算力租赁",
+    "人形机器人": "人形机器人",
+    "消费电子": "消费电子概念",
+    "低空经济": "低空经济",
+    "无人驾驶": "无人驾驶",
+    "智能驾驶": "无人驾驶",
+    "信创": "信创",
+    "央企改革": "央企国企改革",
+    "军工": "军工",
+    "固态电池": "固态电池",
+}
+
+
+def resolve_canonical_concept_name(concept: str) -> str:
+    """将输入的概念名称（例如来自今日主线、用户简写等）规范化为本地同花顺维护的概念标准名。
+
+    解决今日主线（财联社等不同上游）给出的宏观板块简称（如「光伏」）
+    与本地维护的同花顺成分股概念名（如「光伏概念」）不一致的问题。
+    """
+    text = (concept or "").strip()
+    if not text:
+        return text
+
+    connection = _industry_connection()
+    # 1. 精确匹配本地已有概念
+    rows = connection.execute(
+        "SELECT name FROM stock_concepts WHERE name = ?",
+        (text,),
+    ).fetchall()
+    if rows:
+        return str(rows[0]["name"])
+
+    # 2. 常见行业/题材别名映射
+    if text in _COMMON_CONCEPT_ALIASES:
+        target = _COMMON_CONCEPT_ALIASES[text]
+        rows = connection.execute(
+            "SELECT name FROM stock_concepts WHERE name = ?",
+            (target,),
+        ).fetchall()
+        if rows:
+            return str(rows[0]["name"])
+
+    # 3. 概念后缀增删：「光伏」->「光伏概念」，「光伏概念」->「光伏」
+    if not text.endswith("概念"):
+        with_concept = text + "概念"
+        rows = connection.execute(
+            "SELECT name FROM stock_concepts WHERE name = ?",
+            (with_concept,),
+        ).fetchall()
+        if rows:
+            return str(rows[0]["name"])
+    else:
+        without_concept = text[:-2]
+        rows = connection.execute(
+            "SELECT name FROM stock_concepts WHERE name = ?",
+            (without_concept,),
+        ).fetchall()
+        if rows:
+            return str(rows[0]["name"])
+
+    # 4. 前缀匹配：按成分股只数降序选取最大板块
+    rows = connection.execute(
+        "SELECT name, stock_count FROM stock_concepts WHERE name LIKE ? ORDER BY stock_count DESC LIMIT 1",
+        (f"{text}%",),
+    ).fetchall()
+    if rows:
+        return str(rows[0]["name"])
+
+    # 5. 模糊包含：包含该关键字且成分股最多的板块
+    rows = connection.execute(
+        "SELECT name, stock_count FROM stock_concepts WHERE name LIKE ? ORDER BY stock_count DESC LIMIT 1",
+        (f"%{text}%",),
+    ).fetchall()
+    if rows:
+        return str(rows[0]["name"])
+
+    return text
+
+
 def _concept_constituent_rows(concept: str) -> list[sqlite3.Row]:
     connection = _industry_connection()
-    return connection.execute(
+    rows = connection.execute(
         """SELECT stock_code, stock_name, concepts_json
              FROM stock_concept_mappings
             WHERE EXISTS (
@@ -246,6 +338,21 @@ def _concept_constituent_rows(concept: str) -> list[sqlite3.Row]:
             ORDER BY stock_code""",
         (concept,),
     ).fetchall()
+    if not rows:
+        canonical = resolve_canonical_concept_name(concept)
+        if canonical and canonical != concept:
+            rows = connection.execute(
+                """SELECT stock_code, stock_name, concepts_json
+                     FROM stock_concept_mappings
+                    WHERE EXISTS (
+                            SELECT 1 FROM json_each(
+                                CASE WHEN json_valid(concepts_json) THEN concepts_json ELSE '[]' END
+                            ) WHERE json_each.value = ?
+                          )
+                    ORDER BY stock_code""",
+                (canonical,),
+            ).fetchall()
+    return rows
 
 
 def _split_code(raw: str) -> str | None:
@@ -410,7 +517,8 @@ async def get_concept_constituents(concept: str, quote_codes: list[str] | None =
     上游按 80 条一批串行处理（TDX 客户端非线程安全，统一锁内串行），
     全量请求在上游故障时会拖到数十秒。缺省为 None 表示仍然全量拉取。
     """
-    constituents, total = await asyncio.to_thread(list_constituents, concept)
+    canonical_concept = resolve_canonical_concept_name(concept)
+    constituents, total = await asyncio.to_thread(list_constituents, canonical_concept)
     if not constituents:
         raise ResourceNotFoundError(f"未找到概念「{concept}」的成分股", code="concept.not_found")
 
@@ -427,7 +535,7 @@ async def get_concept_constituents(concept: str, quote_codes: list[str] | None =
         codes = [code for code in dict.fromkeys(quote_codes) if code in known_codes]
     if not codes:
         # 没有需要取行情的代码，直接走降级路径
-        logger.debug("概念成分股无需拉取行情: concept=%s", concept)
+        logger.debug("概念成分股无需拉取行情: concept=%s", canonical_concept)
     else:
         try:
             quote_set = await asyncio.wait_for(fetch_realtime_quote_set(codes), timeout=QUOTE_FETCH_TIMEOUT_SECONDS)
@@ -437,7 +545,7 @@ async def get_concept_constituents(concept: str, quote_codes: list[str] | None =
                 if isinstance(quote, dict):
                     quotes[raw_code] = quote
         except Exception as error:  # 行情不可用或超时不应让成分股列表整体失败
-            logger.warning("概念成分股行情不可用或拉取超时: concept=%s, error=%s", concept, error)
+            logger.warning("概念成分股行情不可用或拉取超时: concept=%s, error=%s", canonical_concept, error)
 
     items: list[dict] = []
     # 实时行情没覆盖到的行，若本地已有**当日已确认**的收盘数据则用它兜底。
@@ -450,11 +558,11 @@ async def get_concept_constituents(concept: str, quote_codes: list[str] | None =
         try:
             local_closes = await asyncio.to_thread(_confirmed_local_closes, local_codes)
         except Exception:
-            logger.warning("概念成分股本地收盘兜底失败: concept=%s", concept, exc_info=True)
+            logger.warning("概念成分股本地收盘兜底失败: concept=%s", canonical_concept, exc_info=True)
 
     # 行内"其他概念"标签：规模表按天缓存，挑选规则见 _pick_constituent_tags
     concept_sizes = await asyncio.to_thread(_all_concept_sizes)
-    concept_size = concept_sizes.get(concept, total)
+    concept_size = concept_sizes.get(canonical_concept, total)
 
     for item in constituents:
         quote = quotes.get(item.code)
@@ -483,7 +591,7 @@ async def get_concept_constituents(concept: str, quote_codes: list[str] | None =
                 "amount": amount,
                 "quote_source": source,
                 "related_concepts": _pick_constituent_tags(
-                    concept,
+                    canonical_concept,
                     item.concepts,
                     concept_size=concept_size,
                     sizes=concept_sizes,
@@ -491,9 +599,9 @@ async def get_concept_constituents(concept: str, quote_codes: list[str] | None =
             }
         )
 
-    related = await asyncio.to_thread(_related_concepts, concept, constituents)
+    related = await asyncio.to_thread(_related_concepts, canonical_concept, constituents)
     return {
-        "concept": concept,
+        "concept": canonical_concept,
         "total": total,
         "items": items,
         "related_concepts": [{"name": item.name, "overlap": item.overlap, "ratio": item.ratio} for item in related],
@@ -508,12 +616,13 @@ async def get_concept_index(concept: str, *, days: int) -> dict:
     if days <= 0:
         raise InvalidRequestError("days 必须大于 0")
     days = min(days, MAX_INDEX_DAYS)
-    cache_key = f"concept_index:{concept}:{days}"
+    canonical_concept = resolve_canonical_concept_name(concept)
+    cache_key = f"concept_index:{canonical_concept}:{days}"
     cached = cache.get(cache_key)
     if cached is not None:
         return cached
 
-    constituents, total = await asyncio.to_thread(list_constituents, concept)
+    constituents, total = await asyncio.to_thread(list_constituents, canonical_concept)
     if not constituents:
         raise ResourceNotFoundError(f"未找到概念「{concept}」的成分股", code="concept.not_found")
 
@@ -522,7 +631,7 @@ async def get_concept_index(concept: str, *, days: int) -> dict:
     start_date = (market_today() - timedelta(days=days)).isoformat()
     points = await asyncio.to_thread(load_concept_index, used_codes, start_date)
     payload = {
-        "concept": concept,
+        "concept": canonical_concept,
         "method": "equal_weight_adjusted_close",
         "base": points[0].level if points else None,
         "constituent_total": total,

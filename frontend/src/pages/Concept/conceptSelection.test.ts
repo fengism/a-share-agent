@@ -6,6 +6,7 @@ import {
   CONCEPT_INDEX_RANGES,
   DEFAULT_INDEX_DAYS,
   limitUpBadge,
+  resolveConceptName,
   useConceptPageParams,
   useConceptSearch,
   useFavoriteConcepts,
@@ -158,5 +159,32 @@ describe("limitUpBadge", () => {
     expect(limitUpBadge("920001", 29.9)).toBe("up");
     // 无行情不判断
     expect(limitUpBadge("000001", null)).toBeNull();
+  });
+});
+
+describe("resolveConceptName", () => {
+  const concepts = [
+    { name: "光伏概念", stock_count: 602 },
+    { name: "光伏设备", stock_count: 73 },
+    { name: "芯片概念", stock_count: 927 },
+    { name: "半导体", stock_count: 188 },
+    { name: "低空经济", stock_count: 502 },
+    { name: "新能源汽车", stock_count: 1070 },
+  ];
+
+  it("resolves exact matches directly", () => {
+    expect(resolveConceptName("低空经济", concepts)).toBe("低空经济");
+    expect(resolveConceptName("光伏概念", concepts)).toBe("光伏概念");
+  });
+
+  it("resolves macroeconomic/mainline abbreviations like 光伏 to 光伏概念", () => {
+    expect(resolveConceptName("光伏", concepts)).toBe("光伏概念");
+    expect(resolveConceptName("芯片", concepts)).toBe("芯片概念");
+    expect(resolveConceptName("新能源车", concepts)).toBe("新能源汽车");
+  });
+
+  it("returns original input when concept cannot be found", () => {
+    expect(resolveConceptName("不存在概念", concepts)).toBe("不存在概念");
+    expect(resolveConceptName("", concepts)).toBe("");
   });
 });

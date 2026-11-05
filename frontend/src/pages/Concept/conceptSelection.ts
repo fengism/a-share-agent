@@ -148,6 +148,77 @@ export function useConceptPageParams(): [
   return [params, patch];
 }
 
+export const COMMON_CONCEPT_ALIASES: Record<string, string> = {
+  "光伏": "光伏概念",
+  "芯片": "芯片概念",
+  "半导体": "半导体",
+  "新能源车": "新能源汽车",
+  "新能源汽车": "新能源汽车",
+  "锂电": "锂电池概念",
+  "锂电池": "锂电池概念",
+  "白酒": "白酒概念",
+  "机器人": "机器人概念",
+  "商业航天": "商业航天",
+  "航天": "商业航天",
+  "算力": "东数西算(算力)",
+  "AI算力": "算力租赁",
+  "人形机器人": "人形机器人",
+  "消费电子": "消费电子概念",
+  "低空经济": "低空经济",
+  "无人驾驶": "无人驾驶",
+  "智能驾驶": "无人驾驶",
+  "信创": "信创",
+  "央企改革": "央企国企改革",
+  "军工": "军工",
+  "固态电池": "固态电池",
+};
+
+/**
+ * 概念名称规范化与智能别名映射：
+ * 将今日主线（财联社等不同上游）、外部链接或用户简称（如「光伏」、「芯片」）
+ * 映射至本地同花顺维护的概念标准名（如「光伏概念」、「芯片概念」）。
+ */
+export function resolveConceptName<T extends { name: string; stock_count?: number }>(
+  input: string,
+  conceptList: T[],
+): string {
+  if (!input || !conceptList.length) return input;
+  const trimmed = input.trim();
+  // 1. 精确匹配
+  const exact = conceptList.find((c) => c.name === trimmed);
+  if (exact) return exact.name;
+
+  // 2. 常见行业/主线宏观题材至同花顺概念的映射表
+  if (COMMON_CONCEPT_ALIASES[trimmed]) {
+    const aliasTarget = COMMON_CONCEPT_ALIASES[trimmed];
+    const aliasMatch = conceptList.find((c) => c.name === aliasTarget);
+    if (aliasMatch) return aliasMatch.name;
+  }
+
+  // 3. 概念后缀增删：「光伏」->「光伏概念」，或「光伏概念」->「光伏」
+  if (!trimmed.endsWith("概念")) {
+    const withConcept = conceptList.find((c) => c.name === `${trimmed}概念`);
+    if (withConcept) return withConcept.name;
+  } else {
+    const withoutConcept = conceptList.find((c) => c.name === trimmed.slice(0, -2));
+    if (withoutConcept) return withoutConcept.name;
+  }
+
+  // 4. 前缀匹配：选取以 trimmed 开头且成分股最多的板块（例如「光伏」前缀中规模最大的「光伏概念」）
+  const prefixMatches = conceptList
+    .filter((c) => c.name.startsWith(trimmed))
+    .sort((a, b) => (b.stock_count ?? 0) - (a.stock_count ?? 0));
+  if (prefixMatches.length > 0) return prefixMatches[0].name;
+
+  // 5. 包含匹配：包含关键字且成分股最多的板块
+  const includesMatches = conceptList
+    .filter((c) => c.name.includes(trimmed))
+    .sort((a, b) => (b.stock_count ?? 0) - (a.stock_count ?? 0));
+  if (includesMatches.length > 0) return includesMatches[0].name;
+
+  return trimmed;
+}
+
 /** 概念搜索：本地过滤，避免每敲一个字就打接口。泛型保留 stock_count 等附加字段。 */
 export function useConceptSearch<T extends { name: string }>(items: T[], keyword: string): T[] {
   return useMemo(() => {

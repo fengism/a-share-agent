@@ -47,7 +47,7 @@ const CONCEPTS = [
   { name: "融资融券", stock_count: 3861 },
   { name: "固态电池", stock_count: 297 },
   { name: "宁德时代概念", stock_count: 199 },
-  { name: "钠离子电池", stock_count: 92 },
+  { name: "光伏概念", stock_count: 602 },
 ];
 
 const MAINLINE = {
@@ -55,7 +55,7 @@ const MAINLINE = {
   fetched_at: "2026-09-30T15:30:00",
   items: [
     {
-      title: "算力主线",
+      title: "今日主线",
       description: "",
       continued_days: 3,
       hot: 99,
@@ -68,6 +68,15 @@ const MAINLINE = {
           change_pct: 6.2,
           article_title: "",
           faucets: [{ code: "000002", name: "万科A", change_pct: 4.41, reason: "" }],
+        },
+        {
+          code: "885002",
+          name: "光伏",
+          reason: "光伏产业链反弹",
+          rise_count: 15,
+          change_pct: 3.23,
+          article_title: "",
+          faucets: [],
         },
       ],
     },
@@ -270,6 +279,17 @@ describe("Concept page", () => {
     await waitFor(() => {
       expect(
         screen.getByText((_, node) => node?.textContent === "算力概念 · 3861 只"),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("resolves macro plate name like 光伏 to 光伏概念 when clicked", async () => {
+    setup();
+    const chip = await screen.findByRole("button", { name: /光伏/ });
+    fireEvent.click(chip);
+    await waitFor(() => {
+      expect(
+        screen.getByText((_, node) => node?.textContent === "光伏概念 · 3861 只"),
       ).toBeInTheDocument();
     });
   });

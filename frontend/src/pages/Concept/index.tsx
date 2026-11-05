@@ -26,6 +26,7 @@ import ConceptSidePanel from "./ConceptSidePanel";
 import {
   COMPARE_CONCEPT_LIMIT,
   CONCEPT_INDEX_RANGES,
+  resolveConceptName,
   useConceptPageParams,
   useConceptSearch,
   useFavoriteConcepts,
@@ -161,10 +162,16 @@ function FavoriteChips({
   );
 }
 
-function MainlineChips({ mainline, activeConcept, onSelect }: {
+function MainlineChips({
+  mainline,
+  activeConcept,
+  onSelect,
+  concepts = [],
+}: {
   mainline: MarketMainline | undefined;
   activeConcept: string;
   onSelect: (name: string) => void;
+  concepts?: ConceptSummary[];
 }) {
   const c = useColors();
   const plates = useMemo(() => {
@@ -174,8 +181,10 @@ function MainlineChips({ mainline, activeConcept, onSelect }: {
       for (const plate of chance.plates ?? []) {
         if (!plate.name || seen.has(plate.name)) continue;
         seen.add(plate.name);
+        const resolvedName = resolveConceptName(plate.name, concepts);
         flat.push({
-          name: plate.name,
+          rawName: plate.name,
+          name: resolvedName,
           change_pct: plate.change_pct,
           reason: chance.title || plate.reason,
           faucets: (plate.faucets ?? []).slice(0, 3).map((f) => f.name),
@@ -183,7 +192,7 @@ function MainlineChips({ mainline, activeConcept, onSelect }: {
       }
     }
     return flat.sort((a, b) => (b.change_pct ?? -999) - (a.change_pct ?? -999)).slice(0, 8);
-  }, [mainline]);
+  }, [mainline, concepts]);
 
   if (!plates.length) return null;
   return (
@@ -192,21 +201,21 @@ function MainlineChips({ mainline, activeConcept, onSelect }: {
         <RiseOutlined style={{ color: c.up }} /> 今日主线
       </span>
       {plates.map((plate) => {
-        const active = plate.name === activeConcept;
-        const hint = [
+        const active = plate.name === activeConcept || plate.rawName === activeConcept;
+        const hintParts = [
+          plate.rawName !== plate.name ? `对应同花顺概念：${plate.name}` : null,
           plate.reason || null,
           plate.faucets.length ? `龙头：${plate.faucets.join("、")}` : null,
-        ]
-          .filter(Boolean)
-          .join(" · ");
+        ].filter(Boolean);
+        const hint = hintParts.join(" · ");
         const chip = (
           <button
-            key={plate.name}
+            key={plate.rawName}
             type="button"
             className={`concept-chip${active ? " concept-chip--active" : ""}`}
             onClick={() => onSelect(plate.name)}
           >
-            <span className="concept-chip__name">{plate.name}</span>
+            <span className="concept-chip__name">{plate.rawName}</span>
             {plate.change_pct != null ? (
               <span
                 className="concept-chip__pct financial-num"
@@ -219,7 +228,7 @@ function MainlineChips({ mainline, activeConcept, onSelect }: {
           </button>
         );
         return hint ? (
-          <Tooltip key={plate.name} title={`${plate.name}：${hint}`}>
+          <Tooltip key={plate.rawName} title={`${plate.rawName}：${hint}`}>
             {chip}
           </Tooltip>
         ) : (
@@ -258,6 +267,15 @@ export default function Concept() {
   useEffect(() => {
     if (conceptParam || !concepts.length) return;
     patchParams({ concept: concepts[0].name });
+  }, [conceptParam, concepts, patchParams]);
+
+  // 外部链接或历史参数（如 ?concept=光伏）若为简称，在 concepts 名单就绪后自动规范化重定向为标准同花顺概念名
+  useEffect(() => {
+    if (!conceptParam || !concepts.length) return;
+    const resolved = resolveConceptName(conceptParam, concepts);
+    if (resolved && resolved !== conceptParam && concepts.some((item) => item.name === resolved)) {
+      patchParams({ concept: resolved });
+    }
   }, [conceptParam, concepts, patchParams]);
 
   // 外部换概念（如点关联概念/热门概念）时同步输入框
@@ -311,16 +329,17 @@ export default function Concept() {
 
   const handleSelectConcept = useCallback(
     (next: string) => {
+      const canonical = resolveConceptName(next, concepts);
       patchParams({
-        concept: next,
+        concept: canonical,
         // 主概念换到某个对比概念时，把它从对比列表里移除，避免重复曲线
-        compare: compare.filter((name) => name !== next),
+        compare: compare.filter((name) => name !== canonical && name !== next),
       });
-      setInputValue(next);
+      setInputValue(canonical);
       setKeyword("");
-      rememberRecentConcept(next);
+      rememberRecentConcept(canonical);
     },
-    [patchParams, rememberRecentConcept, compare],
+    [patchParams, rememberRecentConcept, compare, concepts],
   );
 
   const toggleCompareConcept = useCallback(
@@ -369,6 +388,11 @@ export default function Concept() {
   const showConstituents = !isNarrow || mobileView === "constituents";
 
   if (conceptNotFound) {
+    const suggestedConcepts = concepts
+      .filter((item) => item.name.includes(concept) || (concept.length >= 2 && item.name.startsWith(concept.slice(0, 2))))
+      .sort((a, b) => b.stock_count - a.stock_count)
+      .slice(0, 6);
+
     return (
       <main className="concept-page" style={pageContainerStyle}>
         <header>
@@ -386,6 +410,20 @@ export default function Concept() {
             <p className="concept-missing__desc" style={{ color: c.textMuted }}>
               概念名单来自本地维护的同花顺映射，热门概念榜中的名称一般都可直接打开。
             </p>
+            {suggestedConcepts.length > 0 && (
+              <div style={{ marginTop: 12, marginBottom: 12, display: "flex", alignItems: "center", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
+                <span style={{ fontSize: 13, color: c.textMuted }}>为您推荐相关概念：</span>
+                {suggestedConcepts.map((item) => (
+                  <Button
+                    key={item.name}
+                    size="small"
+                    onClick={() => handleSelectConcept(item.name)}
+                  >
+                    {item.name} ({item.stock_count}只)
+                  </Button>
+                ))}
+              </div>
+            )}
             <div className="concept-missing__actions">
               {(hotQuery.data?.length ?? 0) > 0 ? (
                 <Button type="primary" size="small" onClick={() => handleSelectConcept(hotQuery.data![0].name)}>
@@ -493,7 +531,7 @@ export default function Concept() {
           </div>
         </div>
         <FavoriteChips favorites={favorites} activeConcept={concept} onSelect={handleSelectConcept} />
-        <MainlineChips mainline={mainlineQuery.data} activeConcept={concept} onSelect={handleSelectConcept} />
+        <MainlineChips mainline={mainlineQuery.data} activeConcept={concept} onSelect={handleSelectConcept} concepts={concepts} />
         <HotChips hot={hotQuery.data} activeConcept={concept} onSelect={handleSelectConcept} />
         <RecentChips recent={recentConcepts} activeConcept={concept} onSelect={handleSelectConcept} />
       </Card>
