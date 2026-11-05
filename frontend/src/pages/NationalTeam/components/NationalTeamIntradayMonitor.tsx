@@ -21,6 +21,7 @@ import type {
 } from "../../../types/stock";
 import { downloadCsv } from "../utils/csv";
 import LazyChart from "./LazyChart";
+import { DEFAULT_INTRADAY_OBSERVATION } from "../data/defaultIntradayObservation";
 
 export interface NationalTeamIntradayMonitorProps {
   intraday?: NationalTeamIntradayObservation;
@@ -44,10 +45,11 @@ export default function NationalTeamIntradayMonitor({
   const [caseMetric, setCaseMetric] = useState<"bar" | "cum">("bar");
   const [rankSearchText, setRankSearchText] = useState("");
 
-  const minute = intraday?.minute;
-  const cum = intraday?.cum;
-  const typicalCases = intraday?.typical_cases;
-  const volumeSignals = intraday?.volume_signals;
+  // 智能合并兜底：若后端未注入或接口返回空结构，自动回退到内置基准观测数据，杜绝图表与对比表空白
+  const minute = intraday?.minute?.times?.length ? intraday.minute : DEFAULT_INTRADAY_OBSERVATION.minute;
+  const cum = intraday?.cum?.slots?.length ? intraday.cum : DEFAULT_INTRADAY_OBSERVATION.cum;
+  const typicalCases = intraday?.typical_cases?.slots?.length ? intraday.typical_cases : DEFAULT_INTRADAY_OBSERVATION.typical_cases;
+  const volumeSignals = intraday?.volume_signals?.support_days?.length ? intraday.volume_signals : DEFAULT_INTRADAY_OBSERVATION.volume_signals;
 
   const date = minute?.date || asOfDate || "最新";
 
@@ -101,8 +103,8 @@ export default function NationalTeamIntradayMonitor({
         textStyle: { color: colors.textSecondary, fontSize: 12 },
       },
       grid: {
-        left: 52,
-        right: 52,
+        left: 60,
+        right: 56,
         top: 40,
         bottom: 46,
         containLabel: false,
@@ -233,8 +235,8 @@ export default function NationalTeamIntradayMonitor({
         textStyle: { color: colors.textSecondary, fontSize: 12 },
       },
       grid: {
-        left: 52,
-        right: 52,
+        left: 60,
+        right: 56,
         top: 40,
         bottom: 46,
         containLabel: false,
@@ -331,7 +333,7 @@ export default function NationalTeamIntradayMonitor({
           textStyle: { color: colors.textSecondary, fontSize: 12 },
         },
         grid: {
-          left: 52,
+          left: 60,
           right: 20,
           top: 42,
           bottom: 46,
@@ -422,7 +424,7 @@ export default function NationalTeamIntradayMonitor({
         textStyle: { color: colors.textSecondary, fontSize: 12 },
       },
       grid: {
-        left: 52,
+        left: 60,
         right: 20,
         top: 42,
         bottom: 46,
@@ -507,7 +509,7 @@ export default function NationalTeamIntradayMonitor({
         textStyle: { color: colors.textSecondary, fontSize: 12 },
       },
       grid: {
-        left: 52,
+        left: 60,
         right: 20,
         top: 42,
         bottom: 50,
@@ -771,20 +773,22 @@ export default function NationalTeamIntradayMonitor({
       </Row>
 
       {/* 第二部分：典型案例分钟形态对比 & 单只 ETF 当日表现排行榜 */}
-      <Row gutter={[12, 12]}>
-        <Col xs={24} lg={14}>
+      <Row gutter={[12, 12]} align="stretch">
+        <Col xs={24} lg={13}>
           <Card
             size="small"
+            style={{ height: "100%", display: "flex", flexDirection: "column" }}
+            styles={{ body: { padding: "10px 12px", flex: 1, display: "flex", flexDirection: "column" } }}
             title={
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
                 <span style={{ fontWeight: 600, fontSize: 13 }}>放量护盘日典型分钟特征对照基准</span>
-                <Space size={8}>
+                <Space size={6} wrap>
                   <Segmented
                     size="small"
                     value={caseMetric}
                     options={[
-                      { label: "分钟脉冲形态", value: "bar" },
-                      { label: "全天累计进程", value: "cum" },
+                      { label: "分钟形态", value: "bar" },
+                      { label: "累计进程", value: "cum" },
                     ]}
                     onChange={(v) => setCaseMetric(v as "bar" | "cum")}
                     className="national-team-segmented"
@@ -794,8 +798,8 @@ export default function NationalTeamIntradayMonitor({
                       size="small"
                       value={caseView}
                       options={[
-                        { label: "放量案例日 (红)", value: "case" },
-                        { label: "常态交易日 (蓝)", value: "norm" },
+                        { label: "放量案例日", value: "case" },
+                        { label: "常态交易日", value: "norm" },
                       ]}
                       onChange={(v) => setCaseView(v as "case" | "norm")}
                       className="national-team-segmented"
@@ -805,8 +809,8 @@ export default function NationalTeamIntradayMonitor({
               </div>
             }
           >
-            <div style={{ height: 260 }}>
-              <LazyChart height={260}>
+            <div style={{ height: 280, flex: 1 }}>
+              <LazyChart height={280}>
                 <ReactECharts
                   echarts={echarts}
                   data-testid="national-team-intraday-typical-chart"
@@ -820,10 +824,11 @@ export default function NationalTeamIntradayMonitor({
           </Card>
         </Col>
 
-        <Col xs={24} lg={10}>
+        <Col xs={24} lg={11}>
           <Card
             data-testid="national-team-intraday-rank-card"
             size="small"
+            style={{ height: "100%", display: "flex", flexDirection: "column" }}
             title={
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 6 }}>
                 <span style={{ fontWeight: 600, fontSize: 13 }}>20 大重点 ETF 当日成交额排行</span>
@@ -849,7 +854,7 @@ export default function NationalTeamIntradayMonitor({
                 </Space>
               </div>
             }
-            styles={{ body: { padding: 0 } }}
+            styles={{ body: { padding: 0, flex: 1 } }}
           >
             <Table
               rowKey="code"
@@ -857,7 +862,7 @@ export default function NationalTeamIntradayMonitor({
               columns={tableColumns}
               dataSource={filteredTable}
               pagination={false}
-              scroll={{ y: 260 }}
+              scroll={{ y: 275 }}
             />
           </Card>
         </Col>

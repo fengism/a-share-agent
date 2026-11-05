@@ -17,8 +17,8 @@ vi.mock("../../api/queries", () => ({
   useNationalTeamIndexSeriesItem: (indexKey: string, days: number) => mocks.useNationalTeamIndexSeriesItem(indexKey, days),
 }));
 
-vi.mock("echarts-for-react/lib/core", () => ({
-  default: ({ option, ...rest }: {
+vi.mock("echarts-for-react/lib/core", () => {
+  const MockReactECharts = ({ option, ...rest }: {
     option: {
       title?: { text?: string };
       yAxis?: unknown[] | unknown;
@@ -55,8 +55,9 @@ vi.mock("echarts-for-react/lib/core", () => ({
         data-series-symbol-size={option.series?.map((series) => String(series.symbolSize)).join(",")}
       />
     );
-  },
-}));
+  };
+  return { default: MockReactECharts };
+});
 
 const renderPage = (ui = <NationalTeam />, initialEntries = ["/?tab=all"]) =>
   render(<MemoryRouter initialEntries={initialEntries}>{ui}</MemoryRouter>);
