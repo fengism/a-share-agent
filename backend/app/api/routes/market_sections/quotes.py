@@ -196,7 +196,7 @@ async def get_national_team_etf_holdings(
     ),
     include_flow_breakdown: bool = Query(
         True,
-        description=("是否返回 daily_flows[].flows_by_index；前端只用 flows_by_category。"),
+        description=("是否返回 daily_flows[].flows_by_index；供前端宽基日度资金流向热力矩阵使用。"),
     ),
 ):
     """获取核心宽基 ETF 份额变化与国家队持仓代理监测。"""

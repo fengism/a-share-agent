@@ -605,10 +605,10 @@ describe("useNationalTeamHoldings refresh policy", () => {
     const { result, unmount } = renderHook(() => useNationalTeamHoldings(120), { wrapper });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-    // ETF 表格只用最新一天的标量；带上整段 points 会多传约 65% 的体积。
+    // ETF 表格只用最新一天的标量；保留 include_flow_breakdown 供热力矩阵使用。
     expect(vi.mocked(apiGet)).toHaveBeenCalledWith(
       "/market/national-team-etf-holdings",
-      { days: 120, include_etf_points: false, include_index_points: false, include_flow_breakdown: false },
+      { days: 120, include_etf_points: false, include_index_points: false, include_flow_breakdown: true },
       expect.objectContaining({ timeoutMs: API_TIMEOUTS.EXTERNAL }),
     );
     unmount();

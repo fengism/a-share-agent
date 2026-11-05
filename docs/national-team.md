@@ -319,8 +319,8 @@ GET /api/market/national-team/overview?days=30..365
   在图表进入视口后逐图拉取（`LazyChart` 同一套 IntersectionObserver 约定），
   首屏不下载任何指数点位；批量场景仍可用 `/index-series?days=` 一次取全；
 - 响应里的 `index_points_included` 标明本次是否被裁剪，缓存仍只存完整一份；
-- 前端同时传 `include_flow_breakdown=false`：`daily_flows[].flows_by_index` 与指数
-  序列信息重复且前端未使用，关闭后只保留总量与 `flows_by_category`。
+- 前端通过 `include_flow_breakdown=true` 保留 `daily_flows[].flows_by_index`，
+  供「宽基日度资金流向热力矩阵」与单日下钻明细展示各宽基真实净申赎金额。
 
 ## 8. HTTP 缓存
 
@@ -341,8 +341,8 @@ GET /api/market/national-team/overview?days=30..365
 
 ## 9. 已知限制 / 后续工作
 
-1. `daily_flows[].flows_by_index` 已可通过 `include_flow_breakdown=false` 关闭，
-   前端默认关闭；目前没有按宽基拆分的图表需求。
+1. `daily_flows[].flows_by_index` 供宽基日度资金流向热力矩阵使用，
+   可通过 `include_flow_breakdown=false` 关闭以满足极小体积场景。
 2. 托底强度指数已有置信度、近 60 日分位、窗口内历史序列与信号后 5/20 日回测，
    但评分阈值仍是固定经验值，没有按牛熊阶段滚动校准；回测也未计交易成本/滑点。
 3. 回测以「已落库评分日」为单位，缺采的交易日会被跳过；过滤了低置信度/低覆盖率

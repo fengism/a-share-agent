@@ -877,7 +877,7 @@ def without_index_points(response: NationalTeamResponse) -> NationalTeamResponse
 def without_flow_breakdown(response: NationalTeamResponse) -> NationalTeamResponse:
     """去掉按宽基拆分的当日资金流，保留总量与分类拆分。
 
-    前端图表只用 ``flows_by_category``；``flows_by_index`` 与指数序列信息重复。
+    关闭时 ``flows_by_index`` 置空；若前端展示热力矩阵则应保留。
     """
     trimmed = response.model_copy(deep=False)
     trimmed.daily_flows = [
@@ -1031,8 +1031,8 @@ async def get_national_team_etf_holdings(
             标量，传 ``False`` 约省 65% 体积；缓存始终存完整响应。
         include_index_points: 是否带上指数点位序列。传 ``False`` 时标量仍保留，
             图表改由 ``get_national_team_index_series`` 单独获取。
-        include_flow_breakdown: 是否带上 ``daily_flows[].flows_by_index``。前端只用
-            ``flows_by_category``，可安全关闭。
+        include_flow_breakdown: 是否带上 ``daily_flows[].flows_by_index``。宽基日度资金流向热力矩阵
+            依赖此项，传 ``False`` 可置空以极限压缩体积。
     """
     response = await _resolve_response(days)
     if not include_flow_breakdown:
