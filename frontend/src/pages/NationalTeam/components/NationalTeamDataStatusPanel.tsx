@@ -31,11 +31,11 @@ export default function NationalTeamDataStatusPanel({
       data-testid="national-team-data-status-panel"
       style={{
         borderRadius: 8,
-        border: "1px solid var(--c-border)",
-        background: "var(--c-bg-subtle, rgba(128, 128, 128, 0.03))",
+        border: "1px dashed var(--c-border)",
+        background: "var(--c-bg-subtle, rgba(128, 128, 128, 0.02))",
         marginBottom: 10,
       }}
-      styles={{ body: { padding: "6px 12px" } }}
+      styles={{ body: { padding: "4px 10px" } }}
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>

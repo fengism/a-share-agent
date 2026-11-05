@@ -7,6 +7,7 @@ import {
   Empty,
   Input,
   Modal,
+  Popover,
   Row,
   Segmented,
   Space,
@@ -28,6 +29,7 @@ import {
   FileImageOutlined,
   FullscreenOutlined,
   InfoCircleOutlined,
+  QuestionCircleOutlined,
   ReloadOutlined,
   RiseOutlined,
   SafetyCertificateOutlined,
@@ -1173,20 +1175,40 @@ export default function NationalTeam() {
     allowedValues: ["flow", "intraday", "radar", "etf", "portrait", "all"],
   });
 
+  const [assetSubView, setAssetSubView] = useState<"etf" | "portrait">(
+    tabParam === "portrait" || view === "portrait" ? "portrait" : "etf"
+  );
+
   const activeTab = useMemo(() => {
-    if (view === "portrait") return "portrait";
+    if (tabParam === "portrait" || view === "portrait") return "etf";
     return tabParam;
-  }, [view, tabParam]);
+  }, [tabParam, view]);
 
   const handleTabChange = (val: string) => {
     if (val === "portrait") {
       setView("portrait");
-      setTabParam("portrait");
+      setTabParam("etf");
+      setAssetSubView("portrait");
+    } else if (val === "etf") {
+      setTabParam("etf");
     } else {
       setView("etf");
       setTabParam(val);
     }
   };
+
+  const tabOptions = useMemo(() => {
+    const list = [
+      { label: "📊 资金流向", value: "flow" },
+      { label: "⏱️ 盘中监控", value: "intraday" },
+      { label: "🛡️ 托底雷达", value: "radar" },
+      { label: "📈 标的与底仓", value: "etf" },
+    ];
+    if (tabParam === "all") {
+      list.push({ label: "📑 全景总览", value: "all" });
+    }
+    return list;
+  }, [tabParam]);
 
   const [category] = useUrlSearchParam("category", "all", {
     allowedValues: ["all", "core_broad", "a500", "growth", "dividend"],
@@ -1609,7 +1631,34 @@ export default function NationalTeam() {
           showIcon
           icon={<InfoCircleOutlined />}
           title="代理口径说明"
-          description={data?.disclaimer || "ETF 份额变化仅作为资金行为代理指标，不等于中央汇金真实持仓或实际交易。"}
+          description={
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 6 }}>
+              <span>{data?.disclaimer || "ETF 份额变化仅作为资金行为代理指标，不等于中央汇金真实持仓或实际交易。"}</span>
+              <Popover
+                title="国家队 ETF 估算方法与口径规范"
+                content={
+                  <div style={{ maxWidth: 380, fontSize: 12, lineHeight: 1.6 }}>
+                    <div style={{ marginBottom: 6 }}>
+                      <strong>估算方法：</strong>
+                      <div style={{ color: "var(--c-text-secondary)" }}>
+                        {data?.methodology || "ETF 当日份额变化 × ETF 当日收盘价，逐只计算后按宽基汇总。"}
+                      </div>
+                    </div>
+                    <div style={{ borderTop: "1px dashed var(--c-border)", paddingTop: 6, color: "var(--c-text-muted)" }}>
+                      <strong>特别提示：</strong>
+                      <div>
+                        ETF 份额变动为全市场一级市场申购赎回代理汇总结果，包含各类公募、私募、保险及散户资金；成交额为二级市场交易额，严禁将成交额误称为“真实资金净流入”。
+                      </div>
+                    </div>
+                  </div>
+                }
+              >
+                <Button type="link" size="small" style={{ padding: "0 4px", height: "auto", fontSize: 11 }}>
+                  查看口径规范与说明 <QuestionCircleOutlined style={{ fontSize: 11 }} />
+                </Button>
+              </Popover>
+            </div>
+          }
         />
 
         {data?.partial && (
@@ -1727,21 +1776,34 @@ export default function NationalTeam() {
           <Segmented
             size="middle"
             value={activeTab}
-            options={[
-              { label: "📊 资金流向看板", value: "flow" },
-              { label: "⏱️ 盘中分钟观测", value: "intraday" },
-              { label: "🛡️ 托底信号雷达", value: "radar" },
-              { label: "📈 宽基与ETF明细", value: "etf" },
-              { label: "🏛️ 战略底仓全景", value: "portrait" },
-              { label: "📑 全景总览", value: "all" },
-            ]}
+            options={tabOptions}
             onChange={(val) => handleTabChange(String(val))}
             className="national-team-segmented"
             data-testid="national-team-view-switcher"
           />
         </div>
 
-        {activeTab === "portrait" ? (
+        {activeTab === "etf" && (
+          <div className="national-team-asset-subtabs" style={{ marginBottom: 12 }}>
+            <Segmented
+              size="small"
+              value={assetSubView}
+              options={[
+                { label: "📊 宽基 ETF 监测与走势", value: "etf" },
+                { label: "🏛️ 战略底仓画像", value: "portrait" },
+              ]}
+              onChange={(val) => {
+                const next = String(val) as "etf" | "portrait";
+                setAssetSubView(next);
+                setView(next === "portrait" ? "portrait" : "etf");
+              }}
+              className="national-team-segmented"
+              data-testid="national-team-asset-sub-switcher"
+            />
+          </div>
+        )}
+
+        {(activeTab === "portrait" || (activeTab === "etf" && assetSubView === "portrait")) ? (
           <NationalTeamPortraitPanel portrait={data?.portrait} />
         ) : (
           <>
@@ -2232,6 +2294,12 @@ export default function NationalTeam() {
                 </span>
               </div>
             </div>
+
+            {activeTab === "all" && (
+              <div style={{ marginTop: 16 }}>
+                <NationalTeamPortraitPanel portrait={data?.portrait} />
+              </div>
+            )}
           </>
         )}
   </SectionDataState>

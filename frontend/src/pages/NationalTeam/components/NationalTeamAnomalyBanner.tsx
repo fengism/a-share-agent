@@ -99,7 +99,7 @@ export default function NationalTeamAnomalyBanner({ data }: AnomalyBannerProps) 
         type="info"
         showIcon={false}
         className="national-team-anomaly-alert"
-        style={{ marginBottom: 12, borderRadius: 8, padding: "8px 12px" }}
+        style={{ marginBottom: 10, borderRadius: 6, padding: "4px 10px", background: "transparent", border: "1px dashed var(--c-border)" }}
       />
     );
   }

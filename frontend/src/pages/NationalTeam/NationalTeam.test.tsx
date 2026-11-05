@@ -607,8 +607,8 @@ describe("NationalTeam page", () => {
     const viewSwitcher = screen.getByTestId("national-team-view-switcher");
     expect(viewSwitcher).toBeInTheDocument();
 
-    const portraitTab = screen.getByText("🏛️ 战略底仓全景");
-    fireEvent.click(portraitTab);
+    fireEvent.click(screen.getByText("📈 标的与底仓"));
+    fireEvent.click(screen.getByText("🏛️ 战略底仓画像"));
 
     expect(screen.getByTestId("national-team-portrait-panel")).toBeInTheDocument();
     expect(screen.getAllByText("中央汇金").length).toBeGreaterThan(0);
@@ -723,7 +723,8 @@ describe("NationalTeam data quality", () => {  it("shows verified source, busine
 
     expect(screen.getByText(/部分覆盖/)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByText("🏛️ 战略底仓全景"));
+    fireEvent.click(screen.getByText("📈 标的与底仓"));
+    fireEvent.click(screen.getByText("🏛️ 战略底仓画像"));
     const reference = screen.getByTestId("national-team-portrait-reference");
     expect(reference).toHaveTextContent("静态参考");
     expect(reference).toHaveTextContent("2024-12-31");
@@ -826,11 +827,11 @@ describe("NationalTeam data quality", () => {  it("shows verified source, busine
       renderPage(<NationalTeam />, ["/"]);
 
       // Switch to Intraday tab (renders multiple ECharts)
-      fireEvent.click(screen.getByText("⏱️ 盘中分钟观测"));
+      fireEvent.click(screen.getByText("⏱️ 盘中监控"));
       expect(screen.getByTestId("national-team-intraday-minute-chart")).toBeInTheDocument();
 
       // Switch from Intraday tab to Radar tab (unmounts intraday charts, verifies no dispose error)
-      fireEvent.click(screen.getByText("🛡️ 托底信号雷达"));
+      fireEvent.click(screen.getByText("🛡️ 托底雷达"));
       expect(screen.getByTestId("national-team-support-radar")).toBeInTheDocument();
       expect(screen.getByTestId("national-team-milestones")).toBeInTheDocument();
       expect(screen.getByTestId("national-team-support-zones")).toBeInTheDocument();
@@ -838,7 +839,7 @@ describe("NationalTeam data quality", () => {  it("shows verified source, busine
       expect(screen.queryByTestId("national-team-flow-heatmap-table")).not.toBeInTheDocument();
 
       // Switch to ETF details tab
-      fireEvent.click(screen.getByText("📈 宽基与ETF明细"));
+      fireEvent.click(screen.getByText("📈 标的与底仓"));
       expect(screen.getByText("结构轮动 · 20 日份额变化")).toBeInTheDocument();
       expect(screen.getByTestId("national-team-category-cards")).toBeInTheDocument();
       expect(screen.getByRole("radio", { name: "今日净买入" })).toBeInTheDocument();
@@ -849,7 +850,7 @@ describe("NationalTeam data quality", () => {  it("shows verified source, busine
       fireEvent.click(screen.getByText("今日净买入"));
 
       // Switch back to Flow Dashboard tab
-      fireEvent.click(screen.getByText("📊 资金流向看板"));
+      fireEvent.click(screen.getByText("📊 资金流向"));
       expect(screen.getByTestId("national-team-flow-heatmap-table")).toBeInTheDocument();
       expect(screen.queryByTestId("national-team-support-radar")).not.toBeInTheDocument();
     });
@@ -871,7 +872,7 @@ describe("NationalTeam data quality", () => {  it("shows verified source, busine
       renderPage(<NationalTeam />, ["/"]);
 
       // Switch to Intraday tab
-      fireEvent.click(screen.getByText("⏱️ 盘中分钟观测"));
+      fireEvent.click(screen.getByText("⏱️ 盘中监控"));
       expect(screen.getByTestId("national-team-intraday-minute-chart")).toBeInTheDocument();
       expect(screen.getByTestId("national-team-intraday-cum-chart")).toBeInTheDocument();
       expect(screen.getByTestId("national-team-intraday-typical-chart")).toBeInTheDocument();
