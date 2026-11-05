@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from datetime import date
 from typing import Any
 
@@ -32,6 +33,8 @@ from app.modules.quant.public import (
 from app.modules.quant.schemas import QuantUniverse
 from app.modules.screener.public import ScreenerFilter, get_industry_list, screen_stocks
 from app.modules.stock_comparison.public import compare_stocks
+
+logger = logging.getLogger(__name__)
 
 # Composition root: install host adapters for the agentic ports.
 configure_llm_transport(create_chat_completion, stream_chat_completion)
@@ -140,13 +143,17 @@ async def _get_hk_stock_industry_comparison(code: str, period: str | None = None
 
 
 async def _get_market_overview() -> Any:
+    from datetime import timedelta
+
+    from app.core.market import market_today
     from app.financial_data.market import public as market_data
 
+    start_date = (market_today() - timedelta(days=30)).isoformat()
     indices: Any
     volume: Any
     indices, volume = await asyncio.gather(
         market_data.get_indices(),
-        market_data.get_market_volume(),
+        market_data.get_market_volume(start_date=start_date),
         return_exceptions=True,
     )
     result: dict[str, Any] = {}
@@ -154,6 +161,13 @@ async def _get_market_overview() -> Any:
         result["indices"] = indices.model_dump()
     if not isinstance(volume, Exception) and volume is not None:
         result["volume"] = volume.model_dump(mode="json")
+    elif hasattr(market_data, "get_realtime_market_volume"):
+        try:
+            rt_vol = await asyncio.wait_for(market_data.get_realtime_market_volume(), timeout=3.0)
+            if rt_vol:
+                result["volume"] = rt_vol.model_dump(mode="json")
+        except Exception as exc:
+            logger.debug("获取实时两市成交额兜底失败: %s", exc)
     return result
 
 
