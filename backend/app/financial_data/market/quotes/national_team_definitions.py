@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Literal
 
@@ -26,6 +27,7 @@ from app.financial_data.market.quotes.schemas import (
 
 #: 份额单位换算：1 亿份。
 YI = 100_000_000
+logger = logging.getLogger(__name__)
 #: 指数聚合允许缺失部分成员，但覆盖不足一半时不生成点位，避免用极少数 ETF 冒充整条指数。
 INDEX_MIN_COVERAGE = 0.5
 METHOD = "按 ETF 逐只计算：份额变化 × 当日 ETF 收盘价，并在宽基层级汇总；份额单位为亿份，资金单位为亿元。"
@@ -308,7 +310,8 @@ def load_default_intraday_observation() -> NationalTeamIntradayObservation:
     try:
         with open(json_path, encoding="utf-8") as f:
             raw = json.load(f)
-    except Exception:
+    except Exception as exc:
+        logger.warning("加载国家队日内分钟观测数据失败: %s", exc)
         return NationalTeamIntradayObservation()
 
     init_d = raw.get("initData", {})
