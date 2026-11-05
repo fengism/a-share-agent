@@ -1,8 +1,9 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button, Card, Space, Table, Tag } from "antd";
 import {
   ArrowRightOutlined,
   FireOutlined,
+  LineChartOutlined,
   ReloadOutlined,
   RiseOutlined,
   RobotOutlined,
@@ -15,6 +16,7 @@ import PreloadLink from "./PreloadLink";
 import RefreshBadge from "./RefreshBadge";
 import SectionDataState from "./SectionDataState";
 import StockExternalLink from "./StockExternalLink";
+import StockQuickPreviewModal from "./StockQuickPreviewModal";
 import { useUrlSearchParam } from "../hooks/useUrlSearchParam";
 import { formatMarketDateTime } from "../utils/marketTime";
 import { semanticTagStyle } from "../styles/ui";
@@ -37,6 +39,7 @@ function strongestChange(stocks: MarketWindStock[]) {
 }
 
 export default function MarketWindBoard({ embedded = false }: { embedded?: boolean }) {
+  const [previewStock, setPreviewStock] = useState<{ code: string; name: string } | null>(null);
   const windQuery = useMarketWind();
   const plates = useMemo(() => windQuery.data?.items ?? [], [windQuery.data?.items]);
   const [plateParam, setPlateParam] = useUrlSearchParam("plate", "", { replace: true });
@@ -70,12 +73,26 @@ export default function MarketWindBoard({ embedded = false }: { embedded?: boole
     {
       title: "龙头股",
       key: "stock",
-      width: 140,
+      width: 156,
       render: (_value: unknown, stock: MarketWindStock) => (
-        <StockExternalLink code={stock.code} name={stock.name} className="wind-stock-link">
-          <strong>{stock.name || "-"}</strong>
-          <small>{stock.code}</small>
-        </StockExternalLink>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
+          <StockExternalLink code={stock.code} name={stock.name} className="wind-stock-link">
+            <strong>{stock.name || "-"}</strong>
+            <small>{stock.code}</small>
+          </StockExternalLink>
+          <Button
+            type="text"
+            size="small"
+            icon={<LineChartOutlined />}
+            title="K线速查"
+            aria-label={`速查 ${stock.name || stock.code} K线`}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setPreviewStock({ code: stock.code, name: stock.name });
+            }}
+          />
+        </div>
       ),
     },
     {
@@ -264,6 +281,15 @@ export default function MarketWindBoard({ embedded = false }: { embedded?: boole
           </SectionDataState>
         </Card>
       </div>
+
+      {previewStock ? (
+        <StockQuickPreviewModal
+          open={Boolean(previewStock)}
+          code={previewStock?.code ?? null}
+          name={previewStock?.name}
+          onClose={() => setPreviewStock(null)}
+        />
+      ) : null}
     </SectionDataState>
   );
 }

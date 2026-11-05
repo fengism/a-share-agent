@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import {
   BellOutlined,
   DeleteOutlined,
+  EyeOutlined,
   FileSearchOutlined,
   LineChartOutlined,
   PlusOutlined,
@@ -28,6 +29,7 @@ import PreloadLink from "../../components/PreloadLink";
 import { buildWatchlistStockUrl, buildStockAnalysisUrl } from "../../utils/stockLinks";
 import { formatMarketClock } from "../../utils/marketTime";
 import { PriceRangeBar } from "../../components/PriceRangeBar";
+import StockQuickPreviewModal from "../../components/StockQuickPreviewModal";
 import { openGlobalCopilot, triggerStockAiDiagnosis } from "../../utils/copilotEvents";
 
 const { Text } = Typography;
@@ -66,6 +68,7 @@ export default function WatchlistPanel() {
   const deleteAlert = useDeleteWatchlistAlert();
   const search = useStockSearchController();
   const [alertStock, setAlertStock] = useState<WatchlistItem | null>(null);
+  const [previewStock, setPreviewStock] = useState<{ code: string; name: string } | null>(null);
   const [condition, setCondition] = useState<WatchlistAlertCondition>("price_above");
   const [threshold, setThreshold] = useState<number | null>(null);
   const [sortBy, setSortBy] = useState<"default" | "desc" | "asc">("default");
@@ -272,6 +275,15 @@ export default function WatchlistPanel() {
                         onClick={() => triggerStockAiDiagnosis(item.stock_code, item.stock_name, navigate)}
                       />
                     </Tooltip>
+                    <Tooltip title="K线速查">
+                      <Button
+                        size="small"
+                        type="text"
+                        aria-label={`速查${item.stock_name}K线`}
+                        icon={<EyeOutlined />}
+                        onClick={() => setPreviewStock({ code: item.stock_code, name: item.stock_name })}
+                      />
+                    </Tooltip>
                     <Tooltip title="查看个股研报">
                       <Button
                         size="small"
@@ -340,6 +352,15 @@ export default function WatchlistPanel() {
           />
         </Space>
       </Modal>
+
+      {previewStock ? (
+        <StockQuickPreviewModal
+          open={Boolean(previewStock)}
+          code={previewStock.code}
+          name={previewStock.name}
+          onClose={() => setPreviewStock(null)}
+        />
+      ) : null}
     </Card>
   );
 }

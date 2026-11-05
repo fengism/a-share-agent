@@ -52,7 +52,10 @@ from app.financial_data.market.quotes.limit_up_ladder import get_limit_up_ladder
 from app.financial_data.market.quotes.mainline import get_market_mainline
 from app.financial_data.market.quotes.margin import get_market_margin
 from app.financial_data.market.quotes.national_team import (
+    get_national_team_backtest,
     get_national_team_etf_holdings,
+    get_national_team_index_series,
+    get_national_team_index_series_item,
     get_national_team_overview,
 )
 from app.financial_data.market.quotes.northbound_history import get_northbound_history
@@ -110,6 +113,7 @@ from app.financial_data.market.quotes.schemas import (
     NationalTeamOverview,
     NationalTeamResponse,
     NationalTeamSummary,
+    NationalTeamSupportBacktest,
     NorthboundHistoryPoint,
     NorthboundHistoryResponse,
     ThsHotPlate,
@@ -174,7 +178,10 @@ __all__ = [
     "get_market_kuaixun",
     "get_market_mainline",
     "get_market_margin",
+    "get_national_team_backtest",
     "get_national_team_etf_holdings",
+    "get_national_team_index_series",
+    "get_national_team_index_series_item",
     "get_national_team_overview",
     "get_market_other_news",
     "get_northbound_history",
@@ -247,6 +254,7 @@ __all__ = [
     "NationalTeamOverview",
     "NationalTeamResponse",
     "NationalTeamSummary",
+    "NationalTeamSupportBacktest",
     "MarketBreadthDailySummary",
     "MarketBreadthResponse",
     "NorthboundHistoryPoint",

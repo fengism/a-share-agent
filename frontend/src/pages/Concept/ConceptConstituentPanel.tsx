@@ -1,12 +1,13 @@
 import { useMemo, useState } from "react";
 import { Button, Input, Progress, Segmented, Table, Tag, Tooltip } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { FundOutlined, SearchOutlined, StarFilled, StarOutlined } from "@ant-design/icons";
+import { EyeOutlined, FundOutlined, SearchOutlined, StarFilled, StarOutlined } from "@ant-design/icons";
 import { Link } from "react-router-dom";
 import dayjs from "dayjs";
 import ChangeValue from "../../components/ChangeValue";
 import SectionDataState from "../../components/SectionDataState";
 import StockExternalLink from "../../components/StockExternalLink";
+import StockQuickPreviewModal from "../../components/StockQuickPreviewModal";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { useColors, semanticTagStyle } from "../../styles/ui";
 import {
@@ -68,6 +69,7 @@ export default function ConceptConstituentPanel({
   const [sortKey, setSortKey] = useState<SortKey>("change_pct");
   const [descending, setDescending] = useState(true);
   const [pendingWatchCode, setPendingWatchCode] = useState<string | null>(null);
+  const [previewStock, setPreviewStock] = useState<{ code: string; name: string } | null>(null);
   // 本地筛选：方向/涨停 + 名称/代码关键字，全部纯前端即时计算
   const [directionFilter, setDirectionFilter] = useState<"all" | "up" | "down" | "limit">("all");
   const [filterText, setFilterText] = useState("");
@@ -303,12 +305,21 @@ export default function ConceptConstituentPanel({
             {
               title: "",
               key: "actions",
-              width: 88,
+              width: 112,
               align: "right" as const,
               render: (_: unknown, record: ConceptConstituent) => {
                 const watched = watchedCodes.has(record.code);
                 return (
                   <span className="concept-row-actions">
+                    <Tooltip title="K线速查">
+                      <Button
+                        type="text"
+                        size="small"
+                        aria-label={`速查-${record.name || record.code}`}
+                        icon={<EyeOutlined />}
+                        onClick={() => setPreviewStock({ code: record.code, name: record.name })}
+                      />
+                    </Tooltip>
                     <Tooltip title={watched ? "移出自选" : "加入自选"}>
                       <Button
                         type="text"
@@ -444,6 +455,15 @@ export default function ConceptConstituentPanel({
       <p className="concept-index-note" style={{ color: c.textMuted }}>
         点名称或代码进入个股详情，星标加入自选。灰色价格表示当日收盘价（实时行情暂缺时的兜底值）。
       </p>
+
+      {previewStock ? (
+        <StockQuickPreviewModal
+          open={Boolean(previewStock)}
+          code={previewStock.code}
+          name={previewStock.name}
+          onClose={() => setPreviewStock(null)}
+        />
+      ) : null}
     </div>
   );
 }

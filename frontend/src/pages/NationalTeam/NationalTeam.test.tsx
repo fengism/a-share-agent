@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import NationalTeam from ".";
@@ -6,10 +6,14 @@ import NationalTeam from ".";
 const mocks = vi.hoisted(() => ({
   refetch: vi.fn(),
   useNationalTeamHoldings: vi.fn(),
+  useNationalTeamBacktest: vi.fn(),
+  useNationalTeamIndexSeriesItem: vi.fn(),
 }));
 
 vi.mock("../../api/queries", () => ({
   useNationalTeamHoldings: (days: number) => mocks.useNationalTeamHoldings(days),
+  useNationalTeamBacktest: (days: number) => mocks.useNationalTeamBacktest(days),
+  useNationalTeamIndexSeriesItem: (indexKey: string, days: number) => mocks.useNationalTeamIndexSeriesItem(indexKey, days),
 }));
 
 vi.mock("echarts-for-react/lib/core", () => ({
@@ -39,7 +43,18 @@ vi.mock("echarts-for-react/lib/core", () => ({
   ),
 }));
 
-const renderPage = (ui = <NationalTeam />) => render(<MemoryRouter>{ui}</MemoryRouter>);
+const renderPage = (ui = <NationalTeam />, initialEntries = ["/?tab=all"]) =>
+  render(<MemoryRouter initialEntries={initialEntries}>{ui}</MemoryRouter>);
+
+const mockIndexSeries = (indices: unknown[]) => {
+  mocks.useNationalTeamIndexSeriesItem.mockImplementation((indexKey: string) => ({
+    data: (indices as typeof data.indices).find((item) => item.index_key === indexKey),
+    isLoading: false,
+    isFetching: false,
+    error: null,
+    refetch: vi.fn(),
+  }));
+};
 
 const indexNames = ["沪深300", "上证50", "中证500", "中证1000", "科创50", "创业板"];
 const etfs = [
@@ -119,6 +134,7 @@ const data = {
     breadth_factor: 22.0,
     divergence_factor: 21.0,
     confidence: 0.86,
+    percentile_60d: 82.5,
   },
   support_score_history: [
     { date: "2026-09-10", score: 52.0, status: "moderate" as const, confidence: 0.9, coverage_ratio: 1.0 },
@@ -216,6 +232,37 @@ const data = {
     estimated_net_flow_5d_100m: 18.9,
     estimated_net_flow_20d_100m: 38.9,
   },
+  intraday: {
+    minute: {
+      date: "2026-10-15",
+      times: ["09:31", "09:32"],
+      bars: [5.2, 4.8],
+      closes: [3200.1, 3205.5],
+      table: [
+        { code: "510300", name: "沪深300ETF华泰柏瑞", amount: 45.2, pct: 1.25, price: 4.12, volume: 1097000 },
+        { code: "510500", name: "中证500ETF", amount: 28.6, pct: 0.85, price: 5.86, volume: 488000 },
+      ],
+    },
+    cum: {
+      times: ["09:31", "09:32"],
+      today: [5.2, 10.0],
+      yesterday: [4.8, 9.2],
+      ma20: [4.5, 8.9],
+    },
+    typical_cases: {
+      slots: ["09:31", "09:32"],
+      case_amts: [6.5, 12.0],
+      norm_amts: [3.2, 5.8],
+    },
+    volume_signals: {
+      support_days: [
+        { date: "2024-02-06", amount: 350.5, netflow: 125.8, is_support_day: true },
+      ],
+      recent_days: [
+        { date: "2026-10-15", amount: 180.2, netflow: 45.0, is_support_day: false },
+      ],
+    },
+  },
   indices: indexNames.map((index_name, index) => ({
     index_key: `index-${index}`,
     index_name,
@@ -261,6 +308,30 @@ describe("NationalTeam page", () => {
       error: null,
       refetch: mocks.refetch,
     }));
+    mocks.useNationalTeamBacktest.mockImplementation(() => ({
+      data: {
+        as_of_date: "2026-09-16",
+        window_samples: 365,
+        sample_days: 60,
+        horizons: [
+          { days: 5, samples: 55, avg_return_pct: 1.25, median_return_pct: 1.1, win_rate_pct: 61.8, best_return_pct: 4.2, worst_return_pct: -2.1 },
+          { days: 20, samples: 40, avg_return_pct: 2.4, median_return_pct: 2.0, win_rate_pct: 57.5, best_return_pct: 8.0, worst_return_pct: -5.0 },
+        ],
+        by_status: [],
+        note: "",
+      },
+      isLoading: false,
+      isFetching: false,
+      error: null,
+      refetch: vi.fn(),
+    }));
+    mocks.useNationalTeamIndexSeriesItem.mockImplementation((indexKey: string) => ({
+      data: data.indices.find((item) => item.index_key === indexKey),
+      isLoading: false,
+      isFetching: false,
+      error: null,
+      refetch: vi.fn(),
+    }));
   });
 
   it("renders proxy disclosure, summary, six independent dual-axis charts, and all ETFs", () => {
@@ -281,6 +352,8 @@ describe("NationalTeam page", () => {
 
     const charts = screen.getAllByTestId("national-team-chart");
     expect(charts).toHaveLength(6);
+    // 每张图只拉自己那条指数序列，不再由页面一次性下载全部 10 条。
+    expect(mocks.useNationalTeamIndexSeriesItem).toHaveBeenCalledWith("index-0", 120);
     for (const chart of charts) {
       expect(chart).toHaveAttribute("data-y-axes", "2");
       expect(chart).toHaveAttribute("data-legend-visible", "false");
@@ -313,6 +386,7 @@ describe("NationalTeam page", () => {
       error: null,
       refetch: mocks.refetch,
     }));
+    mockIndexSeries(onePointData.indices);
 
     renderPage();
 
@@ -323,22 +397,24 @@ describe("NationalTeam page", () => {
   });
 
   it("shows the actual index date and unknown changes instead of a false zero", () => {
+    const staleIndices = data.indices.map((item) => ({
+      ...item,
+      latest_date: "2026-09-15",
+      latest_change_1d_100m: null,
+      change_5d_100m: null,
+      change_20d_100m: null,
+    }));
     mocks.useNationalTeamHoldings.mockReturnValue({
       data: {
         ...data,
-        indices: data.indices.map((item) => ({
-          ...item,
-          latest_date: "2026-09-15",
-          latest_change_1d_100m: null,
-          change_5d_100m: null,
-          change_20d_100m: null,
-        })),
+        indices: staleIndices,
       },
       isLoading: false,
       isFetching: false,
       error: null,
       refetch: mocks.refetch,
     });
+    mockIndexSeries(staleIndices);
 
     renderPage();
 
@@ -455,7 +531,9 @@ describe("NationalTeam page", () => {
     expect(screen.getByText("积极托底")).toBeInTheDocument();
     expect(screen.getByTestId("national-team-support-confidence")).toHaveTextContent("置信度 86%");
     expect(screen.getByTestId("national-team-score-sparkline")).toHaveTextContent("4 日 +16.5");
-    expect(screen.getByText(/资金托底因子/)).toBeInTheDocument();
+    expect(screen.getByTestId("national-team-backtest")).toHaveTextContent("5 日 +1.25% · 胜率 61.8%");
+    expect(screen.getByTestId("national-team-backtest")).toHaveTextContent("20 日 +2.40% · 胜率 57.5%");
+    expect(screen.getByText(/近60日分位 83%/)).toBeInTheDocument();
     expect(screen.getByText("25.5 / 40")).toBeInTheDocument();
 
     // 2. Milestones
@@ -513,7 +591,7 @@ describe("NationalTeam page", () => {
     const viewSwitcher = screen.getByTestId("national-team-view-switcher");
     expect(viewSwitcher).toBeInTheDocument();
 
-    const portraitTab = screen.getByText("战略机构底仓全景 (汇金/证金/社保)");
+    const portraitTab = screen.getByText("🏛️ 战略底仓全景");
     fireEvent.click(portraitTab);
 
     expect(screen.getByTestId("national-team-portrait-panel")).toBeInTheDocument();
@@ -629,7 +707,7 @@ describe("NationalTeam data quality", () => {  it("shows verified source, busine
 
     expect(screen.getByText(/部分覆盖/)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByText("战略机构底仓全景 (汇金/证金/社保)"));
+    fireEvent.click(screen.getByText("🏛️ 战略底仓全景"));
     const reference = screen.getByTestId("national-team-portrait-reference");
     expect(reference).toHaveTextContent("静态参考");
     expect(reference).toHaveTextContent("2024-12-31");
@@ -637,20 +715,22 @@ describe("NationalTeam data quality", () => {  it("shows verified source, busine
   });
 
   it("shows per-index coverage when some members are missing from the latest day", () => {
+    const coveredIndices = data.indices.map((item, index) => (
+      index === 0
+        ? { ...item, coverage_ratio: 0.75, covered_etf_codes: item.etf_codes.slice(0, 3) }
+        : item
+    ));
     mocks.useNationalTeamHoldings.mockReturnValue({
       data: {
         ...data,
-        indices: data.indices.map((item, index) => (
-          index === 0
-            ? { ...item, coverage_ratio: 0.75, covered_etf_codes: item.etf_codes.slice(0, 3) }
-            : item
-        )),
+        indices: coveredIndices,
       },
       isLoading: false,
       isFetching: false,
       error: null,
       refetch: mocks.refetch,
     });
+    mockIndexSeries(coveredIndices);
 
     renderPage();
 
@@ -660,31 +740,156 @@ describe("NationalTeam data quality", () => {  it("shows verified source, busine
   });
 
   it("sorts indices it does not know about to the end instead of the front", () => {
+    const unknownIndices = [
+      ...data.indices,
+      {
+        ...data.indices[0],
+        index_key: "brand_new",
+        index_name: "新宽基指数",
+        index_code: "999999.SH",
+        etf_codes: [],
+        covered_etf_codes: [],
+      },
+    ];
     mocks.useNationalTeamHoldings.mockReturnValue({
       data: {
         ...data,
-        indices: [
-          ...data.indices,
-          {
-            ...data.indices[0],
-            index_key: "brand_new",
-            index_name: "新宽基指数",
-            index_code: "999999.SH",
-            etf_codes: [],
-            covered_etf_codes: [],
-          },
-        ],
+        indices: unknownIndices,
       },
       isLoading: false,
       isFetching: false,
       error: null,
       refetch: mocks.refetch,
     });
+    mockIndexSeries(unknownIndices);
 
     const { container } = renderPage();
     const titles = Array.from(container.querySelectorAll(".national-team-index-card__title")).map(
       (node) => node.textContent,
     );
     expect(titles[titles.length - 1]).toBe("新宽基指数");
+  });
+
+  describe("NationalTeam sub-tabs and capital flow dashboard", () => {
+    beforeEach(() => {
+      mocks.useNationalTeamHoldings.mockReturnValue({
+        data,
+        isLoading: false,
+        isFetching: false,
+        error: null,
+        refetch: mocks.refetch,
+      });
+    });
+
+    it("defaults to flow tab and renders summary cards, macro chart, and heatmap table", () => {
+      renderPage(<NationalTeam />, ["/"]);
+
+      expect(screen.getByTestId("national-team-view-switcher")).toBeInTheDocument();
+      expect(screen.getByTestId("national-team-data-status-panel")).toBeInTheDocument();
+      expect(screen.getByTestId("national-team-anomaly-banner")).toBeInTheDocument();
+      expect(screen.getByText("宽基日度资金流向热力矩阵")).toBeInTheDocument();
+      expect(screen.getByTestId("national-team-flow-heatmap-table")).toBeInTheDocument();
+      expect(screen.getByTestId("national-team-daily-flow-chart")).toBeInTheDocument();
+      expect(screen.getByTestId("national-team-concentration-card")).toBeInTheDocument();
+      expect(screen.getByText("CR3 资金集中度")).toBeInTheDocument();
+      expect(screen.getByText("样本 ETF 总成交额")).toBeInTheDocument();
+      expect(screen.getByText("区间累计净申购")).toBeInTheDocument();
+      expect(screen.queryByTestId("national-team-support-radar")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("national-team-chart")).not.toBeInTheDocument();
+
+      // Test drilldown modal by clicking a date link in heatmap table
+      const dateLinks = screen.getAllByRole("button", { name: "2026-09-16" });
+      if (dateLinks.length > 0) {
+        fireEvent.click(dateLinks[0]);
+        expect(screen.getByText(/2026-09-16 宽基资金流向下钻分析/)).toBeInTheDocument();
+        fireEvent.click(screen.getByTestId("drilldown-modal-close"));
+      }
+    });
+
+    it("switches across sub-tabs: flow -> radar -> etf -> flow", () => {
+      renderPage(<NationalTeam />, ["/"]);
+
+      // Switch to Radar tab
+      fireEvent.click(screen.getByText("🛡️ 托底信号雷达"));
+      expect(screen.getByTestId("national-team-support-radar")).toBeInTheDocument();
+      expect(screen.getByTestId("national-team-milestones")).toBeInTheDocument();
+      expect(screen.getByTestId("national-team-support-zones")).toBeInTheDocument();
+      expect(screen.queryByTestId("national-team-flow-heatmap-table")).not.toBeInTheDocument();
+
+      // Switch to ETF details tab
+      fireEvent.click(screen.getByText("📈 宽基与ETF明细"));
+      expect(screen.getByText("结构轮动 · 20 日份额变化")).toBeInTheDocument();
+      expect(screen.getByTestId("national-team-category-cards")).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: "今日净买入" })).toBeInTheDocument();
+      expect(screen.getAllByTestId("national-team-chart").length).toBeGreaterThan(0);
+      expect(screen.queryByTestId("national-team-support-radar")).not.toBeInTheDocument();
+
+      // Test preset sort clicking
+      fireEvent.click(screen.getByText("今日净买入"));
+
+      // Switch back to Flow Dashboard tab
+      fireEvent.click(screen.getByText("📊 资金流向看板"));
+      expect(screen.getByTestId("national-team-flow-heatmap-table")).toBeInTheDocument();
+      expect(screen.queryByTestId("national-team-support-radar")).not.toBeInTheDocument();
+    });
+
+    it("supports switching MacroFlowChart view modes between net flow and turnover", () => {
+      renderPage(<NationalTeam />, ["/"]);
+
+      expect(screen.getByText("全市场宽基每日净申赎走势")).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: "净流入与累计走势" })).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("radio", { name: "成交额趋势" }));
+      expect(screen.getByText("样本 ETF 每日总成交额与基准指数对比")).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("radio", { name: "板块细分堆叠" }));
+      expect(screen.getByText("各战术板块资金净申购/净赎回估算（亿元）")).toBeInTheDocument();
+    });
+
+    it("switches to intraday tab and renders intraday monitor charts and table", () => {
+      renderPage(<NationalTeam />, ["/"]);
+
+      // Switch to Intraday tab
+      fireEvent.click(screen.getByText("⏱️ 盘中分钟观测"));
+      expect(screen.getByTestId("national-team-intraday-minute-chart")).toBeInTheDocument();
+      expect(screen.getByTestId("national-team-intraday-cum-chart")).toBeInTheDocument();
+      expect(screen.getByTestId("national-team-intraday-typical-chart")).toBeInTheDocument();
+      expect(screen.getByTestId("national-team-intraday-signal-chart")).toBeInTheDocument();
+      expect(screen.getByText("重点宽基 ETF 分钟成交脉冲与上证走势")).toBeInTheDocument();
+      expect(screen.getByText("全天分钟累计成交额进度对比")).toBeInTheDocument();
+      expect(screen.getByText("放量护盘日典型分钟特征对照基准")).toBeInTheDocument();
+      expect(screen.getByText("20 大重点 ETF 当日成交额排行")).toBeInTheDocument();
+      expect(screen.getByText("历史百亿级放量护盘日 vs 近期成交直方对照")).toBeInTheDocument();
+
+      // Test search filter in ETF rank table
+      const rankCard = screen.getByTestId("national-team-intraday-rank-card");
+      const withinRank = within(rankCard);
+      const searchInput = withinRank.getByTestId("intraday-rank-search-input");
+      expect(searchInput).toBeInTheDocument();
+      fireEvent.change(searchInput, { target: { value: "华泰柏瑞" } });
+      expect(withinRank.getByText("沪深300ETF华泰柏瑞")).toBeInTheDocument();
+      expect(withinRank.queryByText("中证500ETF")).not.toBeInTheDocument();
+
+      // Clear search to restore all items
+      fireEvent.change(searchInput, { target: { value: "" } });
+      expect(withinRank.getByText("沪深300ETF华泰柏瑞")).toBeInTheDocument();
+      expect(withinRank.getByText("中证500ETF")).toBeInTheDocument();
+    });
+
+    it("opens report modal with intraday high-frequency and volume signal insights", () => {
+      renderPage(<NationalTeam />, ["/"]);
+
+      // Click "资金简报" button to open modal
+      fireEvent.click(screen.getByTestId("national-team-report-btn"));
+
+      // Modal appears
+      expect(screen.getByTestId("national-team-poster-content")).toBeInTheDocument();
+      expect(screen.getByText("盘中高频与百亿放量护盘信号")).toBeInTheDocument();
+      expect(screen.getByText("盘中成交领跑")).toBeInTheDocument();
+      expect(screen.getByText("护盘倍数标定")).toBeInTheDocument();
+
+      // Check copy markdown button
+      expect(screen.getByTestId("copy-markdown-btn")).toBeInTheDocument();
+    });
   });
 });

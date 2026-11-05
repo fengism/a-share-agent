@@ -11,6 +11,8 @@ import {
   FileMarkdownOutlined,
   FilePdfOutlined,
   FileTextOutlined,
+  PictureOutlined,
+  LineChartOutlined,
   MoreOutlined,
   RiseOutlined,
   SearchOutlined,
@@ -60,6 +62,9 @@ import { useColors, useStyles } from "../../styles/ui";
 import { normalizeIsoDate } from "../../utils/date";
 import DailyReviewCharts from "./DailyReviewCharts";
 import DailyReviewHero from "./DailyReviewHero";
+import DailyReviewPosterModal from "./DailyReviewPosterModal";
+import ReviewDatePillsBar from "./ReviewDatePillsBar";
+import StockQuickPreviewModal from "../../components/StockQuickPreviewModal";
 import SectionAnchorNav from "../../components/SectionAnchorNav";
 import CollapsibleSection from "../../components/CollapsibleSection";
 import PreviousCheckCard from "./sections/PreviousCheckCard";
@@ -152,6 +157,8 @@ export default function DailyReviewPage() {
 
   const { push, isPushing } = useWorkflowPush();
   const [pushModalOpen, setPushModalOpen] = useState(false);
+  const [posterModalOpen, setPosterModalOpen] = useState(false);
+  const [previewStock, setPreviewStock] = useState<{ code: string; name: string } | null>(null);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [historyFilter, setHistoryFilter] = useState("");
   const generation = useDailyReviewWorkflowStore();
@@ -294,12 +301,14 @@ export default function DailyReviewPage() {
               menu={{
                 items: [
                   { key: "pdf", label: "导出为 PDF (.pdf)", icon: <FilePdfOutlined />, disabled: isExportingPdf },
+                  { key: "poster", label: "生成复盘战报海报", icon: <PictureOutlined /> },
                   { key: "md", label: "导出为 Markdown (.md)", icon: <FileMarkdownOutlined /> },
                   { key: "copy", label: "复制复盘内容", icon: <CopyOutlined /> },
                   { key: "push", label: "推送到群聊", disabled: isExportingPdf },
                 ],
                 onClick: ({ key }) => {
                   if (key === "pdf") void handleExportPdf();
+                  else if (key === "poster") setPosterModalOpen(true);
                   else if (key === "md") handleExportMarkdown();
                   else if (key === "copy") void handleCopyMarkdown();
                   else if (key === "push") setPushModalOpen(true);
@@ -432,6 +441,12 @@ export default function DailyReviewPage() {
         )}
       >
         <div>
+          <ReviewDatePillsBar
+            currentDate={date}
+            availableDates={historyItems.map((item) => item.date)}
+            onSelectDate={(newDate) => setDate(newDate)}
+            disabled={isGenerating || isExportingPdf}
+          />
           {isReviewLoading ? (
             <Card style={cardStyle}>
               <div aria-label="复盘内容加载中" style={{ minHeight: 420, padding: 16 }}>
@@ -601,10 +616,25 @@ export default function DailyReviewPage() {
                 <div style={{ display: "flex", flexDirection: "column", gap: 8, width: "100%" }}>
                   {review.next_day_watchlist.map((item) => (
                     <div key={`${item.name}-${item.role}`} style={{ padding: "var(--c-pad-inset, 7px 12px)", borderRadius: "var(--c-radius-md)", background: c.nestedBg }}>
-                      <Space wrap>
-                        <Text strong>{item.name}</Text>
-                        <Tag color="blue">{item.role}</Tag>
-                      </Space>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <Space wrap>
+                          <Text strong>{item.name}</Text>
+                          <Tag color="blue">{item.role}</Tag>
+                        </Space>
+                        <Button
+                          size="small"
+                          type="text"
+                          icon={<LineChartOutlined />}
+                          title="K线速查"
+                          aria-label={`速查 ${item.name} K线`}
+                          onClick={() => setPreviewStock({
+                            code: (item as unknown as { code?: string }).code || item.name,
+                            name: item.name,
+                          })}
+                        >
+                          K线速查
+                        </Button>
+                      </div>
                       <Paragraph style={{ margin: "6px 0 0" }}>{item.reason || "待补充"}</Paragraph>
                       <Paragraph type="secondary" style={{ margin: "4px 0 0" }}>触发：{item.trigger || "待补充"}</Paragraph>
                     </div>
@@ -755,6 +785,25 @@ export default function DailyReviewPage() {
           )}
         </div>
       </WorkflowWorkspace>
+
+      {previewStock ? (
+        <StockQuickPreviewModal
+          open={Boolean(previewStock)}
+          code={previewStock.code}
+          name={previewStock.name}
+          onClose={() => setPreviewStock(null)}
+        />
+      ) : null}
+
+      {posterModalOpen && review ? (
+        <DailyReviewPosterModal
+          open={posterModalOpen}
+          onClose={() => setPosterModalOpen(false)}
+          review={review}
+          headline={headline}
+          moodSummary={moodSummary}
+        />
+      ) : null}
     </div>
   );
 }

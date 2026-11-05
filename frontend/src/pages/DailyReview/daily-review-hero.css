@@ -43,6 +43,90 @@
   line-height: var(--c-leading-relaxed, 1.75);
 }
 
+/* 5-Factor 量化情绪罗盘 & 战术栏 */
+.daily-review-hero__sentiment-box {
+  margin-bottom: 12px;
+  padding: 10px 14px;
+  border-radius: var(--c-radius-md, 8px);
+  border: 1px solid var(--c-border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.daily-review-hero__sentiment-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.daily-review-hero__sentiment-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.daily-review-hero__sentiment-icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.daily-review-hero__sentiment-temp {
+  font-size: 17px;
+  font-weight: 700;
+  font-family: var(--c-font-mono, monospace);
+}
+
+.daily-review-hero__tactics {
+  font-size: var(--c-font-xs, 12px);
+  line-height: 1.4;
+  flex: 1 1 240px;
+}
+
+.daily-review-hero__factors {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  padding-top: 6px;
+  border-top: 1px dashed color-mix(in srgb, var(--c-border) 60%, transparent);
+}
+
+.daily-review-hero__factor-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+}
+
+.factor-label {
+  color: var(--c-text-muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.factor-progress-bg {
+  flex: 1;
+  height: 5px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--c-border) 60%, transparent);
+  overflow: hidden;
+}
+
+.factor-progress-bar {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.factor-val {
+  font-size: 11px;
+  font-family: var(--c-font-mono, monospace);
+  font-weight: 600;
+  color: var(--c-text-secondary);
+}
+
 .daily-review-hero__mood {
   padding: 10px 14px;
   border-radius: var(--c-radius-md, 8px);
@@ -107,6 +191,10 @@
 @media (max-width: 767px) {
   .daily-review-hero__check {
     order: 3;
+  }
+
+  .daily-review-hero__factors {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .daily-review-hero__metrics {

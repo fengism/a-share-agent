@@ -746,6 +746,14 @@ export interface CustomsTradeDataResponse {
 }
 
 
+export type NationalTeamIntradayItem = components["schemas"]["NationalTeamIntradayItem"];
+export type NationalTeamIntradayMinuteData = components["schemas"]["NationalTeamIntradayMinuteData"];
+export type NationalTeamCumData = components["schemas"]["NationalTeamCumData"];
+export type NationalTeamTypicalCaseData = components["schemas"]["NationalTeamTypicalCaseData"];
+export type NationalTeamSupportVolumeItem = components["schemas"]["NationalTeamSupportVolumeItem"];
+export type NationalTeamSupportVolumeData = components["schemas"]["NationalTeamSupportVolumeData"];
+export type NationalTeamIntradayObservation = components["schemas"]["NationalTeamIntradayObservation"];
+
 export type NationalTeamEtfPoint = components["schemas"]["NationalTeamEtfPoint"];
 export type NationalTeamEtfSeries = components["schemas"]["NationalTeamEtfSeries"];
 export type NationalTeamIndexPoint = components["schemas"]["NationalTeamIndexPoint"];
@@ -754,6 +762,7 @@ export type NationalTeamSummary = components["schemas"]["NationalTeamSummary"];
 export type NationalTeamDailyFlow = components["schemas"]["NationalTeamDailyFlow"];
 export type NationalTeamSupportScore = components["schemas"]["NationalTeamSupportScore"];
 export type NationalTeamSupportHistoryPoint = components["schemas"]["NationalTeamSupportHistoryPoint"];
+export type NationalTeamSupportBacktest = components["schemas"]["NationalTeamSupportBacktest"];
 export type NationalTeamSupportZone = components["schemas"]["NationalTeamSupportZone"];
 export type NationalTeamSupportZoneItem = components["schemas"]["NationalTeamSupportZoneItem"];
 export type NationalTeamMilestone = components["schemas"]["NationalTeamMilestone"];

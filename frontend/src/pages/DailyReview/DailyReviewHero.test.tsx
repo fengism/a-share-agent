@@ -47,6 +47,12 @@ describe("DailyReviewHero", () => {
     expect(screen.getByText("+0.85%")).toBeInTheDocument();
     expect(screen.getByText("主升共振")).toBeInTheDocument();
     expect(screen.getByText(/指数偏强/)).toBeInTheDocument();
+    expect(screen.getByText(/战术策略/)).toBeInTheDocument();
+    expect(screen.getByText("上涨广度")).toBeInTheDocument();
+    expect(screen.getByText("动量积聚")).toBeInTheDocument();
+    expect(screen.getByText("资金量能")).toBeInTheDocument();
+    expect(screen.getByText("结构稳定")).toBeInTheDocument();
+    expect(screen.getByText("周期定位")).toBeInTheDocument();
   });
 
   it("surfaces the previous self-check accuracy", () => {

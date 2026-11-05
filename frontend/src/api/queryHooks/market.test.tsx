@@ -12,6 +12,8 @@ import {
   useMarketIndices,
   useNationalTeamHoldings,
   useNationalTeamOverview,
+  useNationalTeamBacktest,
+  useNationalTeamIndexSeriesItem,
   useMarketIndexIntraday,
   useMarketEmotion,
   useMarketLimitHistory,
@@ -606,7 +608,7 @@ describe("useNationalTeamHoldings refresh policy", () => {
     // ETF 表格只用最新一天的标量；带上整段 points 会多传约 65% 的体积。
     expect(vi.mocked(apiGet)).toHaveBeenCalledWith(
       "/market/national-team-etf-holdings",
-      { days: 120, include_etf_points: false },
+      { days: 120, include_etf_points: false, include_index_points: false, include_flow_breakdown: false },
       expect.objectContaining({ timeoutMs: API_TIMEOUTS.EXTERNAL }),
     );
     unmount();
@@ -623,6 +625,38 @@ describe("useNationalTeamHoldings refresh policy", () => {
     expect(vi.mocked(apiGet)).toHaveBeenCalledWith(
       "/market/national-team/overview",
       { days: 120 },
+      expect.objectContaining({ timeoutMs: API_TIMEOUTS.EXTERNAL }),
+    );
+    unmount();
+    client.clear();
+  });
+
+  it("fetches a single index series for lazy charts", async () => {
+    vi.mocked(apiGet).mockResolvedValue({ index_key: "csi300", points: [] });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = ({ children }: PropsWithChildren) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+    const { result, unmount } = renderHook(() => useNationalTeamIndexSeriesItem("csi300", 120), { wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(vi.mocked(apiGet)).toHaveBeenCalledWith(
+      "/market/national-team/index-series/csi300",
+      { days: 120 },
+      expect.objectContaining({ timeoutMs: API_TIMEOUTS.EXTERNAL }),
+    );
+    unmount();
+    client.clear();
+  });
+
+  it("fetches the support backtest without the full series payload", async () => {
+    vi.mocked(apiGet).mockResolvedValue({ sample_days: 0, horizons: [] });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = ({ children }: PropsWithChildren) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+    const { result, unmount } = renderHook(() => useNationalTeamBacktest(365), { wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(vi.mocked(apiGet)).toHaveBeenCalledWith(
+      "/market/national-team/backtest",
+      { days: 365 },
       expect.objectContaining({ timeoutMs: API_TIMEOUTS.EXTERNAL }),
     );
     unmount();

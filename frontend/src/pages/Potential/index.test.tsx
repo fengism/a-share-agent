@@ -118,4 +118,17 @@ describe("PotentialPage", () => {
     expect(freshCell).not.toBeNull();
     expect(within(freshCell!).getByText("新")).toBeInTheDocument();
   });
+
+  it("renders state trajectory badges and allows intent filtering", () => {
+    render(
+      <MemoryRouter>
+        <PotentialPage />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getAllByText("形态轨迹").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("底部企稳").length).toBeGreaterThan(0);
+    expect(screen.getByText(/全部候选/)).toBeInTheDocument();
+    expect(screen.getByText(/顺势突破/)).toBeInTheDocument();
+  });
 });

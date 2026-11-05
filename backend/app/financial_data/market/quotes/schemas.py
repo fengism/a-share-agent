@@ -621,6 +621,11 @@ class NationalTeamSummary(BaseModel):
     estimated_net_flow_20d_100m: float | None = None
     coverage_ratio: float = 0.0
     quality: Literal["complete", "partial", "insufficient"] = "insufficient"
+    total_amount_1d_100m: float | None = None
+    cumulative_net_flow_100m: float | None = None
+    ytd_net_flow_100m: float | None = None
+    top_flow_category: str | None = None
+    top_flow_index: str | None = None
 
 
 class NationalTeamShareObservation(BaseModel):
@@ -636,6 +641,9 @@ class NationalTeamDailyFlow(BaseModel):
     date: str
     total_flow_100m: float | None = None
     total_shares_change_100m: float | None = None
+    total_amount_100m: float | None = None
+    cumulative_flow_100m: float | None = None
+    benchmark_close: float | None = None
     flows_by_index: dict[str, float] = Field(default_factory=dict)
     flows_by_category: dict[str, float] = Field(default_factory=dict)
 
@@ -651,6 +659,8 @@ class NationalTeamSupportScore(BaseModel):
     #: 0–1，由 ETF 覆盖率与数据新鲜度推导。分数本身不变，但低置信度时不应
     #: 被当成确定结论使用。
     confidence: float = 0.0
+    #: 当前分数在最近 60 个交易日中的分位（0–100）。样本不足 10 日时为 null。
+    percentile_60d: float | None = None
 
 
 class NationalTeamSupportHistoryPoint(BaseModel):
@@ -661,6 +671,49 @@ class NationalTeamSupportHistoryPoint(BaseModel):
     status: Literal["neutral", "moderate", "active", "strong"]
     confidence: float
     coverage_ratio: float = 0.0
+
+
+class NationalTeamBacktestHorizon(BaseModel):
+    """某个持有期的后验表现（信号日之后第 N 个交易日）。"""
+
+    days: int
+    samples: int
+    avg_return_pct: float | None = None
+    median_return_pct: float | None = None
+    win_rate_pct: float | None = None
+    best_return_pct: float | None = None
+    worst_return_pct: float | None = None
+
+
+class NationalTeamBacktestStatus(BaseModel):
+    """按信号强度分组的后验表现。"""
+
+    status: Literal["neutral", "moderate", "active", "strong"]
+    samples: int
+    avg_return_5d_pct: float | None = None
+    avg_return_20d_pct: float | None = None
+    win_rate_5d_pct: float | None = None
+    win_rate_20d_pct: float | None = None
+
+
+class NationalTeamSupportBacktest(BaseModel):
+    """托底评分的后验表现。
+
+    只使用已落库的评分与沪深300 收盘，不依赖当前请求窗口；新部署需要先积累
+    几个交易日的数据，样本不足时各字段为 null。
+    """
+
+    as_of_date: str | None = None
+    #: 回看的评分快照数量（每个交易日一条），不是自然日。
+    window_samples: int = 365
+    sample_days: int = 0
+    excluded_low_confidence: int = 0
+    excluded_low_coverage: int = 0
+    first_sample_date: str | None = None
+    last_sample_date: str | None = None
+    horizons: list[NationalTeamBacktestHorizon] = Field(default_factory=list)
+    by_status: list[NationalTeamBacktestStatus] = Field(default_factory=list)
+    note: str = ""
 
 
 class NationalTeamSupportZoneItem(BaseModel):
@@ -676,6 +729,72 @@ class NationalTeamSupportZone(BaseModel):
     weighted_avg_cost: float | None = None
     cost_buffer_pct: float | None = None
     zones: list[NationalTeamSupportZoneItem] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# 盘中分钟观测与放量信号对比 schemas (对齐重点 ETF 资金看板)
+# ---------------------------------------------------------------------------
+
+
+class NationalTeamIntradayItem(BaseModel):
+    code: str
+    name: str
+    price: float
+    pct: float
+    amount: float
+
+
+class NationalTeamIntradayMinuteData(BaseModel):
+    pre_close: float = 0.0
+    date: str = ""
+    times: list[str] = Field(default_factory=list)
+    bars: list[float] = Field(default_factory=list)
+    closes: list[float] = Field(default_factory=list)
+    table: list[NationalTeamIntradayItem] = Field(default_factory=list)
+    built_at: str = ""
+
+
+class NationalTeamCumData(BaseModel):
+    slots: list[str] = Field(default_factory=list)
+    prev_date: str = ""
+    prev: list[float] = Field(default_factory=list)
+    avg_days: int = 20
+    avg_from: str = ""
+    avg_to: str = ""
+    avg20: list[float] = Field(default_factory=list)
+    built_at: str = ""
+
+
+class NationalTeamTypicalCaseData(BaseModel):
+    slots: list[str] = Field(default_factory=list)
+    sup_amt: list[float] = Field(default_factory=list)
+    sup_cum: list[float] = Field(default_factory=list)
+    nor_amt: list[float] = Field(default_factory=list)
+    nor_cum: list[float] = Field(default_factory=list)
+    sup_n: int = 0
+    nor_n: int = 0
+    range: str = ""
+
+
+class NationalTeamSupportVolumeItem(BaseModel):
+    date: str
+    amount: float
+    netflow: float | None = None
+    is_support_day: bool = False
+    is_pending: bool = False
+
+
+class NationalTeamSupportVolumeData(BaseModel):
+    support_threshold_100m: float = 100.0
+    support_days: list[NationalTeamSupportVolumeItem] = Field(default_factory=list)
+    recent_days: list[NationalTeamSupportVolumeItem] = Field(default_factory=list)
+
+
+class NationalTeamIntradayObservation(BaseModel):
+    minute: NationalTeamIntradayMinuteData = Field(default_factory=NationalTeamIntradayMinuteData)
+    cum: NationalTeamCumData = Field(default_factory=NationalTeamCumData)
+    typical_cases: NationalTeamTypicalCaseData = Field(default_factory=NationalTeamTypicalCaseData)
+    volume_signals: NationalTeamSupportVolumeData = Field(default_factory=NationalTeamSupportVolumeData)
 
 
 class NationalTeamMilestone(BaseModel):
@@ -756,6 +875,8 @@ class NationalTeamResponse(BaseModel):
     refreshing: bool = False
     observations: list[NationalTeamShareObservation] = Field(default_factory=list)
     etf_points_included: bool = True
+    index_points_included: bool = True
+    flow_breakdown_included: bool = True
     missing_share_etfs: list[str] = Field(default_factory=list)
     missing_price_etfs: list[str] = Field(default_factory=list)
     missing_indices: list[str] = Field(default_factory=list)
@@ -770,6 +891,7 @@ class NationalTeamResponse(BaseModel):
     support_zones: list[NationalTeamSupportZone] = Field(default_factory=list)
     milestones: list[NationalTeamMilestone] = Field(default_factory=list)
     portrait: NationalTeamPortrait = Field(default_factory=NationalTeamPortrait)
+    intraday: NationalTeamIntradayObservation = Field(default_factory=NationalTeamIntradayObservation)
     indices: list[NationalTeamIndexSeries] = Field(default_factory=list)
     etfs: list[NationalTeamEtfSeries] = Field(default_factory=list)
 

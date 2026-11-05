@@ -1,0 +1,108 @@
+.stock-quick-preview-modal .ant-modal-content {
+  padding: 16px 20px;
+  border-radius: var(--c-radius-lg, 12px);
+}
+
+.stock-quick-preview__title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-right: 28px;
+  flex-wrap: wrap;
+}
+
+.stock-quick-preview__title-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stock-quick-preview__name {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--c-text-primary);
+}
+
+.stock-quick-preview__code-tag {
+  font-size: 13px;
+  font-family: var(--c-font-mono, monospace);
+  font-weight: 600;
+  margin: 0;
+}
+
+.stock-quick-preview__body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.stock-quick-preview__stats-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-radius: var(--c-radius-md, 8px);
+  background: var(--c-nested-bg, #f8fafc);
+  border: 1px solid var(--c-border, #e2e8f0);
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.stock-quick-preview__price-box {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.stock-quick-preview__price {
+  font-size: 24px;
+  font-weight: 700;
+  font-family: var(--c-font-mono, monospace);
+  color: var(--c-text-primary);
+}
+
+.stock-quick-preview__metrics {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.metric-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.metric-label {
+  font-size: 11px;
+  color: var(--c-text-muted);
+}
+
+.metric-val {
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--c-font-mono, monospace);
+  color: var(--c-text-primary);
+}
+
+.stock-quick-preview__chart-container {
+  min-height: 380px;
+  border-radius: var(--c-radius-md, 8px);
+  background: var(--c-card-bg);
+}
+
+.stock-quick-preview__skeleton {
+  padding: 24px;
+}
+
+.stock-quick-preview__empty {
+  min-height: 380px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}

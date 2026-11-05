@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button, Card, message, Segmented, Table, Tag, Typography } from "antd";
-import { RadarChartOutlined, ThunderboltOutlined } from "@ant-design/icons";
+import { LineChartOutlined, RadarChartOutlined, ThunderboltOutlined } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 import {
   usePotentialDates,
@@ -12,7 +12,9 @@ import {
 } from "../../api/queries";
 import ChangeValue from "../../components/ChangeValue";
 import SectionDataState from "../../components/SectionDataState";
+import StateTrajectoryBadge from "../../components/StateTrajectoryBadge";
 import StockExternalLink from "../../components/StockExternalLink";
+import StockQuickPreviewModal from "../../components/StockQuickPreviewModal";
 import { useColors, useTokens, semanticTagStyle } from "../../styles/ui";
 import type { PotentialPerformanceItem, PotentialStockItem } from "../../types/stock";
 
@@ -80,6 +82,50 @@ export default function PotentialPage() {
 
   const items = useMemo(() => resultQuery.data?.items ?? [], [resultQuery.data?.items]);
 
+  const [previewStock, setPreviewStock] = useState<{ code: string; name: string } | null>(null);
+  const [intentFilter, setIntentFilter] = useState<string>("ALL");
+
+  const { filteredItems, counts } = useMemo(() => {
+    let breakout = 0;
+    let pullback = 0;
+    let reversal = 0;
+    let risk = 0;
+
+    items.forEach((item) => {
+      const isBreakout = item.signal_types?.includes("breakout") || item.strategies?.some((s) => s.includes("突破"));
+      const isPullback = item.signal_types?.includes("pullback") || item.strategies?.some((s) => s.includes("回踩"));
+      const isReversal = item.signal_types?.includes("reversal") || item.strategies?.some((s) => s.includes("底部") || s.includes("反转"));
+      const isRisk = Boolean(item.risk_flags && item.risk_flags.length > 0);
+
+      if (isBreakout) breakout += 1;
+      if (isPullback) pullback += 1;
+      if (isReversal) reversal += 1;
+      if (isRisk) risk += 1;
+    });
+
+    const filtered = items.filter((item) => {
+      if (intentFilter === "ALL") return true;
+      if (intentFilter === "breakout") {
+        return item.signal_types?.includes("breakout") || item.strategies?.some((s) => s.includes("突破"));
+      }
+      if (intentFilter === "pullback") {
+        return item.signal_types?.includes("pullback") || item.strategies?.some((s) => s.includes("回踩"));
+      }
+      if (intentFilter === "reversal") {
+        return item.signal_types?.includes("reversal") || item.strategies?.some((s) => s.includes("底部") || s.includes("反转"));
+      }
+      if (intentFilter === "risk") {
+        return Boolean(item.risk_flags && item.risk_flags.length > 0);
+      }
+      return true;
+    });
+
+    return {
+      filteredItems: filtered,
+      counts: { breakout, pullback, reversal, risk },
+    };
+  }, [items, intentFilter]);
+
   const isLatestDate = selectedDate == null || selectedDate === dates[0]?.date;
 
   const columns: ColumnsType<PotentialStockItem> = useMemo(() => [
@@ -120,12 +166,26 @@ export default function PotentialPage() {
     {
       title: "股票",
       key: "stock",
-      width: 160,
+      width: 170,
       render: (_: unknown, record: PotentialStockItem) => (
-        <StockExternalLink code={record.code} name={record.name} style={{ color: c.primary, display: "flex", flexDirection: "column", minWidth: 0 }}>
-          <span style={{ color: c.textPrimary, fontWeight: Number(t.weight.semibold) }}>{record.name}</span>
-          <span style={{ color: c.textMuted, fontSize: t.font.xs }}>{record.code}</span>
-        </StockExternalLink>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4 }}>
+          <StockExternalLink code={record.code} name={record.name} style={{ color: c.primary, display: "flex", flexDirection: "column", minWidth: 0 }}>
+            <span style={{ color: c.textPrimary, fontWeight: Number(t.weight.semibold) }}>{record.name}</span>
+            <span style={{ color: c.textMuted, fontSize: t.font.xs }}>{record.code}</span>
+          </StockExternalLink>
+          <Button
+            type="text"
+            size="small"
+            icon={<LineChartOutlined />}
+            title="K线速查"
+            aria-label={`速查 ${record.name} K线`}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setPreviewStock({ code: record.code, name: record.name });
+            }}
+          />
+        </div>
       ),
     },
     {
@@ -148,6 +208,17 @@ export default function PotentialPage() {
       width: 100,
       render: (value: string | null) => (
         value ? <Tag style={{ ...semanticTagStyle("info"), fontSize: t.font.xs }}>{value}</Tag> : <span style={{ color: c.textMuted }}>-</span>
+      ),
+    },
+    {
+      title: "形态轨迹",
+      key: "trajectory",
+      width: 170,
+      render: (_: unknown, record: PotentialStockItem) => (
+        <StateTrajectoryBadge
+          signalTypes={record.signal_types}
+          strategies={record.strategies}
+        />
       ),
     },
     {
@@ -376,6 +447,22 @@ export default function PotentialPage() {
             </div>
           ) : null}
         </div>
+        {items.length > 0 ? (
+          <div style={{ marginBottom: t.space[3] }}>
+            <Segmented
+              aria-label="策略意图分类"
+              value={intentFilter}
+              options={[
+                { label: `全部候选 (${items.length})`, value: "ALL" },
+                { label: `🎯 顺势突破 (${counts.breakout})`, value: "breakout" },
+                { label: `💎 回踩企稳 (${counts.pullback})`, value: "pullback" },
+                { label: `⚡ 底部反转 (${counts.reversal})`, value: "reversal" },
+                { label: `⚠️ 风险预警 (${counts.risk})`, value: "risk" },
+              ]}
+              onChange={(val) => setIntentFilter(String(val))}
+            />
+          </div>
+        ) : null}
         <SectionDataState
           isLoading={resultQuery.isLoading}
           error={resultQuery.error}
@@ -388,7 +475,7 @@ export default function PotentialPage() {
         >
           <Table<PotentialStockItem>
             columns={columns}
-            dataSource={items}
+            dataSource={filteredItems}
             rowKey={(record) => `${record.code}-${record.score}`}
             size="small"
             pagination={{ pageSize: 20, showSizeChanger: false }}
@@ -500,6 +587,15 @@ export default function PotentialPage() {
           <Text type="secondary">暂无历史表现数据</Text>
         )}
       </Card>
+
+      {previewStock ? (
+        <StockQuickPreviewModal
+          open={Boolean(previewStock)}
+          code={previewStock.code}
+          name={previewStock.name}
+          onClose={() => setPreviewStock(null)}
+        />
+      ) : null}
     </div>
   );
 }

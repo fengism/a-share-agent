@@ -20,8 +20,10 @@ import type {
   MarketLimitUpLadder,
   MarketMainline,
   MarketMargin,
+  NationalTeamIndexSeries,
   NationalTeamOverview,
   NationalTeamResponse,
+  NationalTeamSupportBacktest,
   MarketBreadth,
   NorthboundHistory,
   MarketPriceAnomaly,
@@ -274,7 +276,7 @@ export function useNationalTeamHoldings(days = 120) {
     queryFn: () => openApiGet("/api/market/national-team-etf-holdings", {
       // ETF 表格只用最新一天的标量，不要每只 ETF 的整段点位：那是约 65% 的响应
       // 体积（实测 902 KiB → 313 KiB），前端一个字都用不到。
-      query: { days, include_etf_points: false },
+      query: { days, include_etf_points: false, include_index_points: false, include_flow_breakdown: false },
       options: { timeoutMs: API_TIMEOUTS.EXTERNAL },
     }),
     select: asApiModel<NationalTeamResponse>(),
@@ -299,6 +301,36 @@ export function useNationalTeamOverview(days = 120) {
       ? 60_000 : QUERY_CACHE_POLICIES.marketTenMinutes.staleMs,
     refetchInterval: (query) => query.state.data?.partial || query.state.data?.refreshing ? 60_000 : false,
     refetchIntervalInBackground: false,
+  });
+}
+
+export function useNationalTeamIndexSeriesItem(indexKey: string, days = 120) {
+  return useQuery({
+    queryKey: queryKeys.market.nationalTeamIndexSeriesItem(indexKey, days),
+    queryFn: () => openApiGet("/api/market/national-team/index-series/{index_key}", {
+      path: { index_key: indexKey },
+      query: { days },
+      options: { timeoutMs: API_TIMEOUTS.EXTERNAL },
+    }),
+    select: asApiModel<NationalTeamIndexSeries>(),
+    enabled: Boolean(indexKey),
+    staleTime: QUERY_CACHE_POLICIES.marketTenMinutes.staleMs,
+  });
+}
+
+export function useNationalTeamBacktest(days = 365, version?: string) {
+  return useQuery({
+    queryKey: [...queryKeys.market.nationalTeamBacktest(days), version ?? ""],
+    queryFn: () => openApiGet("/api/market/national-team/backtest", {
+      query: { days },
+      options: { timeoutMs: API_TIMEOUTS.EXTERNAL },
+    }),
+    select: asApiModel<NationalTeamSupportBacktest>(),
+    // 回测依赖采集完成后落库的评分：首屏请求还没回来时不要抢跑，否则会把
+    // “还没写入”的空结果缓存 10 分钟。
+    enabled: version === undefined || Boolean(version),
+    placeholderData: keepPreviousData,
+    staleTime: QUERY_CACHE_POLICIES.marketTenMinutes.staleMs,
   });
 }
 

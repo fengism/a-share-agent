@@ -3,7 +3,7 @@
 import hashlib
 from datetime import date as Date
 
-from fastapi import APIRouter, Depends, Query, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 
 from app.api.auth.dependencies import require_admin
 from app.core.market import normalize_code
@@ -28,8 +28,10 @@ from app.financial_data.market.public import (
     MarketVolumeResponse,
     MarketWindResponse,
     MarketWindStocksResponse,
+    NationalTeamIndexSeries,
     NationalTeamOverview,
     NationalTeamResponse,
+    NationalTeamSupportBacktest,
     NorthboundHistoryResponse,
     ThsHotPlate,
     ThsHotStock,
@@ -59,7 +61,16 @@ from app.financial_data.market.public import get_market_volume as get_market_vol
 from app.financial_data.market.public import get_market_wind as get_market_wind_service
 from app.financial_data.market.public import get_market_wind_stocks as get_market_wind_stocks_service
 from app.financial_data.market.public import (
+    get_national_team_backtest as get_national_team_backtest_service,
+)
+from app.financial_data.market.public import (
     get_national_team_etf_holdings as get_national_team_etf_holdings_service,
+)
+from app.financial_data.market.public import (
+    get_national_team_index_series as get_national_team_index_series_service,
+)
+from app.financial_data.market.public import (
+    get_national_team_index_series_item as get_national_team_index_series_item_service,
 )
 from app.financial_data.market.public import (
     get_national_team_overview as get_national_team_overview_service,
@@ -176,9 +187,25 @@ async def get_national_team_etf_holdings(
             "（latest_estimated_net_flow_100m），传 false 约省 65% 响应体积。"
         ),
     ),
+    include_index_points: bool = Query(
+        True,
+        description=(
+            "是否返回指数点位序列。传 false 时指数标量仍保留，图表改用"
+            "/national-team/index-series 单独获取，可让首屏先渲染表格与结论。"
+        ),
+    ),
+    include_flow_breakdown: bool = Query(
+        True,
+        description=("是否返回 daily_flows[].flows_by_index；前端只用 flows_by_category。"),
+    ),
 ):
     """获取核心宽基 ETF 份额变化与国家队持仓代理监测。"""
-    result = await get_national_team_etf_holdings_service(days, include_etf_points=include_etf_points)
+    result = await get_national_team_etf_holdings_service(
+        days,
+        include_etf_points=include_etf_points,
+        include_index_points=include_index_points,
+        include_flow_breakdown=include_flow_breakdown,
+    )
     etag = _national_team_etag(result, include_etf_points)
     cache_control = _national_team_cache_control(result)
     if _etag_matches(request.headers.get("if-none-match"), etag):
@@ -191,10 +218,103 @@ async def get_national_team_etf_holdings(
 
 @router.get("/national-team/overview", response_model=NationalTeamOverview)
 async def get_national_team_overview(
+    request: Request,
+    response: Response,
     days: int = Query(120, ge=30, le=365, description="返回最近自然日数量，30-365"),
 ):
     """国家队首屏概览：只返回结论与标量，供首页信号卡等轻量场景使用。"""
-    return await get_national_team_overview_service(days)
+    item = await get_national_team_overview_service(days)
+    history = item.support_score_history
+    etag = _etag_from_values(
+        item.fetched_at,
+        item.as_of_date,
+        item.expected_date,
+        item.partial,
+        item.stale,
+        item.calendar_degraded,
+        item.refreshing,
+        item.covered_etf_count,
+        item.total_etf_count,
+        item.support_score.score,
+        item.support_score.confidence,
+        item.support_score.percentile_60d,
+        len(history),
+        history[-1].date if history else "",
+    )
+    cache_control = _cache_control(item.partial, item.refreshing)
+    not_modified = _not_modified(request, etag, cache_control)
+    if not_modified is not None:
+        return not_modified
+    response.headers["ETag"] = etag
+    response.headers["Cache-Control"] = cache_control
+    return item
+
+
+@router.get("/national-team/index-series", response_model=list[NationalTeamIndexSeries])
+async def get_national_team_index_series(
+    request: Request,
+    response: Response,
+    days: int = Query(120, ge=30, le=365, description="返回最近自然日数量，30-365"),
+):
+    """国家队指数点位序列：详情页图表在首屏响应之后单独拉取。"""
+    items = await get_national_team_index_series_service(days)
+    etag = _etag_from_values(_index_series_etag_values(items))
+    cache_control = "private, max-age=300"
+    not_modified = _not_modified(request, etag, cache_control)
+    if not_modified is not None:
+        return not_modified
+    response.headers["ETag"] = etag
+    response.headers["Cache-Control"] = cache_control
+    return items
+
+
+@router.get(
+    "/national-team/index-series/{index_key}",
+    response_model=NationalTeamIndexSeries,
+)
+async def get_national_team_index_series_item(
+    request: Request,
+    response: Response,
+    index_key: str,
+    days: int = Query(120, ge=30, le=365, description="返回最近自然日数量，30-365"),
+):
+    """单条指数点位序列：图表进入视口后再按需拉取。"""
+    item = await get_national_team_index_series_item_service(index_key, days)
+    if item is None:
+        raise HTTPException(status_code=404, detail=f"未知指数: {index_key}")
+    etag = _etag_from_values(_index_series_etag_values([item]))
+    cache_control = "private, max-age=300"
+    not_modified = _not_modified(request, etag, cache_control)
+    if not_modified is not None:
+        return not_modified
+    response.headers["ETag"] = etag
+    response.headers["Cache-Control"] = cache_control
+    return item
+
+
+@router.get("/national-team/backtest", response_model=NationalTeamSupportBacktest)
+async def get_national_team_backtest(
+    request: Request,
+    response: Response,
+    days: int = Query(365, ge=30, le=1095, description="回看的评分快照数量（每个交易日一条）"),
+):
+    """托底评分的后验表现：信号后 5/20 个交易日的沪深300 涨跌。"""
+    item = await get_national_team_backtest_service(days)
+    etag = _etag_from_values(
+        item.as_of_date,
+        item.window_samples,
+        item.sample_days,
+        item.excluded_low_confidence,
+        item.excluded_low_coverage,
+        [(horizon.days, horizon.samples, horizon.avg_return_pct) for horizon in item.horizons],
+    )
+    cache_control = "private, max-age=300"
+    not_modified = _not_modified(request, etag, cache_control)
+    if not_modified is not None:
+        return not_modified
+    response.headers["ETag"] = etag
+    response.headers["Cache-Control"] = cache_control
+    return item
 
 
 def _national_team_etag(result: NationalTeamResponse, include_etf_points: bool) -> str:
@@ -214,6 +334,8 @@ def _national_team_etag(result: NationalTeamResponse, include_etf_points: bool) 
             str(result.stale),
             str(result.calendar_degraded),
             str(include_etf_points),
+            str(result.index_points_included),
+            str(result.flow_breakdown_included),
         )
     )
     return '"' + hashlib.sha256(parts.encode("utf-8")).hexdigest()[:32] + '"'
@@ -223,6 +345,39 @@ def _national_team_cache_control(result: NationalTeamResponse) -> str:
     """浏览器端缓存时长不得超过后端缓存：partial 60s，完整结果 300s。"""
     max_age = 60 if result.partial or result.refreshing else 300
     return f"private, max-age={max_age}"
+
+
+def _etag_from_values(*values: object) -> str:
+    """按影响响应体的标量生成 ETag，避免为算哈希序列化整份 JSON。"""
+    payload = "|".join(str(value) for value in values)
+    return '"' + hashlib.sha256(payload.encode("utf-8")).hexdigest()[:32] + '"'
+
+
+def _cache_control(partial: bool, refreshing: bool) -> str:
+    return f"private, max-age={60 if partial or refreshing else 300}"
+
+
+def _not_modified(request: Request, etag: str, cache_control: str) -> Response | None:
+    """命中 If-None-Match 时返回带缓存头的 304。"""
+    if not _etag_matches(request.headers.get("if-none-match"), etag):
+        return None
+    return Response(status_code=304, headers={"ETag": etag, "Cache-Control": cache_control})
+
+
+def _index_series_etag_values(items: list[NationalTeamIndexSeries]) -> list[tuple]:
+    return [
+        (
+            item.index_key,
+            item.latest_date,
+            len(item.points),
+            item.points[-1].date if item.points else "",
+            item.points[-1].total_shares_100m if item.points else None,
+            item.points[-1].index_close if item.points else None,
+            item.latest_total_shares_100m,
+            item.coverage_ratio,
+        )
+        for item in items
+    ]
 
 
 def _etag_matches(if_none_match: str | None, etag: str) -> bool:

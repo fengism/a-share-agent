@@ -1,0 +1,55 @@
+.review-date-pills-bar {
+  margin-bottom: 16px;
+  padding: 8px 14px;
+  border-radius: var(--c-radius-md, 8px);
+  background: var(--c-card-bg, #ffffff);
+  border: 1px solid var(--c-border, #e2e8f0);
+}
+
+.review-date-pills-bar__inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.review-date-pills-bar__label {
+  font-size: var(--c-font-xs, 12px);
+  color: var(--c-text-muted, #64748b);
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+}
+
+.review-date-pill {
+  font-family: var(--c-font-mono, monospace);
+  font-size: 12px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.review-date-pill--return {
+  color: var(--c-primary, #0284c7);
+  border-color: var(--c-primary, #0284c7);
+  font-weight: 600;
+}
+
+.review-date-pill--return:hover {
+  background: color-mix(in srgb, var(--c-primary, #0284c7) 12%, transparent);
+}
+
+.review-date-pills-bar__tip {
+  font-size: 11px;
+}
+
+.review-date-pills-bar__tip-text {
+  font-size: 11px;
+}
+
+@media (max-width: 767px) {
+  .review-date-pills-bar__tip {
+    width: 100%;
+    margin-top: 4px;
+  }
+}

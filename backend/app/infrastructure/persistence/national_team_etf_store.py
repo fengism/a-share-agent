@@ -38,6 +38,22 @@ ON CONFLICT(scope, date) DO UPDATE SET
     updated_at = excluded.updated_at
 """
 
+_SCORE_UPSERT = """
+INSERT INTO national_team_support_scores(
+    date, score, status, confidence, coverage_ratio, csi300_close, updated_at
+)
+VALUES (?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(date) DO UPDATE SET
+    score          = excluded.score,
+    status         = excluded.status,
+    confidence     = excluded.confidence,
+    coverage_ratio = excluded.coverage_ratio,
+    csi300_close   = COALESCE(excluded.csi300_close, national_team_support_scores.csi300_close),
+    updated_at     = excluded.updated_at
+"""
+
+_SUPPORT_STATUSES = {"neutral", "moderate", "active", "strong"}
+
 
 def load_share_history(codes: Iterable[str], *, verified_only: bool = False) -> dict[str, dict[str, float]]:
     """加载指定 ETF 的全部存量份额历史。
@@ -216,6 +232,55 @@ def load_share_metadata(codes: Iterable[str]) -> dict[str, dict[str, dict]]:
     return result
 
 
+def save_support_scores(
+    samples: Iterable[tuple[str, float, str, float, float, float | None]],
+) -> None:
+    """写入每日托底评分；同日重复采集以新值覆盖。
+
+    Args:
+        samples: (date, score, status, confidence, coverage_ratio, csi300_close)。
+    """
+    now = _now()
+    rows = []
+    for point_date, score, status, confidence, coverage_ratio, csi300_close in samples:
+        if status not in _SUPPORT_STATUSES:
+            raise ValueError(f"invalid support status: {status!r}")
+        rows.append(
+            (
+                _validated_date(point_date),
+                _bounded_finite(score, lower=0.0, upper=100.0, field=f"score ({point_date})"),
+                status,
+                _bounded_finite(confidence, lower=0.0, upper=1.0, field=f"confidence ({point_date})"),
+                _bounded_finite(coverage_ratio, lower=0.0, upper=1.0, field=f"coverage ({point_date})"),
+                None
+                if csi300_close is None
+                else _nonnegative_finite(csi300_close, field=f"csi300_close ({point_date})"),
+                now,
+            )
+        )
+    if not rows:
+        return
+    with unit_of_work() as work:
+        work.connection.executemany(_SCORE_UPSERT, rows)
+
+
+def load_support_scores(*, since: str | None = None, limit: int | None = None) -> list[dict]:
+    """按日期升序读取评分快照，可选起始日与最近条数。"""
+    query = (
+        "SELECT date, score, status, confidence, coverage_ratio, csi300_close "
+        "FROM national_team_support_scores"
+    )
+    params: list[str] = []
+    if since:
+        query += " WHERE date >= ?"
+        params.append(_validated_date(since))
+    query += " ORDER BY date"
+    rows = [dict(row) for row in get_connection("market").execute(query, params).fetchall()]
+    if limit is not None and limit > 0:
+        rows = rows[-limit:]
+    return rows
+
+
 def save_observations(samples: Iterable[tuple[str, str, float, float]]) -> None:
     rows = [
         (
@@ -263,6 +328,16 @@ def prune(retention_days: int = 370) -> None:
 def _now() -> float:
     """当前时间戳（秒，与库内其他 REAL 时间列保持一致）。"""
     return time.time()
+
+
+def _bounded_finite(value: float, *, lower: float, upper: float, field: str) -> float:
+    try:
+        number = float(value)
+    except (TypeError, ValueError) as error:
+        raise ValueError(f"invalid {field}: {value!r}") from error
+    if isinstance(value, bool) or not math.isfinite(number) or not lower <= number <= upper:
+        raise ValueError(f"invalid {field}: {value!r}")
+    return number
 
 
 def _validated_date(value: str) -> str:

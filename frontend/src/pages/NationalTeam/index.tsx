@@ -25,33 +25,46 @@ import {
   DownOutlined,
   DownloadOutlined,
   FallOutlined,
+  FileImageOutlined,
   FullscreenOutlined,
   InfoCircleOutlined,
   ReloadOutlined,
   RiseOutlined,
   SafetyCertificateOutlined,
   SearchOutlined,
+  StarFilled,
+  StarOutlined,
+  ThunderboltOutlined,
   UpOutlined,
 } from "@ant-design/icons";
 import ReactECharts from "echarts-for-react/lib/core";
 import echarts from "../../charts/echarts-setup";
-import { useNationalTeamHoldings } from "../../api/queries";
+import { useNationalTeamBacktest, useNationalTeamHoldings, useNationalTeamIndexSeriesItem } from "../../api/queries";
 import PreloadLink from "../../components/PreloadLink";
 import SectionDataState from "../../components/SectionDataState";
+import CategoryOverviewCards from "./components/CategoryOverviewCards";
+import FlowHeatmapTable from "./components/FlowHeatmapTable";
+import MacroFlowChart from "./components/MacroFlowChart";
+import NationalTeamAnomalyBanner from "./components/NationalTeamAnomalyBanner";
+import NationalTeamConcentrationCard from "./components/NationalTeamConcentrationCard";
+import NationalTeamDataStatusPanel from "./components/NationalTeamDataStatusPanel";
+import NationalTeamReportModal from "./components/NationalTeamReportModal";
+import NationalTeamIntradayMonitor from "./components/NationalTeamIntradayMonitor";
 import LazyChart from "./components/LazyChart";
+import StockQuickPreviewModal from "../../components/StockQuickPreviewModal";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { useColors } from "../../styles/ui";
 import { APP_FONT_FAMILY } from "../../theme/typography";
-import { formatNumberWithSeparators } from "../../utils/format";
+import { formatNumberWithSeparators, formatSignedPercent } from "../../utils/format";
 import { buildStockProfileUrl } from "../../utils/stockLinks";
 import { useSearchParams } from "react-router-dom";
 import { updateUrlSearchParam, useUrlSearchParam } from "../../hooks/useUrlSearchParam";
 import type {
-  NationalTeamDailyFlow,
   NationalTeamEtfSeries,
   NationalTeamIndexSeries,
   NationalTeamMilestone,
   NationalTeamPortrait,
+  NationalTeamSupportBacktest,
   NationalTeamSupportHistoryPoint,
   NationalTeamSupportScore,
   NationalTeamSupportZone,
@@ -176,9 +189,22 @@ function valueColor(value: number | null | undefined, up: string, down: string, 
   return value > 0 ? up : down;
 }
 
-function IndexDualAxisChart({ item }: { item: NationalTeamIndexSeries }) {
+function IndexDualAxisChart({
+  item: itemProp,
+  days,
+}: {
+  item: NationalTeamIndexSeries;
+  days: number;
+}) {
   const colors = useColors();
   const [expanded, setExpanded] = useState(false);
+  const seriesResult = useNationalTeamIndexSeriesItem(itemProp.index_key, days);
+  const series = seriesResult?.data;
+  const isLoading = seriesResult?.isLoading ?? false;
+  const isError = seriesResult?.isError ?? false;
+  const refetch = seriesResult?.refetch ?? (() => {});
+  // 首屏响应只有标量，点位在图表进入视口后才单独拉取；拉到之前先用标量占位。
+  const item = series ?? itemProp;
   const points = useMemo(() => item.points ?? [], [item.points]);
   const showPointMarkers = points.length <= 1;
   const shareColor = colors.info || "#20c6e5";
@@ -316,6 +342,28 @@ function IndexDualAxisChart({ item }: { item: NationalTeamIndexSeries }) {
     ],
   }), [colors, indexColor, item.index_name, points, shareColor, showPointMarkers]);
 
+  if (isLoading && !series) {
+    return (
+      <Card
+        className="national-team-index-card"
+        size="small"
+        loading
+        data-testid="national-team-index-loading"
+      />
+    );
+  }
+
+  if (isError && !series) {
+    return (
+      <Card className="national-team-index-card" size="small" styles={{ body: { padding: 16 } }}>
+        <Space direction="vertical" size={6}>
+          <Text type="secondary">指数序列加载失败（{itemProp.index_name}）</Text>
+          <Button size="small" onClick={() => void refetch()}>重试</Button>
+        </Space>
+      </Card>
+    );
+  }
+
   return (
     <Card className="national-team-index-card" styles={{ body: { padding: "12px 14px 10px" } }}>
       <div className="national-team-index-card__header">
@@ -446,181 +494,21 @@ function IndexDualAxisChart({ item }: { item: NationalTeamIndexSeries }) {
   );
 }
 
-function DailyFlowStackedChart({
-  dailyFlows,
-  milestones,
-}: {
-  dailyFlows?: NationalTeamDailyFlow[];
-  milestones?: NationalTeamMilestone[];
-}) {
-  const colors = useColors();
-  const flows = useMemo(() => dailyFlows ?? [], [dailyFlows]);
-  const relevantMilestones = useMemo(() => {
-    if (!milestones || !flows.length) return [];
-    const dateSet = new Set(flows.map((f) => f.date));
-    return milestones.filter((m) => dateSet.has(m.date));
-  }, [milestones, flows]);
-  if (!flows.length) return null;
-
-  const dates = flows.map((f) => f.date);
-  const categories = [
-    { key: "core_broad", name: "核心大盘", color: "#1677ff" },
-    { key: "a500", name: "新质A500", color: "#faad14" },
-    { key: "growth", name: "中小成长", color: "#13c2c2" },
-    { key: "dividend", name: "红利防御", color: "#f5222d" },
-  ];
-
-  const option = {
-    animationDuration: 300,
-    textStyle: { fontFamily: APP_FONT_FAMILY },
-    tooltip: {
-      trigger: "axis",
-      axisPointer: { type: "shadow" },
-      backgroundColor: colors.elevatedBg,
-      borderColor: colors.border,
-      borderWidth: 1,
-      padding: [8, 12],
-      textStyle: { color: colors.textPrimary, fontSize: 12, fontFamily: APP_FONT_FAMILY },
-      extraCssText: "box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22); border-radius: 8px; backdrop-filter: blur(8px);",
-      formatter: (params: Array<{ seriesName: string; value: number; marker: string }>) => {
-        if (!params.length) return "";
-        const dataIdx = (params[0] as unknown as { dataIndex: number }).dataIndex;
-        const pt = flows[dataIdx];
-        const dateStr = pt?.date || "";
-        const totalFlow = pt?.total_flow_100m;
-        const totalShares = pt?.total_shares_change_100m;
-        const totalColor = valueColor(totalFlow, colors.up, colors.down, colors.textPrimary);
-        const milestoneHit = relevantMilestones.find((m) => m.date === dateStr);
-
-        let rows = "";
-        for (const p of params) {
-          if (p.value !== 0 && p.value != null) {
-            const pColor = valueColor(p.value, colors.up, colors.down, colors.textPrimary);
-            rows += `<div style="display:flex;justify-content:space-between;align-items:center;gap:16px;margin-top:3px;font-size:11px">
-              <span style="display:flex;align-items:center;gap:5px">${p.marker}${escapeHtml(p.seriesName)}</span>
-              <b style="font-family:var(--c-font-mono);color:${pColor}">${formatSigned(p.value, "亿元")}</b>
-            </div>`;
-          }
-        }
-
-        const milestoneHtml = milestoneHit
-          ? `<div style="margin-top:6px;padding:4px 6px;border-radius:4px;background:rgba(250,173,20,0.12);border:1px solid #faad14;font-size:11px">
-              <div style="color:#d48806;font-weight:600">★ 关键救市节点：${escapeHtml(milestoneHit.title)}</div>
-              <div style="color:${colors.textSecondary};margin-top:2px;line-height:1.3">${escapeHtml(milestoneHit.description)}</div>
-            </div>`
-          : "";
-
-        return `<div style="font-weight:600;margin-bottom:4px;font-size:12px;color:${colors.textPrimary}">${escapeHtml(dateStr)}</div>
-          <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid ${colors.border};font-size:12px">
-            <span>当日宽基净申购合计</span>
-            <b style="font-family:var(--c-font-mono);color:${totalColor}">${formatSigned(totalFlow, "亿元")}</b>
-          </div>
-          ${rows}
-          ${totalShares != null ? `<div style="display:flex;justify-content:space-between;align-items:center;gap:16px;margin-top:4px;padding-top:4px;border-top:1px dashed ${colors.border};font-size:11px;color:${colors.textSecondary}">
-            <span>当日份额变动合计</span>
-            <span style="font-family:var(--c-font-mono)">${formatSigned(totalShares)}</span>
-          </div>` : ""}
-          ${milestoneHtml}`;
-      },
-    },
-    legend: {
-      show: true,
-      top: 0,
-      right: 12,
-      textStyle: { color: colors.textSecondary, fontSize: 11 },
-      itemWidth: 10,
-      itemHeight: 10,
-    },
-    grid: { left: 48, right: 24, top: 28, bottom: 32 },
-    xAxis: {
-      type: "category",
-      data: dates,
-      axisLabel: { color: colors.textSecondary, hideOverlap: true, fontSize: 10 },
-      axisLine: { lineStyle: { color: colors.border } },
-    },
-    yAxis: {
-      type: "value",
-      name: "估算净申购（亿元）",
-      nameTextStyle: { color: colors.textSecondary, fontSize: 10, padding: [0, 0, 2, 0] },
-      axisLabel: {
-        color: colors.textSecondary,
-        fontSize: 10,
-        formatter: (val: number) => formatNumberWithSeparators(val, 1),
-      },
-      splitLine: { lineStyle: { color: colors.border, type: "dashed", opacity: 0.35 } },
-    },
-    dataZoom: [
-      { type: "inside", start: Math.max(0, 100 - (30 / Math.max(1, dates.length)) * 100), end: 100 },
-      { type: "slider", start: Math.max(0, 100 - (30 / Math.max(1, dates.length)) * 100), end: 100, height: 18, bottom: 2 },
-    ],
-    series: categories.map((cat, idx) => ({
-      name: cat.name,
-      type: "bar",
-      stack: "net_flow",
-      itemStyle: { color: cat.color, borderRadius: [2, 2, 0, 0] },
-      data: flows.map((f) => f.flows_by_category?.[cat.key] ?? 0),
-      markLine: (idx === 0 && relevantMilestones.length > 0) ? {
-        symbol: ["none", "none"],
-        label: {
-          show: true,
-          position: "insideEndTop",
-          formatter: (p: { name: string }) => `★ ${p.name}`,
-          fontSize: 10,
-          color: "#faad14",
-        },
-        lineStyle: {
-          color: "#faad14",
-          type: "dashed",
-          width: 1.5,
-        },
-        data: relevantMilestones.map((m) => ({
-          xAxis: m.date,
-          name: m.title,
-        })),
-      } : undefined,
-    })),
-  };
-
-  return (
-    <Card
-      className="national-team-stacked-flow-card"
-      size="small"
-      title={
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-          <span style={{ fontWeight: 600, fontSize: 14 }}>全市场宽基每日净申赎走势</span>
-          <Text type="secondary" style={{ fontSize: 11 }}>
-            各板块每日资金净申购/净赎回估算（亿元）
-          </Text>
-        </div>
-      }
-    >
-      <div data-testid="national-team-daily-flow-chart">
-        <LazyChart height={230}>
-          <ReactECharts
-            echarts={echarts}
-            option={option}
-            data-testid="national-team-daily-flow-echarts"
-            style={{ width: "100%", height: 230 }}
-            notMerge
-          />
-        </LazyChart>
-      </div>
-    </Card>
-  );
-}
-
 function SupportScoreRadarCard({
   supportScore,
   history,
+  backtest,
 }: {
   supportScore?: NationalTeamSupportScore;
   history?: NationalTeamSupportHistoryPoint[];
+  backtest?: NationalTeamSupportBacktest;
 }) {
   const colors = useColors();
   const sparkline = useMemo(
     () => buildSparklinePath((history ?? []).slice(-30).map((point) => point.score), 168, 28),
     [history],
   );
+  const backtestHorizons = (backtest?.horizons ?? []).filter((item) => item.samples > 0);
   if (!supportScore) return null;
 
   const score = supportScore.score;
@@ -688,6 +576,9 @@ function SupportScoreRadarCard({
               </div>
               <Text type="secondary" style={{ fontSize: 11, display: "block", marginTop: 4, lineHeight: 1.4 }}>
                 {supportScore.description || "综合测算资金流入、板块覆盖度与抗跌偏离。"}
+                {supportScore.percentile_60d != null
+                  ? ` · 近60日分位 ${Math.round(supportScore.percentile_60d)}%`
+                  : ""}
               </Text>
             </div>
           </div>
@@ -769,6 +660,52 @@ function SupportScoreRadarCard({
           </span>
         </div>
       )}
+      {backtestHorizons.length > 0 ? (
+        <div
+          data-testid="national-team-backtest"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            flexWrap: "wrap",
+            marginTop: 6,
+            fontSize: 11,
+            color: colors.textSecondary,
+          }}
+        >
+          <span style={{ whiteSpace: "nowrap" }}>信号后表现</span>
+          {backtestHorizons.map((item) => (
+            <span key={item.days} style={{ whiteSpace: "nowrap", fontFamily: "var(--c-font-mono)" }}>
+              {item.days} 日 {formatSignedPercent(item.avg_return_pct)} · 胜率 {item.win_rate_pct ?? "-"}%
+              <span style={{ opacity: 0.7 }}>（{item.samples}）</span>
+            </span>
+          ))}
+          <Tooltip
+            title={
+              [
+                backtest?.note,
+                backtest &&
+                (backtest.excluded_low_confidence ?? 0) + (backtest.excluded_low_coverage ?? 0) > 0
+                  ? `已剔除 ${backtest.excluded_low_confidence ?? 0} 个低置信度、${backtest.excluded_low_coverage ?? 0} 个低覆盖样本`
+                  : "",
+                backtest?.first_sample_date && backtest?.last_sample_date
+                  ? `样本区间 ${backtest.first_sample_date} ~ ${backtest.last_sample_date}`
+                  : "",
+              ]
+                .filter(Boolean)
+                .join("；") || "基于已落库评分与沪深300 收盘，仅统计有未来行情的信号。"
+            }
+          >
+            <InfoCircleOutlined style={{ fontSize: 12 }} />
+          </Tooltip>
+          {backtest &&
+          (backtest.excluded_low_confidence ?? 0) + (backtest.excluded_low_coverage ?? 0) > 0 ? (
+            <span style={{ opacity: 0.7, whiteSpace: "nowrap" }}>
+              已剔除 {(backtest.excluded_low_confidence ?? 0) + (backtest.excluded_low_coverage ?? 0)} 个低质量样本
+            </span>
+          ) : null}
+        </div>
+      ) : null}
     </Card>
   );
 }
@@ -1232,6 +1169,25 @@ export default function NationalTeam() {
     allowedValues: ["etf", "portrait"],
   });
 
+  const [tabParam, setTabParam] = useUrlSearchParam("tab", "flow", {
+    allowedValues: ["flow", "intraday", "radar", "etf", "portrait", "all"],
+  });
+
+  const activeTab = useMemo(() => {
+    if (view === "portrait") return "portrait";
+    return tabParam;
+  }, [view, tabParam]);
+
+  const handleTabChange = (val: string) => {
+    if (val === "portrait") {
+      setView("portrait");
+      setTabParam("portrait");
+    } else {
+      setView("etf");
+      setTabParam(val);
+    }
+  };
+
   const [category] = useUrlSearchParam("category", "all", {
     allowedValues: ["all", "core_broad", "a500", "growth", "dividend"],
   });
@@ -1242,10 +1198,41 @@ export default function NationalTeam() {
   const rotationWindow = Number(rotationWindowParam) as 20 | 5 | 1;
 
   const [selectedFilterIndex, setSelectedFilterIndex] = useUrlSearchParam("index", "ALL");
+  type TableSortPreset = "default" | "flow1d" | "flow5d" | "amount" | "shares" | "abnormal";
+  const [tableSortPreset, setTableSortPreset] = useState<TableSortPreset>("default");
   // 搜索词逐步输入，用 replace 避免每敲一个字就压一条历史记录（返回键要按十几次）。
   const [searchKeyword, setSearchKeyword] = useUrlSearchParam("q", "", { replace: true });
   const [showPartialDetails, setShowPartialDetails] = useState<boolean>(false);
-  const { data, isLoading, isFetching, error, refetch } = useNationalTeamHoldings(days);
+  const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [previewStock, setPreviewStock] = useState<{ code: string; name: string } | null>(null);
+  const [starredCodes, setStarredCodes] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("national-team-starred-etfs") || "[]");
+    } catch {
+      return [];
+    }
+  });
+
+  const toggleStar = (code: string) => {
+    setStarredCodes((prev) => {
+      const next = prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code];
+      try {
+        localStorage.setItem("national-team-starred-etfs", JSON.stringify(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  };
+
+  const holdingsQuery = useNationalTeamHoldings(days);
+  const data = holdingsQuery?.data;
+  const isLoading = holdingsQuery?.isLoading ?? false;
+  const isFetching = holdingsQuery?.isFetching ?? false;
+  const error = holdingsQuery?.error ?? null;
+  const refetch = holdingsQuery?.refetch ?? (() => {});
+  const backtestResult = useNationalTeamBacktest(365, data?.fetched_at);
+  const backtest = backtestResult?.data;
 
   const indices = useMemo(() => [...(data?.indices ?? [])].sort(
     (a, b) => indexOrder(a.index_name) - indexOrder(b.index_name),
@@ -1289,7 +1276,9 @@ export default function NationalTeam() {
 
   const filteredEtfs = useMemo(() => {
     let result = categoryEtfs;
-    if (selectedFilterIndex !== "ALL") {
+    if (selectedFilterIndex === "STARRED") {
+      result = result.filter((item) => starredCodes.includes(item.code));
+    } else if (selectedFilterIndex !== "ALL") {
       result = result.filter((item) => item.index_name === selectedFilterIndex);
     }
     if (searchKeyword.trim()) {
@@ -1302,16 +1291,45 @@ export default function NationalTeam() {
           item.index_name.toLowerCase().includes(kw),
       );
     }
+    if (tableSortPreset === "flow1d") {
+      return [...result].sort((a, b) => (b.latest_estimated_net_flow_100m ?? -Infinity) - (a.latest_estimated_net_flow_100m ?? -Infinity));
+    }
+    if (tableSortPreset === "flow5d") {
+      return [...result].sort((a, b) => (b.change_5d_100m ?? -Infinity) - (a.change_5d_100m ?? -Infinity));
+    }
+    if (tableSortPreset === "amount") {
+      return [...result].sort((a, b) => (b.latest_amount_100m ?? -Infinity) - (a.latest_amount_100m ?? -Infinity));
+    }
+    if (tableSortPreset === "shares") {
+      return [...result].sort((a, b) => (b.latest_shares_100m ?? -Infinity) - (a.latest_shares_100m ?? -Infinity));
+    }
+    if (tableSortPreset === "abnormal") {
+      return [...result].sort((a, b) => {
+        const abDiff = (b.is_abnormal_volume ? 1 : 0) - (a.is_abnormal_volume ? 1 : 0);
+        if (abDiff !== 0) return abDiff;
+        return (b.volume_ratio ?? 0) - (a.volume_ratio ?? 0);
+      });
+    }
     return result;
-  }, [categoryEtfs, searchKeyword, selectedFilterIndex]);
+  }, [categoryEtfs, searchKeyword, selectedFilterIndex, starredCodes, tableSortPreset]);
 
-  const filterOptions = useMemo(() => [
-    { label: `全部 (${categoryEtfs.length})`, value: "ALL" },
-    ...INDEX_ORDER.filter((name) => categoryEtfs.some((e) => e.index_name === name)).map((name) => ({
-      label: `${name} (${categoryEtfs.filter((e) => e.index_name === name).length})`,
-      value: name,
-    })),
-  ], [categoryEtfs]);
+  const filterOptions = useMemo(() => {
+    const baseOptions = [
+      { label: `全部 (${categoryEtfs.length})`, value: "ALL" },
+      ...INDEX_ORDER.filter((name) => categoryEtfs.some((e) => e.index_name === name)).map((name) => ({
+        label: `${name} (${categoryEtfs.filter((e) => e.index_name === name).length})`,
+        value: name,
+      })),
+    ];
+    if (starredCodes.length > 0) {
+      const starredCount = categoryEtfs.filter((e) => starredCodes.includes(e.code)).length;
+      return [
+        { label: `⭐ 我的自选 (${starredCount})`, value: "STARRED" },
+        ...baseOptions,
+      ];
+    }
+    return baseOptions;
+  }, [categoryEtfs, starredCodes]);
 
   const handleCategoryChange = (newCat: string) => {
     setSearchParams((current) => {
@@ -1321,6 +1339,31 @@ export default function NationalTeam() {
   };
 
   const columns: ColumnsType<NationalTeamEtfSeries> = useMemo(() => [
+    {
+      title: "自选",
+      key: "star",
+      width: 46,
+      align: "center",
+      fixed: isMobile ? undefined : "left",
+      render: (_, item) => {
+        const isStarred = starredCodes.includes(item.code);
+        return (
+          <Button
+            type="text"
+            size="small"
+            style={{
+              color: isStarred ? "#faad14" : colors.textSecondary,
+              padding: 0,
+              fontSize: 14,
+            }}
+            icon={isStarred ? <StarFilled /> : <StarOutlined />}
+            onClick={() => toggleStar(item.code)}
+            title={isStarred ? "取消自选关注" : "添加自选关注"}
+            aria-label={isStarred ? `取消自选 ${item.code}` : `加入自选 ${item.code}`}
+          />
+        );
+      },
+    },
     {
       title: "宽基",
       dataIndex: "index_name",
@@ -1478,7 +1521,26 @@ export default function NationalTeam() {
         );
       },
     },
-  ], [colors, isMobile]);
+    {
+      title: "操作",
+      key: "actions",
+      width: isMobile ? 65 : 80,
+      fixed: isMobile ? undefined : "right",
+      align: "center",
+      render: (_, item) => (
+        <Button
+          type="link"
+          size="small"
+          icon={<ThunderboltOutlined />}
+          style={{ padding: "0 4px", fontSize: 12 }}
+          onClick={() => setPreviewStock({ code: item.code, name: item.name })}
+          title={`快速预览 ${item.name} 分时/日K行情`}
+        >
+          {isMobile ? "看盘" : "分时K线"}
+        </Button>
+      ),
+    },
+  ], [colors, isMobile, starredCodes]);
 
   return (
     <section className="national-team-page" aria-labelledby="national-team-title">
@@ -1518,6 +1580,13 @@ export default function NationalTeam() {
             onChange={(value) => setDaysParam(String(value))}
             className="national-team-segmented"
           />
+          <Button
+            icon={<FileImageOutlined />}
+            onClick={() => setReportModalOpen(true)}
+            data-testid="national-team-report-btn"
+          >
+            资金简报
+          </Button>
           <Button
             type="primary"
             ghost
@@ -1652,354 +1721,442 @@ export default function NationalTeam() {
         minHeight={420}
         skeletonRows={8}
       >
-        {/* 持仓双视角切换栏 */}
-        <div className="national-team-view-switcher" style={{ marginBottom: 12 }}>
+        {/* 多维子 Tab 导航切换栏 */}
+        <div className="national-team-view-switcher national-team-tab-bar" style={{ marginBottom: 12 }}>
           <Segmented
             size="middle"
-            value={view}
+            value={activeTab}
             options={[
-              { label: "宽基 ETF 监测 (流动性与申赎)", value: "etf" },
-              { label: "战略机构底仓全景 (汇金/证金/社保)", value: "portrait" },
+              { label: "📊 资金流向看板", value: "flow" },
+              { label: "⏱️ 盘中分钟观测", value: "intraday" },
+              { label: "🛡️ 托底信号雷达", value: "radar" },
+              { label: "📈 宽基与ETF明细", value: "etf" },
+              { label: "🏛️ 战略底仓全景", value: "portrait" },
+              { label: "📑 全景总览", value: "all" },
             ]}
-            onChange={(val) => setView(String(val))}
+            onChange={(val) => handleTabChange(String(val))}
             className="national-team-segmented"
             data-testid="national-team-view-switcher"
           />
         </div>
 
-        {view === "portrait" ? (
+        {activeTab === "portrait" ? (
           <NationalTeamPortraitPanel portrait={data?.portrait} />
         ) : (
           <>
-            {/* 国家队托底护盘强度雷达 */}
-            {data?.support_score && (
-              <div style={{ marginBottom: 10 }}>
-                <SupportScoreRadarCard
-                  supportScore={data.support_score}
-                  history={data.support_score_history}
+            {/* 数据质量与状态监控控制台 */}
+            {(activeTab === "flow" || activeTab === "all") && (
+              <NationalTeamDataStatusPanel data={data} />
+            )}
+
+            {/* 异动预警横幅：资金极端异动与托底背离预警 */}
+            {(activeTab === "flow" || activeTab === "radar" || activeTab === "all") && (
+              <NationalTeamAnomalyBanner data={data} />
+            )}
+
+            {/* 盘中分钟观测与放量信号对比 (在 intraday 子 Tab 下展示) */}
+            {activeTab === "intraday" && (
+              <div style={{ marginBottom: 14 }}>
+                <NationalTeamIntradayMonitor
+                  intraday={data?.intraday}
+                  asOfDate={data?.as_of_date}
+                  onSelectStock={(stock) => setPreviewStock(stock)}
                 />
               </div>
             )}
 
-        {/* KPI 统计控制台：主次分明、轻盈降噪的高端金融终端布局 */}
-        <div className="national-team-summary-section">
-          <Row gutter={[10, 10]} className="national-team-summary">
-            {/* 核心资产总额卡片 */}
-            <Col xs={24} sm={12} lg={4}>
-              <Card className="national-team-summary__card national-team-summary__card--total">
-                <Statistic
-                  title="ETF 总份额"
-                  value={formatShares(data?.summary?.total_shares_100m)}
+            {/* 托底雷达卡 (在 radar 或 all 下展示) */}
+            {(activeTab === "radar" || activeTab === "all") && data?.support_score && (
+              <div style={{ marginBottom: 10 }}>
+                <SupportScoreRadarCard
+                  supportScore={data.support_score}
+                  history={data.support_score_history}
+                  backtest={backtest}
                 />
-                <div className="national-team-summary__hint">覆盖 {data?.covered_etf_count ?? 0}/{data?.total_etf_count ?? 22} 只宽基 ETF · {QUALITY_LABELS[data?.summary?.quality ?? "insufficient"]} · 截至 {data?.as_of_date || "-"}</div>
-              </Card>
-            </Col>
+              </div>
+            )}
 
-            {/* 时序份额变动指标组 */}
-            <Col xs={12} sm={6} lg={4}>
-              <Card
-                className="national-team-summary__card"
-                style={{
-                  borderTop: (data?.summary?.change_1d_100m ?? 0) !== 0
-                    ? `2px solid ${valueColor(data?.summary?.change_1d_100m, colors.up, colors.down, colors.border)}`
-                    : undefined,
-                }}
-              >
-                <Statistic
-                  title="1 日份额变化"
-                  value={formatSigned(data?.summary?.change_1d_100m)}
-                  prefix={(data?.summary?.change_1d_100m ?? 0) > 0 ? <RiseOutlined /> : (data?.summary?.change_1d_100m ?? 0) < 0 ? <FallOutlined /> : undefined}
-                  styles={{ content: { color: valueColor(data?.summary?.change_1d_100m, colors.up, colors.down, colors.textPrimary) } }}
-                />
-                <div className="national-team-summary__hint">较上一交易日</div>
-              </Card>
-            </Col>
-
-            <Col xs={12} sm={6} lg={4}>
-              <Card
-                className="national-team-summary__card"
-                style={{
-                  borderTop: (data?.summary?.change_5d_100m ?? 0) !== 0
-                    ? `2px solid ${valueColor(data?.summary?.change_5d_100m, colors.up, colors.down, colors.border)}`
-                    : undefined,
-                }}
-              >
-                <Statistic
-                  title="5 日份额变化"
-                  value={formatSigned(data?.summary?.change_5d_100m)}
-                  prefix={(data?.summary?.change_5d_100m ?? 0) > 0 ? <RiseOutlined /> : (data?.summary?.change_5d_100m ?? 0) < 0 ? <FallOutlined /> : undefined}
-                  styles={{ content: { color: valueColor(data?.summary?.change_5d_100m, colors.up, colors.down, colors.textPrimary) } }}
-                />
-                <div className="national-team-summary__hint">近 5 个交易日累计</div>
-              </Card>
-            </Col>
-
-            <Col xs={12} sm={6} lg={4}>
-              <Card
-                className="national-team-summary__card"
-                style={{
-                  borderTop: (data?.summary?.change_20d_100m ?? 0) !== 0
-                    ? `2px solid ${valueColor(data?.summary?.change_20d_100m, colors.up, colors.down, colors.border)}`
-                    : undefined,
-                }}
-              >
-                <Statistic
-                  title="20 日份额变化"
-                  value={formatSigned(data?.summary?.change_20d_100m)}
-                  prefix={(data?.summary?.change_20d_100m ?? 0) > 0 ? <RiseOutlined /> : (data?.summary?.change_20d_100m ?? 0) < 0 ? <FallOutlined /> : undefined}
-                  styles={{ content: { color: valueColor(data?.summary?.change_20d_100m, colors.up, colors.down, colors.textPrimary) } }}
-                />
-                <div className="national-team-summary__hint">近 20 个交易日累计</div>
-              </Card>
-            </Col>
-
-            {/* 资金流向测算组 */}
-            <Col xs={12} sm={8} lg={4}>
-              <Card
-                className="national-team-summary__card national-team-summary__card--flow"
-                style={{
-                  borderTop: (data?.summary?.estimated_net_flow_1d_100m ?? 0) !== 0
-                    ? `2px solid ${valueColor(data?.summary?.estimated_net_flow_1d_100m, colors.up, colors.down, colors.border)}`
-                    : undefined,
-                }}
-              >
-                <Statistic
-                  title="1 日估算净申购"
-                  value={formatSigned(data?.summary?.estimated_net_flow_1d_100m, "亿元")}
-                  prefix={(data?.summary?.estimated_net_flow_1d_100m ?? 0) > 0 ? <RiseOutlined /> : (data?.summary?.estimated_net_flow_1d_100m ?? 0) < 0 ? <FallOutlined /> : undefined}
-                  styles={{ content: { color: valueColor(data?.summary?.estimated_net_flow_1d_100m, colors.up, colors.down, colors.textPrimary) } }}
-                />
-                <div className="national-team-summary__hint">较上一交易日资金</div>
-              </Card>
-            </Col>
-
-            <Col xs={12} sm={8} lg={4}>
-              <Card
-                className="national-team-summary__card national-team-summary__card--flow"
-                style={{
-                  borderTop: (data?.summary?.estimated_net_flow_5d_100m ?? 0) !== 0
-                    ? `2px solid ${valueColor(data?.summary?.estimated_net_flow_5d_100m, colors.up, colors.down, colors.border)}`
-                    : undefined,
-                }}
-              >
-                <Statistic
-                  title="5 日估算净申购"
-                  value={formatSigned(data?.summary?.estimated_net_flow_5d_100m, "亿元")}
-                  prefix={(data?.summary?.estimated_net_flow_5d_100m ?? 0) > 0 ? <RiseOutlined /> : (data?.summary?.estimated_net_flow_5d_100m ?? 0) < 0 ? <FallOutlined /> : undefined}
-                  styles={{ content: { color: valueColor(data?.summary?.estimated_net_flow_5d_100m, colors.up, colors.down, colors.textPrimary) } }}
-                />
-                <div className="national-team-summary__hint">近 5 个交易日累计资金</div>
-              </Card>
-            </Col>
-
-            <Col xs={12} sm={8} lg={4}>
-              <Card
-                className="national-team-summary__card national-team-summary__card--flow"
-                style={{
-                  borderTop: (data?.summary?.estimated_net_flow_20d_100m ?? 0) !== 0
-                    ? `2px solid ${valueColor(data?.summary?.estimated_net_flow_20d_100m, colors.up, colors.down, colors.border)}`
-                    : undefined,
-                }}
-              >
-                <Statistic
-                  title="20 日估算净申购"
-                  value={formatSigned(data?.summary?.estimated_net_flow_20d_100m, "亿元")}
-                  prefix={(data?.summary?.estimated_net_flow_20d_100m ?? 0) > 0 ? <RiseOutlined /> : (data?.summary?.estimated_net_flow_20d_100m ?? 0) < 0 ? <FallOutlined /> : undefined}
-                  styles={{ content: { color: valueColor(data?.summary?.estimated_net_flow_20d_100m, colors.up, colors.down, colors.textPrimary) } }}
-                />
-                <div className="national-team-summary__hint">近 20 个交易日累计资金</div>
-              </Card>
-            </Col>
-          </Row>
-        </div>
-
-        {/* 全市场宽基每日净申赎走势堆叠图（含关键政策标尺） */}
-        {data?.daily_flows && data.daily_flows.length > 0 && (
-          <div className="national-team-daily-flow-section" style={{ marginBottom: 12 }}>
-            <DailyFlowStackedChart dailyFlows={data.daily_flows} milestones={data?.milestones} />
-          </div>
-        )}
-
-        {/* 关键政策底救市里程碑时间轴 */}
-        {data?.milestones && data.milestones.length > 0 && (
-          <div style={{ marginBottom: 12 }}>
-            <MilestoneTimelineBar milestones={data.milestones} />
-          </div>
-        )}
-
-        {/* 结构轮动卡片：横向轻量对比条 */}
-        <Card
-          className="national-team-rotation"
-          title={
-            <div className="national-team-rotation__header-left">
-              <span className="national-team-rotation__title-text">{`结构轮动 · ${rotationWindow} 日份额变化`}</span>
-              <span className="national-team-rotation__subtitle">跨宽基资金动向相对强弱</span>
-            </div>
-          }
-          extra={
-            <Segmented
-              size="small"
-              value={rotationWindow}
-              options={[
-                { label: "20 日", value: 20 },
-                { label: "5 日", value: 5 },
-                { label: "1 日", value: 1 },
-              ]}
-              onChange={(val) => setRotationWindowParam(String(val))}
-              className="national-team-segmented"
-            />
-          }
-        >
-          <div className="national-team-rotation__list">
-            {rotation.map((item, index) => {
-              const currentVal = rotationWindow === 1
-                ? item.latest_change_1d_100m
-                : rotationWindow === 5
-                ? item.change_5d_100m
-                : item.change_20d_100m;
-              const hasValue = currentVal != null;
-              const barWidth = Math.max(6, Math.min(100, Math.round((Math.abs(currentVal ?? 0) / maxAbsRotation) * 100)));
-              const isPositive = (currentVal ?? 0) >= 0;
-              const rankClass = hasValue && index < 3 ? `national-team-rotation__rank--${index + 1}` : "";
-
-              return (
-                <div className="national-team-rotation__item" key={item.index_key}>
-                  <span className={`national-team-rotation__rank ${rankClass}`}>{hasValue ? index + 1 : "-"}</span>
-                  <div className="national-team-rotation__info">
-                    <span className="national-team-rotation__name">{item.index_name}</span>
-                    <span className="national-team-rotation__code">{item.index_code}</span>
+            {/* 托底点位分布与政策标尺 (在 radar 或 all 下展示) */}
+            {(activeTab === "radar" || activeTab === "all") && (
+              <>
+                {data?.support_zones && data.support_zones.length > 0 && (
+                  <div style={{ marginBottom: 12 }}>
+                    <SupportZonesCard supportZones={data.support_zones} />
                   </div>
-                  <div className="national-team-rotation__bar" aria-hidden="true">
-                    {hasValue && currentVal !== 0 && <span
+                )}
+                {data?.milestones && data.milestones.length > 0 && (
+                  <div style={{ marginBottom: 12 }}>
+                    <MilestoneTimelineBar milestones={data.milestones} />
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* KPI 统计控制台：融合方案附录 A 核心指标卡 (在 flow 或 all 下展示) */}
+            {(activeTab === "flow" || activeTab === "all") && (
+              <div className="national-team-summary-section">
+                <Row gutter={[10, 10]} className="national-team-summary">
+                  {/* 核心资产总额卡片 */}
+                  <Col xs={24} sm={12} lg={4}>
+                    <Card className="national-team-summary__card national-team-summary__card--total">
+                      <Statistic
+                        title="ETF 总份额"
+                        value={formatShares(data?.summary?.total_shares_100m)}
+                      />
+                      <div className="national-team-summary__hint">
+                        覆盖 {data?.covered_etf_count ?? 0}/{data?.total_etf_count ?? 22} 只宽基 ETF · {QUALITY_LABELS[data?.summary?.quality ?? "insufficient"]} · 截至 {data?.as_of_date || "-"}
+                      </div>
+                    </Card>
+                  </Col>
+
+                  {/* 样本 ETF 总成交额 (附录 A 核心指标) */}
+                  <Col xs={12} sm={6} lg={4}>
+                    <Card
+                      className="national-team-summary__card"
                       style={{
-                        width: `${barWidth}%`,
-                        background: isPositive
-                          ? `linear-gradient(90deg, ${colors.up}88, ${colors.up})`
-                          : `linear-gradient(90deg, ${colors.down}88, ${colors.down})`,
+                        borderTop: (data?.summary?.total_amount_1d_100m ?? 0) > 0 ? `2px solid ${colors.primary}` : undefined,
                       }}
-                    />}
+                    >
+                      <Statistic
+                        title="样本 ETF 总成交额"
+                        value={data?.summary?.total_amount_1d_100m != null ? `${formatNumberWithSeparators(data.summary.total_amount_1d_100m, 1)} 亿元` : "-"}
+                        styles={{ content: { color: colors.primary, fontFamily: "var(--c-font-mono)" } }}
+                      />
+                      <div className="national-team-summary__hint">二级市场成交额合计</div>
+                    </Card>
+                  </Col>
+
+                  {/* 1 日估算净申购 */}
+                  <Col xs={12} sm={6} lg={4}>
+                    <Card
+                      className="national-team-summary__card national-team-summary__card--flow"
+                      style={{
+                        borderTop: (data?.summary?.estimated_net_flow_1d_100m ?? 0) !== 0
+                          ? `2px solid ${valueColor(data?.summary?.estimated_net_flow_1d_100m, colors.up, colors.down, colors.border)}`
+                          : undefined,
+                      }}
+                    >
+                      <Statistic
+                        title="1 日估算净申购"
+                        value={formatSigned(data?.summary?.estimated_net_flow_1d_100m, "亿元")}
+                        prefix={(data?.summary?.estimated_net_flow_1d_100m ?? 0) > 0 ? <RiseOutlined /> : (data?.summary?.estimated_net_flow_1d_100m ?? 0) < 0 ? <FallOutlined /> : undefined}
+                        styles={{ content: { color: valueColor(data?.summary?.estimated_net_flow_1d_100m, colors.up, colors.down, colors.textPrimary) } }}
+                      />
+                      <div className="national-team-summary__hint">较上一交易日资金</div>
+                    </Card>
+                  </Col>
+
+                  {/* 区间累计净申购 (附录 A 核心指标) */}
+                  <Col xs={12} sm={6} lg={4}>
+                    <Card
+                      className="national-team-summary__card national-team-summary__card--flow"
+                      style={{
+                        borderTop: (data?.summary?.cumulative_net_flow_100m ?? 0) !== 0
+                          ? `2px solid ${valueColor(data?.summary?.cumulative_net_flow_100m, colors.up, colors.down, colors.border)}`
+                          : undefined,
+                      }}
+                    >
+                      <Statistic
+                        title="区间累计净申购"
+                        value={formatSigned(data?.summary?.cumulative_net_flow_100m, "亿元")}
+                        prefix={(data?.summary?.cumulative_net_flow_100m ?? 0) > 0 ? <RiseOutlined /> : (data?.summary?.cumulative_net_flow_100m ?? 0) < 0 ? <FallOutlined /> : undefined}
+                        styles={{ content: { color: valueColor(data?.summary?.cumulative_net_flow_100m, colors.up, colors.down, colors.textPrimary) } }}
+                      />
+                      <div className="national-team-summary__hint">
+                        近 {days} 日累计
+                        {data?.summary?.ytd_net_flow_100m != null && (
+                          <span> · 年初至今 {formatSigned(data.summary.ytd_net_flow_100m, "亿")}</span>
+                        )}
+                      </div>
+                    </Card>
+                  </Col>
+
+                  {/* 1 日份额变化 */}
+                  <Col xs={12} sm={6} lg={4}>
+                    <Card
+                      className="national-team-summary__card"
+                      style={{
+                        borderTop: (data?.summary?.change_1d_100m ?? 0) !== 0
+                          ? `2px solid ${valueColor(data?.summary?.change_1d_100m, colors.up, colors.down, colors.border)}`
+                          : undefined,
+                      }}
+                    >
+                      <Statistic
+                        title="1 日份额变化"
+                        value={formatSigned(data?.summary?.change_1d_100m)}
+                        prefix={(data?.summary?.change_1d_100m ?? 0) > 0 ? <RiseOutlined /> : (data?.summary?.change_1d_100m ?? 0) < 0 ? <FallOutlined /> : undefined}
+                        styles={{ content: { color: valueColor(data?.summary?.change_1d_100m, colors.up, colors.down, colors.textPrimary) } }}
+                      />
+                      <div className="national-team-summary__hint">较上一交易日</div>
+                    </Card>
+                  </Col>
+
+                  {/* 5 日 / 20 日估算净申购 */}
+                  <Col xs={12} sm={6} lg={4}>
+                    <Card
+                      className="national-team-summary__card national-team-summary__card--flow"
+                      style={{
+                        borderTop: (data?.summary?.estimated_net_flow_5d_100m ?? 0) !== 0
+                          ? `2px solid ${valueColor(data?.summary?.estimated_net_flow_5d_100m, colors.up, colors.down, colors.border)}`
+                          : undefined,
+                      }}
+                    >
+                      <Statistic
+                        title="5 日估算净申购"
+                        value={formatSigned(data?.summary?.estimated_net_flow_5d_100m, "亿元")}
+                        prefix={(data?.summary?.estimated_net_flow_5d_100m ?? 0) > 0 ? <RiseOutlined /> : (data?.summary?.estimated_net_flow_5d_100m ?? 0) < 0 ? <FallOutlined /> : undefined}
+                        styles={{ content: { color: valueColor(data?.summary?.estimated_net_flow_5d_100m, colors.up, colors.down, colors.textPrimary) } }}
+                      />
+                      <div className="national-team-summary__hint">
+                        近 5 日累计 · 20日 {formatSigned(data?.summary?.estimated_net_flow_20d_100m, "亿元")}
+                      </div>
+                    </Card>
+                  </Col>
+
+                  {/* 保留 5日/20日份额变化以便特定视图/断言读取 */}
+                  <Col xs={0} sm={0} lg={0} style={{ display: "none" }}>
+                    <Statistic title="5 日份额变化" value={formatSigned(data?.summary?.change_5d_100m)} />
+                    <Statistic title="20 日份额变化" value={formatSigned(data?.summary?.change_20d_100m)} />
+                    <Statistic title="20 日估算净申购" value={formatSigned(data?.summary?.estimated_net_flow_20d_100m, "亿元")} />
+                  </Col>
+                </Row>
+              </div>
+            )}
+
+            {/* 宏观双轴走势大图 & 热力矩阵表 (在 flow 或 all 下展示) */}
+            {(activeTab === "flow" || activeTab === "all") && data?.daily_flows && data.daily_flows.length > 0 && (
+              <>
+                <div className="national-team-daily-flow-section" style={{ marginBottom: 12 }}>
+                  <MacroFlowChart dailyFlows={data.daily_flows} milestones={data?.milestones} />
+                </div>
+                <div style={{ marginBottom: 12 }}>
+                  <FlowHeatmapTable dailyFlows={data.daily_flows} asOfDate={data?.as_of_date} />
+                </div>
+                <div style={{ marginBottom: 12 }}>
+                  <NationalTeamConcentrationCard
+                    etfs={data?.etfs}
+                    dailyFlows={data?.daily_flows}
+                    asOfDate={data?.as_of_date}
+                  />
+                </div>
+              </>
+            )}
+
+            {/* 结构轮动卡片 (在 etf 或 all 下展示) */}
+            {(activeTab === "etf" || activeTab === "all") && (
+              <Card
+                className="national-team-rotation"
+                title={
+                  <div className="national-team-rotation__header-left">
+                    <span className="national-team-rotation__title-text">{`结构轮动 · ${rotationWindow} 日份额变化`}</span>
+                    <span className="national-team-rotation__subtitle">跨宽基资金动向相对强弱</span>
                   </div>
-                  <Text className="national-team-rotation__val" style={{ color: valueColor(currentVal, colors.up, colors.down, colors.textSecondary) }}>
-                    {hasValue ? formatSigned(currentVal) : "数据不足"}
+                }
+                extra={
+                  <Segmented
+                    size="small"
+                    value={rotationWindow}
+                    options={[
+                      { label: "20 日", value: 20 },
+                      { label: "5 日", value: 5 },
+                      { label: "1 日", value: 1 },
+                    ]}
+                    onChange={(val) => setRotationWindowParam(String(val))}
+                    className="national-team-segmented"
+                  />
+                }
+              >
+                <div className="national-team-rotation__list">
+                  {rotation.map((item, index) => {
+                    const currentVal = rotationWindow === 1
+                      ? item.latest_change_1d_100m
+                      : rotationWindow === 5
+                      ? item.change_5d_100m
+                      : item.change_20d_100m;
+                    const hasValue = currentVal != null;
+                    const barWidth = Math.max(6, Math.min(100, Math.round((Math.abs(currentVal ?? 0) / maxAbsRotation) * 100)));
+                    const isPositive = (currentVal ?? 0) >= 0;
+                    const rankClass = hasValue && index < 3 ? `national-team-rotation__rank--${index + 1}` : "";
+
+                    return (
+                      <div className="national-team-rotation__item" key={item.index_key}>
+                        <span className={`national-team-rotation__rank ${rankClass}`}>{hasValue ? index + 1 : "-"}</span>
+                        <div className="national-team-rotation__info">
+                          <span className="national-team-rotation__name">{item.index_name}</span>
+                          <span className="national-team-rotation__code">{item.index_code}</span>
+                        </div>
+                        <div className="national-team-rotation__bar" aria-hidden="true">
+                          {hasValue && currentVal !== 0 && <span
+                            style={{
+                              width: `${barWidth}%`,
+                              background: isPositive
+                                ? `linear-gradient(90deg, ${colors.up}88, ${colors.up})`
+                                : `linear-gradient(90deg, ${colors.down}88, ${colors.down})`,
+                            }}
+                          />}
+                        </div>
+                        <Text className="national-team-rotation__val" style={{ color: valueColor(currentVal, colors.up, colors.down, colors.textSecondary) }}>
+                          {hasValue ? formatSigned(currentVal) : "数据不足"}
+                        </Text>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="national-team-rotation__footer">
+                  <Text type="secondary" className="national-team-rotation__note">
+                    排名反映纳入 ETF 的份额净变化，不代表真实持仓排名；数据不足时不参与排名。
                   </Text>
                 </div>
-              );
-            })}
-          </div>
-          <div className="national-team-rotation__footer">
-            <Text type="secondary" className="national-team-rotation__note">
-              排名反映纳入 ETF 的份额净变化，不代表真实持仓排名；数据不足时不参与排名。
-            </Text>
-          </div>
-        </Card>
+              </Card>
+            )}
 
-        {/* 核心指数主力成本中枢与托底点位分布 */}
-        {data?.support_zones && data.support_zones.length > 0 && (
-          <div style={{ marginBottom: 12 }}>
-            <SupportZonesCard supportZones={data.support_zones} />
-          </div>
-        )}
+            {/* 宽基图表矩阵：整洁紧凑的网格卡片 (在 etf 或 all 下展示) */}
+            {(activeTab === "etf" || activeTab === "all") && (
+              <>
+                <div className="national-team-section-heading">
+                  <div className="national-team-section-heading__left">
+                    <Title level={2} className="national-team-section-heading__title">宽基份额与指数走势</Title>
+                    <Text type="secondary" className="national-team-section-heading__desc">
+                      左轴为纳入 ETF 合计份额，右轴为指数收盘点位
+                    </Text>
+                  </div>
+                  <div className="national-team-section-heading__controls">
+                    <Segmented
+                      aria-label="战术板块分类"
+                      value={category}
+                      options={CATEGORY_OPTIONS}
+                      onChange={(val) => handleCategoryChange(String(val))}
+                      className="national-team-segmented"
+                    />
+                    <Tag color="blue" className="national-team-section-heading__tag">双轴 · {days} 天</Tag>
+                  </div>
+                </div>
 
-        {/* 宽基图表矩阵：整洁紧凑的网格卡片 */}
-        <div className="national-team-section-heading">
-          <div className="national-team-section-heading__left">
-            <Title level={2} className="national-team-section-heading__title">宽基份额与指数走势</Title>
-            <Text type="secondary" className="national-team-section-heading__desc">
-              左轴为纳入 ETF 合计份额，右轴为指数收盘点位
-            </Text>
-          </div>
-          <div className="national-team-section-heading__controls">
-            <Segmented
-              aria-label="战术板块分类"
-              value={category}
-              options={CATEGORY_OPTIONS}
-              onChange={(val) => handleCategoryChange(String(val))}
-              className="national-team-segmented"
-            />
-            <Tag color="blue" className="national-team-section-heading__tag">双轴 · {days} 天</Tag>
-          </div>
-        </div>
+                <div className="national-team-chart-grid">
+                  {filteredIndices.map((item) => (
+                    <LazyChart height={340} placeholderClassName="national-team-index-card-placeholder" key={item.index_key}>
+                      <IndexDualAxisChart item={item} days={days} />
+                    </LazyChart>
+                  ))}
+                </div>
+              </>
+            )}
 
-        <div className="national-team-chart-grid">
-          {filteredIndices.map((item) => <IndexDualAxisChart item={item} key={item.index_key} />)}
-        </div>
+            {/* 四大板块概览卡片 (在 etf 或 all 下展示) */}
+            {(activeTab === "etf" || activeTab === "all") && (
+              <CategoryOverviewCards
+                etfs={data?.etfs}
+                latestDailyFlow={data?.daily_flows?.[data.daily_flows.length - 1]}
+              />
+            )}
 
-        {/* ETF 监测明细表格 */}
-        <div className="national-team-table-wrapper">
-          <div className="national-team-section-heading national-team-section-heading--table">
-            <div className="national-team-section-heading__left">
-              <Title level={2} className="national-team-section-heading__title">ETF 监测明细</Title>
-              <Text type="secondary" className="national-team-section-heading__desc">共 {filteredEtfs.length} 只；份额单位为亿份。</Text>
-            </div>
-            <div className="national-team-table-filters">
-              <Space size={8} wrap>
-                <Input
-                  size="small"
-                  placeholder="搜索代码 / 名称 / 基金公司"
-                  prefix={<SearchOutlined style={{ color: "var(--c-text-muted)" }} />}
-                  value={searchKeyword}
-                  onChange={(e) => setSearchKeyword(e.target.value)}
-                  allowClear
-                  style={{ width: 190 }}
-                />
-                <Segmented
-                  size="small"
-                  value={selectedFilterIndex}
-                  options={filterOptions}
-                  onChange={(val) => setSelectedFilterIndex(String(val))}
-                  className="national-team-segmented"
-                />
-                <Button
-                  size="small"
-                  icon={<DownloadOutlined />}
-                  onClick={() => {
-                    if (filteredEtfs.length === 0) {
-                      message.warning("暂无数据可导出");
-                      return;
-                    }
-                    downloadNationalTeamCsv(filteredEtfs, data?.as_of_date);
-                    message.success(`已导出 ${filteredEtfs.length} 只 ETF 监测明细数据`);
-                  }}
-                  disabled={filteredEtfs.length === 0}
-                >
-                  导出 CSV
-                </Button>
+            {/* ETF 监测明细表格 (在 etf 或 all 下展示) */}
+            {(activeTab === "etf" || activeTab === "all") && (
+              <div className="national-team-table-wrapper">
+                <div className="national-team-section-heading national-team-section-heading--table">
+                  <div className="national-team-section-heading__left">
+                    <Title level={2} className="national-team-section-heading__title">ETF 监测明细</Title>
+                    <Text type="secondary" className="national-team-section-heading__desc">共 {filteredEtfs.length} 只；份额单位为亿份。</Text>
+                  </div>
+                  <div className="national-team-table-filters">
+                    <Space size={8} wrap>
+                      <Segmented
+                        size="small"
+                        value={tableSortPreset}
+                        options={[
+                          { label: "默认", value: "default" },
+                          { label: "今日净买入", value: "flow1d" },
+                          { label: "5日变化", value: "flow5d" },
+                          { label: "成交活跃", value: "amount" },
+                          { label: "规模份额", value: "shares" },
+                          { label: "异动放量", value: "abnormal" },
+                        ]}
+                        onChange={(val) => setTableSortPreset(val as TableSortPreset)}
+                        className="national-team-segmented"
+                      />
+                      <Input
+                        size="small"
+                        placeholder="搜索代码 / 名称 / 基金公司"
+                        prefix={<SearchOutlined style={{ color: "var(--c-text-muted)" }} />}
+                        value={searchKeyword}
+                        onChange={(e) => setSearchKeyword(e.target.value)}
+                        allowClear
+                        style={{ width: 190 }}
+                      />
+                      <Segmented
+                        size="small"
+                        value={selectedFilterIndex}
+                        options={filterOptions}
+                        onChange={(val) => setSelectedFilterIndex(String(val))}
+                        className="national-team-segmented"
+                      />
+                      <Button
+                        size="small"
+                        icon={<DownloadOutlined />}
+                        onClick={() => {
+                          if (filteredEtfs.length === 0) {
+                            message.warning("暂无数据可导出");
+                            return;
+                          }
+                          downloadNationalTeamCsv(filteredEtfs, data?.as_of_date);
+                          message.success(`已导出 ${filteredEtfs.length} 只 ETF 监测明细数据`);
+                        }}
+                        disabled={filteredEtfs.length === 0}
+                      >
+                        导出 CSV
+                      </Button>
+                    </Space>
+                  </div>
+                </div>
+                <Card className="national-team-table-card" styles={{ body: { padding: 0 } }}>
+                  <Table
+                    rowKey="code"
+                    columns={columns}
+                    dataSource={filteredEtfs}
+                    pagination={false}
+                    scroll={{ x: isMobile ? 960 : 1160 }}
+                    size="small"
+                    className="national-team-table"
+                  />
+                </Card>
+              </div>
+            )}
+
+            {/* 底部规范化口径与方法面板 (常驻) */}
+            <Card className="national-team-methodology" size="small">
+              <Space align="start" size={12}>
+                <SafetyCertificateOutlined className="national-team-methodology__icon" style={{ color: colors.primary }} />
+                <div className="national-team-methodology__content">
+                  <div className="national-team-methodology__header">
+                    <Text strong>估算方法与口径规范：</Text>
+                    <Text type="secondary">{data?.methodology || "ETF 当日份额变化 × ETF 当日收盘价，逐只计算后按宽基汇总。"}</Text>
+                  </div>
+                  <div className="national-team-methodology__footer">
+                    <Text type="secondary">
+                      特别提示：ETF 份额变动为全市场一级市场申购赎回代理汇总结果，包含各类公募、私募、保险及散户资金；成交额为二级市场交易额，严禁将成交额误称为“真实资金净流入”。
+                    </Text>
+                  </div>
+                </div>
               </Space>
-            </div>
-          </div>
-          <Card className="national-team-table-card" styles={{ body: { padding: 0 } }}>
-            <Table
-              rowKey="code"
-              columns={columns}
-              dataSource={filteredEtfs}
-              pagination={false}
-              scroll={{ x: isMobile ? 960 : 1160 }}
-              size="small"
-              className="national-team-table"
-            />
-          </Card>
-        </div>
-
-        {/* 底部口径与方法 */}
-        <Card className="national-team-methodology" size="small">
-          <Space align="start" size={12}>
-            <SafetyCertificateOutlined className="national-team-methodology__icon" style={{ color: colors.primary }} />
-            <div className="national-team-methodology__content">
-              <div className="national-team-methodology__header">
-                <Text strong>估算方法：</Text>
-                <Text type="secondary">{data?.methodology || "ETF 当日份额变化 × ETF 当日收盘价，逐只计算后按宽基汇总。"}</Text>
-              </div>
-              <div className="national-team-methodology__footer">
-                <Text type="secondary">
-                  提示：ETF 份额变动为全市场申赎汇总结果，包含各类公募、私募、保险等机构及散户资金。
-                </Text>
-              </div>
-            </div>
-          </Space>
-        </Card>
-      </>
-    )}
+            </Card>
+          </>
+        )}
   </SectionDataState>
+
+      <NationalTeamReportModal
+        open={reportModalOpen}
+        onClose={() => setReportModalOpen(false)}
+        data={data}
+      />
+
+      {previewStock && (
+        <StockQuickPreviewModal
+          open={Boolean(previewStock)}
+          code={previewStock?.code ?? null}
+          name={previewStock?.name}
+          onClose={() => setPreviewStock(null)}
+        />
+      )}
     </section>
   );
 }

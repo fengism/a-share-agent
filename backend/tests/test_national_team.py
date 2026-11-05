@@ -1,6 +1,6 @@
 import asyncio
 import time
-from datetime import datetime
+from datetime import date, datetime, timedelta
 
 import pytest
 
@@ -48,10 +48,15 @@ def test_build_national_team_response_daily_flows():
         "csi300": {"2026-09-15": 3800.0, "2026-09-16": 3850.0},
         "csi_a500": {"2026-09-15": 4200.0, "2026-09-16": 4250.0},
     }
+    etf_amount_history = {
+        "510300": {"2026-09-15": 10.0, "2026-09-16": 15.0},
+        "560510": {"2026-09-15": 2.0, "2026-09-16": 3.0},
+    }
 
     response = build_national_team_response(
         share_history=share_history,
         etf_close_history=etf_close_history,
+        etf_amount_history=etf_amount_history,
         index_close_history=index_close_history,
         fetched_at="2026-09-16T18:00:00+08:00",
         requested_days=30,
@@ -67,10 +72,18 @@ def test_build_national_team_response_daily_flows():
     assert flow_pt.date == "2026-09-16"
     assert flow_pt.total_flow_100m == pytest.approx(0.82)
     assert flow_pt.total_shares_change_100m == pytest.approx(0.3)
+    assert flow_pt.total_amount_100m == pytest.approx(18.0)
+    assert flow_pt.cumulative_flow_100m == pytest.approx(0.82)
+    assert flow_pt.benchmark_close == pytest.approx(3850.0)
     assert flow_pt.flows_by_index.get("沪深300") == pytest.approx(0.72)
     assert flow_pt.flows_by_index.get("中证A500") == pytest.approx(0.1)
     assert flow_pt.flows_by_category.get("core_broad") == pytest.approx(0.72)
     assert flow_pt.flows_by_category.get("a500") == pytest.approx(0.1)
+    assert response.summary.total_amount_1d_100m == pytest.approx(18.0)
+    assert response.summary.cumulative_net_flow_100m == pytest.approx(0.82)
+    assert response.summary.ytd_net_flow_100m == pytest.approx(0.82)
+    assert response.summary.top_flow_category == "core_broad"
+    assert response.summary.top_flow_index == "沪深300"
 
 
 def test_build_national_team_response_support_score_and_zones():
@@ -568,8 +581,8 @@ def test_national_team_route_sets_etag_and_returns_304(monkeypatch):
     )
     seen: list[bool] = []
 
-    async def fake_service(days, *, include_etf_points=True):
-        seen.append(include_etf_points)
+    async def fake_service(days, *, include_etf_points=True, include_index_points=True, include_flow_breakdown=True):
+        seen.append((include_etf_points, include_index_points, include_flow_breakdown))
         return payload
 
     monkeypatch.setattr(quotes_route, "get_national_team_etf_holdings_service", fake_service)
@@ -577,11 +590,11 @@ def test_national_team_route_sets_etag_and_returns_304(monkeypatch):
     response = Response()
     result = asyncio.run(
         quotes_route.get_national_team_etf_holdings(
-            _http_request(), response, days=120, include_etf_points=False
+            _http_request(), response, days=120, include_etf_points=False, include_index_points=True, include_flow_breakdown=True
         )
     )
     assert result is payload
-    assert seen == [False]
+    assert seen == [(False, True, True)]
     etag = response.headers["etag"]
     assert etag.startswith('"') and etag.endswith('"')
     assert response.headers["cache-control"].startswith("private, max-age=")
@@ -592,6 +605,8 @@ def test_national_team_route_sets_etag_and_returns_304(monkeypatch):
             Response(),
             days=120,
             include_etf_points=False,
+            include_index_points=True,
+            include_flow_breakdown=True,
         )
     )
     assert isinstance(not_modified, Response)
@@ -747,3 +762,463 @@ def test_get_national_team_overview_reuses_full_response(monkeypatch):
     overview = asyncio.run(nt.get_national_team_overview(120))
     assert calls == [120]
     assert overview.support_score.score == full.support_score.score
+
+
+def test_build_support_backtest_uses_future_closes():
+    from app.financial_data.market.quotes.national_team import build_support_backtest
+
+    rows = [
+        {
+            "date": f"2026-01-{index + 1:02d}",
+            "status": "active" if index % 2 == 0 else "moderate",
+            # 每日 +1 点，5 日 = +5%，20 日 = +20%。
+            "csi300_close": 100.0 + index,
+        }
+        for index in range(30)
+    ]
+
+    result = build_support_backtest(rows, window_samples=365)
+
+    def mean_return(horizon: int, predicate=lambda index: True) -> float:
+        values = [
+            ((100.0 + index + horizon) / (100.0 + index) - 1) * 100
+            for index in range(len(rows) - horizon)
+            if predicate(index)
+        ]
+        return sum(values) / len(values)
+
+    assert result.sample_days == 30
+    assert result.as_of_date == "2026-01-30"
+    five, twenty = result.horizons
+    assert (five.days, five.samples) == (5, 25)
+    assert five.avg_return_pct == pytest.approx(mean_return(5), abs=0.01)
+    assert five.win_rate_pct == pytest.approx(100.0)
+    assert (twenty.days, twenty.samples) == (20, 10)
+    assert twenty.avg_return_pct == pytest.approx(mean_return(20), abs=0.01)
+
+    by_status = {item.status: item for item in result.by_status}
+    assert set(by_status) == {"neutral", "moderate", "active", "strong"}
+    assert by_status["active"].samples == 5
+    assert by_status["active"].avg_return_20d_pct == pytest.approx(
+        mean_return(20, lambda index: index % 2 == 0), abs=0.01
+    )
+    assert by_status["neutral"].samples == 0
+    assert by_status["neutral"].avg_return_20d_pct is None
+
+
+def test_build_support_backtest_skips_missing_closes_and_flags_small_samples():
+    from app.financial_data.market.quotes.national_team import build_support_backtest
+
+    rows = [
+        {"date": f"2026-02-{index + 1:02d}", "status": "active", "csi300_close": None if index == 3 else 100.0 + index}
+        for index in range(10)
+    ]
+
+    result = build_support_backtest(rows, window_samples=365)
+
+    assert result.sample_days == 9
+    assert result.horizons[0].samples == 4  # 只有 9 个有效收盘，5 日样本 4 个
+    assert "样本不足" in result.note
+
+
+def test_support_score_rows_pair_csi300_close():
+    from app.financial_data.market.quotes.national_team import _support_score_rows
+
+    dates = ["2026-09-15", "2026-09-16"]
+    members = ["510300", "510310", "510330", "159919"]
+    response = build_national_team_response(
+        share_history={code: {dates[0]: 100_000_000, dates[1]: 110_000_000} for code in members},
+        etf_close_history={code: {dates[0]: 3.5, dates[1]: 3.6} for code in members},
+        index_close_history={"csi300": {dates[0]: 3800.0, dates[1]: 3850.0}},
+        fetched_at="2026-09-16T18:00:00+08:00",
+        requested_days=30,
+        expected_trading_dates=dates,
+    )
+
+    rows = _support_score_rows(response)
+
+    assert [row[0] for row in rows] == dates
+    assert rows[-1][5] == pytest.approx(3850.0)
+    assert rows[-1][1] == response.support_score_history[-1].score
+
+
+def test_without_index_points_keeps_scalars_and_other_series():
+    from app.financial_data.market.quotes.national_team import without_index_points
+
+    dates = ["2026-09-15", "2026-09-16"]
+    members = ["510300", "510310", "510330", "159919"]
+    full = build_national_team_response(
+        share_history={code: {dates[0]: 100_000_000, dates[1]: 110_000_000} for code in members},
+        etf_close_history={code: {dates[0]: 3.5, dates[1]: 3.6} for code in members},
+        index_close_history={"csi300": {dates[0]: 3800.0, dates[1]: 3850.0}},
+        fetched_at="2026-09-16T18:00:00+08:00",
+        requested_days=30,
+        expected_trading_dates=dates,
+    )
+
+    trimmed = without_index_points(full)
+
+    assert trimmed.index_points_included is False
+    assert all(item.points == [] for item in trimmed.indices)
+    assert any(item.points for item in full.indices)
+    for original, stripped in zip(full.indices, trimmed.indices, strict=True):
+        assert stripped.index_key == original.index_key
+        assert stripped.latest_date == original.latest_date
+        assert stripped.latest_change_1d_100m == original.latest_change_1d_100m
+        assert stripped.change_5d_100m == original.change_5d_100m
+        assert stripped.estimated_net_flow_1d_100m == original.estimated_net_flow_1d_100m
+        assert stripped.coverage_ratio == original.coverage_ratio
+    # 其它序列不能被连带清空。
+    assert trimmed.summary == full.summary
+    assert trimmed.daily_flows == full.daily_flows
+    assert trimmed.support_score == full.support_score
+    assert trimmed.support_zones == full.support_zones
+
+
+def test_get_national_team_index_series_reuses_full_response(monkeypatch):
+    from app.financial_data.market.quotes import national_team as nt
+
+    dates = ["2026-09-15", "2026-09-16"]
+    members = ["510300", "510310", "510330", "159919"]
+    full = build_national_team_response(
+        share_history={code: {dates[0]: 100_000_000, dates[1]: 110_000_000} for code in members},
+        etf_close_history={code: {dates[0]: 3.5, dates[1]: 3.6} for code in members},
+        index_close_history={"csi300": {dates[0]: 3800.0, dates[1]: 3850.0}},
+        fetched_at="2026-09-16T18:00:00+08:00",
+        requested_days=30,
+        expected_trading_dates=dates,
+    )
+
+    async def fake_resolve(days):
+        assert days == 120
+        return full
+
+    monkeypatch.setattr(nt, "_resolve_response", fake_resolve)
+
+    indices = asyncio.run(nt.get_national_team_index_series(120))
+    assert indices is full.indices
+    assert any(item.points for item in indices)
+
+
+def test_without_flow_breakdown_keeps_totals_and_categories():
+    from app.financial_data.market.quotes.national_team import without_flow_breakdown
+
+    dates = ["2026-09-15", "2026-09-16"]
+    members = ["510300", "510310", "510330", "159919"]
+    full = build_national_team_response(
+        share_history={code: {dates[0]: 100_000_000, dates[1]: 110_000_000} for code in members},
+        etf_close_history={code: {dates[0]: 3.5, dates[1]: 3.6} for code in members},
+        index_close_history={"csi300": {dates[0]: 3800.0, dates[1]: 3850.0}},
+        fetched_at="2026-09-16T18:00:00+08:00",
+        requested_days=30,
+        expected_trading_dates=dates,
+    )
+
+    trimmed = without_flow_breakdown(full)
+
+    assert trimmed.flow_breakdown_included is False
+    assert all(flow.flows_by_index == {} for flow in trimmed.daily_flows)
+    assert any(flow.flows_by_index for flow in full.daily_flows)
+    assert [flow.total_flow_100m for flow in trimmed.daily_flows] == [
+        flow.total_flow_100m for flow in full.daily_flows
+    ]
+    assert [flow.flows_by_category for flow in trimmed.daily_flows] == [
+        flow.flows_by_category for flow in full.daily_flows
+    ]
+
+
+def test_get_national_team_index_series_item_filters_and_returns_none(monkeypatch):
+    from app.financial_data.market.quotes import national_team as nt
+
+    dates = ["2026-09-15", "2026-09-16"]
+    members = ["510300", "510310", "510330", "159919"]
+    full = build_national_team_response(
+        share_history={code: {dates[0]: 100_000_000, dates[1]: 110_000_000} for code in members},
+        etf_close_history={code: {dates[0]: 3.5, dates[1]: 3.6} for code in members},
+        index_close_history={"csi300": {dates[0]: 3800.0, dates[1]: 3850.0}},
+        fetched_at="2026-09-16T18:00:00+08:00",
+        requested_days=30,
+        expected_trading_dates=dates,
+    )
+
+    async def fake_resolve(days):
+        assert days == 120
+        return full
+
+    monkeypatch.setattr(nt, "_resolve_response", fake_resolve)
+
+    item = asyncio.run(nt.get_national_team_index_series_item("csi300", 120))
+    assert item is not None
+    assert item.index_key == "csi300"
+    assert item.points
+    assert asyncio.run(nt.get_national_team_index_series_item("nope", 120)) is None
+
+
+def test_score_percentile_needs_minimum_samples():
+    from app.financial_data.market.quotes.national_team_aggregation import _score_percentile
+    from app.financial_data.market.quotes.schemas import NationalTeamSupportHistoryPoint
+
+    history = [
+        NationalTeamSupportHistoryPoint(
+            date=f"2026-09-{index + 1:02d}", score=float(index), status="neutral", confidence=0.9
+        )
+        for index in range(60)
+    ]
+
+    assert _score_percentile(history, 59.0) == pytest.approx(99.2)
+    assert _score_percentile(history, 29.5) == pytest.approx(50.0)
+    assert _score_percentile(history, 0.0) == pytest.approx(0.8)
+    # 全平时是 50 分位，而不是 100。
+    flat = [
+        NationalTeamSupportHistoryPoint(
+            date=f"2026-10-{index + 1:02d}", score=60.0, status="active", confidence=0.9
+        )
+        for index in range(60)
+    ]
+    assert _score_percentile(flat, 60.0) == pytest.approx(50.0)
+    # 少于 60 个样本不硬凑 60 日分位。
+    assert _score_percentile(history[:59], 58.0) is None
+
+
+def test_build_response_fills_score_percentile_when_history_is_enough():
+    from app.financial_data.market.quotes.national_team import ETF_POOL, INDEX_POOL
+
+    dates = [(date(2026, 1, 1) + timedelta(days=index)).isoformat() for index in range(70)]
+    members = list(ETF_POOL)
+    response = build_national_team_response(
+        share_history={
+            code: {day: 100_000_000 + index * 5_000_000 for index, day in enumerate(dates)}
+            for code in members
+        },
+        etf_close_history={code: {day: 3.5 for day in dates} for code in members},
+        index_close_history={key: {day: 3500.0 + index * 10 for index, day in enumerate(dates)} for key in INDEX_POOL},
+        fetched_at="2026-09-12T18:00:00+08:00",
+        requested_days=30,
+        expected_trading_dates=dates,
+    )
+
+    assert response.support_score.percentile_60d is not None
+    assert 0.0 <= response.support_score.percentile_60d <= 100.0
+
+
+def test_support_score_store_upserts_and_keeps_known_close():
+    from app.infrastructure.persistence import national_team_etf_store as store
+
+    dates = ["2099-01-01", "2099-01-02", "2099-01-03"]
+    store.save_support_scores(
+        [
+            (dates[0], 40.0, "moderate", 0.9, 1.0, 3500.0),
+            (dates[1], 55.0, "moderate", 0.9, 1.0, 3550.0),
+            (dates[2], 70.0, "active", 0.8, 0.9, 3600.0),
+        ]
+    )
+
+    rows = store.load_support_scores(since=dates[0])
+    ours = [row for row in rows if row["date"] in dates]
+    assert [row["date"] for row in ours] == dates
+    assert ours[1]["score"] == pytest.approx(55.0)
+    assert ours[2]["csi300_close"] == pytest.approx(3600.0)
+
+    # 同日重算但当天没有指数收盘：不能把已知收盘抹掉。
+    store.save_support_scores([(dates[1], 58.0, "moderate", 0.95, 1.0, None)])
+    updated = {row["date"]: row for row in store.load_support_scores(since=dates[0])}
+    assert updated[dates[1]]["score"] == pytest.approx(58.0)
+    assert updated[dates[1]]["confidence"] == pytest.approx(0.95)
+    assert updated[dates[1]]["csi300_close"] == pytest.approx(3550.0)
+
+    # 只取最近 N 条时按日期升序返回尾部。
+    assert [row["date"] for row in store.load_support_scores(since=dates[0], limit=2)] == dates[1:]
+
+    with pytest.raises(ValueError):
+        store.save_support_scores([("2099-01-04", 50.0, "unknown", 0.9, 1.0, None)])
+
+
+def test_missing_breadth_is_neutral_not_zero():
+    """当天分类资金流尚未出来时，扩散因子应给中性分而不是 0。"""
+    dates = ["2026-09-16"]
+    members = ["510300", "510310", "510330", "159919"]
+    response = build_national_team_response(
+        share_history={code: {dates[0]: 100_000_000} for code in members},
+        etf_close_history={code: {dates[0]: 3.5} for code in members},
+        index_close_history={"csi300": {dates[0]: 3800.0}},
+        fetched_at="2026-09-16T18:00:00+08:00",
+        requested_days=30,
+        expected_trading_dates=dates,
+    )
+
+    assert response.daily_flows[-1].total_flow_100m is None
+    assert response.support_score.breadth_factor == pytest.approx(15.0)
+
+
+def test_backtest_filters_low_confidence_and_coverage():
+    from app.financial_data.market.quotes.national_team import build_support_backtest
+
+    rows = [
+        {
+            "date": f"2026-03-{index + 1:02d}",
+            "status": "active",
+            "confidence": 0.9,
+            "coverage_ratio": 1.0,
+            "csi300_close": 100.0 + index,
+        }
+        for index in range(30)
+    ]
+    for row in rows[:5]:
+        row["confidence"] = 0.2
+    for row in rows[5:9]:
+        row["coverage_ratio"] = 0.2
+
+    result = build_support_backtest(rows, window_samples=365)
+
+    assert result.excluded_low_confidence == 5
+    assert result.excluded_low_coverage == 4
+    assert result.sample_days == 21
+    assert result.first_sample_date == rows[9]["date"]
+    assert result.last_sample_date == rows[-1]["date"]
+    assert result.horizons[1].samples == 1
+    assert "20 日样本不足" in result.note
+
+
+def test_overview_and_backtest_routes_support_conditional_requests(monkeypatch):
+    from starlette.responses import Response
+
+    from app.api.routes.market_sections import quotes as quotes_route
+    from app.financial_data.market.quotes.national_team import (
+        build_national_team_overview,
+        build_support_backtest,
+    )
+
+    dates = ["2026-09-15", "2026-09-16"]
+    members = ["510300", "510310", "510330", "159919"]
+    full = build_national_team_response(
+        share_history={code: {dates[0]: 100_000_000, dates[1]: 110_000_000} for code in members},
+        etf_close_history={code: {dates[0]: 3.5, dates[1]: 3.6} for code in members},
+        index_close_history={"csi300": {dates[0]: 3800.0, dates[1]: 3850.0}},
+        fetched_at="2026-09-16T18:00:00+08:00",
+        requested_days=30,
+        expected_trading_dates=dates,
+    )
+    overview = build_national_team_overview(full)
+    backtest = build_support_backtest(
+        [
+            {"date": f"2026-04-{index + 1:02d}", "status": "active", "confidence": 0.9, "coverage_ratio": 1.0, "csi300_close": 100.0 + index}
+            for index in range(30)
+        ]
+    )
+
+    async def fake_overview(days):
+        return overview
+
+    async def fake_backtest(days):
+        return backtest
+
+    monkeypatch.setattr(quotes_route, "get_national_team_overview_service", fake_overview)
+    monkeypatch.setattr(quotes_route, "get_national_team_backtest_service", fake_backtest)
+
+    overview_response = Response()
+    assert asyncio.run(
+        quotes_route.get_national_team_overview(_http_request(), overview_response, days=120)
+    ) is overview
+    overview_etag = overview_response.headers["etag"]
+    assert overview_response.headers["cache-control"].startswith("private, max-age=")
+
+    not_modified = asyncio.run(
+        quotes_route.get_national_team_overview(
+            _http_request([(b"if-none-match", overview_etag.encode())]),
+            Response(),
+            days=120,
+        )
+    )
+    assert isinstance(not_modified, Response)
+    assert not_modified.status_code == 304
+
+    backtest_response = Response()
+    assert asyncio.run(
+        quotes_route.get_national_team_backtest(_http_request(), backtest_response, days=365)
+    ) is backtest
+    assert backtest_response.headers["etag"].startswith('"')
+    assert backtest_response.headers["cache-control"] == "private, max-age=300"
+
+
+def test_market_migration_15_creates_support_scores_table_on_upgrade():
+    """旧库（迁移前已有基础表）升级时，迁移 15 必须补出评分表，且可重复执行。"""
+    import sqlite3
+
+    from app.infrastructure.persistence import ddl, migrations
+
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    # 模拟迁移前的老库：除评分表以外的基础表都已存在。
+    for statement in ddl.MARKET_TABLES:
+        if "national_team_support_scores" in statement:
+            continue
+        conn.execute(statement)
+    assert (
+        conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='national_team_support_scores'"
+        ).fetchone()
+        is None
+    )
+
+    migrations.apply_migrations(conn, migrations.MARKET_MIGRATIONS)
+
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(national_team_support_scores)")}
+    assert columns == {"date", "score", "status", "confidence", "coverage_ratio", "csi300_close", "updated_at"}
+    assert conn.execute("SELECT 1 FROM schema_migrations WHERE version = 15").fetchone() is not None
+
+    # 再跑一次不能报错，也不能重复插入迁移记录。
+    migrations.apply_migrations(conn, migrations.MARKET_MIGRATIONS)
+    count = conn.execute("SELECT COUNT(*) FROM schema_migrations WHERE version = 15").fetchone()[0]
+    assert count == 1
+
+
+def test_backtest_cache_is_invalidated_after_scores_are_saved(monkeypatch):
+    """评分落库后必须让回测缓存失效，否则新样本要等 5 分钟才生效。"""
+    from app.core.cache import market_cache
+    from app.financial_data.market.quotes import national_team as nt
+
+    rows = [
+        {
+            "date": "2026-05-01",
+            "score": 62.0,
+            "status": "active",
+            "confidence": 0.9,
+            "coverage_ratio": 1.0,
+            "csi300_close": 3800.0,
+        }
+    ]
+    saved: list[list[dict]] = []
+
+    async def fake_call_blocking(func, *, semaphore):  # noqa: ANN001
+        return func()
+
+    monkeypatch.setattr(nt, "call_blocking", fake_call_blocking)
+    monkeypatch.setattr(nt, "_support_score_rows", lambda response: rows)
+    monkeypatch.setattr(nt.national_team_etf_store, "save_support_scores", lambda payload: saved.append(payload))
+
+    cache_key = f"{nt._BACKTEST_CACHE_PREFIX}365"
+    market_cache.set(cache_key, {"sentinel": True}, ttl=300)
+
+    asyncio.run(nt._record_support_scores(object()))
+
+    assert saved == [rows]
+    assert market_cache.get(cache_key) is None
+
+
+def test_backtest_cache_survives_persist_failure(monkeypatch):
+    """落库失败时不能清缓存，否则每次请求都要重新算一遍回测。"""
+    from app.core.cache import market_cache
+    from app.financial_data.market.quotes import national_team as nt
+
+    async def fake_call_blocking(func, *, semaphore):  # noqa: ANN001
+        raise RuntimeError("db locked")
+
+    monkeypatch.setattr(nt, "call_blocking", fake_call_blocking)
+    monkeypatch.setattr(nt, "_support_score_rows", lambda response: [{"date": "2026-05-01"}])
+
+    cache_key = f"{nt._BACKTEST_CACHE_PREFIX}365"
+    market_cache.set(cache_key, {"sentinel": True}, ttl=300)
+
+    asyncio.run(nt._record_support_scores(object()))
+
+    assert market_cache.get(cache_key) == {"sentinel": True}

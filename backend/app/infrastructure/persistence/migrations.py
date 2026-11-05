@@ -713,6 +713,12 @@ def _add_national_team_etf_tables(conn: sqlite3.Connection) -> None:
     )
 
 
+def _add_national_team_support_scores(conn: sqlite3.Connection) -> None:
+    from app.infrastructure.persistence.ddl import NATIONAL_TEAM_SUPPORT_SCORES_TABLE
+
+    conn.execute(NATIONAL_TEAM_SUPPORT_SCORES_TABLE)
+
+
 def _add_sector_constituent_tables(conn: sqlite3.Connection) -> None:
     statements = (
         """
@@ -782,6 +788,7 @@ MARKET_MIGRATIONS = (
     Migration(12, "add national team provenance", _add_national_team_provenance),
     Migration(13, "add macro analysis cache", _add_macro_analysis_cache),
     Migration(14, "repair twitter refresh state timezone", _repair_twitter_refresh_state_timezone),
+    Migration(15, "add national team support scores", _add_national_team_support_scores),
 )
 
 def _add_stock_concepts_tables(conn: sqlite3.Connection) -> None:

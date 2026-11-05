@@ -17094,8 +17094,225 @@
         "title": "MutationResponse",
         "type": "object"
       },
+      "NationalTeamBacktestHorizon": {
+        "description": "某个持有期的后验表现（信号日之后第 N 个交易日）。",
+        "properties": {
+          "avg_return_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Return Pct"
+          },
+          "best_return_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Best Return Pct"
+          },
+          "days": {
+            "title": "Days",
+            "type": "integer"
+          },
+          "median_return_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Median Return Pct"
+          },
+          "samples": {
+            "title": "Samples",
+            "type": "integer"
+          },
+          "win_rate_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Win Rate Pct"
+          },
+          "worst_return_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Worst Return Pct"
+          }
+        },
+        "required": [
+          "days",
+          "samples"
+        ],
+        "title": "NationalTeamBacktestHorizon",
+        "type": "object"
+      },
+      "NationalTeamBacktestStatus": {
+        "description": "按信号强度分组的后验表现。",
+        "properties": {
+          "avg_return_20d_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Return 20D Pct"
+          },
+          "avg_return_5d_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Return 5D Pct"
+          },
+          "samples": {
+            "title": "Samples",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "neutral",
+              "moderate",
+              "active",
+              "strong"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "win_rate_20d_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Win Rate 20D Pct"
+          },
+          "win_rate_5d_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Win Rate 5D Pct"
+          }
+        },
+        "required": [
+          "status",
+          "samples"
+        ],
+        "title": "NationalTeamBacktestStatus",
+        "type": "object"
+      },
+      "NationalTeamCumData": {
+        "properties": {
+          "avg20": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Avg20",
+            "type": "array"
+          },
+          "avg_days": {
+            "default": 20,
+            "title": "Avg Days",
+            "type": "integer"
+          },
+          "avg_from": {
+            "default": "",
+            "title": "Avg From",
+            "type": "string"
+          },
+          "avg_to": {
+            "default": "",
+            "title": "Avg To",
+            "type": "string"
+          },
+          "built_at": {
+            "default": "",
+            "title": "Built At",
+            "type": "string"
+          },
+          "prev": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Prev",
+            "type": "array"
+          },
+          "prev_date": {
+            "default": "",
+            "title": "Prev Date",
+            "type": "string"
+          },
+          "slots": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Slots",
+            "type": "array"
+          }
+        },
+        "title": "NationalTeamCumData",
+        "type": "object"
+      },
       "NationalTeamDailyFlow": {
         "properties": {
+          "benchmark_close": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark Close"
+          },
+          "cumulative_flow_100m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cumulative Flow 100M"
+          },
           "date": {
             "title": "Date",
             "type": "string"
@@ -17113,6 +17330,17 @@
             },
             "title": "Flows By Index",
             "type": "object"
+          },
+          "total_amount_100m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Amount 100M"
           },
           "total_flow_100m": {
             "anyOf": [
@@ -17638,6 +17866,106 @@
         "title": "NationalTeamIndustryAllocation",
         "type": "object"
       },
+      "NationalTeamIntradayItem": {
+        "properties": {
+          "amount": {
+            "title": "Amount",
+            "type": "number"
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "pct": {
+            "title": "Pct",
+            "type": "number"
+          },
+          "price": {
+            "title": "Price",
+            "type": "number"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "price",
+          "pct",
+          "amount"
+        ],
+        "title": "NationalTeamIntradayItem",
+        "type": "object"
+      },
+      "NationalTeamIntradayMinuteData": {
+        "properties": {
+          "bars": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Bars",
+            "type": "array"
+          },
+          "built_at": {
+            "default": "",
+            "title": "Built At",
+            "type": "string"
+          },
+          "closes": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Closes",
+            "type": "array"
+          },
+          "date": {
+            "default": "",
+            "title": "Date",
+            "type": "string"
+          },
+          "pre_close": {
+            "default": 0.0,
+            "title": "Pre Close",
+            "type": "number"
+          },
+          "table": {
+            "items": {
+              "$ref": "#/components/schemas/NationalTeamIntradayItem"
+            },
+            "title": "Table",
+            "type": "array"
+          },
+          "times": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Times",
+            "type": "array"
+          }
+        },
+        "title": "NationalTeamIntradayMinuteData",
+        "type": "object"
+      },
+      "NationalTeamIntradayObservation": {
+        "properties": {
+          "cum": {
+            "$ref": "#/components/schemas/NationalTeamCumData"
+          },
+          "minute": {
+            "$ref": "#/components/schemas/NationalTeamIntradayMinuteData"
+          },
+          "typical_cases": {
+            "$ref": "#/components/schemas/NationalTeamTypicalCaseData"
+          },
+          "volume_signals": {
+            "$ref": "#/components/schemas/NationalTeamSupportVolumeData"
+          }
+        },
+        "title": "NationalTeamIntradayObservation",
+        "type": "object"
+      },
       "NationalTeamMilestone": {
         "properties": {
           "date": {
@@ -17881,12 +18209,25 @@
             "title": "Fetched At",
             "type": "string"
           },
+          "flow_breakdown_included": {
+            "default": true,
+            "title": "Flow Breakdown Included",
+            "type": "boolean"
+          },
+          "index_points_included": {
+            "default": true,
+            "title": "Index Points Included",
+            "type": "boolean"
+          },
           "indices": {
             "items": {
               "$ref": "#/components/schemas/NationalTeamIndexSeries"
             },
             "title": "Indices",
             "type": "array"
+          },
+          "intraday": {
+            "$ref": "#/components/schemas/NationalTeamIntradayObservation"
           },
           "methodology": {
             "title": "Methodology",
@@ -18081,6 +18422,17 @@
             "title": "Coverage Ratio",
             "type": "number"
           },
+          "cumulative_net_flow_100m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cumulative Net Flow 100M"
+          },
           "estimated_net_flow_1d_100m": {
             "anyOf": [
               {
@@ -18124,6 +18476,39 @@
             "title": "Quality",
             "type": "string"
           },
+          "top_flow_category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top Flow Category"
+          },
+          "top_flow_index": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top Flow Index"
+          },
+          "total_amount_1d_100m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Amount 1D 100M"
+          },
           "total_shares_100m": {
             "anyOf": [
               {
@@ -18134,9 +18519,99 @@
               }
             ],
             "title": "Total Shares 100M"
+          },
+          "ytd_net_flow_100m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ytd Net Flow 100M"
           }
         },
         "title": "NationalTeamSummary",
+        "type": "object"
+      },
+      "NationalTeamSupportBacktest": {
+        "description": "托底评分的后验表现。\n\n只使用已落库的评分与沪深300 收盘，不依赖当前请求窗口；新部署需要先积累\n几个交易日的数据，样本不足时各字段为 null。",
+        "properties": {
+          "as_of_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of Date"
+          },
+          "by_status": {
+            "items": {
+              "$ref": "#/components/schemas/NationalTeamBacktestStatus"
+            },
+            "title": "By Status",
+            "type": "array"
+          },
+          "excluded_low_confidence": {
+            "default": 0,
+            "title": "Excluded Low Confidence",
+            "type": "integer"
+          },
+          "excluded_low_coverage": {
+            "default": 0,
+            "title": "Excluded Low Coverage",
+            "type": "integer"
+          },
+          "first_sample_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Sample Date"
+          },
+          "horizons": {
+            "items": {
+              "$ref": "#/components/schemas/NationalTeamBacktestHorizon"
+            },
+            "title": "Horizons",
+            "type": "array"
+          },
+          "last_sample_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Sample Date"
+          },
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          },
+          "sample_days": {
+            "default": 0,
+            "title": "Sample Days",
+            "type": "integer"
+          },
+          "window_samples": {
+            "default": 365,
+            "title": "Window Samples",
+            "type": "integer"
+          }
+        },
+        "title": "NationalTeamSupportBacktest",
         "type": "object"
       },
       "NationalTeamSupportHistoryPoint": {
@@ -18211,6 +18686,17 @@
             "title": "Net Flow Factor",
             "type": "number"
           },
+          "percentile_60d": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Percentile 60D"
+          },
           "score": {
             "default": 50.0,
             "title": "Score",
@@ -18229,6 +18715,70 @@
           }
         },
         "title": "NationalTeamSupportScore",
+        "type": "object"
+      },
+      "NationalTeamSupportVolumeData": {
+        "properties": {
+          "recent_days": {
+            "items": {
+              "$ref": "#/components/schemas/NationalTeamSupportVolumeItem"
+            },
+            "title": "Recent Days",
+            "type": "array"
+          },
+          "support_days": {
+            "items": {
+              "$ref": "#/components/schemas/NationalTeamSupportVolumeItem"
+            },
+            "title": "Support Days",
+            "type": "array"
+          },
+          "support_threshold_100m": {
+            "default": 100.0,
+            "title": "Support Threshold 100M",
+            "type": "number"
+          }
+        },
+        "title": "NationalTeamSupportVolumeData",
+        "type": "object"
+      },
+      "NationalTeamSupportVolumeItem": {
+        "properties": {
+          "amount": {
+            "title": "Amount",
+            "type": "number"
+          },
+          "date": {
+            "title": "Date",
+            "type": "string"
+          },
+          "is_pending": {
+            "default": false,
+            "title": "Is Pending",
+            "type": "boolean"
+          },
+          "is_support_day": {
+            "default": false,
+            "title": "Is Support Day",
+            "type": "boolean"
+          },
+          "netflow": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Netflow"
+          }
+        },
+        "required": [
+          "date",
+          "amount"
+        ],
+        "title": "NationalTeamSupportVolumeItem",
         "type": "object"
       },
       "NationalTeamSupportZone": {
@@ -18348,6 +18898,62 @@
           "industry"
         ],
         "title": "NationalTeamTopHolding",
+        "type": "object"
+      },
+      "NationalTeamTypicalCaseData": {
+        "properties": {
+          "nor_amt": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Nor Amt",
+            "type": "array"
+          },
+          "nor_cum": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Nor Cum",
+            "type": "array"
+          },
+          "nor_n": {
+            "default": 0,
+            "title": "Nor N",
+            "type": "integer"
+          },
+          "range": {
+            "default": "",
+            "title": "Range",
+            "type": "string"
+          },
+          "slots": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Slots",
+            "type": "array"
+          },
+          "sup_amt": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Sup Amt",
+            "type": "array"
+          },
+          "sup_cum": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Sup Cum",
+            "type": "array"
+          },
+          "sup_n": {
+            "default": 0,
+            "title": "Sup N",
+            "type": "integer"
+          }
+        },
+        "title": "NationalTeamTypicalCaseData",
         "type": "object"
       },
       "NeedsSetupResponse": {
@@ -38842,6 +39448,30 @@
               "title": "Include Etf Points",
               "type": "boolean"
             }
+          },
+          {
+            "description": "是否返回指数点位序列。传 false 时指数标量仍保留，图表改用/national-team/index-series 单独获取，可让首屏先渲染表格与结论。",
+            "in": "query",
+            "name": "include_index_points",
+            "required": false,
+            "schema": {
+              "default": true,
+              "description": "是否返回指数点位序列。传 false 时指数标量仍保留，图表改用/national-team/index-series 单独获取，可让首屏先渲染表格与结论。",
+              "title": "Include Index Points",
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "是否返回 daily_flows[].flows_by_index；前端只用 flows_by_category。",
+            "in": "query",
+            "name": "include_flow_breakdown",
+            "required": false,
+            "schema": {
+              "default": true,
+              "description": "是否返回 daily_flows[].flows_by_index；前端只用 flows_by_category。",
+              "title": "Include Flow Breakdown",
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -38872,6 +39502,178 @@
           }
         ],
         "summary": "Get National Team Etf Holdings",
+        "tags": [
+          "market"
+        ]
+      }
+    },
+    "/api/market/national-team/backtest": {
+      "get": {
+        "description": "托底评分的后验表现：信号后 5/20 个交易日的沪深300 涨跌。",
+        "operationId": "get_national_team_backtest_api_market_national_team_backtest_get",
+        "parameters": [
+          {
+            "description": "回看的评分快照数量（每个交易日一条）",
+            "in": "query",
+            "name": "days",
+            "required": false,
+            "schema": {
+              "default": 365,
+              "description": "回看的评分快照数量（每个交易日一条）",
+              "maximum": 1095,
+              "minimum": 30,
+              "title": "Days",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NationalTeamSupportBacktest"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get National Team Backtest",
+        "tags": [
+          "market"
+        ]
+      }
+    },
+    "/api/market/national-team/index-series": {
+      "get": {
+        "description": "国家队指数点位序列：详情页图表在首屏响应之后单独拉取。",
+        "operationId": "get_national_team_index_series_api_market_national_team_index_series_get",
+        "parameters": [
+          {
+            "description": "返回最近自然日数量，30-365",
+            "in": "query",
+            "name": "days",
+            "required": false,
+            "schema": {
+              "default": 120,
+              "description": "返回最近自然日数量，30-365",
+              "maximum": 365,
+              "minimum": 30,
+              "title": "Days",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/NationalTeamIndexSeries"
+                  },
+                  "title": "Response Get National Team Index Series Api Market National Team Index Series Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get National Team Index Series",
+        "tags": [
+          "market"
+        ]
+      }
+    },
+    "/api/market/national-team/index-series/{index_key}": {
+      "get": {
+        "description": "单条指数点位序列：图表进入视口后再按需拉取。",
+        "operationId": "get_national_team_index_series_item_api_market_national_team_index_series__index_key__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "index_key",
+            "required": true,
+            "schema": {
+              "title": "Index Key",
+              "type": "string"
+            }
+          },
+          {
+            "description": "返回最近自然日数量，30-365",
+            "in": "query",
+            "name": "days",
+            "required": false,
+            "schema": {
+              "default": 120,
+              "description": "返回最近自然日数量，30-365",
+              "maximum": 365,
+              "minimum": 30,
+              "title": "Days",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NationalTeamIndexSeries"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get National Team Index Series Item",
         "tags": [
           "market"
         ]

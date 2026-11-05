@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Button, DatePicker, Drawer, Space, Table, Tag, Tooltip } from "antd";
-import { AppstoreOutlined } from "@ant-design/icons";
+import { Button, DatePicker, Drawer, Segmented, Space, Table, Tag, Tooltip } from "antd";
+import { AppstoreOutlined, LineChartOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import type { ColumnsType } from "antd/es/table";
 import ChangeValue from "../../components/ChangeValue";
@@ -9,6 +9,8 @@ import ResponsiveMetricGrid from "../../components/ResponsiveMetricGrid";
 import SectionDataState from "../../components/SectionDataState";
 import SectionToolbar from "../../components/SectionToolbar";
 import StockExternalLink from "../../components/StockExternalLink";
+import StockQuickPreviewModal from "../../components/StockQuickPreviewModal";
+import SectorRRGChart from "./SectorRRGChart";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { useUrlSearchParam } from "../../hooks/useUrlSearchParam";
 import { useIndustryRankings, useMarketSectorStocksHistory } from "../../api/queries";
@@ -39,6 +41,7 @@ function SectorStocksDrawer({
   const c = useColors();
   const t = useTokens();
   const isNarrow = useMediaQuery("(max-width: 768px)");
+  const [previewStock, setPreviewStock] = useState<{ code: string; name: string } | null>(null);
   const query = useMarketSectorStocksHistory(sector ? dateText : "", sector?.code ?? "");
   const items = useMemo(() => query.data?.items ?? [], [query.data?.items]);
   const hasData = items.length > 0;
@@ -49,14 +52,28 @@ function SectorStocksDrawer({
       title: "股票",
       key: "stock",
       fixed: isNarrow ? undefined : ("left" as const),
-      width: 140,
+      width: 156,
       render: (_value: unknown, stock: MarketSectorStocksHistoryItem) => (
-        <StockExternalLink code={stock.code} name={stock.name} style={{ display: "inline-flex" }}>
-          <Space orientation="vertical" size={0}>
-            <span style={{ fontWeight: Number(t.weight.medium) }}>{stock.name}</span>
-            <span style={{ color: c.textSecondary, fontSize: t.font.xs, fontFamily: "var(--c-font-mono)" }}>{stock.code}</span>
-          </Space>
-        </StockExternalLink>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4 }}>
+          <StockExternalLink code={stock.code} name={stock.name} style={{ display: "inline-flex" }}>
+            <Space orientation="vertical" size={0}>
+              <span style={{ fontWeight: Number(t.weight.medium) }}>{stock.name}</span>
+              <span style={{ color: c.textSecondary, fontSize: t.font.xs, fontFamily: "var(--c-font-mono)" }}>{stock.code}</span>
+            </Space>
+          </StockExternalLink>
+          <Button
+            type="text"
+            size="small"
+            icon={<LineChartOutlined />}
+            title="K线速查"
+            aria-label={`速查${stock.name}K线`}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setPreviewStock({ code: stock.code, name: stock.name });
+            }}
+          />
+        </div>
       ),
     };
     const priceColumn = {
@@ -214,6 +231,14 @@ function SectorStocksDrawer({
           size="small"
         />
       </SectionDataState>
+      {previewStock ? (
+        <StockQuickPreviewModal
+          open={Boolean(previewStock)}
+          code={previewStock.code}
+          name={previewStock.name}
+          onClose={() => setPreviewStock(null)}
+        />
+      ) : null}
     </Drawer>
   );
 }
@@ -243,6 +268,7 @@ export default function IndustryRankTab() {
   const drillDownDisabled = !isKaipanhongSource;
   const drillDownTooltip = "当前数据来自降级数据源，仅开盘红数据支持查看成分股";
   const [drawerSector, setDrawerSector] = useState<DrawerSector | null>(null);
+  const [viewMode, setViewMode] = useState<"table" | "rrg">("table");
 
   const columns: ColumnsType<IndustryRankItem> = useMemo(() => {
     const stocksActionColumn = {
@@ -397,6 +423,15 @@ export default function IndustryRankTab() {
           }
           actions={
             <Space wrap>
+              <Segmented
+                options={[
+                  { label: "表格列表", value: "table" },
+                  { label: "RRG四象限", value: "rrg" },
+                ]}
+                value={viewMode}
+                onChange={(val) => setViewMode(val as "table" | "rrg")}
+                size="small"
+              />
               <DatePicker
                 aria-label="行业排行日期"
                 value={selectedDate}
@@ -418,20 +453,31 @@ export default function IndustryRankTab() {
         errorTitle="行业排名加载失败"
         minHeight={320}
       >
-        <Table<IndustryRankItem>
-          columns={columns}
-          dataSource={sectors}
-          rowKey="code"
-          pagination={false}
-          virtual={!isNarrow}
-          expandable={isNarrow ? {
-            expandedRowRender: renderExpandedRow,
-            columnWidth: 36,
-          } : undefined}
-          scroll={{ x: isNarrow ? 360 : 1180, y: 600 }}
-          size="small"
-          style={{ background: "transparent" }}
-        />
+        {viewMode === "rrg" ? (
+          <SectorRRGChart
+            sectors={sectors}
+            onSelectSector={(s) => {
+              if (!drillDownDisabled) {
+                setDrawerSector(s);
+              }
+            }}
+          />
+        ) : (
+          <Table<IndustryRankItem>
+            columns={columns}
+            dataSource={sectors}
+            rowKey="code"
+            pagination={false}
+            virtual={!isNarrow}
+            expandable={isNarrow ? {
+              expandedRowRender: renderExpandedRow,
+              columnWidth: 36,
+            } : undefined}
+            scroll={{ x: isNarrow ? 360 : 1180, y: 600 }}
+            size="small"
+            style={{ background: "transparent" }}
+          />
+        )}
       </SectionDataState>
       <SectorStocksDrawer
         sector={drawerSector}

@@ -229,4 +229,14 @@ describe("IndustryRankTab", () => {
     }
     expect(mocks.stocksQuery).not.toHaveBeenCalledWith("2026-08-20", "881169");
   });
+
+  it("switches to RRG quadrant view and displays quadrant cards", () => {
+    renderTab("/market?tab=industry-rank&industryDate=2026-08-20");
+
+    const rrgBtn = screen.getByText("RRG四象限");
+    fireEvent.click(rrgBtn);
+
+    expect(screen.getByText(/行业板块轮动四象限全景/)).toBeInTheDocument();
+    expect(screen.getAllByText(/领先加速/).length).toBeGreaterThan(0);
+  });
 });

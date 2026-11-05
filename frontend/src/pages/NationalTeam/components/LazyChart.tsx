@@ -3,6 +3,8 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 interface LazyChartProps {
   /** 未进入视口时占位高度，需与实际图表高度一致，避免懒加载时页面跳动。 */
   height: number;
+  /** 用 CSS 控制占位高度时传入类名，可配合媒体查询覆盖固定像素。 */
+  placeholderClassName?: string;
   children: ReactNode;
 }
 
@@ -13,7 +15,7 @@ interface LazyChartProps {
  * 与 `charts/LazyKlineChart`、`pages/IndustryChain/LazyIndustryChart` 保持同一套
  * 约定：无 `IntersectionObserver`（jsdom）时直接渲染，测试无需额外桩。
  */
-export default function LazyChart({ height, children }: LazyChartProps) {
+export default function LazyChart({ height, placeholderClassName, children }: LazyChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [shouldRender, setShouldRender] = useState(() => typeof IntersectionObserver === "undefined");
 
@@ -30,8 +32,17 @@ export default function LazyChart({ height, children }: LazyChartProps) {
   }, [shouldRender]);
 
   return (
-    <div ref={containerRef} style={{ minHeight: height, width: "100%" }}>
-      {shouldRender ? children : <div aria-hidden="true" style={{ height }} />}
+    <div
+      ref={containerRef}
+      style={{ minHeight: placeholderClassName ? undefined : height, width: "100%" }}
+    >
+      {shouldRender ? (
+        children
+      ) : placeholderClassName ? (
+        <div aria-hidden="true" className={placeholderClassName} />
+      ) : (
+        <div aria-hidden="true" style={{ height }} />
+      )}
     </div>
   );
 }

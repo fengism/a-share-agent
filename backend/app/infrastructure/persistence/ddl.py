@@ -845,6 +845,20 @@ CREATE TABLE IF NOT EXISTS national_team_etf_imports (
 )
 """
 
+# 每日托底评分快照：评分本身由序列实时回算，但“信号出现后 5/20 日表现”需要未来
+# 行情，只有把评分与当日沪深300 收盘一起落库，才能在没有额外行情源时做后验。
+NATIONAL_TEAM_SUPPORT_SCORES_TABLE = """
+CREATE TABLE IF NOT EXISTS national_team_support_scores (
+    date           TEXT PRIMARY KEY,
+    score          REAL NOT NULL,
+    status         TEXT NOT NULL,
+    confidence     REAL NOT NULL,
+    coverage_ratio REAL NOT NULL,
+    csi300_close   REAL,
+    updated_at     REAL NOT NULL
+)
+"""
+
 MARKET_TABLES.extend(
     [
         NATIONAL_TEAM_ETF_SHARES_TABLE,
@@ -852,6 +866,7 @@ MARKET_TABLES.extend(
         NATIONAL_TEAM_ETF_BACKFILL_TABLE,
         NATIONAL_TEAM_ETF_OBSERVATIONS_TABLE,
         NATIONAL_TEAM_ETF_IMPORTS_TABLE,
+        NATIONAL_TEAM_SUPPORT_SCORES_TABLE,
     ]
 )
 

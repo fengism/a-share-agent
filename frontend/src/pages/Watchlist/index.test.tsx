@@ -317,5 +317,6 @@ describe("WatchlistPage", () => {
 
     expect(screen.getByLabelText("选择贵州茅台")).toBeInTheDocument();
     expect(screen.getByLabelText("AI体检贵州茅台")).toBeInTheDocument();
+    expect(screen.getByLabelText("速查贵州茅台K线")).toBeInTheDocument();
   });
 });

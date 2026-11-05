@@ -11,6 +11,7 @@ import {
   FallOutlined,
   FileSearchOutlined,
   ImportOutlined,
+  LineChartOutlined,
   MinusCircleOutlined,
   PlusOutlined,
   ReloadOutlined,
@@ -68,6 +69,7 @@ import { WatchlistAllocationBar } from "./components/WatchlistAllocationBar";
 import { WatchlistCardList } from "./components/WatchlistCardList";
 import { WatchlistNoteCell } from "./components/WatchlistNoteCell";
 import { WatchlistQuickImportModal } from "./components/WatchlistQuickImportModal";
+import StockQuickPreviewModal from "../../components/StockQuickPreviewModal";
 import "./watchlist.css";
 
 const { Paragraph, Text, Title } = Typography;
@@ -380,6 +382,7 @@ export default function WatchlistPage() {
   const [threshold, setThreshold] = useState<number | null>(null);
   const [layoutMode, setLayoutMode] = useState<"table" | "cards">("table");
   const [quickImportOpen, setQuickImportOpen] = useState(false);
+  const [previewStock, setPreviewStock] = useState<{ code: string; name: string } | null>(null);
 
   const selectedStockCodes = useMemo(() => {
     const allItems = watchlist.data?.items ?? [];
@@ -722,10 +725,19 @@ export default function WatchlistPage() {
       title: "操作",
       key: "actions",
       fixed: "right",
-      width: isMobile ? 90 : 112,
+      width: isMobile ? 120 : 144,
       align: "center",
       render: (_, item) => (
         <Space size={2}>
+          <Tooltip title="K线速查">
+            <Button
+              type="text"
+              size="small"
+              aria-label={`速查${item.stock_name}K线`}
+              icon={<LineChartOutlined />}
+              onClick={() => setPreviewStock({ code: item.stock_code, name: item.stock_name })}
+            />
+          </Tooltip>
           <Tooltip title="AI 深度体检">
             <Button
               type="text"
@@ -885,6 +897,7 @@ export default function WatchlistPage() {
             onSetAlert={setAlertStock}
             onDelete={(item) => void handleDelete(item)}
             onSelectConcept={focusConceptGroup}
+            onQuickPreview={setPreviewStock}
           />
         </div>
       );
@@ -1213,6 +1226,15 @@ export default function WatchlistPage() {
         existingCodes={(watchlist.data?.items ?? []).map((i) => i.stock_code)}
         onImport={handleBatchImport}
       />
+
+      {previewStock ? (
+        <StockQuickPreviewModal
+          open={Boolean(previewStock)}
+          code={previewStock.code}
+          name={previewStock.name}
+          onClose={() => setPreviewStock(null)}
+        />
+      ) : null}
     </div>
   );
 }

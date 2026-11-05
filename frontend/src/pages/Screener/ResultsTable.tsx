@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Table, Tag, Spin, Empty, Tooltip, Space, Button, message } from "antd";
-import { PlusOutlined, RobotOutlined, LineChartOutlined, CheckOutlined } from "@ant-design/icons";
+import { PlusOutlined, RobotOutlined, LineChartOutlined, CheckOutlined, EyeOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import type { ColumnsType, TableProps } from "antd/es/table";
 import ChangeValue from "../../components/ChangeValue";
 import ResponsiveMetricGrid from "../../components/ResponsiveMetricGrid";
 import PreloadLink from "../../components/PreloadLink";
+import StockQuickPreviewModal from "../../components/StockQuickPreviewModal";
 import { buildStockProfileUrl } from "../../utils/stockLinks";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import type { ScreenerFilter, ScreenerItem, ScreenerResult } from "../../types/stock";
@@ -172,6 +173,7 @@ export default function ResultsTable({
   const navigate = useNavigate();
   const isNarrow = useMediaQuery("(max-width: 768px)");
   const [addedCodes, setAddedCodes] = useState<Set<string>>(new Set());
+  const [previewStock, setPreviewStock] = useState<{ code: string; name: string } | null>(null);
 
   const handleAddWatchlist = useCallback(async (record: ScreenerItem) => {
     try {
@@ -624,7 +626,7 @@ export default function ResultsTable({
     nextColumns.push({
       title: "操作",
       key: "actions",
-      width: 110,
+      width: 130,
       fixed: "right",
       render: (_: unknown, record: ScreenerItem) => {
         const isAdded = addedCodes.has(record.code);
@@ -638,6 +640,15 @@ export default function ResultsTable({
                 icon={isAdded ? <CheckOutlined style={{ color: "#52c41a" }} /> : <PlusOutlined />}
                 disabled={isAdded}
                 onClick={() => void handleAddWatchlist(record)}
+              />
+            </Tooltip>
+            <Tooltip title="K线速查">
+              <Button
+                type="text"
+                size="small"
+                aria-label={`速查-${record.code}`}
+                icon={<EyeOutlined />}
+                onClick={() => setPreviewStock({ code: record.code, name: record.name })}
               />
             </Tooltip>
             <Tooltip title="AI 深度体检">
@@ -880,6 +891,14 @@ export default function ResultsTable({
         tableLayout="fixed"
         scroll={isNarrow ? { x: 380 } : { x: "max-content" }}
       />
+      {previewStock ? (
+        <StockQuickPreviewModal
+          open={Boolean(previewStock)}
+          code={previewStock.code}
+          name={previewStock.name}
+          onClose={() => setPreviewStock(null)}
+        />
+      ) : null}
     </div>
   );
 }

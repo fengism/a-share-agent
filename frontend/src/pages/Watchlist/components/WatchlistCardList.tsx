@@ -4,6 +4,7 @@ import {
   BellOutlined,
   DeleteOutlined,
   FileSearchOutlined,
+  LineChartOutlined,
   RobotOutlined,
 } from "@ant-design/icons";
 import { Button, Checkbox, Space, Tag, Tooltip } from "antd";
@@ -22,6 +23,7 @@ interface WatchlistCardItemProps {
   onSetAlert: (item: WatchlistItem) => void;
   onDelete: (item: WatchlistItem) => void;
   onSelectConcept: (conceptName: string) => void;
+  onQuickPreview?: (stock: { code: string; name: string }) => void;
 }
 
 const WatchlistCardItem: React.FC<WatchlistCardItemProps> = ({
@@ -31,6 +33,7 @@ const WatchlistCardItem: React.FC<WatchlistCardItemProps> = ({
   onSetAlert,
   onDelete,
   onSelectConcept,
+  onQuickPreview,
 }) => {
   const navigate = useNavigate();
   const flashClass = usePriceFlash(item.current_price);
@@ -193,6 +196,17 @@ const WatchlistCardItem: React.FC<WatchlistCardItemProps> = ({
         </div>
 
         <Space size={2}>
+          {onQuickPreview ? (
+            <Tooltip title="K线速查">
+              <Button
+                type="text"
+                size="small"
+                icon={<LineChartOutlined />}
+                aria-label={`速查${item.stock_name}K线`}
+                onClick={() => onQuickPreview({ code: item.stock_code, name: item.stock_name })}
+              />
+            </Tooltip>
+          ) : null}
           <Tooltip title="AI 伴随体检">
             <Button
               type="text"
@@ -243,6 +257,7 @@ interface WatchlistCardListProps {
   onSetAlert: (item: WatchlistItem) => void;
   onDelete: (item: WatchlistItem) => void;
   onSelectConcept: (conceptName: string) => void;
+  onQuickPreview?: (stock: { code: string; name: string }) => void;
 }
 
 export const WatchlistCardList: React.FC<WatchlistCardListProps> = ({
@@ -252,6 +267,7 @@ export const WatchlistCardList: React.FC<WatchlistCardListProps> = ({
   onSetAlert,
   onDelete,
   onSelectConcept,
+  onQuickPreview,
 }) => {
   return (
     <div
@@ -272,6 +288,7 @@ export const WatchlistCardList: React.FC<WatchlistCardListProps> = ({
           onSetAlert={onSetAlert}
           onDelete={onDelete}
           onSelectConcept={onSelectConcept}
+          onQuickPreview={onQuickPreview}
         />
       ))}
     </div>

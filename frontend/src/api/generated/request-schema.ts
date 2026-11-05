@@ -2610,6 +2610,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/market/national-team/backtest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get National Team Backtest
+         * @description 托底评分的后验表现：信号后 5/20 个交易日的沪深300 涨跌。
+         */
+        get: operations["get_national_team_backtest_api_market_national_team_backtest_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/market/national-team/index-series": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get National Team Index Series
+         * @description 国家队指数点位序列：详情页图表在首屏响应之后单独拉取。
+         */
+        get: operations["get_national_team_index_series_api_market_national_team_index_series_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/market/national-team/index-series/{index_key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get National Team Index Series Item
+         * @description 单条指数点位序列：图表进入视口后再按需拉取。
+         */
+        get: operations["get_national_team_index_series_item_api_market_national_team_index_series__index_key__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/market/national-team/overview": {
         parameters: {
             query?: never;
@@ -11740,8 +11800,87 @@ export interface components {
              */
             success?: boolean;
         };
+        /**
+         * NationalTeamBacktestHorizon
+         * @description 某个持有期的后验表现（信号日之后第 N 个交易日）。
+         */
+        NationalTeamBacktestHorizon: {
+            /** Avg Return Pct */
+            avg_return_pct?: number | null;
+            /** Best Return Pct */
+            best_return_pct?: number | null;
+            /** Days */
+            days: number;
+            /** Median Return Pct */
+            median_return_pct?: number | null;
+            /** Samples */
+            samples: number;
+            /** Win Rate Pct */
+            win_rate_pct?: number | null;
+            /** Worst Return Pct */
+            worst_return_pct?: number | null;
+        };
+        /**
+         * NationalTeamBacktestStatus
+         * @description 按信号强度分组的后验表现。
+         */
+        NationalTeamBacktestStatus: {
+            /** Avg Return 20D Pct */
+            avg_return_20d_pct?: number | null;
+            /** Avg Return 5D Pct */
+            avg_return_5d_pct?: number | null;
+            /** Samples */
+            samples: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "neutral" | "moderate" | "active" | "strong";
+            /** Win Rate 20D Pct */
+            win_rate_20d_pct?: number | null;
+            /** Win Rate 5D Pct */
+            win_rate_5d_pct?: number | null;
+        };
+        /** NationalTeamCumData */
+        NationalTeamCumData: {
+            /** Avg20 */
+            avg20?: number[];
+            /**
+             * Avg Days
+             * @default 20
+             */
+            avg_days?: number;
+            /**
+             * Avg From
+             * @default
+             */
+            avg_from?: string;
+            /**
+             * Avg To
+             * @default
+             */
+            avg_to?: string;
+            /**
+             * Built At
+             * @default
+             */
+            built_at?: string;
+            /** Prev */
+            prev?: number[];
+            /**
+             * Prev Date
+             * @default
+             */
+            prev_date?: string;
+            /** Slots */
+            slots?: string[];
+        };
         /** NationalTeamDailyFlow */
         NationalTeamDailyFlow: {
+            /** Benchmark Close */
+            benchmark_close?: number | null;
+            /** Cumulative Flow 100M */
+            cumulative_flow_100m?: number | null;
             /** Date */
             date: string;
             /** Flows By Category */
@@ -11752,6 +11891,8 @@ export interface components {
             flows_by_index?: {
                 [key: string]: number;
             };
+            /** Total Amount 100M */
+            total_amount_100m?: number | null;
             /** Total Flow 100M */
             total_flow_100m?: number | null;
             /** Total Shares Change 100M */
@@ -11926,6 +12067,52 @@ export interface components {
             /** Weight Pct */
             weight_pct: number;
         };
+        /** NationalTeamIntradayItem */
+        NationalTeamIntradayItem: {
+            /** Amount */
+            amount: number;
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
+            /** Pct */
+            pct: number;
+            /** Price */
+            price: number;
+        };
+        /** NationalTeamIntradayMinuteData */
+        NationalTeamIntradayMinuteData: {
+            /** Bars */
+            bars?: number[];
+            /**
+             * Built At
+             * @default
+             */
+            built_at?: string;
+            /** Closes */
+            closes?: number[];
+            /**
+             * Date
+             * @default
+             */
+            date?: string;
+            /**
+             * Pre Close
+             * @default 0
+             */
+            pre_close?: number;
+            /** Table */
+            table?: components["schemas"]["NationalTeamIntradayItem"][];
+            /** Times */
+            times?: string[];
+        };
+        /** NationalTeamIntradayObservation */
+        NationalTeamIntradayObservation: {
+            cum?: components["schemas"]["NationalTeamCumData"];
+            minute?: components["schemas"]["NationalTeamIntradayMinuteData"];
+            typical_cases?: components["schemas"]["NationalTeamTypicalCaseData"];
+            volume_signals?: components["schemas"]["NationalTeamSupportVolumeData"];
+        };
         /** NationalTeamMilestone */
         NationalTeamMilestone: {
             /** Date */
@@ -12066,8 +12253,19 @@ export interface components {
             expected_date?: string | null;
             /** Fetched At */
             fetched_at: string;
+            /**
+             * Flow Breakdown Included
+             * @default true
+             */
+            flow_breakdown_included?: boolean;
+            /**
+             * Index Points Included
+             * @default true
+             */
+            index_points_included?: boolean;
             /** Indices */
             indices?: components["schemas"]["NationalTeamIndexSeries"][];
+            intraday?: components["schemas"]["NationalTeamIntradayObservation"];
             /** Methodology */
             methodology: string;
             /** Milestones */
@@ -12149,6 +12347,8 @@ export interface components {
              * @default 0
              */
             coverage_ratio?: number;
+            /** Cumulative Net Flow 100M */
+            cumulative_net_flow_100m?: number | null;
             /** Estimated Net Flow 1D 100M */
             estimated_net_flow_1d_100m?: number | null;
             /** Estimated Net Flow 20D 100M */
@@ -12161,8 +12361,60 @@ export interface components {
              * @enum {string}
              */
             quality?: "complete" | "partial" | "insufficient";
+            /** Top Flow Category */
+            top_flow_category?: string | null;
+            /** Top Flow Index */
+            top_flow_index?: string | null;
+            /** Total Amount 1D 100M */
+            total_amount_1d_100m?: number | null;
             /** Total Shares 100M */
             total_shares_100m?: number | null;
+            /** Ytd Net Flow 100M */
+            ytd_net_flow_100m?: number | null;
+        };
+        /**
+         * NationalTeamSupportBacktest
+         * @description 托底评分的后验表现。
+         *
+         *     只使用已落库的评分与沪深300 收盘，不依赖当前请求窗口；新部署需要先积累
+         *     几个交易日的数据，样本不足时各字段为 null。
+         */
+        NationalTeamSupportBacktest: {
+            /** As Of Date */
+            as_of_date?: string | null;
+            /** By Status */
+            by_status?: components["schemas"]["NationalTeamBacktestStatus"][];
+            /**
+             * Excluded Low Confidence
+             * @default 0
+             */
+            excluded_low_confidence?: number;
+            /**
+             * Excluded Low Coverage
+             * @default 0
+             */
+            excluded_low_coverage?: number;
+            /** First Sample Date */
+            first_sample_date?: string | null;
+            /** Horizons */
+            horizons?: components["schemas"]["NationalTeamBacktestHorizon"][];
+            /** Last Sample Date */
+            last_sample_date?: string | null;
+            /**
+             * Note
+             * @default
+             */
+            note?: string;
+            /**
+             * Sample Days
+             * @default 0
+             */
+            sample_days?: number;
+            /**
+             * Window Samples
+             * @default 365
+             */
+            window_samples?: number;
         };
         /**
          * NationalTeamSupportHistoryPoint
@@ -12218,6 +12470,8 @@ export interface components {
              * @default 0
              */
             net_flow_factor?: number;
+            /** Percentile 60D */
+            percentile_60d?: number | null;
             /**
              * Score
              * @default 50
@@ -12229,6 +12483,37 @@ export interface components {
              * @enum {string}
              */
             status?: "neutral" | "moderate" | "active" | "strong";
+        };
+        /** NationalTeamSupportVolumeData */
+        NationalTeamSupportVolumeData: {
+            /** Recent Days */
+            recent_days?: components["schemas"]["NationalTeamSupportVolumeItem"][];
+            /** Support Days */
+            support_days?: components["schemas"]["NationalTeamSupportVolumeItem"][];
+            /**
+             * Support Threshold 100M
+             * @default 100
+             */
+            support_threshold_100m?: number;
+        };
+        /** NationalTeamSupportVolumeItem */
+        NationalTeamSupportVolumeItem: {
+            /** Amount */
+            amount: number;
+            /** Date */
+            date: string;
+            /**
+             * Is Pending
+             * @default false
+             */
+            is_pending?: boolean;
+            /**
+             * Is Support Day
+             * @default false
+             */
+            is_support_day?: boolean;
+            /** Netflow */
+            netflow?: number | null;
         };
         /** NationalTeamSupportZone */
         NationalTeamSupportZone: {
@@ -12268,6 +12553,34 @@ export interface components {
             name: string;
             /** Shareholding Ratio Pct */
             shareholding_ratio_pct: number;
+        };
+        /** NationalTeamTypicalCaseData */
+        NationalTeamTypicalCaseData: {
+            /** Nor Amt */
+            nor_amt?: number[];
+            /** Nor Cum */
+            nor_cum?: number[];
+            /**
+             * Nor N
+             * @default 0
+             */
+            nor_n?: number;
+            /**
+             * Range
+             * @default
+             */
+            range?: string;
+            /** Slots */
+            slots?: string[];
+            /** Sup Amt */
+            sup_amt?: number[];
+            /** Sup Cum */
+            sup_cum?: number[];
+            /**
+             * Sup N
+             * @default 0
+             */
+            sup_n?: number;
         };
         /** NeedsSetupResponse */
         NeedsSetupResponse: {
@@ -21570,6 +21883,10 @@ export interface operations {
                 days?: number;
                 /** @description 是否返回每只 ETF 的完整点位序列。ETF 表格只需最新一天的标量（latest_estimated_net_flow_100m），传 false 约省 65% 响应体积。 */
                 include_etf_points?: boolean;
+                /** @description 是否返回指数点位序列。传 false 时指数标量仍保留，图表改用/national-team/index-series 单独获取，可让首屏先渲染表格与结论。 */
+                include_index_points?: boolean;
+                /** @description 是否返回 daily_flows[].flows_by_index；前端只用 flows_by_category。 */
+                include_flow_breakdown?: boolean;
             };
             header?: never;
             path?: never;
@@ -21584,6 +21901,104 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NationalTeamResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_national_team_backtest_api_market_national_team_backtest_get: {
+        parameters: {
+            query?: {
+                /** @description 回看的评分快照数量（每个交易日一条） */
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NationalTeamSupportBacktest"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_national_team_index_series_api_market_national_team_index_series_get: {
+        parameters: {
+            query?: {
+                /** @description 返回最近自然日数量，30-365 */
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NationalTeamIndexSeries"][];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_national_team_index_series_item_api_market_national_team_index_series__index_key__get: {
+        parameters: {
+            query?: {
+                /** @description 返回最近自然日数量，30-365 */
+                days?: number;
+            };
+            header?: never;
+            path: {
+                index_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NationalTeamIndexSeries"];
                 };
             };
             /** @description 统一错误响应 */

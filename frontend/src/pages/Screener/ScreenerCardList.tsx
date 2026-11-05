@@ -1,9 +1,10 @@
 import React from "react";
 import { Card, Checkbox, Pagination, Tag, Button, Empty, Tooltip, Space } from "antd";
-import { PlusOutlined, RobotOutlined, LineChartOutlined, CheckOutlined } from "@ant-design/icons";
+import { PlusOutlined, RobotOutlined, LineChartOutlined, CheckOutlined, EyeOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import type { ScreenerItem, ScreenerResult } from "../../types/stock";
 import ChangeValue from "../../components/ChangeValue";
+import StockQuickPreviewModal from "../../components/StockQuickPreviewModal";
 import { buildStockProfileUrl } from "../../utils/stockLinks";
 import * as uiStyles from "../../styles/ui";
 
@@ -35,6 +36,7 @@ export const ScreenerCardList: React.FC<ScreenerCardListProps> = ({
   const c = typeof uiStyles.useColors === "function" ? uiStyles.useColors() : DEFAULT_COLORS;
   const navigate = useNavigate();
   const [addedCodes, setAddedCodes] = React.useState<Set<string>>(new Set());
+  const [previewStock, setPreviewStock] = React.useState<{ code: string; name: string } | null>(null);
 
   const items = data?.items ?? [];
 
@@ -230,6 +232,13 @@ export const ScreenerCardList: React.FC<ScreenerCardListProps> = ({
                 </Button>
                 <Button
                   size="small"
+                  icon={<EyeOutlined />}
+                  onClick={() => setPreviewStock({ code: record.code, name: record.name })}
+                >
+                  速查
+                </Button>
+                <Button
+                  size="small"
                   type="primary"
                   ghost
                   icon={<RobotOutlined />}
@@ -263,6 +272,15 @@ export const ScreenerCardList: React.FC<ScreenerCardListProps> = ({
           />
         </div>
       )}
+
+      {previewStock ? (
+        <StockQuickPreviewModal
+          open={Boolean(previewStock)}
+          code={previewStock.code}
+          name={previewStock.name}
+          onClose={() => setPreviewStock(null)}
+        />
+      ) : null}
     </div>
   );
 };

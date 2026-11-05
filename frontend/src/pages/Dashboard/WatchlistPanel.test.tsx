@@ -124,6 +124,8 @@ describe("WatchlistPanel", () => {
 
     expect(screen.getByRole("button", { name: "查看大唐发电研报" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "查看贵州茅台研报" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "速查大唐发电K线" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "速查贵州茅台K线" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "回测大唐发电" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "回测贵州茅台" })).toBeInTheDocument();
 

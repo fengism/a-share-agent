@@ -42,9 +42,11 @@ export default function NationalTeamSignalCard() {
   );
   const freshness = data.stale
     ? "份额停留在上一交易日"
-    : data.partial
-      ? "部分 ETF 数据缺失"
-      : "数据完整";
+    : data.calendar_degraded
+      ? "交易日历暂不可用"
+      : data.partial
+        ? "部分 ETF 数据缺失"
+        : "数据完整";
   const confidenceHint =
     confidence >= 80
       ? "ETF 覆盖率与数据新鲜度良好。"
