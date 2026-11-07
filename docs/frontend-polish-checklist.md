@@ -35,7 +35,7 @@ node scripts/check-style-hygiene.mjs
 
 | 指标 | 基线 | 当前 | 变化 |
 | :--- | ---: | ---: | --- |
-| 内联样式 `style={{}}` | 3619 | **1590** | **-2029（-56.1%）**（另消除了未计入正则的 109 处 `style={cardStyle}`） |
+| 内联样式 `style={{}}` | 3619 | **1511** | **-2108（-58.3%）**（另消除了未计入正则的 109 处 `style={cardStyle}`） |
 | `!important`（全站） | 473 | **177** | **-296（-62.6%）**（含导出专用 93 处：打印导出 46 + 截图导出 47；常规 UI 仅剩 84 处） |
 | `!important`（`styles/base/` 分片） | 157 | **82** | **-75（-47.8%）**（含 `atlas-and-charts.css` 导出态 47 处；常规基础分片仅剩 35 处） |
 | CSS Modules 文件数 | 0 | **1** | 试点落地（SectionToolbar） |
@@ -50,7 +50,7 @@ node scripts/check-style-hygiene.mjs
 | 原 `watchlist.css` 行数 | 738 | **已拆为 7 个分片** | 最大分片 189 行（responsive） |
 | 第四批/第五批大样式拆分 | 436~633 | **12 个文件全部拆至 ≤344 行** | `quant-form` (2 片)、`base/dashboard` (2 片)、`market-daily-bar-manager` (4 片)、`Chat/styles` (4 片)、`Concept/styles` (4 片)、`market-emotion` (3 片)、`market-wind` (3 片)、`Analysis/workspace` (3 片)、`Quant/quant-results` (3 片)、`Dashboard/styles` (3 片)、`Settings` (4 片) |
 | 单文件 CSS 最大行数 | 2637 | **394** | **-2244（-85.1%）**，全站 201 个 CSS 文件最大为 `app-header.css` 381 行（13 行余量），由门禁锁定 `MAX_CSS_LINES = 394` |
-| CSS 文件数 / 零 `!important` 文件数 | 68 / — | **204 / 172** | 84.3% 的 CSS 文件已实现零 `!important` |
+| CSS 文件数 / 零 `!important` 文件数 | 68 / — | **207 / 175** | 84.5% 的 CSS 文件已实现零 `!important` |
 | CSS 结构缺陷 | 1（`feed.css` 不可解析） | **0** | 已修，并由门禁防复发 |
 | 导航分组 / 可导航入口 | 5 组 / 17 个 | **4 工作区＋1 工具区** / 17 个 | 分组重组 |
 | `NationalTeam/index.tsx` | 2330 行 | **1250 行** | -1080 |
@@ -122,7 +122,7 @@ node scripts/check-style-hygiene.mjs
 - ✅ `<FinancialMetric>` 金额/涨跌格式化组件（等宽数字对齐、联动 A 股红涨绿跌、悬浮说明与单位展示，已在 `src/components/FinancialMetric.tsx` 实现并配备单测）
 - ✅ `base.css` 拆分为 `styles/base/` 下 12 个按关注点分片（原 2637 行 → 最大分片 623 行）
 - ✅ 引入 CSS Modules（`SectionToolbar.module.css` 试点）
-- 🟡 内联样式治理（`3619 → 1590`，**-2029，-56.1%**，外加 109 处 `cardStyle` 迁出）
+- 🟡 内联样式治理（`3619 → 1511`，**-2108，-58.3%**，外加 109 处 `cardStyle` 迁出）
 - ✅ `!important` 大规模实测清理（全站 `473 → 177`，**-62.6%**；`styles/base/` 分片 `157 → 82`，**-47.8%**；除 93 处打印/截图导出专用强覆盖外，常规 UI 仅剩 84 处，全部经 86 个生产 E2E 场景计算样式差分验证零回归）
 
 **现状**：设计提案要求的三个核心基础组件（`DashboardGrid` / `SectionHeader` / `FinancialMetric`）已全部标准化沉淀并入库，且完全遵守样式卫生门禁（零内联样式、零 `!important`）。连同既有基础设施（`page/PageShell`、`page/SectionBlock`、`SectionToolbar`、`ResponsiveMetricGrid`、`ChangeValue`、`SectionDataState`），形成了完整的前端组件底座。
@@ -149,7 +149,7 @@ node scripts/check-style-hygiene.mjs
 - ✅ 阶段二（全局抽屉 + 看板重构）：已完成
 - 🟡 阶段三（CSS 瘦身 + 组件沉淀 + 移动端适配）：CSS 瘦身与组件沉淀已完成；移动端适配仅零散覆盖，无专项
 
-**原方案完成度估计：约 86%。**唯一长尾是内联样式（剩余 1590 处）。
+**原方案完成度估计：约 87%。**唯一长尾是内联样式（剩余 1511 处）。
 
 ---
 
@@ -181,7 +181,7 @@ node scripts/check-style-hygiene.mjs
   - 修正 antd v6 `width` → `size` 废弃告警
   - 验证：11 个受影响页面测试 87/87 通过
 - ✅ **Dashboard 内联样式试点**（43 → 3，-93%）
-- 🟡 **全站内联样式推广**（3619 → 1590，**-2029，-56.1%**，另迁出 109 处 `cardStyle`）
+- 🟡 **全站内联样式推广**（3619 → 1511，**-2108，-58.3%**，另迁出 109 处 `cardStyle`）
   - 已完成核心页面与重灾区清理：
     - `Macro/GlobalRatesTab.tsx` (42 → 0)
     - `Quant/BacktestRunsComparatorModal.tsx` (41 → 0)
@@ -258,7 +258,7 @@ node scripts/check-style-hygiene.mjs
 
 | 待办 | 估算 |
 | :--- | :--- |
-| 内联样式清理（当前 1590；`/potential` 迁 63 处、`IndustryAtlas` 迁 78 处、五个热点文件共迁 115 处） | 长期背景任务，不占主线 |
+| 内联样式清理（当前 1511；`/potential` 迁 63 处、`IndustryAtlas` 迁 78 处、五个热点文件迁 115 处、本批四文件迁 79 处） | 长期背景任务，不占主线 |
 | 布局密度优化 | 🟡 测量完成（`docs/frontend-density-report.md`）；Phase 1 统一为低风险改造，Phase 2 收紧需设计确认 |
 | `!important` 治理（473 → **177**，常规 UI 仅剩 84 处） | ✅ 主体已完成（93 处导出态 + 84 处移动端/表头/页面级承重覆盖，需 antd token 迁移才能继续） |
 | 导航收敛 + 路由兼容 | ✅ 已完成 |
@@ -676,6 +676,28 @@ antd `.ant-btn > .anticon` 压掉，图标回弹 2px，探针捕获后改为 `[d
 - 单测 `Market/Stock/Screener/NationalTeam` **176/176**；全站 E2E **90/90**；构建通过。
 - 内联预算 1725 → **1610**（实际 1590，预留 20 缓冲）。
 
+### 4o. 内联样式批次八：四个已覆盖文件 79 处
+
+| 文件 | 迁前 → 迁后 | 去向 |
+|:---|:---|:---|
+| `Quant/BacktestFormSections.tsx` | 24 → 0 | `quant-form.css`（option/quick/selected/preset 类） |
+| `Chat/components/EmptyChatState.tsx` | 22 → 4 | 新增 `Chat/styles/empty-state.css` |
+| `Settings/config-cards/EastmoneyProxyConfigCard.tsx` | 21 → 5 | 新增 `Settings/styles/eastmoney-proxy.css` |
+| `Macro/CommoditiesTab.tsx` | 22 → 3 | 新增 `Macro/styles/commodities.css` |
+
+- 保留的内联都是真正的动态值：渐变/`color-mix`（空状态机器人、时段推荐）、
+  涨跌色三元表达式、`semanticTagStyle` 展开、选中态边框。
+- antd 覆盖统一用 `[data-theme] .x.ant-tag` / `.ant-divider.proxy-divider` /
+  `[data-theme] .chat-empty-samples .ant-btn.x`（0,3,0 ~ 0,4,0）。
+- **验证**：5 个相关 spec 共 18 个生产探针场景 + 1 个临时 commodity 场景（最终状态停在商品页，
+  避免既有测试切到 trade 后丢失采样）→ **0 差异**；
+  已从 dump 确认 `chat-empty-card`（558 次）、`quant-quick-import`、`proxy-scope-tag`、
+  `commodity-name` 等新类实际渲染，非“类未生效”的假零差。
+  唯一的 anysearch 普通用户场景因页面加载状态在两次采样间变化（`unstable` 42）而不可用，
+  已排除；管理员场景（923 元素）零差异且包含代理卡片。
+- 单测 81 文件 / **325 用例**；全站 E2E **90/90**；构建通过。
+- 内联预算 1610 → **1531**（实际 1511）。
+
 ### 5. 四批大规模清理与 E2E 盲区补齐（448 → 177）
 
 在探针稳定后，按「迁移阻挡型内联样式 + 提高自有选择器特异性 + 生产 86 场景计算样式零差异」完成了四批治理：
@@ -697,7 +719,7 @@ antd `.ant-btn > .anticon` 压掉，图标回弹 2px，探针捕获后改为 `[d
    - `src/styles/base/reset.css`（7 处）：压制页面卡片渐变背景（表头 6 处已改由 Table token 接管）；
    - `src/styles/base/responsive-helpers.css`（6 处）：双栏折叠与 `prefers-reduced-motion`。
 3. **其余分文件零星 56 处**：单文件最大 5 处（`portfolio.css`、`market-page.css`）。
-   - 已由 `frontend/scripts/check-style-hygiene.mjs` 棘轮锁定在 `IMPORTANT_BUDGET = 177`、`INLINE_STYLE_BUDGET = 1610`、`MAX_CSS_LINES = 394`（内联实际 1590、预留 20 缓冲，其余余量为 0/13）。
+   - 已由 `frontend/scripts/check-style-hygiene.mjs` 棘轮锁定在 `IMPORTANT_BUDGET = 177`、`INLINE_STYLE_BUDGET = 1531`、`MAX_CSS_LINES = 394`（内联实际 1511、预留 20 缓冲，其余余量为 0/13）。
    - 删除任何一条前，必须用生产计算样式差分（见 4e）证明零差异；本轮测得绝大多数剩余项是**承重**的（抗 antd 同特异性平局、压制页面自身渐变、移动端紧凑排版）。
 
 ## 六、本次会话改动文件清单
@@ -774,4 +796,6 @@ antd `.ant-btn > .anticon` 压掉，图标回弹 2px，探针捕获后改为 `[d
 - 后续新增：`src/pages/Potential/styles/index.css`、`src/components/auth/{index,hero,card-and-form,responsive}.css`、
   `src/styles/base/app-shell-sidebar-and-user.css`、`src/pages/Portfolio/{portfolio-summary,portfolio-hero}.css`、
   `src/pages/IndustryChain/styles/atlas-workspace.css`、`src/pages/Stock/styles/chart-toolbar.css`、
-  `src/pages/NationalTeam/styles/data-status-panel.css`、`backend/app/modules/potential/market_data.py`
+  `src/pages/NationalTeam/styles/data-status-panel.css`、`src/pages/Chat/styles/empty-state.css`、
+  `src/pages/Settings/styles/eastmoney-proxy.css`、`src/pages/Macro/styles/commodities.css`、
+  `backend/app/modules/potential/market_data.py`
