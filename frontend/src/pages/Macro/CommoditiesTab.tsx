@@ -64,9 +64,9 @@ export default function CommoditiesTab() {
       key: "symbol",
       render: (_: unknown, record: CommodityItem) => (
         <div>
-          <div style={{ fontWeight: 600 }}>{record.name}</div>
-          <div style={{ fontSize: 12, color: c.textSecondary }}>
-            {record.symbol} · <Tag style={{ fontSize: 11 }}>{record.contract}</Tag>
+          <div className="commodity-name">{record.name}</div>
+          <div className="commodity-symbol">
+            {record.symbol} · <Tag className="commodity-contract-tag">{record.contract}</Tag>
           </div>
         </div>
       ),
@@ -93,10 +93,10 @@ export default function CommoditiesTab() {
       align: "right" as const,
       render: (val: number | null, record: CommodityItem) => (
         <div>
-          <span className="financial-num" style={{ fontWeight: 600, fontSize: 14 }}>
+          <span className="financial-num commodity-price">
             {val != null ? val.toLocaleString() : "-"}
           </span>
-          <span style={{ fontSize: 11, color: c.textSecondary, marginLeft: 4 }}>{record.unit}</span>
+          <span className="commodity-unit">{record.unit}</span>
         </div>
       ),
     },
@@ -130,7 +130,7 @@ export default function CommoditiesTab() {
       key: "range",
       align: "right" as const,
       render: (_: unknown, record: CommodityItem) => (
-        <span className="financial-num" style={{ fontSize: 12, color: c.textSecondary }}>
+        <span className="financial-num commodity-range">
           {record.low != null ? record.low.toLocaleString() : "-"} ~ {record.high != null ? record.high.toLocaleString() : "-"}
         </span>
       ),
@@ -142,7 +142,7 @@ export default function CommoditiesTab() {
       render: (chains: string[]) => (
         <Space size={[0, 4]} wrap>
           {chains.map((chain) => (
-            <Tag key={chain} style={{ fontSize: 12, borderRadius: 3 }}>
+            <Tag key={chain} className="commodity-chain-tag">
               {chain}
             </Tag>
           ))}
@@ -154,7 +154,7 @@ export default function CommoditiesTab() {
       dataIndex: "description",
       key: "description",
       ellipsis: true,
-      render: (desc: string) => <span style={{ fontSize: 12, color: c.textSecondary }}>{desc}</span>,
+      render: (desc: string) => <span className="commodity-desc">{desc}</span>,
     },
   ];
 
@@ -179,7 +179,7 @@ export default function CommoditiesTab() {
       </div>
 
       {/* 5 大核心先导大宗风向标 */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 12, marginBottom: 16 }}>
+      <div className="commodity-barometer-grid">
         {barometers.map(({ def, item }) => {
           const pct = item?.change_pct ?? null;
           const isUp = pct != null && pct > 0;
@@ -204,15 +204,15 @@ export default function CommoditiesTab() {
                 }
               }}
             >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontSize: 13, fontWeight: 600 }}>{def.label}</span>
-                <Tag color={def.tagColor} style={{ fontSize: 11, margin: 0 }}>{def.role}</Tag>
+              <div className="commodity-kpi-head">
+                <span className="commodity-kpi-label">{def.label}</span>
+                <Tag color={def.tagColor} className="commodity-role-tag">{def.role}</Tag>
               </div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 6 }}>
+              <div className="commodity-kpi-values">
                 <Statistic
                   value={item?.latest_price != null ? item.latest_price.toLocaleString() : "-"}
                   styles={{ content: { fontSize: 18, fontWeight: 700 } }}
-                  suffix={<span style={{ fontSize: 11, color: c.textMuted }}>{item?.unit ?? ""}</span>}
+                  suffix={<span className="commodity-kpi-unit">{item?.unit ?? ""}</span>}
                 />
                 {pct != null ? (
                   <span style={{ color: pctColor, fontSize: 12, fontWeight: 600 }}>
@@ -220,7 +220,7 @@ export default function CommoditiesTab() {
                     {isUp ? `+${pct.toFixed(2)}` : pct.toFixed(2)}%
                   </span>
                 ) : (
-                  <span style={{ color: c.textMuted, fontSize: 12 }}>-</span>
+                  <span className="commodity-kpi-empty">-</span>
                 )}
               </div>
               <div className="macro-kpi-subtext" title={def.mapping}>
@@ -231,8 +231,8 @@ export default function CommoditiesTab() {
         })}
       </div>
 
-      <Card size="small" variant="borderless" style={{ marginBottom: 16 }}>
-        <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
+      <Card size="small" variant="borderless" className="u-mb-16">
+        <div className="commodity-toolbar">
           <Radio.Group
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
@@ -249,11 +249,11 @@ export default function CommoditiesTab() {
           </Radio.Group>
 
           <Input
-            prefix={<SearchOutlined style={{ color: c.textSecondary }} />}
+            prefix={<SearchOutlined className="commodity-search-icon" />}
             placeholder="搜索品种名称、代码或产业链 (如: 碳酸锂、铜、储能)"
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
-            style={{ width: "100%", maxWidth: 300 }}
+            className="commodity-search"
             size="small"
             allowClear
           />

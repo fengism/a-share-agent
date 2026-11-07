@@ -288,3 +288,97 @@
 .quant-page .ant-btn {
   font-size: var(--quant-font-control);
 }
+
+/* 回测范围字段：自 BacktestFormSections 内联样式迁出 */
+
+.quant-option-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.quant-option-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+[data-theme] .quant-market-tag.ant-tag {
+  font-size: 10px;
+  line-height: 16px;
+  padding: 0 4px;
+  margin: 0;
+}
+
+.quant-option-code {
+  font-family: monospace;
+}
+
+.quant-option-name {
+  opacity: 0.85;
+}
+
+.quant-option-price {
+  color: var(--c-text-muted);
+  font-size: var(--c-font-xs);
+}
+
+.quant-codes-autocomplete {
+  width: 100%;
+}
+
+.quant-search-icon {
+  color: var(--c-text-muted);
+}
+
+.quant-codes-helper {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: -10px;
+  margin-bottom: 14px;
+}
+
+.quant-selected-stocks,
+.quant-quick-stocks {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.quant-selected-label,
+.quant-quick-label {
+  font-size: var(--c-font-xs);
+  color: var(--c-text-muted);
+}
+
+[data-theme] .quant-selected-tag.ant-tag {
+  font-size: var(--c-font-xs);
+  margin-inline-end: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+[data-theme] .ant-btn.quant-quick-import {
+  font-size: var(--c-font-xs);
+  height: 24px;
+  line-height: 22px;
+  padding: 0 8px;
+}
+
+[data-theme] .quant-preset-tag.ant-tag {
+  cursor: pointer;
+  font-size: var(--c-font-xs);
+  margin-inline-end: 0;
+}
+
+[data-theme] .quant-preset-tag--dim.ant-tag {
+  opacity: 0.7;
+}
+
+.quant-number-full {
+  width: 100%;
+}
