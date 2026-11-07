@@ -181,7 +181,6 @@
 .dashboard-sidebar .dashboard-watchlist__item:focus-within .dashboard-watchlist__actions--overlay { opacity: 1; transform: translateY(0); pointer-events: auto; }
 
 @container dashboard-page (max-width: 900px) {
-  .dashboard-layout { grid-template-columns: minmax(0, 1fr); }
   .dashboard-sidebar {
     position: static;
     max-height: none;
@@ -201,7 +200,6 @@
 /* 媒体查询兜底：确保不支持 @container 的移动端环境（较旧 WebView、微信浏览器等）
    以及子元素计算宽度时的正确单列回退 */
 @media (max-width: 900px) {
-  .dashboard-layout { grid-template-columns: minmax(0, 1fr); }
   .dashboard-sidebar {
     position: static;
     max-height: none;

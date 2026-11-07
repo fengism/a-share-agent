@@ -66,4 +66,3 @@
 .market-board-panel__more { color: var(--c-text-secondary); font-size: var(--c-font-xs); }
 .market-board-panel__placeholder { display: grid; min-height: 180px; place-items: center; padding: var(--c-space-5); color: var(--c-text-muted); font-size: var(--c-font-sm); text-align: center; }
 .market-board-panel > .ant-skeleton { padding: var(--c-space-4); }
-

@@ -378,4 +378,3 @@
   background: color-mix(in srgb, var(--c-accent) 14%, transparent);
   border: 1px solid color-mix(in srgb, var(--c-accent) 32%, transparent);
 }
-

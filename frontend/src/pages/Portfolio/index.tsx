@@ -15,7 +15,8 @@ import PortfolioSettingsCard from "./PortfolioSettingsCard";
 import TransactionEntryCard, { type TransactionEntryCardHandle } from "./TransactionEntryCard";
 import type { PortfolioStockSummary, PortfolioTrimSuggestion } from "../../types/portfolio";
 import { errorMessage, formatTime } from "./portfolioFormatters";
-import "./portfolio.css";
+import "./portfolio-summary.css";
+import "./portfolio-hero.css";
 
 export default function PortfolioPage() {
   const transactionEntryRef = useRef<TransactionEntryCardHandle>(null);

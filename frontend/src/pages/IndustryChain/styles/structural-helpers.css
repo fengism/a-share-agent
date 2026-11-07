@@ -234,4 +234,3 @@
   background: color-mix(in srgb, var(--c-card-bg) 94%, transparent);
   backdrop-filter: blur(12px);
 }
-

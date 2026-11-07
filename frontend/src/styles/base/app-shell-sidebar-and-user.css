@@ -1,0 +1,204 @@
+/* 侧栏页脚状态条、用户菜单、路由加载、错误边界
+   自原 base.css 第 771–1134 行拆出。
+   本目录内文件由 index.css 按固定顺序 @import，顺序不可调整：
+   同特异性规则靠源序决出胜负，重排会改变层叠结果。 */
+/* ── 底部量化雷达状态条 ── */
+.app-sidebar-footer {
+  padding: 10px 14px;
+}
+
+.app-sidebar-footer--mobile {
+  padding: 12px 16px;
+  padding-bottom: max(16px, env(safe-area-inset-bottom, 0px));
+}
+
+[data-theme="stellar-blue"] .app-sidebar-footer,
+[data-theme="light"] .app-sidebar-footer {
+  border-top: 1px solid var(--c-border);
+  background: var(--c-sider-bg);
+}
+
+.app-sidebar-footer--collapsed {
+  padding: 10px 0;
+  display: flex;
+  justify-content: center;
+}
+
+.app-sidebar-footer__status {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.app-sidebar-footer__pulse {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--c-success);
+  flex-shrink: 0;
+  animation: pulseDotGlow 2.5s infinite ease-in-out;
+}
+
+.app-sidebar-footer__label {
+  font-size: 10px;
+  font-family: var(--c-font-mono);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--c-text-muted);
+}
+
+.app-sidebar-footer__badge {
+  margin-left: auto;
+  font-size: 9px;
+  font-family: var(--c-font-mono);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--c-success);
+  background: rgba(18, 183, 106, 0.1);
+  border: 1px solid rgba(18, 183, 106, 0.25);
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+
+.app-user-menu {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+.app-user-menu__trigger {
+  display: flex;
+  height: 40px;
+  padding: 4px var(--c-space-2);
+  align-items: center;
+  justify-content: center;
+  gap: var(--c-space-2);
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius-md);
+  color: var(--c-text-primary);
+  background: transparent;
+  cursor: pointer;
+  box-sizing: border-box;
+  font: inherit;
+  line-height: 1;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.app-user-menu__trigger:hover,
+.app-user-menu__trigger[aria-expanded="true"] {
+  border-color: var(--c-primary);
+  background: var(--c-hover-bg);
+}
+
+.app-user-menu__trigger:focus-visible,
+.app-user-menu__item:focus-visible {
+  outline: 2px solid var(--c-focus-ring);
+  outline-offset: 2px;
+}
+
+.app-user-menu__trigger--mobile {
+  width: 40px;
+  padding: 0;
+}
+
+.app-user-menu__avatar {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--c-on-primary);
+  background: var(--c-primary);
+  font-size: var(--c-font-base);
+}
+
+.app-user-menu__username {
+  max-width: 120px;
+  overflow: hidden;
+  font-size: var(--c-font-md);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-user-menu__panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: calc(var(--c-z-header) + 1);
+  width: 190px;
+  padding: 7px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius-lg);
+  color: var(--c-text-primary);
+  background: var(--c-surface-overlay);
+  box-shadow: var(--c-shadow-lg);
+  box-sizing: border-box;
+}
+
+.app-user-menu__identity {
+  display: flex;
+  min-width: 0;
+  padding: 8px 9px;
+  align-items: center;
+  gap: 6px;
+}
+
+.app-user-menu__identity-name {
+  min-width: 0;
+  overflow: hidden;
+  flex: 1;
+  font-size: var(--c-font-base);
+  font-weight: var(--c-weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-user-menu__admin-badge {
+  padding: 2px 6px;
+  flex: 0 0 auto;
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius-pill);
+  color: var(--c-warning);
+  background: var(--c-hover-bg);
+  font-size: var(--c-font-xs);
+  line-height: var(--c-leading-normal);
+}
+
+.app-user-menu__separator {
+  height: 1px;
+  margin: 3px 0;
+  background: var(--c-border);
+}
+
+.app-user-menu__item {
+  display: flex;
+  width: 100%;
+  min-height: 36px;
+  padding: 0 9px;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: var(--c-radius-sm);
+  color: var(--c-text-primary);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--c-font-sm);
+  text-align: left;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.app-user-menu__item:hover {
+  color: var(--c-text-primary);
+  background: var(--c-hover-bg);
+}
+
+.app-user-menu__item--danger {
+  color: var(--c-up);
+}
+
+.app-user-menu__item--danger:hover {
+  color: var(--c-up);
+  background: var(--c-hover-bg);
+}

@@ -91,4 +91,3 @@
 .market-board-emotion__breadth-bar > .is-up { background: var(--c-up); }
 .market-board-emotion__breadth-bar > .is-down { background: var(--c-down); }
 .market-board-emotion__breadth p { grid-column: 1 / -1; margin: 0; color: var(--c-text-secondary); font-size: var(--c-font-sm); line-height: var(--c-leading-relaxed); }
-
