@@ -1,0 +1,161 @@
+/* 选股结果表格样式 */
+
+.screener-results__badge {
+  font-size: 10px;
+  line-height: 14px;
+  padding: 0 3px;
+  border-radius: 2px;
+  font-weight: 600;
+}
+
+.screener-results__badge--limit-up {
+  background-color: rgba(245, 34, 45, 0.15);
+  color: var(--c-up, #f5222d);
+}
+
+.screener-results__badge--limit-down {
+  background-color: rgba(82, 196, 26, 0.15);
+  color: var(--c-down, #52c41a);
+}
+
+.screener-results__badge--high-turnover {
+  background-color: rgba(250, 140, 22, 0.15);
+  color: #fa8c16;
+}
+
+.screener-results__badge--volume {
+  background-color: rgba(114, 46, 209, 0.15);
+  color: #722ed1;
+}
+
+.screener-results__badge--broken-net {
+  font-size: var(--c-font-xs, 11px);
+  line-height: 14px;
+  padding: 0 3px;
+  border-radius: 2px;
+  background-color: rgba(24, 144, 255, 0.12);
+  color: #1890ff;
+  font-weight: 600;
+}
+
+.screener-results__badges-wrap {
+  display: inline-flex;
+  gap: 3px;
+  align-items: center;
+}
+
+.screener-results__stock-link {
+  display: block;
+  color: var(--c-primary);
+}
+
+.screener-results__stock-name {
+  display: block;
+  color: var(--c-text-primary);
+  font-weight: var(--c-weight-semibold);
+}
+
+.screener-results__stock-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--c-text-muted);
+  font-size: var(--c-font-xs);
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+
+.screener-results__score-tag.ant-tag {
+  font-size: 10px;
+  line-height: 14px;
+  padding: 0 3px;
+  margin: 0;
+  font-weight: 600;
+}
+
+.screener-results__code-link {
+  color: var(--c-primary);
+  font-weight: var(--c-weight-medium);
+}
+
+.screener-results__price-stack {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.screener-results__strategy-age-tag.ant-tag {
+  font-weight: 600;
+  min-width: 42px;
+  text-align: center;
+  margin: 0;
+}
+
+.screener-results__cell-with-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  justify-content: flex-end;
+  width: 100%;
+}
+
+.screener-results__concept-tag.ant-tag {
+  margin-right: 4px;
+  margin-bottom: 2px;
+}
+
+.screener-results__percentile--low {
+  color: var(--c-down);
+  font-weight: var(--c-weight-medium);
+}
+
+.screener-results__percentile--mid {
+  color: var(--c-warning);
+  font-weight: var(--c-weight-medium);
+}
+
+.screener-results__percentile--high {
+  color: var(--c-up);
+  font-weight: var(--c-weight-medium);
+}
+
+.screener-results__added-icon {
+  color: var(--c-primary);
+}
+
+.screener-results__ai-icon {
+  color: var(--c-primary);
+}
+
+.screener-results__expanded-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.screener-results__expanded-actions {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  border-top: 1px dashed var(--c-border);
+  padding-top: 8px;
+}
+
+.screener-results__perspective-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+  align-items: center;
+  gap: 6px;
+}
+
+.screener-results__perspective-label {
+  font-size: 12px;
+  color: var(--c-text-muted);
+}
+
+.screener-results__perspective-btn.ant-btn {
+  font-size: 12px;
+  padding: 0 8px;
+}

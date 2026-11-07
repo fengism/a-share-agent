@@ -1,0 +1,44 @@
+/* 焦点环、跳过导航、屏幕阅读器辅助
+   自原 base.css 第 145–184 行拆出。
+   本目录内文件由 index.css 按固定顺序 @import，顺序不可调整：
+   同特异性规则靠源序决出胜负，重排会改变层叠结果。 */
+/* Keyboard focus ring for custom clickable elements (role="button").
+   Only shows on keyboard navigation, not mouse clicks. */
+[role="button"]:focus-visible {
+  outline: 2px solid var(--c-primary);
+  outline-offset: 2px;
+  border-radius: var(--c-radius-sm);
+}
+
+.financial-num {
+  font-family: var(--c-font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.app-skip-link {
+  position: fixed;
+  top: 8px;
+  left: 12px;
+  z-index: 1000;
+  padding: 8px 12px;
+  border: 1px solid var(--c-primary);
+  border-radius: var(--c-radius-md);
+  color: var(--c-text-primary);
+  background: var(--c-card-bg);
+  box-shadow: var(--c-card-shadow);
+  font-size: var(--c-font-md);
+  font-weight: var(--c-weight-semibold);
+  text-decoration: none;
+  transform: translateY(-160%);
+  transition: transform 0.15s ease;
+}
+
+.app-skip-link:focus {
+  transform: translateY(0);
+}
+
+#main-content:focus {
+  outline: none;
+}
+

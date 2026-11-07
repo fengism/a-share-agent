@@ -76,7 +76,7 @@ export default function PriceTab() {
         <Card size="small" className="macro-kpi-card" variant="borderless">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <span style={{ fontSize: 12, color: c.textSecondary }}>PPI 工业出厂价格 (同比)</span>
-            <Tag color="volcano" icon={<DollarOutlined />}>工业出厂</Tag>
+            <Tag color="orange" icon={<DollarOutlined />}>工业出厂</Tag>
           </div>
           <Statistic
             value={ppiYoY != null ? `${ppiYoY > 0 ? "+" : ""}${ppiYoY.toFixed(2)}%` : "-"}

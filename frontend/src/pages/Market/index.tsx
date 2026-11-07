@@ -105,6 +105,7 @@ export default function Market() {
             activeKey={activeTab}
             onChange={setActiveTab}
             ariaLabel="市场数据分类"
+            desktopMode="rail"
             size="middle"
             tabBarGutter={8}
             collapseQuery="(max-width: 767px)"

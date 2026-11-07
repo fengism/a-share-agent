@@ -1,0 +1,221 @@
+/* KPI 汇总台与结构轮动（原 §3–§4）
+   自 national-team.css 第 186–403 行拆出。
+   由同目录 index.css 按固定顺序 @import，顺序不可调整：同特异性规则靠源序决胜负。 */
+/* ── 3. KPI Summary Console ─────────────────────────────────────────────── */
+.national-team-summary-section {
+  width: 100%;
+}
+
+.national-team-summary {
+  margin: 0 !important;
+}
+
+.national-team-summary__card {
+  height: 100%;
+  border-radius: 10px;
+  border: 1px solid var(--c-border);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  background: var(--c-card-bg);
+}
+
+.national-team-summary__card .ant-card-body {
+  padding: 10px 14px 8px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.national-team-summary__card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1);
+  border-color: rgba(32, 198, 229, 0.35);
+}
+
+.national-team-summary__card--total {
+  background:
+    linear-gradient(135deg, rgba(32, 198, 229, 0.1) 0%, rgba(8, 127, 152, 0.03) 100%),
+    var(--c-card-bg);
+  border-color: rgba(32, 198, 229, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.national-team-summary__card--total::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #087f98, #20c6e5, #3ec98f);
+}
+
+.national-team-summary .ant-statistic-title {
+  color: var(--c-text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  margin-bottom: 3px;
+  letter-spacing: 0.01em;
+}
+
+.national-team-summary .ant-statistic-content {
+  font-family: var(--c-font-mono);
+  font-size: clamp(15px, 1.15vw, 19px);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.national-team-summary .ant-statistic-content-prefix {
+  margin-right: 4px;
+  font-size: 13px;
+}
+
+.national-team-summary__hint {
+  margin-top: 4px;
+  color: var(--c-text-muted);
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+/* ── 4. Structure Rotation (结构轮动) ────────────────────────────────────── */
+.national-team-rotation {
+  border-radius: 12px;
+  border: 1px solid var(--c-border);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.04), var(--c-shadow-xs, 0 1px 3px rgba(0, 0, 0, 0.04));
+  overflow: hidden;
+}
+
+.national-team-rotation .ant-card-head {
+  min-height: 40px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--c-border);
+}
+
+.national-team-rotation__header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.national-team-rotation__title-text {
+  font-size: 14px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.national-team-rotation__subtitle {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--c-text-muted);
+}
+
+.national-team-rotation .ant-card-body {
+  padding: 10px 16px 8px;
+}
+
+.national-team-rotation__list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 20px;
+}
+
+.national-team-rotation__item {
+  display: grid;
+  grid-template-columns: 20px 100px minmax(60px, 1fr) 95px;
+  align-items: center;
+  gap: 10px;
+  min-height: 30px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  transition: background 0.15s ease;
+}
+
+.national-team-rotation__item:hover {
+  background: var(--c-hover-bg, rgba(128, 128, 128, 0.06));
+}
+
+.national-team-rotation__rank {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  color: var(--c-text-muted);
+  background: var(--c-bg-subtle, rgba(140, 140, 140, 0.1));
+  font-family: var(--c-font-mono);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.national-team-rotation__rank--1 {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(245, 158, 11, 0.3);
+}
+
+.national-team-rotation__rank--2 {
+  background: linear-gradient(135deg, #94a3b8, #64748b);
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(100, 116, 139, 0.25);
+}
+
+.national-team-rotation__rank--3 {
+  background: linear-gradient(135deg, #d97706, #92400e);
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(217, 119, 6, 0.25);
+}
+
+.national-team-rotation__info {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.national-team-rotation__name {
+  font-weight: 600;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.national-team-rotation__code {
+  font-size: 10px;
+  font-family: var(--c-font-mono);
+  color: var(--c-text-muted);
+}
+
+.national-team-rotation__bar {
+  height: 5px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: var(--c-muted-soft, rgba(128, 128, 128, 0.1));
+}
+
+.national-team-rotation__bar span {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.national-team-rotation__val.ant-typography {
+  font-family: var(--c-font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.national-team-rotation__footer {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--c-border);
+}
+
+.national-team-rotation__note {
+  font-size: 11px;
+}
+

@@ -60,7 +60,7 @@ const columns: TableProps<StockResearchReport>["columns"] = [
 export default function ResearchReportsPanel({ code }: Props) {
   const c = useColors();
   const t = useTokens();
-  const { cardStyle, sectionHeaderStyle } = useStyles();
+  const { sectionHeaderStyle } = useStyles();
   const reportsQuery = useStockReports(code);
   const data = reportsQuery.data;
   const items = data?.items;
@@ -97,7 +97,7 @@ export default function ResearchReportsPanel({ code }: Props) {
           size="small"
           title={`研报列表（${data?.total_count ?? 0} 份）`}
           extra={<Text type="secondary">来源：新浪财经</Text>}
-          style={{ ...cardStyle }}
+          className="u-card"
           styles={{ body: { padding: t.space[4] } }}
         >
           {consensus ? (

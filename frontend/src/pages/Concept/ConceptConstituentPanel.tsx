@@ -7,7 +7,7 @@ import dayjs from "dayjs";
 import ChangeValue from "../../components/ChangeValue";
 import SectionDataState from "../../components/SectionDataState";
 import StockExternalLink from "../../components/StockExternalLink";
-import StockQuickPreviewModal from "../../components/StockQuickPreviewModal";
+import StockWorkspaceDrawer from "../../components/StockWorkspaceDrawer";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { useColors, semanticTagStyle } from "../../styles/ui";
 import {
@@ -457,7 +457,7 @@ export default function ConceptConstituentPanel({
       </p>
 
       {previewStock ? (
-        <StockQuickPreviewModal
+        <StockWorkspaceDrawer
           open={Boolean(previewStock)}
           code={previewStock.code}
           name={previewStock.name}

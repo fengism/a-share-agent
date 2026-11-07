@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { SaveOutlined, SettingOutlined } from "@ant-design/icons";
 import { Button, Card, Col, Form, InputNumber, Row, Typography, message } from "antd";
 import { useUpdatePortfolioSettings } from "../../api/queries";
-import { useColors, useStyles } from "../../styles/ui";
+import { useColors } from "../../styles/ui";
 import type {
   PortfolioAccountSettings,
   PortfolioAccountSettingsUpdate,
@@ -19,7 +19,6 @@ interface PortfolioSettingsCardProps {
 
 export default function PortfolioSettingsCard({ settings, isModal = false, onSaved }: PortfolioSettingsCardProps) {
   const colors = useColors();
-  const { cardStyle } = useStyles();
   const [form] = Form.useForm<PortfolioAccountSettingsUpdate>();
   const updateMutation = useUpdatePortfolioSettings();
 
@@ -134,7 +133,7 @@ export default function PortfolioSettingsCard({ settings, isModal = false, onSav
     <Card
       size="small"
       title={<span><SettingOutlined style={{ marginRight: 6 }} />账户与风控设置</span>}
-      style={{ ...cardStyle, marginBottom: 16 }}
+      className="u-card" style={{ marginBottom: 16 }}
     >
       {formContent}
     </Card>

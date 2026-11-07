@@ -32,7 +32,7 @@ import {
   useFavoriteConcepts,
   useRecentConcepts,
 } from "./conceptSelection";
-import "./concept-page.css";
+import "./styles/index.css";
 
 /** 指数卡片视图切换：单概念 K 线 / 多概念对比 */
 const INDEX_VIEW_OPTIONS = [

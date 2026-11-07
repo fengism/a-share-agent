@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { AppstoreOutlined, TableOutlined } from "@ant-design/icons";
 import { Card, Empty, Segmented, Table, Tooltip, Typography } from "antd";
 import type { QuantBacktestResult } from "../../../api/queries";
-import { useColors, useStyles } from "../../../styles/ui";
+import { useColors } from "../../../styles/ui";
 import { formatPercent } from "./formatters";
 
 const { Text } = Typography;
@@ -22,7 +22,6 @@ const MONTH_COLS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 export default function MonthlyReturnsHeatmap({ monthlyReturns }: MonthlyReturnsHeatmapProps) {
   const [viewMode, setViewMode] = useState<"heatmap" | "list">("heatmap");
   const colors = useColors();
-  const { cardStyle } = useStyles();
 
   // Process data into matrix by Year
   const { rows, maxAbsReturn } = useMemo(() => {
@@ -106,8 +105,7 @@ export default function MonthlyReturnsHeatmap({ monthlyReturns }: MonthlyReturns
         />
       )}
       size="small"
-      style={cardStyle}
-      className="quant-result-card quant-table-card"
+      className="quant-result-card quant-table-card u-card"
     >
       {monthlyReturns.length === 0 ? (
         <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无月度收益" />

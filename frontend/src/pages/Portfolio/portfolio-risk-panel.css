@@ -1,0 +1,177 @@
+/* 组合仓位风险面板样式 */
+
+.portfolio-risk-card.ant-card {
+  margin-bottom: 16px;
+}
+
+.portfolio-risk-panel__title-icon {
+  color: var(--c-primary);
+}
+
+.portfolio-risk-panel__level-icon {
+  font-size: 12px;
+}
+
+.portfolio-risk-panel__level-tag {
+  border-color: var(--c-border);
+  background: var(--c-hover-bg);
+}
+
+.portfolio-risk-panel__level-tag--up {
+  color: var(--c-up);
+}
+
+.portfolio-risk-panel__level-tag--down {
+  color: var(--c-down);
+}
+
+.portfolio-risk-panel__level-tag--warning {
+  color: var(--c-warning);
+}
+
+.portfolio-risk-panel__level-tag--info {
+  color: var(--c-info);
+}
+
+.portfolio-risk-panel__metrics-section {
+  margin-bottom: 16px;
+}
+
+.portfolio-risk-panel__stat-box {
+  padding: var(--c-pad-inset, 7px 12px);
+  background: var(--c-nested-bg, rgba(0, 0, 0, 0.02));
+  border-radius: 8px;
+  height: 100%;
+}
+
+.portfolio-risk-panel__stat-box--overlimit {
+  border-left: 3px solid var(--c-warning, #faad14);
+}
+
+.portfolio-risk-panel__overlimit-text {
+  color: var(--c-warning, #faad14);
+}
+
+.portfolio-risk-panel__details-box {
+  border: 1px solid var(--c-border, rgba(128, 128, 128, 0.15));
+  border-radius: 8px;
+  padding: var(--c-pad-inset, 7px 12px);
+  margin-bottom: 12px;
+}
+
+.portfolio-risk-panel__details-title {
+  font-size: var(--c-font-xs, 12px);
+  color: var(--c-text-muted);
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.portfolio-risk-panel__sector-section {
+  margin-top: 14px;
+}
+
+.portfolio-risk-panel__section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.portfolio-risk-panel__section-title {
+  font-size: var(--c-font-sm, 13px);
+}
+
+.portfolio-risk-panel__section-limit {
+  color: var(--c-text-muted);
+  font-size: var(--c-font-xs);
+}
+
+.portfolio-risk-panel__bar-container {
+  display: flex;
+  height: 7px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--c-nested-bg, rgba(0, 0, 0, 0.02));
+  margin-bottom: 10px;
+}
+
+.portfolio-risk-panel__bar-item {
+  transition: width 0.3s ease;
+}
+
+.portfolio-risk-panel__sector-tag.ant-tag {
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.portfolio-risk-panel__sector-tag--overlimit.ant-tag {
+  border-color: var(--c-warning, #faad14);
+}
+
+.portfolio-risk-panel__sector-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+.portfolio-risk-panel__sector-meta {
+  color: var(--c-text-muted);
+  margin-left: 6px;
+}
+
+.portfolio-risk-panel__sector-warn {
+  color: var(--c-warning, #faad14);
+  margin-left: 4px;
+  font-size: 11px;
+}
+
+.portfolio-risk-panel__trim-section {
+  margin-top: 16px;
+}
+
+.portfolio-risk-panel__trim-space {
+  width: 100%;
+}
+
+.portfolio-risk-panel__trim-card {
+  padding: var(--c-pad-inset, 7px 12px);
+  border-radius: 8px;
+  background: var(--c-nested-bg, rgba(0, 0, 0, 0.02));
+  border: 1px solid var(--c-border, rgba(128, 128, 128, 0.15));
+}
+
+.portfolio-risk-panel__trim-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.portfolio-risk-panel__trim-tag.ant-tag {
+  font-weight: 600;
+}
+
+.portfolio-risk-panel__trim-amount {
+  font-weight: 600;
+}
+
+.portfolio-risk-panel__trim-meta {
+  color: var(--c-text-muted);
+}
+
+.portfolio-risk-panel__trim-reasons {
+  margin-top: 6px;
+}
+
+.portfolio-risk-panel__trim-reasons-text {
+  color: var(--c-text-muted);
+  font-size: var(--c-font-sm);
+}
+
+.portfolio-risk-panel__alert.ant-alert {
+  margin-top: 14px;
+}

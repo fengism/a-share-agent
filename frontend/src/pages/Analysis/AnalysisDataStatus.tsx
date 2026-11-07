@@ -44,7 +44,6 @@ export default function AnalysisDataStatus({ pageData, result }: AnalysisDataSta
           {trace?.generated_at ? <Text type="secondary">生成于 {trace.generated_at}</Text> : null}
         </Space>
       )}
-      style={{ marginBottom: 16 }}
     />
   );
 }

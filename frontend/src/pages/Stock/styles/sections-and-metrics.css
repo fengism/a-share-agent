@@ -1,0 +1,188 @@
+/* 区段卡、区段标题与指标栅格（含骨架占位）
+   自 stock-page.css 第 320–504 行拆出。
+   由同目录 index.css 按固定顺序 @import，顺序不可调整：同特异性规则靠源序决胜负。 */
+.stock-section-card {
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+[data-theme="stellar-blue"] .stock-section-card.u-card {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--c-card-bg);
+}
+
+[data-theme="stellar-blue"] .stock-section-card::before {
+  display: none;
+}
+
+[data-theme="stellar-blue"] .stock-section-card.u-card:hover {
+  border-color: rgba(255, 255, 255, 0.16);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+}
+
+[data-theme="light"] .stock-section-card.u-card {
+  border: 1px solid var(--c-border);
+  background: var(--c-card-bg);
+  box-shadow: 0 1px 3px rgba(44, 34, 20, 0.04);
+}
+
+[data-theme="light"] .stock-section-card::before {
+  display: none;
+}
+
+[data-theme="light"] .stock-section-card.u-card:hover {
+  border-color: var(--c-primary);
+  box-shadow: 0 4px 14px rgba(16, 24, 40, 0.06);
+}
+
+.stock-section-title {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 11px;
+  line-height: 1.2;
+}
+
+.stock-section-title__icon {
+  display: inline-grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  place-items: center;
+  border-radius: 10px;
+  font-size: var(--c-font-base);
+}
+
+[data-theme="stellar-blue"] .stock-section-title__icon {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--c-nested-bg);
+  color: var(--c-primary);
+  box-shadow: none;
+}
+
+[data-theme="light"] .stock-section-title__icon {
+  border: 1px solid var(--c-border);
+  background: var(--c-primary-soft);
+  color: var(--c-primary);
+  box-shadow: none;
+}
+
+.stock-section-title__copy {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.stock-section-title h2 {
+  margin: 0;
+  color: var(--c-text-primary);
+  font-size: var(--c-font-base);
+  font-weight: var(--c-weight-semibold);
+}
+
+.stock-section-title small {
+  overflow: hidden;
+  color: var(--c-text-muted);
+  font-size: var(--c-font-xs);
+  font-weight: var(--c-weight-normal);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stock-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+  padding: var(--c-space-3);
+  gap: var(--c-space-2);
+}
+
+.stock-metric {
+  position: relative;
+  display: grid;
+  min-height: 76px;
+  align-content: center;
+  gap: 7px;
+  margin: 0;
+  padding: 13px 14px;
+  overflow: hidden;
+  border-radius: var(--c-radius-md);
+  transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+
+[data-theme="stellar-blue"] .stock-metric {
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--c-nested-bg);
+}
+
+[data-theme="stellar-blue"] .stock-metric:hover {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  transform: translateY(-1px);
+}
+
+[data-theme="stellar-blue"] .stock-metric--featured {
+  background: var(--c-nested-bg);
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+[data-theme="stellar-blue"] .stock-metric--featured::after {
+  display: none;
+}
+
+[data-theme="light"] .stock-metric {
+  border: 1px solid var(--c-border);
+  background: var(--c-nested-bg);
+}
+
+[data-theme="light"] .stock-metric:hover {
+  border-color: var(--c-border);
+  background: var(--c-hover-bg);
+  box-shadow: 0 2px 8px rgba(16, 24, 40, 0.06);
+  transform: translateY(-1px);
+}
+
+[data-theme="light"] .stock-metric--featured {
+  border-color: var(--c-border);
+  background: linear-gradient(135deg, rgba(8, 127, 152, 0.06), var(--c-nested-bg));
+}
+
+[data-theme="light"] .stock-metric--featured::after {
+  position: absolute;
+  width: 34px;
+  height: 34px;
+  right: -13px;
+  bottom: -13px;
+  border: 7px solid rgba(8, 127, 152, 0.10);
+  border-radius: 50%;
+  content: "";
+}
+
+/* 指标数值为骨架时的占位：去掉 antd 骨架默认外边距，保证与真实数值同高 */
+.stock-metric__placeholder {
+  margin: 0;
+}
+
+.stock-metric__placeholder .ant-skeleton-element,
+.stock-metric__placeholder .ant-skeleton-button {
+  margin: 0;
+}
+
+.stock-metric dt {
+  color: var(--c-text-muted);
+  font-size: var(--c-font-xs);
+}
+
+.stock-metric dd {
+  margin: 0;
+  color: var(--c-text-primary);
+  font-family: var(--c-font-mono);
+  font-size: var(--c-font-lg);
+  font-weight: var(--c-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.stock-metric--featured dd { color: var(--c-primary); }
+

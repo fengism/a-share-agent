@@ -1,0 +1,43 @@
+/* 统一数据页工具条：左右对齐，窄屏堆叠，与卡片栅格间距一致。
+   CSS Modules 试点：类名由构建哈希隔离，无需 section-toolbar__ 前缀，
+   也不会被页面级样式意外覆盖。新增样式请在此文件内以短名书写。 */
+.root {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  color: var(--c-text-secondary);
+  font-size: var(--c-font-md);
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 576px) {
+  .root {
+    align-items: stretch;
+  }
+
+  .meta,
+  .actions {
+    width: 100%;
+  }
+
+  .actions {
+    justify-content: space-between;
+  }
+}

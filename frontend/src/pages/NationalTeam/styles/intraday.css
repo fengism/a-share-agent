@@ -1,0 +1,329 @@
+/* 盘中扫描告警与异动横幅（含 ≤640px 移动端）
+   自 national-team.css 第 1299–1448 行拆出。
+   由同目录 index.css 按固定顺序 @import，顺序不可调整：同特异性规则靠源序决胜负。 */
+/* -------------------------------------------------------------
+ * 盘中主力放量异动监测 (Sweep Alert) 响应式与移动端深度优化
+ * ------------------------------------------------------------- */
+.national-team-sweep-alert {
+  border-radius: 8px;
+}
+
+.national-team-sweep-alert__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.national-team-sweep-alert__title-main {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.national-team-sweep-alert__subtitle {
+  font-size: 12px;
+  color: var(--c-text-secondary);
+}
+
+.national-team-sweep-alert__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.national-team-sweep-alert__tag.ant-tag {
+  cursor: pointer;
+  padding: 3px 8px;
+  font-size: 12px;
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  white-space: normal;
+  height: auto;
+  line-height: 1.4;
+  max-width: 100%;
+  transition: all 0.2s ease;
+}
+
+.national-team-sweep-alert__tag:hover {
+  opacity: 0.85;
+}
+
+.national-team-sweep-alert__item-name {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.national-team-sweep-alert__item-code {
+  font-size: 11px;
+  opacity: 0.85;
+  font-family: var(--c-font-mono);
+}
+
+.national-team-sweep-alert__item-metrics {
+  font-family: var(--c-font-mono);
+}
+
+/* 异动预警横幅移动端优化 */
+.national-team-anomaly-banner__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.national-team-anomaly-banner__desc.ant-typography {
+  font-size: 12px;
+}
+
+/* 移动端 (<= 640px) 彻底解决显示不全、横向溢出与换行截断 */
+@media (max-width: 640px) {
+  .national-team-sweep-alert.ant-alert {
+    padding: 8px 10px;
+  }
+
+  .national-team-sweep-alert.ant-alert .ant-alert-icon {
+    margin-inline-end: 8px;
+    font-size: 15px;
+    margin-top: 2px;
+  }
+
+  .national-team-sweep-alert.ant-alert .ant-alert-message {
+    margin-bottom: 4px;
+  }
+
+  .national-team-sweep-alert__title {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+
+  .national-team-sweep-alert__subtitle {
+    font-size: 11px;
+    line-height: 1.35;
+    word-break: break-all;
+  }
+
+  .national-team-sweep-alert__list {
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 6px;
+    width: 100%;
+  }
+
+  .national-team-sweep-alert__tag.ant-tag {
+    display: flex;
+    width: 100%;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 10px;
+    box-sizing: border-box;
+    border-radius: 6px;
+  }
+
+  .national-team-sweep-alert__item-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding-right: 6px;
+  }
+
+  .national-team-sweep-alert__item-metrics {
+    flex-shrink: 0;
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  .national-team-anomaly-banner__item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 3px;
+  }
+
+  .national-team-anomaly-banner__desc.ant-typography {
+    font-size: 11.5px;
+    line-height: 1.4;
+    width: 100%;
+  }
+}
+
+/* ── National Team Report Modal & Poster Styles ────────────────────────── */
+.national-team-report-modal__scroll {
+  max-height: 72vh;
+  overflow-y: auto;
+  padding: 4px 8px;
+}
+
+.national-team-poster {
+  background: var(--c-card-bg);
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius-lg, 12px);
+  padding: 24px 28px;
+  color: var(--c-text-primary);
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+.national-team-poster__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
+}
+
+.national-team-poster__title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.national-team-poster__icon {
+  font-size: 22px;
+}
+
+.national-team-poster__title.ant-typography {
+  margin: 0;
+  font-weight: 700;
+}
+
+.national-team-poster__desc {
+  font-size: 12px;
+  color: var(--c-text-secondary);
+}
+
+.national-team-poster__meta {
+  text-align: right;
+}
+
+.national-team-poster__meta-sub {
+  font-size: 11px;
+  color: var(--c-text-secondary);
+  margin-top: 4px;
+}
+
+.national-team-poster__support-banner {
+  background: var(--c-bg-layout);
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius-md, 8px);
+  padding: 12px 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.national-team-poster__support-title {
+  font-size: 12px;
+  color: var(--c-text-secondary);
+}
+
+.national-team-poster__support-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.national-team-poster__support-level {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.national-team-poster__support-score {
+  font-size: 13px;
+  color: var(--c-text-secondary);
+}
+
+.national-team-poster__metric-card.ant-card {
+  background: var(--c-bg-layout);
+  text-align: center;
+}
+
+.national-team-poster__metric-title {
+  font-size: 11px;
+  color: var(--c-text-secondary);
+}
+
+.national-team-poster__metric-val {
+  font-size: 16px;
+  font-weight: 700;
+  margin-top: 4px;
+  font-family: var(--c-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.national-team-poster__metric-unit {
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.national-team-poster__section {
+  margin-bottom: 18px;
+}
+
+.national-team-poster__section-title {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.national-team-poster__category-item {
+  padding: 8px 12px;
+  background: var(--c-bg-layout);
+  border-radius: var(--c-radius-md, 8px);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.national-team-poster__category-val {
+  font-weight: 700;
+  font-size: 12px;
+  font-family: var(--c-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.national-team-poster__box {
+  padding: 10px 14px;
+  background: var(--c-bg-layout);
+  border-radius: var(--c-radius-md, 8px);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.national-team-poster__box-row {
+  margin-bottom: 6px;
+}
+
+.national-team-poster__tag {
+  font-size: 10px;
+  margin-right: 6px;
+}
+
+.national-team-poster__item-gap {
+  margin-right: 12px;
+}
+
+.national-team-poster__divider.ant-divider {
+  margin: 16px 0 12px 0;
+}
+
+.national-team-poster__footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  color: var(--c-text-secondary);
+}
+

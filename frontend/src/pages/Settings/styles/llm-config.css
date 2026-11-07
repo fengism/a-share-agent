@@ -1,0 +1,126 @@
+/* 大模型配置卡片样式 (LLM Config Card) */
+.llm-config-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding: var(--c-pad-inset, 7px 12px);
+  border-radius: 8px;
+  font-size: var(--c-font-sm);
+  border: 1px solid var(--c-border);
+}
+
+.llm-config-banner.is-admin {
+  border-color: rgba(114, 46, 209, 0.25);
+  background-color: rgba(114, 46, 209, 0.04);
+}
+
+.llm-config-banner.is-admin-llm {
+  border-color: rgba(22, 119, 255, 0.25);
+  background-color: rgba(22, 119, 255, 0.04);
+}
+
+.llm-config-banner.is-inherits-endpoint {
+  border-color: rgba(250, 173, 20, 0.3);
+  background-color: rgba(250, 173, 20, 0.05);
+}
+
+.llm-config-banner.is-custom {
+  border-color: rgba(250, 140, 22, 0.3);
+  background-color: rgba(250, 140, 22, 0.05);
+}
+
+.llm-config-banner__left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex: 1;
+  min-width: 260px;
+}
+
+.llm-config-banner__tag.ant-tag {
+  margin: 0;
+  font-weight: 500;
+}
+
+.llm-config-banner__btn.ant-btn {
+  flex-shrink: 0;
+}
+
+.llm-config-icon--mr-8 {
+  margin-right: 8px;
+}
+
+.llm-config-icon--mr-6 {
+  margin-right: 6px;
+}
+
+.llm-config-subtext--ml-8 {
+  margin-left: 8px;
+}
+
+.llm-config-model-row {
+  display: flex;
+  gap: 8px;
+}
+
+.llm-config-model-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.llm-config-presets-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+  align-items: center;
+}
+
+.llm-config-presets-label {
+  font-size: var(--c-font-xs);
+  color: var(--c-text-muted);
+}
+
+.llm-config-preset-tag.ant-tag {
+  cursor: pointer;
+  font-size: var(--c-font-xs);
+  margin-inline-end: 0;
+  border-radius: 4px;
+}
+
+.llm-config-preset-tag.is-active {
+  background: var(--c-primary-soft);
+  border-color: var(--c-primary);
+  color: var(--c-primary);
+}
+
+.llm-config-inline-link.ant-btn {
+  padding: 0;
+  height: auto;
+  font-size: var(--c-font-xs);
+}
+
+.llm-config-error-text {
+  color: var(--c-down);
+}
+
+.llm-config-submodel-alert {
+  margin-top: 8px;
+}
+
+.llm-config-submodel-alert__content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.llm-config-subtext-block {
+  font-size: var(--c-font-sm);
+  color: var(--c-text-muted);
+}

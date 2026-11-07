@@ -45,6 +45,7 @@ import { useColors, useStyles, useTokens, type ThemeColors } from "../../styles/
 import type { KlineItem } from "../../types/stock";
 import { buildStockProfileUrl } from "../../utils/stockLinks";
 import "./hk-market.css";
+import "./hk-market-tab.css";
 
 const { Title, Paragraph, Text } = Typography;
 const INDEX_SYMBOLS = ["HSI", "HSCEI", "HSTECH"];
@@ -86,6 +87,11 @@ function getChangeColor(changePct: number | null | undefined, c: ThemeColors) {
   if (changePct > 0) return c.up;
   if (changePct < 0) return c.down;
   return c.textSecondary;
+}
+
+function getChangeClass(changePct: number | null | undefined): string {
+  if (changePct == null || changePct === 0) return "hk-val--flat";
+  return changePct > 0 ? "hk-val--up" : "hk-val--down";
 }
 
 function chartItems(items: HKKlineData["items"] | undefined): KlineItem[] {
@@ -232,13 +238,13 @@ export default function HKMarketTab({
       value: stock.code,
       label: (
         <div className="hk-stock-search-option">
-          <Text strong style={{ color: colors.textPrimary }}>{stock.name}</Text>
-          <Text className="financial-num" type="secondary" style={{ color: colors.primary }}>{stock.code}</Text>
-          {stock.english_name && <Text type="secondary" style={{ color: colors.textSecondary }}>{stock.english_name}</Text>}
+          <Text strong className="hk-stock-search-option__name">{stock.name}</Text>
+          <Text className="financial-num hk-stock-search-option__code" type="secondary">{stock.code}</Text>
+          {stock.english_name && <Text type="secondary" className="hk-stock-search-option__eng">{stock.english_name}</Text>}
         </div>
       ),
     })),
-    [colors.primary, colors.textPrimary, colors.textSecondary, searchItems],
+    [searchItems],
   );
 
   const isSearchPending = !isSelectedSearch && Boolean(normalizedSearch)
@@ -269,7 +275,7 @@ export default function HKMarketTab({
           to={buildStockProfileUrl(value)}
           onClick={(e) => e.stopPropagation()}
         >
-          <Text className="financial-num" strong style={{ color: colors.primary, cursor: "pointer" }}>{value}</Text>
+          <Text className="financial-num hk-table__code-link" strong>{value}</Text>
         </PreloadLink>
       ),
     },
@@ -283,10 +289,9 @@ export default function HKMarketTab({
         <PreloadLink
           to={buildStockProfileUrl(record.code)}
           onClick={(e) => e.stopPropagation()}
-          className="hk-stock-name-cell"
-          style={{ display: "block" }}
+          className="hk-stock-name-cell hk-table__name-link"
         >
-          <Text strong ellipsis style={{ color: colors.textPrimary, cursor: "pointer" }}>{record.name}</Text>
+          <Text strong ellipsis className="hk-table__name-text">{record.name}</Text>
           {record.english_name && <span className="hk-stock-english-name">{record.english_name}</span>}
         </PreloadLink>
       ),
@@ -298,10 +303,7 @@ export default function HKMarketTab({
       align: "right" as const,
       sorter: (a, b) => (a.price ?? 0) - (b.price ?? 0),
       render: (value: number | null, record: HKStockQuote) => (
-        <span
-          className="financial-num"
-          style={{ fontWeight: 600, color: getChangeColor(record.change_pct, colors) }}
-        >
+        <span className={`financial-num hk-table__change ${getChangeClass(record.change_pct)}`}>
           {formatNumber(value)}
         </span>
       ),
@@ -321,7 +323,7 @@ export default function HKMarketTab({
       align: "right" as const,
       responsive: ["md"],
       sorter: (a, b) => (a.open ?? 0) - (b.open ?? 0),
-      render: (value: number | null) => <span className="financial-num" style={{ color: colors.textPrimary }}>{formatNumber(value)}</span>,
+      render: (value: number | null) => <span className="financial-num hk-table__cell-num">{formatNumber(value)}</span>,
     },
     {
       title: "最高",
@@ -330,7 +332,7 @@ export default function HKMarketTab({
       align: "right" as const,
       responsive: ["md"],
       sorter: (a, b) => (a.high ?? 0) - (b.high ?? 0),
-      render: (value: number | null) => <span className="financial-num" style={{ color: colors.textPrimary }}>{formatNumber(value)}</span>,
+      render: (value: number | null) => <span className="financial-num hk-table__cell-num">{formatNumber(value)}</span>,
     },
     {
       title: "最低",
@@ -339,7 +341,7 @@ export default function HKMarketTab({
       align: "right" as const,
       responsive: ["md"],
       sorter: (a, b) => (a.low ?? 0) - (b.low ?? 0),
-      render: (value: number | null) => <span className="financial-num" style={{ color: colors.textPrimary }}>{formatNumber(value)}</span>,
+      render: (value: number | null) => <span className="financial-num hk-table__cell-num">{formatNumber(value)}</span>,
     },
     {
       title: "成交额",
@@ -348,7 +350,7 @@ export default function HKMarketTab({
       align: "right" as const,
       responsive: ["lg"],
       sorter: (a, b) => (a.amount ?? 0) - (b.amount ?? 0),
-      render: (value: number | null) => <span className="financial-num" style={{ color: colors.textPrimary }}>{formatAmount(value)}</span>,
+      render: (value: number | null) => <span className="financial-num hk-table__cell-num">{formatAmount(value)}</span>,
     },
     {
       title: "市盈率",
@@ -358,7 +360,7 @@ export default function HKMarketTab({
       responsive: ["xl"],
       sorter: (a, b) => (a.pe_ttm ?? 0) - (b.pe_ttm ?? 0),
       render: (value: number | null) => (
-        <span className="financial-num" style={{ color: colors.textPrimary }}>
+        <span className="financial-num hk-table__cell-num">
           {value != null ? value.toFixed(2) : "-"}
         </span>
       ),
@@ -371,7 +373,7 @@ export default function HKMarketTab({
       responsive: ["lg"],
       sorter: (a, b) => (a.market_cap ?? 0) - (b.market_cap ?? 0),
       render: (value: number | null) => (
-        <span className="financial-num" style={{ color: colors.textPrimary }}>
+        <span className="financial-num hk-table__cell-num">
           {formatAmount(value)}
         </span>
       ),
@@ -474,8 +476,8 @@ export default function HKMarketTab({
   return (
     <div style={embedded ? undefined : pageContainerStyle} className="hk-market-page">
       {embedded ? (
-        <div style={{ marginBottom: 12 }} className="hk-market-header hk-market-header--embedded">
-          <Tag color="green" className="hk-live-tag">
+        <div className="hk-market-header hk-market-header--embedded">
+          <Tag color="processing" className="hk-live-tag">
             <span className="hk-live-dot" />
             Sina 实时
           </Tag>
@@ -494,7 +496,7 @@ export default function HKMarketTab({
           <div>
             <div className="u-page-title u-page-title--compact">
               <Title level={3} style={pageTitleStyle}>港股行情</Title>
-              <Tag color="green" className="hk-live-tag">
+              <Tag color="processing" className="hk-live-tag">
                 <span className="hk-live-dot" />
                 Sina 实时
               </Tag>
@@ -536,16 +538,14 @@ export default function HKMarketTab({
                   <Card hoverable styles={{ body: { padding: tokens.space[4] } }}>
                     <div className="hk-index-card-head">
                       <span
-                        className="hk-index-name"
-                        style={{ color: active ? colors.primary : colors.textPrimary }}
+                        className={`hk-index-name ${active ? "hk-index-name--active" : "hk-index-name--inactive"}`}
                       >
                         {index.name}
                       </span>
                       <span className="hk-index-code-badge">{index.code}</span>
                     </div>
                     <div
-                      className="hk-index-price"
-                      style={{ color: getChangeColor(index.change_pct, colors) }}
+                      className={`hk-index-price ${getChangeClass(index.change_pct)}`}
                     >
                       {formatNumber(index.price)}
                     </div>
@@ -569,7 +569,7 @@ export default function HKMarketTab({
         className="hk-section-card"
         title={
           <div className="hk-card-title-group">
-            <span style={{ fontWeight: 600, color: colors.textPrimary }}>{activeIndexObj?.name ?? activeIndex} · 历史行情</span>
+            <span className="hk-chart-card__title">{activeIndexObj?.name ?? activeIndex} · 历史行情</span>
             {activeIndexObj?.price != null && (
               <Tag color={getChangeColor(activeIndexObj.change_pct, colors)}>
                 最新: {formatNumber(activeIndexObj.price)}
@@ -613,16 +613,11 @@ export default function HKMarketTab({
           className="hk-section-card hk-active-stock-card"
           title={
             <div className="hk-card-title-group">
-              <span style={{ fontWeight: 600, color: colors.textPrimary }}>{activeStock.name}</span>
+              <span className="hk-stock-drawer__title">{activeStock.name}</span>
               <Tag color="blue">{activeStock.code}</Tag>
               {activeStockQuote?.price != null && (
                 <span
-                  className="financial-num"
-                  style={{
-                    fontWeight: 700,
-                    fontSize: 16,
-                    color: getChangeColor(activeStockQuote.change_pct, colors),
-                  }}
+                  className={`financial-num hk-stock-drawer__price ${getChangeClass(activeStockQuote.change_pct)}`}
                 >
                   {formatNumber(activeStockQuote.price)}
                 </span>
@@ -672,13 +667,13 @@ export default function HKMarketTab({
               </div>
               <div className="hk-metric-item">
                 <span className="hk-metric-label">最高</span>
-                <span className="hk-metric-value" style={{ color: colors.up }}>
+                <span className="hk-metric-value hk-metric-value--up">
                   {formatNumber(activeStockQuote.high)}
                 </span>
               </div>
               <div className="hk-metric-item">
                 <span className="hk-metric-label">最低</span>
-                <span className="hk-metric-value" style={{ color: colors.down }}>
+                <span className="hk-metric-value hk-metric-value--down">
                   {formatNumber(activeStockQuote.low)}
                 </span>
               </div>
@@ -714,7 +709,7 @@ export default function HKMarketTab({
       {/* ── 港股个股行情与筛选 ── */}
       <Card
         className="hk-section-card"
-        title={<span style={{ color: colors.textPrimary, fontWeight: 600 }}>港股实时行情</span>}
+        title={<span className="hk-section-title">港股实时行情</span>}
         extra={
           <AutoComplete
             className="hk-stock-search"
@@ -746,7 +741,7 @@ export default function HKMarketTab({
         <div className="hk-toolbar-container">
           <div className="hk-filter-bar">
             <div className="hk-quick-filters">
-              <Text type="secondary" style={{ fontSize: 13, marginRight: 4, color: colors.textSecondary }}>快速排序：</Text>
+              <Text type="secondary" className="hk-sort-label">快速排序：</Text>
               <Segmented
                 options={SORT_OPTIONS as unknown as string[]}
                 value={sortOption}
@@ -757,7 +752,7 @@ export default function HKMarketTab({
 
           <div className="hk-selection-toolbar">
             <div className="hk-selection-summary">
-              <Text strong style={{ color: colors.textPrimary }}>已选 {selectedStocks.length}/{MAX_COMPARE_STOCKS}</Text>
+              <Text strong className="hk-selection-count">已选 {selectedStocks.length}/{MAX_COMPARE_STOCKS}</Text>
               <div className="hk-selection-tags" aria-label="已选港股">
                 {selectedStocks.map((stock) => (
                   <Tag
@@ -767,11 +762,7 @@ export default function HKMarketTab({
                       event.preventDefault();
                       removeSelectedStock(stock.code);
                     }}
-                    style={{
-                      background: colors.cardBg,
-                      borderColor: colors.border,
-                      color: colors.textSecondary,
-                    }}
+                    className="hk-selection-tag"
                   >
                     {stock.name} {stock.code}
                   </Tag>
@@ -885,7 +876,7 @@ export default function HKMarketTab({
           },
         }}
       >
-        <div style={{ marginBottom: 8, flexShrink: 0 }}>
+        <div className="hk-compare-toolbar">
           {indexPeriodControl}
         </div>
         <LazyKlineChart
@@ -919,7 +910,7 @@ export default function HKMarketTab({
             },
           }}
         >
-          <div style={{ marginBottom: 8, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", flexShrink: 0 }}>
+          <div className="hk-compare-controls">
             {stockLandscapeToolbar}
           </div>
           <LazyKlineChart

@@ -24,6 +24,8 @@ type CrudeChartMode = "sc_wti" | "all_oils" | "oil_vs_us10y";
 // 此前这里兜底了写死的 "3.10%" / "4.25% - 4.50%"，那些值早已与实际不符，
 // 会在接口失败时把过期数字当成实时数据展示。
 const RATE_PLACEHOLDER = "--";
+const CHART_STYLE_380: React.CSSProperties = { height: 380, width: "100%" };
+const CHART_STYLE_260: React.CSSProperties = { height: 260, width: "100%" };
 
 export default function GlobalRatesTab() {
   const c = useColors();
@@ -613,7 +615,7 @@ export default function GlobalRatesTab() {
       dataIndex: "cn_10y",
       key: "cn_10y",
       align: "right" as const,
-      render: (v: number | null) => (v != null ? <span style={{ color: "#1677ff", fontWeight: 600 }}>{v.toFixed(3)}%</span> : "-"),
+      render: (v: number | null) => (v != null ? <span className="global-rates-val--us">{v.toFixed(3)}%</span> : "-"),
     },
     {
       title: "🇨🇳 中债 30Y",
@@ -641,7 +643,7 @@ export default function GlobalRatesTab() {
       dataIndex: "us_10y",
       key: "us_10y",
       align: "right" as const,
-      render: (v: number | null) => (v != null ? <span style={{ color: "#fa541c", fontWeight: 600 }}>{v.toFixed(3)}%</span> : "-"),
+      render: (v: number | null) => (v != null ? <span className="global-rates-val--cn">{v.toFixed(3)}%</span> : "-"),
     },
     {
       title: "🇺🇸 美债 30Y",
@@ -704,7 +706,7 @@ export default function GlobalRatesTab() {
       </div>
 
       {/* 核心指标看板 */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 16, marginBottom: 16 }}>
+      <div className="global-rates-cards-grid">
         {/* 美元指数 */}
         <Card size="small" className="macro-stat-card">
           <Statistic
@@ -713,9 +715,9 @@ export default function GlobalRatesTab() {
             precision={2}
             styles={{ content: { color: (fx?.dxy?.change ?? 0) >= 0 ? c.up : c.down, fontWeight: 600 } }}
             prefix={(fx?.dxy?.change ?? 0) >= 0 ? <ArrowUpOutlined /> : <ArrowDownOutlined />}
-            suffix={<span style={{ fontSize: 13, marginLeft: 4 }}>{fx?.dxy?.change_pct != null ? `${fx.dxy.change_pct > 0 ? "+" : ""}${fx.dxy.change_pct}%` : ""}</span>}
+            suffix={<span className="global-rates-suffix">{fx?.dxy?.change_pct != null ? `${fx.dxy.change_pct > 0 ? "+" : ""}${fx.dxy.change_pct}%` : ""}</span>}
           />
-          <div style={{ fontSize: 12, color: c.textSecondary, marginTop: 4 }}>全球风险资产定价基准</div>
+          <div className="global-rates-card-hint">全球风险资产定价基准</div>
         </Card>
 
         {/* 离岸人民币 */}
@@ -725,9 +727,9 @@ export default function GlobalRatesTab() {
             value={fx?.usd_cnh?.value ?? "-"}
             precision={4}
             styles={{ content: { color: (fx?.usd_cnh?.change ?? 0) >= 0 ? c.down : c.up, fontWeight: 600 } }}
-            suffix={<span style={{ fontSize: 13, marginLeft: 4 }}>{fx?.usd_cnh?.change_pct != null ? `${fx.usd_cnh.change_pct > 0 ? "+" : ""}${fx.usd_cnh.change_pct}%` : ""}</span>}
+            suffix={<span className="global-rates-suffix">{fx?.usd_cnh?.change_pct != null ? `${fx.usd_cnh.change_pct > 0 ? "+" : ""}${fx.usd_cnh.change_pct}%` : ""}</span>}
           />
-          <div style={{ fontSize: 12, color: c.textSecondary, marginTop: 4 }}>外资进出 A 股风向标</div>
+          <div className="global-rates-card-hint">外资进出 A 股风向标</div>
         </Card>
 
         {/* 美债 10 年期收益率 */}
@@ -739,7 +741,7 @@ export default function GlobalRatesTab() {
             styles={{ content: { color: "#fa541c", fontWeight: 600 } }}
             suffix={effectiveUs10y != null ? "%" : undefined}
           />
-          <div style={{ fontSize: 12, color: c.textSecondary, marginTop: 4 }}>
+          <div className="global-rates-card-hint">
             {bond?.us_date ? `最新公布: ${bond.us_date}` : "全球无风险折现率之锚"}
           </div>
         </Card>
@@ -753,7 +755,7 @@ export default function GlobalRatesTab() {
             styles={{ content: { color: (effectiveSpread10y ?? 0) >= 0 ? c.up : c.down, fontWeight: 600 } }}
             suffix={effectiveSpread10y != null ? "%" : undefined}
           />
-          <div style={{ fontSize: 12, color: c.textSecondary, marginTop: 4 }}>{effectiveSpreadStatus}</div>
+          <div className="global-rates-card-hint">{effectiveSpreadStatus}</div>
         </Card>
 
         {/* 原油主连 */}
@@ -765,14 +767,14 @@ export default function GlobalRatesTab() {
             prefix="¥"
             styles={{ content: { color: (crude?.sc0?.change ?? 0) >= 0 ? c.up : c.down, fontWeight: 600 } }}
             suffix={
-              <span style={{ fontSize: 13, marginLeft: 4 }}>
+              <span className="global-rates-suffix">
                 {crude?.sc0?.change_pct != null ? `${crude.sc0.change_pct > 0 ? "+" : ""}${crude.sc0.change_pct}%` : ""}
               </span>
             }
           />
-          <div style={{ fontSize: 12, color: c.textSecondary, marginTop: 4, display: "flex", justifyContent: "space-between" }}>
+          <div className="global-rates-wti-row">
             <span>WTI美原油:</span>
-            <span style={{ fontWeight: 500, color: (crude?.wti?.change ?? 0) >= 0 ? c.up : c.down }}>
+            <span className={`global-rates-wti-val ${(crude?.wti?.change ?? 0) >= 0 ? "u-text-up" : "u-text-down"}`}>
               {crude?.wti?.price != null ? `$${crude.wti.price}` : "-"}
               {crude?.wti?.change_pct != null ? ` (${crude.wti.change_pct > 0 ? "+" : ""}${crude.wti.change_pct}%)` : ""}
             </span>
@@ -782,13 +784,14 @@ export default function GlobalRatesTab() {
 
       {/* 中美国债收益率历史走势与利差曲线对比 */}
       <Card
+        className="u-mb-16"
         title={
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: "space-between" }}>
-            <span style={{ fontSize: "var(--c-font-base)", fontWeight: 600 }}>
-              <LineChartOutlined style={{ color: "#1677ff", marginRight: 6 }} />
+          <div className="global-rates-card-header">
+            <span className="global-rates-card-title">
+              <LineChartOutlined className="global-rates-icon--us" />
               中美国债收益率走势与利差曲线对比（参考东方财富数据中心）
             </span>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div className="global-rates-header-controls">
               <Segmented
                 size="small"
                 value={chartMode}
@@ -815,17 +818,16 @@ export default function GlobalRatesTab() {
           </div>
         }
         size="small"
-        style={{ marginBottom: 16 }}
       >
         {historyChartOption ? (
           <ReactECharts
             echarts={echarts}
             option={historyChartOption}
-            style={{ height: 380, width: "100%" }}
+            style={CHART_STYLE_380}
             notMerge
           />
         ) : (
-          <div style={{ height: 380, display: "flex", alignItems: "center", justifyContent: "center", color: c.textMuted }}>
+          <div className="global-rates-chart-empty--380">
             正在加载国债收益率曲线...
           </div>
         )}
@@ -833,13 +835,14 @@ export default function GlobalRatesTab() {
 
       {/* 原油主连走势与宏观通胀折现联动卡片 */}
       <Card
+        className="u-mb-16"
         title={
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: "space-between" }}>
-            <span style={{ fontSize: "var(--c-font-base)", fontWeight: 600 }}>
-              <FireOutlined style={{ color: "#fa541c", marginRight: 6 }} />
+          <div className="global-rates-card-header">
+            <span className="global-rates-card-title">
+              <FireOutlined className="global-rates-icon--oil" />
               全球大宗原油主连走势与通胀联动（上海原油 SC0 · 纽约 WTI · 布伦特 Brent）
             </span>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div className="global-rates-header-controls">
               <Segmented
                 size="small"
                 value={crudeMode}
@@ -865,29 +868,28 @@ export default function GlobalRatesTab() {
           </div>
         }
         size="small"
-        style={{ marginBottom: 16 }}
       >
         {crudeChartOption ? (
           <ReactECharts
             echarts={echarts}
             option={crudeChartOption}
-            style={{ height: 380, width: "100%" }}
+            style={CHART_STYLE_380}
             notMerge
           />
         ) : (
-          <div style={{ height: 380, display: "flex", alignItems: "center", justifyContent: "center", color: c.textMuted }}>
+          <div className="global-rates-chart-empty--380">
             正在加载原油主连走势曲线...
           </div>
         )}
       </Card>
 
       {/* 收益率期限结构 (Term Structure) 与主要央行基准利率 */}
-      <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+      <Row gutter={[16, 16]} className="u-mb-16">
         <Col xs={24} lg={12}>
           <Card
             title={
               <span>
-                <BarChartOutlined style={{ color: "#722ed1", marginRight: 6 }} />
+                <BarChartOutlined className="global-rates-icon--purple" />
                 中美国债收益率期限结构对比 (2Y · 5Y · 10Y · 30Y)
               </span>
             }
@@ -897,11 +899,11 @@ export default function GlobalRatesTab() {
               <ReactECharts
                 echarts={echarts}
                 option={termStructureChartOption}
-                style={{ height: 260, width: "100%" }}
+                style={CHART_STYLE_260}
                 notMerge
               />
             ) : (
-              <div style={{ height: 260, display: "flex", alignItems: "center", justifyContent: "center", color: c.textMuted }}>
+              <div className="global-rates-chart-empty--260">
                 期限结构数据加载中...
               </div>
             )}
@@ -910,18 +912,18 @@ export default function GlobalRatesTab() {
 
         <Col xs={24} lg={12}>
           <Card title="全球主要央行政策基准利率与传导" size="small">
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              <div style={{ padding: "var(--c-pad-inset, 7px 12px)", background: c.nestedBg, borderRadius: 6, borderLeft: `3px solid ${c.primary}` }}>
-                <div style={{ fontSize: 12, color: c.textSecondary }}>中国人民银行 · 1年期 LPR</div>
-                <div style={{ fontSize: 16, fontWeight: 600, marginTop: 2 }}>{policy?.china_lpr_1y ?? RATE_PLACEHOLDER}</div>
+            <div className="global-rates-policy-list">
+              <div className="global-rates-policy-item global-rates-policy-item--lpr1">
+                <div className="global-rates-policy-label">中国人民银行 · 1年期 LPR</div>
+                <div className="global-rates-policy-value">{policy?.china_lpr_1y ?? RATE_PLACEHOLDER}</div>
               </div>
-              <div style={{ padding: "var(--c-pad-inset, 7px 12px)", background: c.nestedBg, borderRadius: 6, borderLeft: `3px solid ${c.accent}` }}>
-                <div style={{ fontSize: 12, color: c.textSecondary }}>中国人民银行 · 5年期以上 LPR (房贷基准)</div>
-                <div style={{ fontSize: 16, fontWeight: 600, marginTop: 2 }}>{policy?.china_lpr_5y ?? RATE_PLACEHOLDER}</div>
+              <div className="global-rates-policy-item global-rates-policy-item--lpr5">
+                <div className="global-rates-policy-label">中国人民银行 · 5年期以上 LPR (房贷基准)</div>
+                <div className="global-rates-policy-value">{policy?.china_lpr_5y ?? RATE_PLACEHOLDER}</div>
               </div>
-              <div style={{ padding: "var(--c-pad-inset, 7px 12px)", background: c.nestedBg, borderRadius: 6, borderLeft: `3px solid #722ed1` }}>
-                <div style={{ fontSize: 12, color: c.textSecondary }}>美联储 · 联邦基金目标利率 (Fed Funds Rate)</div>
-                <div style={{ fontSize: 16, fontWeight: 600, marginTop: 2 }}>{policy?.us_fed_funds_rate ?? RATE_PLACEHOLDER}</div>
+              <div className="global-rates-policy-item global-rates-policy-item--fed">
+                <div className="global-rates-policy-label">美联储 · 联邦基金目标利率 (Fed Funds Rate)</div>
+                <div className="global-rates-policy-value">{policy?.us_fed_funds_rate ?? RATE_PLACEHOLDER}</div>
               </div>
             </div>
           </Card>
@@ -935,11 +937,11 @@ export default function GlobalRatesTab() {
         extra={
           <Input
             placeholder="搜索日期 (如 2026-08)..."
-            prefix={<SearchOutlined style={{ color: c.textMuted }} />}
+            prefix={<SearchOutlined className="global-rates-search-icon" />}
             size="small"
             value={tableSearch}
             onChange={(e) => setTableSearch(e.target.value)}
-            style={{ width: 220 }}
+            className="global-rates-search-input"
             allowClear
           />
         }

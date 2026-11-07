@@ -15,13 +15,14 @@ import ChangeValue from "./ChangeValue";
 import PreloadLink from "./PreloadLink";
 import RefreshBadge from "./RefreshBadge";
 import SectionDataState from "./SectionDataState";
+import SectionHeader from "./SectionHeader";
 import StockExternalLink from "./StockExternalLink";
-import StockQuickPreviewModal from "./StockQuickPreviewModal";
+import StockWorkspaceDrawer from "./StockWorkspaceDrawer";
 import { useUrlSearchParam } from "../hooks/useUrlSearchParam";
 import { formatMarketDateTime } from "../utils/marketTime";
 import { semanticTagStyle } from "../styles/ui";
 import type { MarketWindStock } from "../types/stock";
-import "./market-wind.css";
+import "./market-wind/index.css";
 
 function formatFetchedAt(value: string | undefined) {
   return formatMarketDateTime(value, value || "-");
@@ -157,7 +158,7 @@ export default function MarketWindBoard({ embedded = false }: { embedded?: boole
                 </Button>
               </PreloadLink>
             )}
-            <Space size={[8, 8]} wrap style={{ marginLeft: "auto" }}>
+            <Space size={[8, 8]} wrap>
               <Tag style={semanticTagStyle("primary")}>{plates.length} 个风口</Tag>
               <Tag style={semanticTagStyle("up")}>{stockMetricValue} 只龙头</Tag>
               <RefreshBadge />
@@ -205,14 +206,13 @@ export default function MarketWindBoard({ embedded = false }: { embedded?: boole
         )}
 
         <section className="wind-plate-section" aria-labelledby="wind-plate-title">
-          <div className="wind-section-heading">
-            <span className="wind-section-heading__icon"><ThunderboltOutlined /></span>
-            <span>
-              <strong id="wind-plate-title">风口题材</strong>
-              <small>选择题材查看催化逻辑与对应龙头表现</small>
-            </span>
-            <Tag>{plates.length} 个</Tag>
-          </div>
+          <SectionHeader
+            icon={<ThunderboltOutlined />}
+            title={<span id="wind-plate-title">风口题材</span>}
+            subtitle="选择题材查看催化逻辑与对应龙头表现"
+            extra={<Tag>{plates.length} 个</Tag>}
+            className="wind-section-heading"
+          />
 
           <div className="wind-plate-grid">
             {plates.map((plate, index) => {
@@ -283,7 +283,7 @@ export default function MarketWindBoard({ embedded = false }: { embedded?: boole
       </div>
 
       {previewStock ? (
-        <StockQuickPreviewModal
+        <StockWorkspaceDrawer
           open={Boolean(previewStock)}
           code={previewStock?.code ?? null}
           name={previewStock?.name}

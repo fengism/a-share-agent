@@ -1,0 +1,94 @@
+/* emotion —— 自 market-overview.css 第 404–495 行拆出。
+   由同目录 index.css 按固定顺序 @import，顺序不可调整：同特异性规则靠源序决胜负。 */
+.market-board-emotion {
+  display: grid;
+  grid-template-columns: minmax(138px, 0.7fr) minmax(220px, 1.3fr);
+  min-height: 184px;
+}
+
+.market-board-emotion__score {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: var(--c-space-4);
+}
+
+[data-theme="stellar-blue"] .market-board-emotion__score {
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+[data-theme="light"] .market-board-emotion__score {
+  border-right: 1px solid var(--c-border);
+}
+
+.market-board-emotion__score > span { color: var(--c-text-secondary); font-size: var(--c-font-sm); }
+.market-board-emotion__score > strong {
+  margin-top: 4px;
+  font-family: var(--c-font-mono);
+  font-size: 32px;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--c-primary);
+  text-shadow: none;
+}
+
+[data-theme="light"] .market-board-emotion__score > strong {
+  color: var(--c-primary);
+  text-shadow: none;
+}
+
+.market-board-emotion__score > small {
+  margin-top: 4px;
+  color: var(--c-primary);
+  font-size: var(--c-font-sm);
+  font-weight: var(--c-weight-semibold);
+}
+
+[data-theme="light"] .market-board-emotion__score > small {
+  color: var(--c-primary);
+}
+
+.market-board-emotion__meter {
+  height: 6px;
+  overflow: hidden;
+  margin-top: 12px;
+  border-radius: var(--c-radius-pill);
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="light"] .market-board-emotion__meter {
+  background: var(--c-border);
+  box-shadow: inset 0 1px 2px rgba(16, 24, 40, 0.08);
+}
+
+.market-board-emotion__meter > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--c-down), var(--c-warning), var(--c-up));
+  box-shadow: none;
+}
+
+[data-theme="light"] .market-board-emotion__meter > span {
+  box-shadow: none;
+}
+
+.market-board-emotion__breadth {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: center;
+  gap: 10px var(--c-space-4);
+  padding: var(--c-space-4);
+}
+
+.market-board-emotion__breadth > div:not(.market-board-emotion__breadth-bar) { display: grid; gap: 4px; }
+.market-board-emotion__breadth > div > span { color: var(--c-text-muted); font-size: var(--c-font-xs); }
+.market-board-emotion__breadth > div > strong { font-size: var(--c-font-xl); font-variant-numeric: tabular-nums; }
+.market-board-emotion__breadth-bar { grid-column: 1 / -1; display: flex; height: 10px; overflow: hidden; border-radius: var(--c-radius-pill); background: var(--c-border); }
+.market-board-emotion__breadth-bar > span { display: block; height: 100%; }
+.market-board-emotion__breadth-bar > .is-up { background: var(--c-up); }
+.market-board-emotion__breadth-bar > .is-down { background: var(--c-down); }
+.market-board-emotion__breadth p { grid-column: 1 / -1; margin: 0; color: var(--c-text-secondary); font-size: var(--c-font-sm); line-height: var(--c-leading-relaxed); }
+

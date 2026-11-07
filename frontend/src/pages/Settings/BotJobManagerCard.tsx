@@ -7,7 +7,7 @@ import { formatMarketDateTime } from "../../utils/marketTime";
 import type { BotAdminJob } from "../../types/settings";
 
 export default function BotJobManagerCard() {
-  const { cardStyle, sectionCardBodyStyle } = useStyles();
+  const { sectionCardBodyStyle } = useStyles();
   const colors = useColors();
   const { data, isLoading, error, refetch, isFetching } = useBotJobs(true);
   const retryJob = useRetryBotJob();
@@ -36,7 +36,7 @@ export default function BotJobManagerCard() {
           刷新
         </Button>
       )}
-      style={{ ...cardStyle, marginBottom: 16 }}
+      className="u-card" style={{ marginBottom: 16 }}
       styles={{ body: sectionCardBodyStyle }}
     >
       <Space wrap style={{ marginBottom: 12 }}>

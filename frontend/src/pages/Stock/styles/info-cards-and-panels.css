@@ -1,0 +1,339 @@
+/* 业务简介、信息卡与图表工具条、指标副图、延迟加载区（含大段响应式）
+   自 stock-page.css 第 505–835 行拆出。
+   由同目录 index.css 按固定顺序 @import，顺序不可调整：同特异性规则靠源序决胜负。 */
+.stock-business-intro {
+  display: grid;
+  gap: var(--c-space-3);
+}
+
+.stock-business-intro__item {
+  display: grid;
+  grid-template-columns: 108px minmax(0, 1fr);
+  gap: var(--c-space-4);
+  align-items: start;
+  padding: 12px 14px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius-md);
+  background: var(--c-nested-bg);
+}
+
+.stock-business-intro__item > span {
+  display: inline-flex;
+  width: fit-content;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--c-primary-soft);
+  color: var(--c-primary);
+  font-size: var(--c-font-xs);
+  font-weight: var(--c-weight-semibold);
+}
+
+.stock-business-intro__item > p {
+  margin: 0;
+  color: var(--c-text-primary);
+  font-size: var(--c-font-sm);
+  line-height: var(--c-leading-relaxed);
+}
+
+.stock-chart-card .ant-card-head-wrapper,
+.stock-information-card .ant-card-head-wrapper {
+  gap: var(--c-space-4);
+}
+
+.stock-chart-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--c-space-2);
+  margin-bottom: var(--c-space-3);
+  padding: 8px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius-md);
+  background: var(--c-nested-bg);
+}
+
+.stock-chart-card .ant-segmented,
+.stock-information-card .ant-tabs-nav::before {
+  border-color: var(--c-border);
+}
+
+.stock-information-card .ant-card-head { border-bottom: 0; }
+.stock-information-card .ant-tabs-nav { margin-bottom: var(--c-space-4); }
+.stock-information-card .ant-tabs-tab { padding-block: 13px; }
+.stock-information-card .ant-tabs-tab-active { font-weight: var(--c-weight-semibold); }
+.stock-information-card .ant-tabs > .ant-tabs-nav .ant-tabs-ink-bar { background: var(--c-primary); height: 2px; border-radius: 2px; }
+.stock-information-tab { display: inline-flex; align-items: center; gap: 7px; }
+
+.stock-news-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--c-space-4);
+}
+
+.stock-information-list { margin: 0; padding: 0; list-style: none; }
+.stock-information-list__item {
+  display: grid;
+  gap: 5px;
+  padding: 13px 2px;
+  border-bottom: 1px solid var(--c-border);
+  transition: padding-left 0.2s ease, background-color 0.2s ease;
+}
+.stock-information-list__item:hover { padding-left: 7px; background: var(--c-hover-bg); }
+.stock-information-list__item:last-child { border-bottom: 0; }
+.stock-information-list__title { overflow: hidden; color: var(--c-text-primary); font-weight: var(--c-weight-medium); text-overflow: ellipsis; white-space: nowrap; }
+.stock-information-list__meta { color: var(--c-text-muted); font-size: var(--c-font-sm); }
+
+@media (max-width: 1120px) {
+  .stock-page__overview-grid { grid-template-columns: 1fr; }
+  .stock-header-card__content { grid-template-columns: minmax(0, 1fr) auto; }
+  .stock-header-card__quote { border-right: 0; }
+  .stock-header-card__actions { grid-column: 1 / -1; max-width: none; justify-content: flex-start; }
+}
+
+@media (max-width: 720px) {
+  .stock-page { gap: var(--c-space-4); }
+  .stock-header-card__content { grid-template-columns: 1fr; padding: var(--c-space-5); }
+  .stock-header-card__quote {
+    min-width: 0;
+    padding: var(--c-space-4) 0;
+    align-items: start;
+    border-block: 1px solid var(--c-border);
+    border-inline: 0;
+    text-align: left;
+  }
+  .stock-header-card__quote .ant-typography { justify-content: flex-start; }
+  .stock-header-card__actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .stock-header-card__actions .ant-btn { width: 100%; }
+  .stock-metrics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .stock-business-intro__item { grid-template-columns: 1fr; gap: var(--c-space-2); }
+  .stock-news-grid { grid-template-columns: 1fr; }
+  .stock-chart-card .ant-card-head-wrapper { align-items: stretch; flex-direction: column; }
+  .stock-chart-card .ant-card-extra { margin-inline-start: 0; padding-top: 0; }
+  .stock-chart-card .ant-card-extra .ant-segmented { width: 100%; }
+  .stock-chart-card .ant-card-extra .ant-segmented-group { display: grid; grid-template-columns: repeat(3, 1fr); }
+  .stock-chart-toolbar {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* ── 全屏看盘弹窗通用布局加固 ── */
+  .stock-fullscreen-modal .ant-modal-content {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .stock-fullscreen-modal .ant-modal-body {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  /* ── 移动端全屏沉浸看盘模态优化 ── */
+  .stock-fullscreen-modal .ant-modal {
+    max-width: 100vw;
+    margin: 0;
+    top: 0;
+    padding-bottom: 0;
+  }
+  .stock-fullscreen-modal .ant-modal-content {
+    border-radius: 0;
+    min-height: 100dvh;
+    padding: 12px 8px 8px 8px;
+    box-shadow: none;
+  }
+  .stock-fullscreen-modal .ant-modal-header {
+    margin-bottom: 8px;
+  }
+  .stock-fullscreen-modal .stock-chart-toolbar {
+    justify-content: flex-start;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding: 6px 8px;
+    gap: 8px;
+    max-width: 100%;
+  }
+  .stock-fullscreen-modal .stock-chart-toolbar::-webkit-scrollbar {
+    display: none;
+  }
+  .stock-fullscreen-modal .stock-chart-toolbar > * {
+    flex-shrink: 0;
+  }
+
+  /* ── 个股详情底部 Tab 栏移动端响应式与水平滑动优化 ── */
+  .stock-detail-tabs > .ant-tabs > .ant-tabs-nav {
+    margin-bottom: var(--c-space-3);
+  }
+
+  .stock-detail-tabs > .ant-tabs > .ant-tabs-nav .ant-tabs-nav-wrap {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-x pan-y;
+    scrollbar-width: none;
+  }
+
+  .stock-detail-tabs > .ant-tabs > .ant-tabs-nav .ant-tabs-nav-wrap::-webkit-scrollbar {
+    display: none;
+  }
+
+  .stock-detail-tabs > .ant-tabs > .ant-tabs-nav .ant-tabs-nav-list {
+    display: flex;
+    min-width: 100%;
+    transform: none !important;
+  }
+
+  .stock-detail-tabs > .ant-tabs > .ant-tabs-nav .ant-tabs-tab {
+    flex: 1 0 auto;
+    justify-content: center;
+    padding: 10px 14px;
+    margin: 0;
+    font-size: var(--c-font-sm);
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .stock-detail-tabs > .ant-tabs > .ant-tabs-nav .ant-tabs-tab + .ant-tabs-tab {
+    margin: 0;
+  }
+
+  .stock-detail-tabs > .ant-tabs > .ant-tabs-nav .ant-tabs-nav-operations {
+    display: none;
+  }
+
+  /* ── 资讯与研究子 Tab 栏移动端水平滑动优化 ── */
+  .stock-information-card .ant-tabs-nav {
+    margin-bottom: var(--c-space-3);
+  }
+
+  .stock-information-card .ant-tabs > .ant-tabs-nav .ant-tabs-nav-wrap {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-x pan-y;
+    scrollbar-width: none;
+  }
+
+  .stock-information-card .ant-tabs-nav-wrap::-webkit-scrollbar {
+    display: none;
+  }
+
+  .stock-information-card .ant-tabs-nav-list {
+    display: flex;
+    min-width: max-content;
+    transform: none !important;
+  }
+
+  .stock-information-card .ant-tabs > .ant-tabs-nav .ant-tabs-tab,
+  .stock-information-card .ant-tabs > .ant-tabs-nav .ant-tabs-tab + .ant-tabs-tab {
+    flex-shrink: 0;
+    padding: 8px 12px;
+    margin: 0 4px 0 0;
+    white-space: nowrap;
+  }
+
+  .stock-information-card .ant-tabs > .ant-tabs-nav .ant-tabs-nav-operations {
+    display: none;
+  }
+
+  .stock-information-tab {
+    gap: 5px;
+    font-size: var(--c-font-sm);
+  }
+}
+
+@media (max-width: 460px) {
+  .stock-header-card__title-row h2 { font-size: 24px; }
+  .stock-header-card__quote strong { font-size: clamp(22px, 5.5vw, 26px); }
+  .stock-header-card__icon { width: 40px; height: 40px; flex-basis: 40px; }
+  .stock-header-card__actions { grid-template-columns: 1fr; }
+  .stock-metrics-grid { grid-template-columns: 1fr; }
+  .stock-section-title small { white-space: normal; }
+  .stock-information-tab .anticon { display: none; }
+
+  .stock-detail-tabs > .ant-tabs > .ant-tabs-nav .ant-tabs-tab {
+    padding: 8px 6px;
+    font-size: 13px;
+  }
+
+  .stock-information-card .ant-tabs > .ant-tabs-nav .ant-tabs-tab {
+    padding: 6px 10px;
+    font-size: 13px;
+  }
+
+  .stock-information-tab {
+    gap: 4px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stock-section-card,
+  .stock-metric,
+  .stock-information-list__item { transition: none; }
+}
+
+.stock-macd-panel {
+  min-height: 280px;
+  padding: var(--c-space-3) 0;
+}
+
+
+.indicator-subchart__label {
+  color: var(--c-text-primary);
+  font-size: var(--c-font-sm);
+}
+
+.stock-financial-card .ant-card-body {
+  min-width: 0;
+  padding-top: var(--c-space-4);
+}
+
+@media (max-width: 720px) {
+  .stock-chart-card .ant-card-extra .ant-segmented-group {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .stock-financial-card .financial-statement-tabs .ant-segmented-group {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 460px) {
+  .stock-chart-card .ant-card-extra .ant-segmented-group {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .stock-financial-card .ant-card-body {
+    padding-inline: var(--c-space-3);
+  }
+}
+
+.stock-deferred-section {
+  min-width: 0;
+}
+
+.stock-deferred-section__placeholder {
+  min-height: inherit;
+  padding: var(--c-space-5);
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius-lg);
+  background: var(--c-card-bg);
+  box-sizing: border-box;
+}
+
+.stock-chart-card { scroll-margin-top: 84px; }
+.stock-chart-chanlun-toggle { display: inline-flex; align-items: center; gap: 8px; }
+.stock-chart-hint { color: var(--c-text-secondary); font-size: var(--c-font-sm); }
+
+@media (max-width: 640px) {
+  .stock-chart-hint {
+    display: none;
+  }
+}
+

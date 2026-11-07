@@ -30,7 +30,7 @@
   align-items: center;
   gap: var(--c-space-4);
   min-height: 92px;
-  margin-bottom: var(--c-space-4) !important;
+  margin-bottom: var(--c-space-4);
   padding: var(--c-space-4) var(--c-space-5);
   border: 1px solid var(--c-border);
   border-radius: var(--c-radius-md);
@@ -84,17 +84,26 @@
   line-height: var(--c-leading-tight);
 }
 
+.quant-page-header .u-page-title--compact > h3.ant-typography,
 .quant-page-header .u-page-title h3,
 .quant-page-header h3.ant-typography {
-  font-size: var(--quant-font-title) !important;
-  line-height: var(--c-leading-tight) !important;
+  margin: 0;
+  color: var(--c-text-primary);
+  font-size: var(--quant-font-title);
+  line-height: var(--c-leading-tight);
 }
 
 .quant-page-header__description {
   max-width: 560px;
   padding-left: var(--c-space-4);
   border-left: 1px solid var(--c-border);
-  font-size: var(--quant-font-body) !important;
+}
+
+.quant-page-header__description.ant-typography {
+  margin-top: var(--c-space-2);
+  margin-bottom: 0;
+  color: var(--c-text-secondary);
+  font-size: var(--quant-font-body);
   line-height: var(--c-leading-normal);
 }
 
@@ -127,19 +136,29 @@
 .quant-workspace-switcher > .responsive-section-nav__tabs > .ant-tabs-nav,
 .quant-backtest-workspace > .responsive-section-nav__tabs > .ant-tabs-nav {
   min-height: 44px;
-  margin-bottom: var(--c-space-3) !important;
+  margin-bottom: var(--c-space-3);
   padding-inline: var(--c-space-2);
   border: 1px solid var(--c-border);
   border-radius: var(--c-radius-md);
   background: color-mix(in srgb, var(--c-card-bg) 94%, var(--c-page-bg));
+  font-weight: var(--c-weight-bold);
+}
+
+.quant-workspace-switcher > .responsive-section-nav__tabs > .ant-tabs-nav .ant-tabs-nav-more {
+  margin-left: var(--c-space-4);
+}
+
+.quant-backtest-workspace > .responsive-section-nav__tabs > .ant-tabs-nav .ant-tabs-nav-more {
+  margin-left: var(--c-space-3);
 }
 
 .quant-page .responsive-section-nav__tabs > .ant-tabs-nav::before {
   border-bottom: 0;
 }
 
-.quant-page .responsive-section-nav__tabs > .ant-tabs-nav .ant-tabs-tab {
-  margin: 0 !important;
+.quant-page .responsive-section-nav__tabs.ant-tabs > .ant-tabs-nav .ant-tabs-tab,
+.quant-page .responsive-section-nav__tabs.ant-tabs > .ant-tabs-nav .ant-tabs-tab + .ant-tabs-tab {
+  margin: 0;
   padding: 11px var(--c-space-4);
   font-size: var(--quant-font-body);
 }

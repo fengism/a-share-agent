@@ -17,7 +17,7 @@ import type {
 import { semanticTagStyle } from "../../theme/hooks";
 import type { SemanticTagColor } from "../../theme/hooks";
 import "./stock-research-typography.css";
-import "./research-framework.css";
+import "./styles/index.css";
 
 const { Paragraph, Text, Title } = Typography;
 

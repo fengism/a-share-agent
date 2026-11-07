@@ -1,8 +1,28 @@
 /* ── 仓位管理（Portfolio）移动端响应式样式 ── */
 
 /* 资产汇总卡片与统计指标 */
+.portfolio-block-mb {
+  margin-bottom: 16px;
+}
+
 .portfolio-summary-card {
   transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.portfolio-summary-card--position.ant-card {
+  border-left: 3px solid #722ed1;
+}
+
+.portfolio-summary-card--market.ant-card {
+  border-left: 3px solid var(--c-primary);
+}
+
+.portfolio-summary-card--cost.ant-card {
+  border-left: 3px solid #1890ff;
+}
+
+.portfolio-summary-side-grid {
+  height: 100%;
 }
 
 .portfolio-summary-stat .ant-statistic-title {
@@ -14,19 +34,50 @@
   text-overflow: ellipsis;
 }
 
-.portfolio-summary-stat .ant-statistic-content {
+.portfolio-summary-stat .ant-statistic-title .anticon {
+  margin-right: 4px;
+}
+
+.portfolio-summary-stat .ant-statistic-content,
+.portfolio-summary-stat.ant-statistic .ant-statistic-content {
+  font-family: var(--c-font-mono);
+  font-weight: 700;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   letter-spacing: -0.01em;
 }
 
-.portfolio-summary-subtext {
+.portfolio-hero-stat.ant-statistic .ant-statistic-content {
+  font-weight: 800;
+  font-size: calc(var(--c-font-lg, 18px) * 1.5);
+  letter-spacing: -0.02em;
+}
+
+.portfolio-hero-pnl-strip .portfolio-summary-stat.ant-statistic .ant-statistic-content {
+  font-size: 15px;
+}
+
+.portfolio-summary-subtext,
+.portfolio-summary-subtext.ant-typography {
   display: block;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   margin-top: 4px;
+  color: var(--c-text-muted);
+  font-size: var(--c-font-sm);
+}
+
+.portfolio-hero-pnl-strip .portfolio-summary-subtext,
+.portfolio-hero-pnl-strip .portfolio-summary-subtext.ant-typography {
+  font-size: var(--c-font-xs);
+}
+
+.portfolio-risk-subtext,
+.portfolio-risk-subtext.ant-typography {
+  color: var(--c-text-muted);
+  font-size: var(--c-font-sm);
 }
 
 /* 实际买卖点卡片头部与列表 */
@@ -42,96 +93,104 @@
 
 /* 移动端媒体查询（≤ 768px） */
 @media (max-width: 768px) {
-  .portfolio-summary-card .ant-card-body {
-    padding: 10px 10px !important;
+  .portfolio-summary-card.ant-card > .ant-card-body {
+    padding: 10px 10px;
   }
 
   .portfolio-summary-stat .ant-statistic-title {
-    font-size: 11px !important;
-    margin-bottom: 2px !important;
+    font-size: 11px;
+    margin-bottom: 2px;
   }
 
-  .portfolio-summary-stat .ant-statistic-content {
-    font-size: 16px !important;
+  .portfolio-summary-stat .ant-statistic-content,
+  .portfolio-summary-stat.ant-statistic .ant-statistic-content {
+    font-size: 16px;
   }
 
-  .portfolio-summary-stat .ant-statistic-content-prefix {
-    font-size: 13px !important;
-    margin-inline-end: 2px !important;
+  .portfolio-summary-stat.ant-statistic .ant-statistic-content .ant-statistic-content-prefix {
+    font-size: 13px;
+    margin-inline-end: 2px;
   }
 
   .portfolio-summary-stat .ant-statistic-content-suffix {
-    font-size: 12px !important;
+    font-size: 12px;
   }
 
-  .portfolio-summary-subtext {
-    font-size: 10.5px !important;
-    margin-top: 2px !important;
+  .portfolio-summary-subtext,
+  .portfolio-summary-subtext.ant-typography,
+  .portfolio-hero-pnl-strip .portfolio-summary-subtext,
+  .portfolio-hero-pnl-strip .portfolio-summary-subtext.ant-typography {
+    font-size: 10.5px;
+    margin-top: 2px;
   }
 
   /* 仓位风险与资产曲线统计指标移动端收缩 */
   .portfolio-risk-stat .ant-statistic-title,
   .portfolio-equity-stat .ant-statistic-title {
     font-size: 11px !important;
-    margin-bottom: 2px !important;
+    margin-bottom: 2px;
   }
 
-  .portfolio-risk-stat .ant-statistic-content,
-  .portfolio-equity-stat .ant-statistic-content {
-    font-size: 16px !important;
+  .portfolio-risk-stat.ant-statistic .ant-statistic-content,
+  .portfolio-equity-stat.ant-statistic .ant-statistic-content {
+    font-size: 16px;
   }
 
   .portfolio-risk-stat .ant-statistic-content-prefix,
   .portfolio-risk-stat .ant-statistic-content-suffix,
   .portfolio-equity-stat .ant-statistic-content-prefix,
   .portfolio-equity-stat .ant-statistic-content-suffix {
-    font-size: 12px !important;
+    font-size: 12px;
   }
 
-  .portfolio-risk-subtext {
-    font-size: 10.5px !important;
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    display: block !important;
+  .portfolio-risk-subtext,
+  .portfolio-risk-subtext.ant-typography {
+    font-size: 10.5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
   }
 }
 
 /* 超窄屏手机端媒体查询（≤ 480px） */
 @media (max-width: 480px) {
-  .portfolio-summary-card .ant-card-body {
-    padding: 8px 8px !important;
+  .portfolio-summary-card.ant-card > .ant-card-body {
+    padding: 8px 8px;
   }
 
   .portfolio-summary-stat .ant-statistic-title {
-    font-size: 10.5px !important;
+    font-size: 10.5px;
   }
 
   .portfolio-summary-stat .ant-statistic-content {
     font-size: 14.5px !important;
   }
 
-  .portfolio-summary-stat .ant-statistic-content-prefix {
-    font-size: 11.5px !important;
+  .portfolio-summary-stat.ant-statistic .ant-statistic-content .ant-statistic-content-prefix {
+    font-size: 11.5px;
   }
 
   .portfolio-summary-stat .ant-statistic-content-suffix {
-    font-size: 11px !important;
+    font-size: 11px;
   }
 
-  .portfolio-summary-subtext {
-    font-size: 10px !important;
+  .portfolio-summary-subtext,
+  .portfolio-summary-subtext.ant-typography,
+  .portfolio-hero-pnl-strip .portfolio-summary-subtext,
+  .portfolio-hero-pnl-strip .portfolio-summary-subtext.ant-typography {
+    font-size: 10px;
   }
 
-  .portfolio-risk-stat .ant-statistic-content,
-  .portfolio-equity-stat .ant-statistic-content {
-    font-size: 14.5px !important;
+  .portfolio-risk-stat.ant-statistic .ant-statistic-content,
+  .portfolio-equity-stat.ant-statistic .ant-statistic-content {
+    font-size: 14.5px;
   }
 }
 
 @media (max-width: 576px) {
-  .portfolio-settings-submit-item .ant-form-item-label {
-    display: none !important;
+  .portfolio-settings-submit-item.ant-form-item .ant-form-item-label {
+    display: none;
   }
 }
 
@@ -143,8 +202,8 @@
   margin-left: 2px;
 }
 
-.portfolio-tables-card .ant-tabs-nav {
-  margin-bottom: 8px !important;
+.portfolio-tables-card .ant-tabs > .ant-tabs-nav {
+  margin-bottom: 8px;
 }
 
 .portfolio-bare-table-container {
@@ -152,30 +211,140 @@
 }
 
 /* Hero 看板增强与响应式 */
-.portfolio-hero-card {
+.portfolio-hero-card,
+.portfolio-hero-card.ant-card {
   position: relative;
   overflow: hidden;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  border-top: 3px solid var(--c-primary);
+}
+
+.portfolio-hero-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.portfolio-hero-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.portfolio-hero-stat .ant-statistic-title .portfolio-hero-title > .anticon {
+  margin-right: 0;
+}
+
+.portfolio-hero-mask-btn.ant-btn {
+  padding: 0;
+  height: 18px;
+  width: 18px;
+  color: var(--c-text-muted);
+}
+
+.portfolio-hero-pos-badge {
+  text-align: right;
+}
+
+.portfolio-hero-pos-badge__label {
+  font-size: var(--c-font-xs, 12px);
+  color: var(--c-text-muted);
+}
+
+.portfolio-hero-pos-badge__val {
+  font-family: var(--c-font-mono);
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--c-primary);
+}
+
+.portfolio-position-bar-container {
+  margin: 10px 0 16px;
+}
+
+.portfolio-position-bar__labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--c-font-xs, 12px);
+  margin-bottom: 4px;
+  color: var(--c-text-muted);
+}
+
+.portfolio-position-bar__track {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--c-nested-bg);
+  overflow: hidden;
+  display: flex;
+}
+
+.portfolio-position-bar__seg {
+  transition: width 0.3s ease;
+}
+
+.portfolio-position-bar__seg--primary {
+  background: var(--c-primary);
+}
+
+.portfolio-position-legend {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  font-size: var(--c-font-xs);
+}
+
+.portfolio-position-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.portfolio-position-legend__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.portfolio-position-legend__name {
+  color: var(--c-text-secondary);
+}
+
+.portfolio-position-legend__pct {
+  font-weight: 600;
+  font-family: var(--c-font-mono);
+  color: var(--c-text-muted);
 }
 
 .portfolio-hero-pnl-strip {
+  background: var(--c-nested-bg);
+  border-radius: 8px;
+  padding: var(--c-pad-inset, 7px 12px);
+  margin-top: 8px;
   transition: background-color 0.2s ease;
 }
 
 @media (max-width: 768px) {
-  .portfolio-hero-stat .ant-statistic-content {
-    font-size: 22px !important;
+  .portfolio-hero-stat .ant-statistic-content,
+  .portfolio-hero-stat.ant-statistic .ant-statistic-content {
+    font-size: 22px;
   }
 
   .portfolio-hero-pnl-strip {
-    padding: 8px !important;
+    padding: 8px;
   }
 
-  .portfolio-hero-pnl-strip .ant-statistic-content {
-    font-size: 13px !important;
+  .portfolio-hero-pnl-strip .ant-statistic-content,
+  .portfolio-hero-pnl-strip .portfolio-summary-stat.ant-statistic .ant-statistic-content {
+    font-size: 13px;
   }
 
   .portfolio-position-bar-container {
-    margin: 8px 0 12px !important;
+    margin: 8px 0 12px;
   }
 }
 
@@ -192,8 +361,9 @@
     font-size: 12px !important;
   }
 
-  .portfolio-hero-pnl-strip .portfolio-summary-subtext {
-    font-size: 9.5px !important;
+  .portfolio-hero-pnl-strip .portfolio-summary-subtext,
+  .portfolio-hero-pnl-strip .portfolio-summary-subtext.ant-typography {
+    font-size: 9.5px;
   }
 }
 

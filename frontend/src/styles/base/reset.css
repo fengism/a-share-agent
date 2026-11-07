@@ -1,0 +1,148 @@
+/* 全局重置、环境光背景、哑光卡片质感、滚动条
+   自原 base.css 第 1–144 行拆出。
+   本目录内文件由 index.css 按固定顺序 @import，顺序不可调整：
+   同特异性规则靠源序决出胜负，重排会改变层叠结果。 */
+/* Global base styles.
+   - tabular-nums keeps financial figures vertically aligned in tables/stats
+   - font smoothing + legibility for crisp CJK + latin text
+   - thin, unobtrusive scrollbars that suit the dark themes */
+
+body {
+  margin: 0;
+  font-family: var(
+    --c-font-sans,
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Helvetica Neue", Arial, sans-serif
+  );
+  font-size: var(--c-font-base, 14px);
+  line-height: var(--c-leading-normal, 1.5);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* ── Modern Institutional Ambient Background ──────────────────────── */
+[data-theme="stellar-blue"] body,
+[data-theme="stellar-blue"] .app-shell-root {
+  background-color: var(--c-page-bg);
+  background-image:
+    radial-gradient(ellipse 70% 380px at 50% -80px, rgba(59, 130, 246, 0.08), transparent 70%);
+  background-attachment: fixed;
+}
+
+[data-theme="light"] body,
+[data-theme="light"] .app-shell-root {
+  background-color: var(--c-page-bg);
+  background-image:
+    radial-gradient(ellipse 70% 320px at 50% -80px, rgba(180, 83, 9, 0.03), transparent 70%);
+  background-attachment: fixed;
+}
+
+/* 顶部微高光与哑光现代卡片质感 */
+.ant-card {
+  box-shadow: var(--c-card-shadow);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+[data-theme="stellar-blue"] .ant-card {
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  background: var(--c-card-bg) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+[data-theme="stellar-blue"] .ant-card:hover {
+  border-color: rgba(255, 255, 255, 0.16) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+}
+
+[data-theme="stellar-blue"] .ant-table-thead > tr > th {
+  background: var(--c-nested-bg);
+  color: var(--c-text-secondary);
+  border-bottom: 1px solid var(--c-border);
+  font-size: 12px;
+  letter-spacing: 0.01em;
+}
+
+[data-theme="stellar-blue"] .ant-table-tbody > tr:hover > td {
+  background: rgba(255, 255, 255, 0.035) !important;
+}
+
+[data-theme="stellar-blue"] .ant-table {
+  background: transparent;
+}
+
+[data-theme="light"] .ant-card {
+  border-color: var(--c-border) !important;
+  background: var(--c-card-bg) !important;
+  box-shadow: var(--c-card-shadow);
+}
+
+[data-theme="light"] .ant-table-thead > tr > th {
+  background: var(--c-nested-bg);
+  color: var(--c-text-secondary);
+  border-bottom: 1px solid var(--c-border);
+  font-size: 12px;
+  letter-spacing: 0.01em;
+}
+
+[data-theme="light"] .ant-table-tbody > tr:hover > td {
+  background: var(--c-hover-bg) !important;
+}
+
+[data-theme="light"] .ant-table {
+  background: transparent;
+}
+
+/* 柔和呼吸灯动效 */
+@keyframes cyberPulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@keyframes cyberPrimaryPulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+code,
+kbd,
+pre,
+samp {
+  font-family: var(--c-font-mono, "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Monaco, "Courier New", monospace);
+}
+
+* {
+  scrollbar-width: thin;
+}
+
+*::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--c-border);
+  border-radius: var(--c-radius-pill);
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--c-text-muted);
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+

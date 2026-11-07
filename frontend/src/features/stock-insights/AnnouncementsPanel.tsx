@@ -81,7 +81,7 @@ function BulletinItem({ item }: { item: StockBulletin }) {
 export default function AnnouncementsPanel({ code }: Props) {
   const c = useColors();
   const t = useTokens();
-  const { cardStyle, sectionHeaderStyle } = useStyles();
+  const { sectionHeaderStyle } = useStyles();
   const [page, setPage] = useState(1);
   const bulletinsQuery = useStockBulletins(code, page, BULLETIN_PAGE_SIZE);
   const data = bulletinsQuery.data;
@@ -109,7 +109,7 @@ export default function AnnouncementsPanel({ code }: Props) {
           size="small"
           title={`公告列表（第 ${data?.page ?? page} / ${totalPages || "-"} 页）`}
           extra={<Text type="secondary">来源：{sourceLabel}</Text>}
-          style={{ ...cardStyle }}
+          className="u-card"
           styles={{ body: { padding: t.space[4] } }}
         >
           {items.length > 0 ? (

@@ -9,6 +9,7 @@ import type { ThemeColors } from "../theme/themes";
 import { createDebouncedResizeHandler, shouldFitChartContent } from "./chartLifecycle";
 import { toBusinessDay, hexToRgba } from "./utils";
 import { MAX_KLINE_HISTORY_YEARS } from "../utils/date";
+import "./indicator-sub-charts.css";
 
 export type IndicatorType = "macd" | "rsi" | "kdj";
 type Props = {
@@ -381,8 +382,8 @@ export default function IndicatorSubCharts({
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap", gap: 8 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+      <div className="indicator-sub__header">
+        <div className="indicator-sub__header-start">
           {availableTypes.length > 1 ? (
             <Segmented
               value={activeIndicatorType}
@@ -417,27 +418,27 @@ export default function IndicatorSubCharts({
               : `近 ${historyYears} 年 · 向左滑动加载更早数据（最多 ${MAX_KLINE_HISTORY_YEARS} 年）`}
           </span>
         </div>
-        <div style={{ display: "flex", gap: 10, alignItems: "center", fontSize: "var(--c-font-xs)", color: c.textSecondary, flexWrap: "wrap" }}>
+        <div className="indicator-sub__legend">
           {activeDate && (
-            <span style={{ color: c.textMuted, fontFamily: "var(--c-font-mono)", fontSize: "11px" }}>{activeDate}</span>
+            <span className="indicator-sub__time">{activeDate}</span>
           )}
           {activeIndicatorType === "macd" && (
             <>
-              <span style={{ color: c.primary, display: "inline-flex", alignItems: "center", gap: 4 }}>
-                <span style={{ width: 8, height: 2, background: c.primary, display: "inline-block" }} />
+              <span className="indicator-sub__legend-item is-primary">
+                <span className="indicator-sub__swatch" />
                 <span>DIF</span>
-                {difVal != null && <strong style={{ fontFamily: "var(--c-font-mono)" }}>{difVal.toFixed(2)}</strong>}
+                {difVal != null && <strong className="indicator-sub__mono">{difVal.toFixed(2)}</strong>}
               </span>
-              <span style={{ color: c.accent, display: "inline-flex", alignItems: "center", gap: 4 }}>
-                <span style={{ width: 8, height: 2, background: c.accent, display: "inline-block" }} />
+              <span className="indicator-sub__legend-item is-accent">
+                <span className="indicator-sub__swatch" />
                 <span>DEA</span>
-                {deaVal != null && <strong style={{ fontFamily: "var(--c-font-mono)" }}>{deaVal.toFixed(2)}</strong>}
+                {deaVal != null && <strong className="indicator-sub__mono">{deaVal.toFixed(2)}</strong>}
               </span>
-              <span style={{ color: macdHistVal != null && macdHistVal >= 0 ? c.up : c.down, display: "inline-flex", alignItems: "center", gap: 4 }}>
-                <span style={{ width: 6, height: 6, background: macdHistVal != null && macdHistVal >= 0 ? c.up : c.down, display: "inline-block" }} />
+              <span className={`indicator-sub__legend-item ${macdHistVal != null && macdHistVal >= 0 ? "is-up" : "is-down"}`}>
+                <span className="indicator-sub__swatch indicator-sub__swatch--hist" />
                 <span>MACD柱</span>
                 {macdHistVal != null && (
-                  <strong style={{ fontFamily: "var(--c-font-mono)" }}>
+                  <strong className="indicator-sub__mono">
                     {macdHistVal >= 0 ? `+${macdHistVal.toFixed(2)}` : macdHistVal.toFixed(2)}
                   </strong>
                 )}
@@ -446,35 +447,35 @@ export default function IndicatorSubCharts({
           )}
           {activeIndicatorType === "rsi" && (
             <>
-              <span style={{ color: c.accent, display: "inline-flex", alignItems: "center", gap: 4 }}>
-                <span style={{ width: 8, height: 2, background: c.accent, display: "inline-block" }} />
+              <span className="indicator-sub__legend-item is-accent">
+                <span className="indicator-sub__swatch" />
                 <span>RSI(14)</span>
-                {rsiVal != null && <strong style={{ fontFamily: "var(--c-font-mono)" }}>{rsiVal.toFixed(1)}</strong>}
+                {rsiVal != null && <strong className="indicator-sub__mono">{rsiVal.toFixed(1)}</strong>}
               </span>
-              <span style={{ color: c.up, opacity: 0.8, display: "inline-flex", alignItems: "center", gap: 4 }}>
+              <span className="indicator-sub__legend-item is-up is-dim">
                 ┄ 70超买
               </span>
-              <span style={{ color: c.down, opacity: 0.8, display: "inline-flex", alignItems: "center", gap: 4 }}>
+              <span className="indicator-sub__legend-item is-down is-dim">
                 ┄ 30超卖
               </span>
             </>
           )}
           {activeIndicatorType === "kdj" && (
             <>
-              <span style={{ color: c.primary, display: "inline-flex", alignItems: "center", gap: 4 }}>
-                <span style={{ width: 8, height: 2, background: c.primary, display: "inline-block" }} />
+              <span className="indicator-sub__legend-item is-primary">
+                <span className="indicator-sub__swatch" />
                 <span>K</span>
-                {kVal != null && <strong style={{ fontFamily: "var(--c-font-mono)" }}>{kVal.toFixed(2)}</strong>}
+                {kVal != null && <strong className="indicator-sub__mono">{kVal.toFixed(2)}</strong>}
               </span>
-              <span style={{ color: c.accent, display: "inline-flex", alignItems: "center", gap: 4 }}>
-                <span style={{ width: 8, height: 2, background: c.accent, display: "inline-block" }} />
+              <span className="indicator-sub__legend-item is-accent">
+                <span className="indicator-sub__swatch" />
                 <span>D</span>
-                {dVal != null && <strong style={{ fontFamily: "var(--c-font-mono)" }}>{dVal.toFixed(2)}</strong>}
+                {dVal != null && <strong className="indicator-sub__mono">{dVal.toFixed(2)}</strong>}
               </span>
-              <span style={{ color: c.warning, display: "inline-flex", alignItems: "center", gap: 4 }}>
-                <span style={{ width: 8, height: 2, background: c.warning, display: "inline-block" }} />
+              <span className="indicator-sub__legend-item is-warning">
+                <span className="indicator-sub__swatch" />
                 <span>J</span>
-                {jVal != null && <strong style={{ fontFamily: "var(--c-font-mono)" }}>{jVal.toFixed(2)}</strong>}
+                {jVal != null && <strong className="indicator-sub__mono">{jVal.toFixed(2)}</strong>}
               </span>
             </>
           )}

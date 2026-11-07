@@ -1,0 +1,252 @@
+/* 量化回测结果：粘性工具栏、章节导航、图表/明细表容器与响应式规则。 */
+
+.quant-result-toolbar {
+  position: sticky;
+  top: var(--c-space-2);
+  z-index: 5;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--c-space-3);
+  padding: var(--c-space-2) var(--c-space-3);
+  margin-bottom: var(--c-space-3);
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius-md);
+  background: color-mix(in srgb, var(--c-card-bg) 95%, transparent);
+  backdrop-filter: blur(12px);
+  box-shadow: var(--c-shadow-sm);
+}
+
+.quant-result-toolbar .quant-result-nav {
+  position: static;
+  margin: 0;
+  border: none;
+  background: transparent;
+  backdrop-filter: none;
+  box-shadow: none;
+}
+
+.quant-result-nav {
+  position: sticky;
+  z-index: 4;
+  top: var(--c-space-2);
+  display: flex;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 0 var(--c-space-3) auto;
+  padding: 2px;
+  overflow-x: auto;
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius-md);
+  background: color-mix(in srgb, var(--c-card-bg) 96%, transparent);
+  backdrop-filter: blur(10px);
+}
+
+.quant-result-nav a {
+  flex: none;
+  padding: 5px 10px;
+  border-right: 1px solid var(--c-border);
+  border-radius: 0;
+  color: var(--c-text-secondary);
+  font-size: var(--quant-font-label);
+  font-weight: var(--c-weight-semibold);
+  line-height: var(--c-leading-tight);
+}
+
+.quant-result-nav a:last-child {
+  border-right: 0;
+}
+
+.quant-result-nav a:hover,
+.quant-result-nav a:focus-visible {
+  color: var(--c-primary);
+  background: var(--c-primary-soft);
+}
+
+.quant-result-anchor {
+  min-width: 0;
+  scroll-margin-top: 72px;
+}
+
+
+.quant-metric-grid--secondary {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.quant-metric-grid--secondary .quant-metric-card::before {
+  display: none;
+}
+
+.quant-metric-grid--secondary .quant-metric-card.ant-card > .ant-card-body {
+  padding: var(--c-space-3);
+}
+
+.quant-metric-grid--secondary .ant-statistic-content {
+  font-size: var(--c-font-xl);
+}
+
+.quant-metric-hint {
+  margin-top: var(--c-space-2);
+  color: var(--c-text-muted);
+  font-size: var(--quant-font-caption);
+  line-height: var(--c-leading-normal);
+}
+
+.quant-performance-diagnostics {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--c-space-2);
+  margin-bottom: var(--c-space-4);
+  color: var(--c-text-secondary);
+  font-size: var(--quant-font-label);
+}
+
+.quant-performance-diagnostics .ant-tag {
+  margin: 0;
+}
+
+.quant-performance-diagnostics small {
+  margin-left: auto;
+  color: var(--c-text-muted);
+  font-size: var(--quant-font-caption);
+}
+
+.quant-model-assumptions {
+  margin-bottom: var(--c-space-4);
+  padding: var(--c-space-3) var(--c-space-4);
+  border: 1px solid color-mix(in srgb, var(--c-warning) 30%, var(--c-border));
+  border-radius: var(--c-radius-md);
+  background: color-mix(in srgb, var(--c-warning) 5%, var(--c-card-bg));
+  color: var(--c-text-secondary);
+  font-size: var(--quant-font-label);
+  line-height: var(--c-leading-normal);
+}
+
+.quant-model-assumptions > div {
+  display: flex;
+  align-items: baseline;
+  gap: var(--c-space-2);
+}
+
+.quant-model-assumptions .anticon {
+  color: var(--c-warning);
+}
+
+.quant-model-assumptions strong {
+  color: var(--c-text-primary);
+  font-weight: var(--c-weight-semibold);
+}
+
+.quant-model-assumptions summary {
+  width: fit-content;
+  margin-top: var(--c-space-2);
+  cursor: pointer;
+  color: var(--c-text-secondary);
+}
+
+.quant-model-assumptions summary:hover {
+  color: var(--c-primary);
+}
+
+.quant-model-assumptions summary:focus-visible {
+  outline: 2px solid var(--c-primary);
+  outline-offset: 3px;
+}
+
+.quant-model-assumptions ul {
+  margin: var(--c-space-2) 0 0;
+  padding-left: var(--c-space-5);
+}
+
+.quant-model-assumptions li + li {
+  margin-top: var(--c-space-1);
+}
+
+@media (max-width: 1199px) {
+  .quant-metric-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .quant-metric-card .ant-statistic-content {
+    font-size: var(--c-font-2xl);
+  }
+}
+
+@media (max-width: 640px) {
+  .quant-metric-grid--secondary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .quant-performance-diagnostics small {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .quant-result-context {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .quant-result-context > .ant-btn {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .quant-result-strategy {
+    grid-template-columns: 1fr;
+    gap: 3px;
+  }
+
+  .quant-result-strategy span {
+    text-align: left;
+    white-space: normal;
+  }
+
+  .quant-result-nav {
+    position: static;
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .quant-result-nav a {
+    flex: 1 0 auto;
+    text-align: center;
+  }
+}
+
+@media (max-width: 540px) {
+  .quant-metric-grid,
+  .quant-metric-grid--secondary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .quant-metric-card.ant-card > .ant-card-body,
+  .quant-metric-grid--secondary .quant-metric-card.ant-card > .ant-card-body {
+    padding: 11px 9px 9px;
+  }
+
+  .quant-metric-card .ant-statistic-content {
+    font-size: var(--c-font-2xl);
+  }
+
+  .quant-metric-grid--secondary .ant-statistic-content {
+    font-size: var(--c-font-xl);
+  }
+
+  .quant-result-card .ant-card-head {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .quant-result-card .ant-card-extra {
+    max-width: 100%;
+    padding-top: 0;
+    padding-bottom: 8px;
+  }
+
+  .quant-result-card .ant-card-extra .ant-space {
+    row-gap: 4px !important;
+  }
+}

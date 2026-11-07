@@ -5,7 +5,7 @@ import ReactECharts from "echarts-for-react/lib/core";
 import type { QuantBacktestResult } from "../../../api/queries";
 import echarts from "../../../charts/echarts-setup";
 import { useMediaQuery } from "../../../hooks/useMediaQuery";
-import { useColors, useStyles } from "../../../styles/ui";
+import { useColors } from "../../../styles/ui";
 import {
   buildAlphaRiskChartOption,
   buildDrawdownChartOption,
@@ -27,7 +27,6 @@ const VIEW_OPTIONS = [
 export default function BacktestCharts({ equityCurve }: BacktestChartsProps) {
   const [chartView, setChartView] = useState<string>("all");
   const colors = useColors();
-  const { cardStyle } = useStyles();
   const isNarrow = useMediaQuery("(max-width: 768px)");
   const chartHeight = isNarrow ? 260 : 340;
   const equityOption = useMemo(
@@ -71,8 +70,7 @@ export default function BacktestCharts({ equityCurve }: BacktestChartsProps) {
                 </span>
               )}
               size="small"
-              style={cardStyle}
-              className="quant-result-card quant-chart-card"
+              className="quant-result-card quant-chart-card u-card"
             >
               {equityCurve.length > 0 ? (
                 <ReactECharts
@@ -96,8 +94,7 @@ export default function BacktestCharts({ equityCurve }: BacktestChartsProps) {
                 </span>
               )}
               size="small"
-              style={cardStyle}
-              className="quant-result-card quant-chart-card"
+              className="quant-result-card quant-chart-card u-card"
             >
               {equityCurve.length > 0 ? (
                 <ReactECharts
@@ -129,8 +126,7 @@ export default function BacktestCharts({ equityCurve }: BacktestChartsProps) {
                 </span>
               )}
               size="small"
-              style={cardStyle}
-              className="quant-result-card quant-chart-card"
+              className="quant-result-card quant-chart-card u-card"
             >
               {equityCurve.length > 0 && equityCurve.some((p) => p.position_weights && Object.keys(p.position_weights).length > 0) ? (
                 <ReactECharts
@@ -158,8 +154,7 @@ export default function BacktestCharts({ equityCurve }: BacktestChartsProps) {
                 </span>
               )}
               size="small"
-              style={cardStyle}
-              className="quant-result-card quant-chart-card"
+              className="quant-result-card quant-chart-card u-card"
             >
               {equityCurve.length > 0 ? (
                 <ReactECharts

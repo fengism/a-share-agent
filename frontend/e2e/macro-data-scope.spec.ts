@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./base";
 
 test("separates futures quotes and static trade references", async ({ page }) => {
   await page.route(/^http:\/\/127\.0\.0\.1:4173\/api\//, async route => {

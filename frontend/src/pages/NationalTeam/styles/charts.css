@@ -1,0 +1,366 @@
+/* 图表栅格、指数双轴卡、ETF 表（原 §6–§7）
+   自 national-team.css 第 639–950 行拆出。
+   由同目录 index.css 按固定顺序 @import，顺序不可调整：同特异性规则靠源序决胜负。 */
+/* ── 6. Chart Grid & Index Dual Axis Card ────────────────────────────────── */
+.national-team-chart-grid {
+  display: grid;
+  /* 宽屏 3 列，中屏 2 列，小屏 1 列，大幅压缩垂直滚动距离 */
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@media (max-width: 1399px) {
+  .national-team-chart-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .national-team-chart-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.national-team-index-card {
+  min-width: 0;
+  border-radius: 12px;
+  border: 1px solid var(--c-border);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.04), var(--c-shadow-xs, 0 1px 3px rgba(0, 0, 0, 0.04));
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  background: var(--c-card-bg);
+}
+
+.national-team-index-card-placeholder {
+  /* 占位高度跟随卡片实际结构：桌面约 340px，窄屏标题与统计行换行后需要更高。 */
+  min-height: 340px;
+  width: 100%;
+}
+
+@media (max-width: 640px) {
+  .national-team-index-card-placeholder {
+    min-height: 420px;
+  }
+}
+
+.national-team-index-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  border-color: rgba(32, 198, 229, 0.35);
+}
+
+.national-team-index-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.national-team-index-card__title-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.national-team-index-card__title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.national-team-index-card__title.ant-typography {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.national-team-index-card__tag {
+  margin: 0;
+  font-family: var(--c-font-mono);
+  font-size: 10px;
+  padding: 0 4px;
+  line-height: 16px;
+  border-radius: 3px;
+}
+
+/* 内联微型图例：居左排布在标题下方，极具紧凑感与指引性 */
+.national-team-index-card__legend {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  min-height: 20px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--c-bg-subtle, rgba(128, 128, 128, 0.04));
+  font-size: 11px;
+  width: fit-content;
+}
+
+.national-team-index-card__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  font-size: 11px;
+}
+
+.national-team-index-card__legend-sub.ant-typography {
+  font-size: 10px;
+  color: var(--c-text-muted);
+}
+
+.national-team-index-card__legend-line {
+  display: inline-block;
+  width: 12px;
+  height: 0;
+  border-top: 2px solid currentColor;
+}
+
+.national-team-index-card__legend-line--dashed {
+  border-top-style: dashed;
+}
+
+/* 右侧最新统计与增量指标 */
+.national-team-index-card__stat-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.national-team-index-card__shares-box {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.national-team-index-card__shares-label {
+  font-size: 11px;
+  color: var(--c-text-muted);
+}
+
+.national-team-index-card__shares-val {
+  font-family: var(--c-font-mono);
+  color: var(--c-text-primary);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.national-team-index-card__delta-wrap {
+  justify-content: flex-end;
+}
+
+.national-team-index-card__change-tag {
+  display: inline-block;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-family: var(--c-font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+/* 成分 ETF 条：弱化细条，不夺目但随时可知 */
+.national-team-index-card__etfs-bar {
+  margin-bottom: 6px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--c-bg-subtle, rgba(128, 128, 128, 0.03));
+  border: 1px dashed var(--c-border);
+}
+
+.national-team-index-card__etf-list.ant-typography {
+  font-size: 11px;
+  color: var(--c-text-muted);
+  display: block;
+}
+
+.national-team-index-card__history-note {
+  display: block;
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+/* ── 7. ETF Table Section ────────────────────────────────────────────────── */
+.national-team-table-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.national-team-section-heading--table {
+  align-items: center;
+}
+
+.national-team-table-filters {
+  display: flex;
+  align-items: center;
+}
+
+.national-team-table-filters .ant-input-affix-wrapper {
+  width: 190px;
+}
+
+.national-team-table-filters .ant-input-prefix > .anticon {
+  color: var(--c-text-muted);
+}
+
+.national-team-table-card {
+  overflow: hidden;
+  border-radius: 12px;
+  border: 1px solid var(--c-border);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.04), var(--c-shadow-xs, 0 1px 3px rgba(0, 0, 0, 0.04));
+}
+
+.national-team-table .ant-table-content {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x pan-y;
+}
+
+.national-team-table .ant-table-thead > tr > th {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 7px 12px;
+  background: var(--c-bg-subtle, rgba(128, 128, 128, 0.04));
+  border-bottom: 1px solid var(--c-border);
+}
+
+.national-team-table .ant-table-tbody > tr > td {
+  font-size: 12.5px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--c-border);
+}
+
+.national-team-index-tag {
+  margin: 0;
+  border-radius: 4px;
+  font-weight: 500;
+  font-size: 11px;
+  padding: 0 6px;
+  line-height: 18px;
+}
+
+.national-team-etf-name {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.national-team-etf-code-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.national-team-code {
+  font-family: var(--c-font-mono);
+  font-weight: 600;
+  font-size: 12.5px;
+}
+
+.national-team-code-link {
+  color: var(--c-accent, #20c6e5);
+  text-decoration: none;
+  transition: all 0.15s ease;
+}
+
+.national-team-code-link:hover {
+  text-decoration: underline;
+  color: var(--c-primary, #1677ff);
+  text-shadow: 0 0 8px rgba(32, 198, 229, 0.3);
+}
+
+.national-team-exchange-tag {
+  margin: 0;
+  font-size: 9px;
+  padding: 0 3px;
+  line-height: 14px;
+  border-radius: 2px;
+  color: var(--c-text-muted);
+  border: 1px solid var(--c-border);
+}
+
+.national-team-etf-fullname.ant-typography {
+  font-size: 11px;
+  color: var(--c-text-secondary);
+  line-height: 1.2;
+}
+
+.national-team-subtle-text.ant-typography {
+  font-size: 12px;
+  color: var(--c-text-secondary);
+}
+
+.national-team-date {
+  font-family: var(--c-font-mono);
+  font-size: 12px;
+  color: var(--c-text-secondary);
+}
+
+.national-team-shares-val {
+  font-family: var(--c-font-mono);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.national-team-delta-pill {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-family: var(--c-font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+}
+
+.national-team-star-btn {
+  padding: 0;
+  font-size: 14px;
+  color: var(--c-text-secondary);
+}
+
+.national-team-star-btn.is-starred {
+  color: var(--c-accent, #faad14);
+}
+
+.national-team-index-col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.national-team-cat-tag {
+  font-size: 10px;
+  line-height: 16px;
+  padding: 0 4px;
+  margin: 0;
+  width: fit-content;
+}
+
+.national-team-volume-ratio-tag {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 0 4px;
+}
+
+.national-team-chart-btn {
+  font-size: 12px;
+  padding: 0 4px;
+}
+
+.national-team-empty-card {
+  text-align: center;
+  padding: 12px 0;
+  background: var(--c-bg-subtle, rgba(128, 128, 128, 0.02));
+  border-style: dashed;
+}
+

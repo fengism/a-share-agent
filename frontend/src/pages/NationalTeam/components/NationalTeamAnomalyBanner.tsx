@@ -111,16 +111,16 @@ export default function NationalTeamAnomalyBanner({ data }: AnomalyBannerProps) 
           key={idx}
           type={sig.type}
           showIcon
-          icon={<ThunderboltOutlined style={{ color: sig.type === "warning" ? "#faad14" : sig.type === "success" ? colors.up : colors.primary }} />}
+          icon={<ThunderboltOutlined style={{ color: sig.type === "warning" ? "#faad14" : colors.primary }} />}
           message={
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 6 }}>
+            <div className="national-team-anomaly-banner__item">
               <Space size={6} align="center">
                 <Text strong style={{ fontSize: 13 }}>{sig.title}</Text>
-                <Tag color={sig.type === "warning" ? "gold" : sig.type === "success" ? "red" : "blue"} style={{ fontSize: 10, lineHeight: "16px", padding: "0 4px" }}>
+                <Tag color={sig.type === "warning" ? "gold" : "blue"} style={{ fontSize: 10, lineHeight: "16px", padding: "0 4px" }}>
                   实时信号
                 </Tag>
               </Space>
-              <Text type="secondary" style={{ fontSize: 12 }}>{sig.desc}</Text>
+              <Text type="secondary" className="national-team-anomaly-banner__desc">{sig.desc}</Text>
             </div>
           }
           style={{ marginBottom: idx < signals.length - 1 ? 6 : 0, borderRadius: 8, padding: "7px 12px" }}

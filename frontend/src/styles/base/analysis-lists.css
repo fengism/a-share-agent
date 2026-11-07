@@ -1,0 +1,57 @@
+/* 分析页因子/明细列表
+   自原 base.css 第 1759–1811 行拆出。
+   本目录内文件由 index.css 按固定顺序 @import，顺序不可调整：
+   同特异性规则靠源序决出胜负，重排会改变层叠结果。 */
+.analysis-detail-list__item {
+  display: grid;
+  gap: 3px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--c-border);
+}
+
+.analysis-detail-list__item:last-child {
+  border-bottom: 0;
+}
+
+.analysis-detail-list__title {
+  color: var(--c-text-primary);
+  font-size: var(--c-font-md);
+  line-height: var(--c-leading-relaxed);
+  overflow-wrap: anywhere;
+}
+
+.analysis-detail-list__title.is-secondary,
+.analysis-detail-list__meta,
+.analysis-factor-list,
+.analysis-factor-list__empty {
+  color: var(--c-text-secondary);
+}
+
+.analysis-detail-list__meta,
+.analysis-factor-list,
+.analysis-factor-list__empty {
+  font-size: var(--c-font-sm);
+}
+
+.analysis-factor-list {
+  display: grid;
+  gap: 5px;
+  margin-top: 8px;
+  line-height: var(--c-leading-relaxed);
+}
+
+.analysis-factor-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+}
+
+.analysis-factor-list li > span {
+  flex: none;
+  font-weight: var(--c-weight-bold);
+}
+
+.analysis-factor-list__empty {
+  margin-top: 8px;
+}
+

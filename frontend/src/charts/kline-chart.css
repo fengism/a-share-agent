@@ -1,0 +1,274 @@
+/* K 线主图：HUD、指标图例、工具栏、绘图区与筹码浮层。
+   原先写在 KlineChart.tsx 的 style 对象里，逐条等价迁移。
+   图例色是图表专用硬编码色（不随主题变化），色块用 currentColor 继承。 */
+
+.kline-chart__hint {
+  font-size: 11px;
+  color: var(--c-text-muted);
+  white-space: nowrap;
+}
+
+.kline-chart__legend {
+  font-size: 11px;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.kline-chart__legend-text {
+  white-space: nowrap;
+}
+
+.kline-chart__dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.kline-chart__legend.is-ma,
+.kline-chart__legend-text.is-ma,
+.kline-chart__dot.is-ma {
+  color: #f0b90b;
+}
+
+.kline-chart__legend.is-purple,
+.kline-chart__legend-text.is-purple,
+.kline-chart__dot.is-purple {
+  color: #9254de;
+}
+
+.kline-chart__legend.is-orange,
+.kline-chart__legend-text.is-orange,
+.kline-chart__dot.is-orange {
+  color: #ff7a45;
+}
+
+.kline-chart__legend.is-cyan,
+.kline-chart__legend-text.is-cyan,
+.kline-chart__dot.is-cyan {
+  color: #00d4d4;
+}
+
+.kline-chart__legend.is-sky,
+.kline-chart__legend-text.is-sky,
+.kline-chart__dot.is-sky {
+  color: #38bdf8;
+}
+
+.kline-chart__legend.is-fuchsia,
+.kline-chart__legend-text.is-fuchsia,
+.kline-chart__dot.is-fuchsia {
+  color: #e879f9;
+}
+
+.kline-chart__legend.is-magenta,
+.kline-chart__legend-text.is-magenta,
+.kline-chart__dot.is-magenta {
+  color: #d946ef;
+}
+
+.kline-chart__legend.is-violet,
+.kline-chart__legend-text.is-violet,
+.kline-chart__dot.is-violet {
+  color: #c084fc;
+}
+
+.kline-chart__legend-text.is-blue {
+  color: #1890ff;
+}
+
+.kline-chart__legend-text.is-teal {
+  color: #13c2c2;
+}
+
+.kline-chart__legend-text.is-amber {
+  color: #faad14;
+}
+
+.kline-chart__chip {
+  padding: 1px 6px;
+  font-size: 11px;
+  border-radius: 4px;
+  border: 1px solid var(--c-border);
+  background: transparent;
+  color: var(--c-text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.kline-chart__scale-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+}
+
+.kline-chart__hud-shell {
+  min-height: 32px;
+  padding: 4px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  row-gap: 4px;
+  column-gap: 8px;
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--c-text-secondary);
+  background-color: var(--c-nested-bg);
+  border-bottom: 1px solid var(--c-border);
+  font-family: var(--c-font-mono);
+  user-select: none;
+}
+
+.kline-chart__hud-stats {
+  display: flex;
+  align-items: center;
+  gap: 4px 10px;
+  flex-wrap: wrap;
+  flex: 1 1 auto;
+  min-width: 0;
+  line-height: 1.4;
+}
+
+.kline-chart__hud-time {
+  color: var(--c-text-primary);
+  font-weight: 700;
+  min-width: 80px;
+  flex-shrink: 0;
+  padding-right: 6px;
+  border-right: 1px solid var(--c-border);
+  margin-right: 2px;
+}
+
+.kline-chart__toolbar-end {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+
+.kline-chart__icon {
+  font-size: 12px;
+  line-height: 1;
+}
+
+.kline-chart__indicators-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 100%;
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+
+.kline-chart__plot {
+  position: relative;
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  background-color: var(--c-card-bg);
+}
+
+.kline-chart__canvas {
+  width: 100%;
+  height: 100%;
+  background-color: var(--c-card-bg);
+}
+
+.kline-chart__volume-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.kline-chart__legend-group {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.kline-chart__tabs-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.kline-chart__drag-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.kline-chart__drag-handle {
+  width: 22px;
+  height: 3px;
+  border-radius: 2px;
+  background-color: var(--c-border);
+  opacity: 0.8;
+}
+
+.kline-chart__unit {
+  font-size: 10px;
+  color: var(--c-text-muted);
+  opacity: 0.75;
+}
+
+.kline-chart__chip-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 3px;
+}
+
+.kline-chart__chip-title {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--c-text-secondary);
+  letter-spacing: 0.02em;
+}
+
+.kline-chart__chip-title.is-amber {
+  color: #faad14;
+}
+
+.kline-chart__chip-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 1px;
+  overflow: hidden;
+}
+
+.kline-chart__chip-bar-row {
+  display: flex;
+  align-items: center;
+  height: 4px;
+  gap: 3px;
+}
+
+.kline-chart__chip-label {
+  color: var(--c-text-secondary);
+  font-weight: 500;
+}
+
+.kline-chart__chip-overlay {
+  position: absolute;
+  right: 12px;
+  top: 10px;
+  z-index: 5;
+}

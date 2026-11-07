@@ -4,7 +4,7 @@ import RatingBadge from "../../components/RatingBadge";
 import SignalBadge from "../../components/SignalBadge";
 import { renderWithCitations } from "../../features/investment-research/citationRendering";
 import type { AnalysisResult } from "../../types/stock";
-import { useColors, useStyles, useTokens } from "../../theme/hooks";
+import { useColors, useTokens } from "../../theme/hooks";
 import "./analysis-conclusion.css";
 
 const { Text } = Typography;
@@ -17,7 +17,6 @@ interface Props {
 export default function AIConclusion({ result, embedded = false }: Props) {
   const c = useColors();
   const t = useTokens();
-  const { cardStyle } = useStyles();
   const {
     fundamental,
     valuation_view,
@@ -68,7 +67,6 @@ export default function AIConclusion({ result, embedded = false }: Props) {
     : "暂无公允区间";
 
   const conclusionStyle = {
-    ...(embedded ? {} : cardStyle),
     marginBottom: embedded ? 0 : t.space[4],
     "--analysis-accent": accent,
     "--analysis-accent-soft": accentSoft,
@@ -178,7 +176,7 @@ export default function AIConclusion({ result, embedded = false }: Props) {
   return (
     <Card
       size="small"
-      className="analysis-conclusion pdf-avoid-break"
+      className="analysis-conclusion pdf-avoid-break u-card"
       title={<span className="analysis-conclusion__title">AI 综合研判</span>}
       style={conclusionStyle}
       styles={{ body: { padding: 0 } }}

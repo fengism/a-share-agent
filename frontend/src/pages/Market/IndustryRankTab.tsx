@@ -9,16 +9,17 @@ import ResponsiveMetricGrid from "../../components/ResponsiveMetricGrid";
 import SectionDataState from "../../components/SectionDataState";
 import SectionToolbar from "../../components/SectionToolbar";
 import StockExternalLink from "../../components/StockExternalLink";
-import StockQuickPreviewModal from "../../components/StockQuickPreviewModal";
+import StockWorkspaceDrawer from "../../components/StockWorkspaceDrawer";
 import SectorRRGChart from "./SectorRRGChart";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { useUrlSearchParam } from "../../hooks/useUrlSearchParam";
 import { useIndustryRankings, useMarketSectorStocksHistory } from "../../api/queries";
 import type { IndustryRankItem, MarketSectorStocksHistoryItem } from "../../types/stock";
-import { useColors, useStyles, useTokens } from "../../theme/hooks";
+import { useColors, useTokens } from "../../theme/hooks";
 import { normalizeIsoDate } from "../../utils/date";
 import { formatAmount, formatMarketCap } from "../../utils/format";
 import { rankBadge } from "../../components/rankBadge";
+import "./industry-rank.css";
 
 function formatRate(value: number | null) {
   return value === null ? "-" : `${value.toFixed(2)}%`;
@@ -232,7 +233,7 @@ function SectorStocksDrawer({
         />
       </SectionDataState>
       {previewStock ? (
-        <StockQuickPreviewModal
+        <StockWorkspaceDrawer
           open={Boolean(previewStock)}
           code={previewStock.code}
           name={previewStock.name}
@@ -247,7 +248,6 @@ export default function IndustryRankTab() {
   const c = useColors();
   const t = useTokens();
   const isNarrow = useMediaQuery("(max-width: 768px)");
-  const { cardStyle } = useStyles();
   const today = dayjs().format("YYYY-MM-DD");
   const [dateParam, setDate] = useUrlSearchParam("industryDate", today, { replace: true });
   const normalizedDate = normalizeIsoDate(dateParam, today);
@@ -398,7 +398,7 @@ export default function IndustryRankTab() {
   ), []);
 
   return (
-    <div style={{ ...cardStyle, padding: 0, borderRadius: t.radius.md, boxShadow: t.shadow.xs }}>
+    <div className="u-card" style={{ padding: 0, borderRadius: t.radius.md, boxShadow: t.shadow.xs }}>
       <div
         style={{
           padding: `${t.space[3]} ${t.space[4]}`,

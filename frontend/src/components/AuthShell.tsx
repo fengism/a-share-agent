@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { FundOutlined, LineChartOutlined, MessageOutlined, PieChartOutlined } from "@ant-design/icons";
 import ThemeSelector from "./ThemeSelector";
-import "./auth.css";
+import "./auth/index.css";
 
 export default function AuthShell({ children }: { children: ReactNode }) {
   return (

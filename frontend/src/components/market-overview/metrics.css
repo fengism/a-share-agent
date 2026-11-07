@@ -1,0 +1,99 @@
+/* metrics —— 自 market-overview.css 第 240–336 行拆出。
+   由同目录 index.css 按固定顺序 @import，顺序不可调整：同特异性规则靠源序决胜负。 */
+.market-board__metrics {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  overflow: hidden;
+  border-radius: var(--c-radius-md);
+}
+
+[data-theme="stellar-blue"] .market-board__metrics {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--c-card-bg);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="light"] .market-board__metrics {
+  border: 1px solid var(--c-border);
+  background: var(--c-card-bg);
+  box-shadow: 0 1px 3px rgba(44, 34, 20, 0.04);
+}
+
+.market-board-metric {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+  padding: 14px 16px;
+  transition: all 160ms ease;
+}
+
+[data-theme="stellar-blue"] .market-board-metric {
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+[data-theme="stellar-blue"] .market-board-metric:hover {
+  background: rgba(255, 255, 255, 0.035);
+}
+
+[data-theme="light"] .market-board-metric {
+  border-right: 1px solid var(--c-border);
+}
+
+[data-theme="light"] .market-board-metric:hover {
+  background: var(--c-hover-bg, #f5f7fa);
+}
+
+.market-board-metric:last-child { border-right: 0; }
+.market-board-metric > span {
+  overflow: hidden;
+  color: var(--c-text-muted);
+  font-size: 11px;
+  font-weight: var(--c-weight-medium);
+  letter-spacing: 0.05em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.market-board-metric > small {
+  overflow: hidden;
+  color: var(--c-text-muted);
+  font-size: 11px;
+  font-family: var(--c-font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.market-board-metric > strong {
+  font-size: 20px;
+  line-height: var(--c-leading-tight);
+  font-family: var(--c-font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.market-board-metric--up > strong {
+  color: var(--c-up);
+  text-shadow: 0 0 12px rgba(236, 93, 82, 0.4);
+}
+.market-board-metric--down > strong {
+  color: var(--c-down);
+  text-shadow: 0 0 12px rgba(62, 201, 143, 0.4);
+}
+.market-board-metric--warning > strong {
+  color: var(--c-warning);
+  text-shadow: 0 0 12px rgba(247, 144, 9, 0.4);
+}
+
+[data-theme="light"] .market-board-metric > strong {
+  text-shadow: none;
+}
+
+.market-board__grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: var(--market-board-gap);
+  align-items: stretch;
+}
+

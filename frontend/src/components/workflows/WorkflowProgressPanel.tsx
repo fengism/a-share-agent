@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import { StopOutlined, CheckCircleOutlined, CloseCircleOutlined, LoadingOutlined, WarningOutlined } from "@ant-design/icons";
 import { Card, Spin, Steps, Typography, type StepsProps } from "antd";
-import { useStyles } from "../../styles/ui";
 
 const { Text } = Typography;
 
@@ -22,7 +21,6 @@ export default function WorkflowProgressPanel({
   message,
   children,
 }: WorkflowProgressPanelProps) {
-  const { cardStyle } = useStyles();
   const messageIcon = status === "running"
     ? <Spin size="small" />
     : status === "error"
@@ -34,7 +32,7 @@ export default function WorkflowProgressPanel({
           : <StopOutlined />;
 
   return (
-    <Card size="small" style={{ ...cardStyle, marginBottom: 20 }} styles={{ body: { padding: "20px 24px" } }}>
+    <Card size="small" className="u-card" style={{ marginBottom: 20 }} styles={{ body: { padding: "20px 24px" } }}>
       <Steps current={current} items={items} size="small" status={status === "error" ? "error" : status === "cancelled" || status === "detached" || status === "idle" ? "wait" : undefined} />
       {message ? (
         <div

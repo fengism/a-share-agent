@@ -18,7 +18,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { queryKeys } from "../../api/queryKeys";
 import { downloadIndustryChainPdfFromData, useMineIndustryChainAtlas } from "../../api/queryHooks/workflows";
-import { useColors, useStyles } from "../../styles/ui";
+import { useColors } from "../../styles/ui";
 import type { IndustryChainChart, IndustryChainResult } from "../../types/stock";
 import { reportPresentation } from "./reportPresentation";
 import { buildIndustryReportMarkdown } from "./industryReportMarkdown";
@@ -32,7 +32,7 @@ import IndustryResearchSections, { IndustryResearchAudit } from "./IndustryResea
 import MarkdownReport from "./MarkdownReport";
 import LazyIndustryChart from "./LazyIndustryChart";
 import { marketDateStamp } from "../../utils/marketTime";
-import "./industry-report.css";
+import "./styles/index.css";
 
 const IndustryChart = lazy(() => import("./IndustryChart"));
 
@@ -98,7 +98,6 @@ export default function IndustryReport({
 }: IndustryReportProps) {
   const result = useMemo(() => reportPresentation(rawResult), [rawResult]);
   const colors = useColors();
-  const { cardStyle } = useStyles();
   const isNarrow = useMediaQuery("(max-width: 768px)");
   const [expandedChart, setExpandedChart] = useState<{ chart: IndustryChainChart; index: number } | null>(null);
   const [feishuReceiver, setFeishuReceiver] = useState(defaultReceiver || "");
@@ -263,8 +262,8 @@ export default function IndustryReport({
     <>
       <div className="industry-report__header">
         <div className="industry-report__title-row">
-          <Text className="industry-report__title" strong style={{ color: colors.textPrimary, fontSize: "var(--c-font-lg)" }}>
-            <ApartmentOutlined style={{ marginRight: 6 }} />
+          <Text className="industry-report__title" strong>
+            <ApartmentOutlined className="u-mr-6" />
             {reportName} 产业链
           </Text>
           <div className="industry-report__actions">
@@ -273,7 +272,7 @@ export default function IndustryReport({
               placement="bottomRight"
               content={(
                 <div style={{ width: isNarrow ? "min(280px, 80vw)" : 280 }}>
-                  <Text style={{ color: colors.textSecondary, fontSize: "var(--c-font-sm)", display: "block", marginBottom: 8 }}>
+                  <Text className="industry-report__push-hint">
                     飞书接收人 open_id
                   </Text>
                   <Input
@@ -283,7 +282,7 @@ export default function IndustryReport({
                     onChange={(event) => setFeishuReceiver(event.target.value)}
                     disabled={isPushing}
                     id="feishu-receiver-input"
-                    style={{ marginBottom: 12 }}
+                    className="u-mb-12"
                   />
                   <Button
                     type="primary"
@@ -293,7 +292,7 @@ export default function IndustryReport({
                     loading={isPushing}
                     disabled={!archiveId}
                     onClick={() => onPush("feishu", feishuReceiver.trim())}
-                    style={{ marginBottom: 8 }}
+                    className="u-mb-8"
                   >
                     推送到飞书
                   </Button>
@@ -308,13 +307,13 @@ export default function IndustryReport({
                     推送到 Notion
                   </Button>
                   {!archiveId && (
-                    <div style={{ color: colors.textSecondary, fontSize: "var(--c-font-sm)", marginTop: 8 }}>
+                    <div className="industry-report__push-note">
                       提示：从右侧历史打开的报告可直接推送。
                     </div>
                   )}
                   {pushResult && (
                     <div style={{ marginTop: 12, padding: 10, background: `${colors.down}1a`, borderRadius: 6 }}>
-                      <div style={{ color: colors.down, fontSize: "var(--c-font-sm)", marginBottom: 4 }}>
+                      <div className="industry-report__push-error-title">
                         ✓ 已推送到 {pushResult.target === "feishu" ? "飞书" : "Notion"}
                       </div>
                       {pushResult.url && (
@@ -322,13 +321,13 @@ export default function IndustryReport({
                           href={pushResult.url}
                           target="_blank"
                           rel="noreferrer"
-                          style={{ color: colors.primary, fontSize: "var(--c-font-sm)", wordBreak: "break-all" }}
+                          className="industry-report__push-url"
                         >
                           {pushResult.url}
                         </a>
                       )}
                       {pushResult.message && (
-                        <div style={{ color: colors.textSecondary, fontSize: "var(--c-font-xs)", marginTop: 4 }}>{pushResult.message}</div>
+                        <div className="industry-report__push-error-meta">{pushResult.message}</div>
                       )}
                     </div>
                   )}
@@ -378,7 +377,7 @@ export default function IndustryReport({
                 loading={isExportingPdf}
                 aria-label="导出"
               >
-                导出 <DownOutlined style={{ fontSize: 10, marginLeft: 2 }} />
+                导出 <DownOutlined className="industry-report__export-icon" />
               </Button>
             </Dropdown>
             <Button
@@ -395,8 +394,8 @@ export default function IndustryReport({
 
         <div className="industry-report__meta">
           {result.aliases && result.aliases.length > 0 && (
-            <div className="industry-report__aliases" style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {result.aliases.map((alias) => <Tag key={alias} className="industry-report__wrap-tag" style={{ margin: 0 }}>{alias}</Tag>)}
+            <div className="industry-report__aliases industry-report__aliases--spaced">
+            {result.aliases.map((alias) => <Tag key={alias} className="industry-report__wrap-tag u-tag-flush">{alias}</Tag>)}
             </div>
           )}
           {scopeSummary && <Text className="industry-report__scope-summary" type="secondary">研究范围：{scopeSummary}</Text>}
@@ -425,16 +424,15 @@ export default function IndustryReport({
 
       {(result.quality_status === "degraded" || result.archive_status === "failed" || Boolean(result.warnings?.length)) && (
         <Alert
-          className="industry-report__alert"
+          className="industry-report__alert u-mb-16"
           type={result.archive_status === "failed" ? "error" : "warning"}
           showIcon
           title={result.archive_status === "failed" ? "报告未保存" : "报告存在质量提示"}
           description={result.warnings?.length ? (
-            <ul style={{ margin: 0, paddingLeft: 18 }}>
+            <ul className="industry-report__warnings">
               {result.warnings.map((warning) => <li className="industry-report__warning" key={warning}>{warning}</li>)}
             </ul>
           ) : "部分结构化内容未能完整生成，请结合原始来源谨慎使用。"}
-          style={{ marginBottom: 16 }}
         />
       )}
 
@@ -474,16 +472,16 @@ export default function IndustryReport({
         <IndustryResearchSections result={result} />
 
         {result.charts.length > 0 && (
-          <div style={{ marginBottom: 16 }}>
+          <div className="u-mb-16">
             {result.charts.map((chart, index) => {
               const chartHeight = chart.type === "tree"
                 ? "clamp(400px, 55vh, 900px)"
                 : "clamp(450px, 60vh, 750px)";
               const hasValidOption = Boolean(chart.option && typeof chart.option === "object");
               return (
-                <div key={index} style={{ ...cardStyle, padding: "16px 20px", marginBottom: 16 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                    <Text strong style={{ color: colors.textPrimary, fontSize: "var(--c-font-base)" }}>{chart.title}</Text>
+                <div key={index} className="u-card industry-report__chart-card">
+                  <div className="industry-report__chart-head">
+                    <Text strong className="industry-report__chart-title">{chart.title}</Text>
                     {hasValidOption && (
                       <Button
                         type="text"
@@ -491,17 +489,17 @@ export default function IndustryReport({
                         icon={<FullscreenOutlined />}
                         aria-label={`放大${chart.title}`}
                         onClick={() => setExpandedChart({ chart, index })}
-                        style={{ color: colors.textMuted }}
+                        className="industry-report__chart-expand"
                       />
                     )}
                   </div>
                   {chart.description && (
-                    <Text style={{ color: colors.textSecondary, fontSize: "var(--c-font-md)", marginBottom: 12, display: "block", lineHeight: "var(--c-leading-normal)" }}>
+                    <Text className="industry-report__chart-desc">
                       {chart.description}
                     </Text>
                   )}
                   {hasValidOption ? (
-                    <div style={{ width: "100%", overflow: "auto" }}>
+                    <div className="industry-report__chart-scroll">
                       <LazyIndustryChart option={chart.option} height={chartHeight} />
                     </div>
                   ) : (
@@ -560,7 +558,7 @@ export default function IndustryReport({
         {expandedChart && (
           <Suspense
             fallback={(
-              <div aria-label="产业链大图加载中" style={{ minHeight: 360, width: "100%" }}>
+              <div aria-label="产业链大图加载中" className="industry-report__chart-loading">
                 <Skeleton.Node active style={{ width: "100%", height: 360 }} />
               </div>
             )}

@@ -1,0 +1,301 @@
+/* 日线行情同步管理卡片：任务队列、执行进度与历史日历明细。 */
+
+.market-daily-backfill__actions,
+.market-daily-manual__actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--c-border);
+}
+
+.market-daily-job-list {
+  margin-top: 16px;
+}
+
+.market-daily-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 108px;
+  gap: 14px;
+  padding: 18px;
+  border: 1px dashed color-mix(in srgb, var(--c-border) 80%, var(--c-text-muted) 20%);
+  border-radius: var(--c-radius-md);
+  color: var(--c-text-muted);
+  background: var(--c-hover-bg);
+}
+
+.market-daily-empty > .anticon {
+  font-size: 24px;
+  color: var(--c-primary);
+}
+
+.market-daily-empty div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.market-daily-empty strong {
+  color: var(--c-text-primary);
+}
+
+.market-daily-empty span {
+  font-size: var(--c-font-sm);
+}
+
+.market-daily-empty--compact {
+  min-height: 82px;
+}
+
+.market-daily-job {
+  padding: 14px 16px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius-md);
+  background: var(--c-hover-bg);
+}
+
+.market-daily-job + .market-daily-job {
+  margin-top: 10px;
+}
+
+.market-daily-job__topline,
+.market-daily-history__day-header,
+.market-daily-factor__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.market-daily-job__tags {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.market-daily-job__tags .ant-tag,
+.market-daily-history .ant-tag {
+  margin-inline-end: 0;
+}
+
+.market-daily-job__metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin: 12px 0 8px;
+  color: var(--c-text-muted);
+  font-size: var(--c-font-sm);
+}
+
+.market-daily-job__metrics strong {
+  color: var(--c-text-primary);
+}
+
+.market-daily-job__error,
+.market-daily-factor__error,
+.market-daily-history__error {
+  margin-top: 7px;
+  color: var(--c-error);
+  font-size: var(--c-font-sm);
+  word-break: break-all;
+}
+
+.market-daily-job__details {
+  margin-top: 9px;
+  color: var(--c-text-secondary);
+  font-size: var(--c-font-sm);
+}
+
+.market-daily-job__details summary {
+  cursor: pointer;
+}
+
+.market-daily-job__details > div {
+  max-height: 160px;
+  margin-top: 6px;
+  overflow-y: auto;
+}
+
+.market-daily-job__details p {
+  margin: 0;
+  padding: 3px 0;
+  color: var(--c-text-muted);
+  word-break: break-all;
+}
+
+.market-daily-job__details strong {
+  color: var(--c-text-primary);
+}
+
+.market-daily-history__header {
+  display: flex;
+  justify-content: space-between;
+  margin: 20px 0 10px;
+  padding-top: 18px;
+  border-top: 1px solid var(--c-border);
+}
+
+.market-daily-history__header > div {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.market-daily-history__header strong {
+  color: var(--c-text-primary);
+}
+
+.market-daily-history__header span {
+  color: var(--c-text-muted);
+  font-size: var(--c-font-sm);
+}
+
+.market-daily-history {
+  display: grid;
+  gap: 10px;
+}
+
+.market-daily-history__day {
+  padding: 12px 14px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius-md);
+  background: var(--c-hover-bg);
+}
+
+.market-daily-history__day.is-active {
+  border-color: color-mix(in srgb, var(--c-primary) 56%, var(--c-border));
+  box-shadow: inset 3px 0 0 var(--c-primary);
+}
+
+.market-daily-history__day-header {
+  margin-bottom: 9px;
+}
+
+.market-daily-history__day-header > .ant-btn {
+  padding-inline: 0;
+}
+
+.market-daily-history__segments {
+  display: grid;
+  gap: 8px;
+}
+
+.market-daily-history__segment {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--c-border) 60%, transparent);
+  border-radius: var(--c-radius-sm);
+  background: color-mix(in srgb, var(--c-nested-bg) 75%, transparent);
+}
+
+.market-daily-history__segment-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.market-daily-history__segment-title {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  min-width: 0;
+}
+
+.market-daily-history__segment-title strong {
+  color: var(--c-text-primary);
+  font-size: var(--c-font-sm);
+  font-weight: var(--c-weight-semibold);
+  white-space: nowrap;
+}
+
+.market-daily-history__segment-counts {
+  color: var(--c-text-muted);
+  font-size: var(--c-font-xs);
+  white-space: nowrap;
+}
+
+.market-daily-history__segment-tags {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+}
+
+.market-daily-history__checkpoint {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.market-daily-history__checkpoint small {
+  color: var(--c-text-muted);
+  font-size: var(--c-font-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.market-daily-history__error {
+  position: static;
+  margin-top: 2px;
+  padding: 4px 8px;
+  border-radius: var(--c-radius-sm);
+  background: color-mix(in srgb, var(--c-error) 8%, transparent);
+  color: var(--c-error);
+  font-size: var(--c-font-xs);
+  line-height: var(--c-leading-normal);
+  word-break: break-all;
+}
+
+.market-daily-factor__toolbar {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.65fr) auto auto auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.market-daily-factor__result {
+  margin-top: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius-md);
+  background: var(--c-hover-bg);
+}
+
+.market-daily-factor__metrics {
+  display: flex;
+  gap: 26px;
+}
+
+.market-daily-factor__metrics span {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.market-daily-factor__metrics small,
+.market-daily-factor__meta {
+  color: var(--c-text-muted);
+  font-size: var(--c-font-sm);
+}
+
+.market-daily-factor__metrics strong {
+  color: var(--c-text-primary);
+  font-size: var(--c-font-lg);
+}
+
+.market-daily-factor__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px 18px;
+  margin-top: 10px;
+}

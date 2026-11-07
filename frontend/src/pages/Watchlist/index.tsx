@@ -69,8 +69,8 @@ import { WatchlistAllocationBar } from "./components/WatchlistAllocationBar";
 import { WatchlistCardList } from "./components/WatchlistCardList";
 import { WatchlistNoteCell } from "./components/WatchlistNoteCell";
 import { WatchlistQuickImportModal } from "./components/WatchlistQuickImportModal";
-import StockQuickPreviewModal from "../../components/StockQuickPreviewModal";
-import "./watchlist.css";
+import StockWorkspaceDrawer from "../../components/StockWorkspaceDrawer";
+import "./styles/index.css";
 
 const { Paragraph, Text, Title } = Typography;
 
@@ -360,7 +360,7 @@ function WatchlistPriceCell({ value, changePct }: { value: number | null; change
 }
 
 export default function WatchlistPage() {
-  const { cardStyle, pageContainerStyle, pageDescriptionStyle, pageTitleStyle } = useStyles();
+  const { pageContainerStyle, pageDescriptionStyle, pageTitleStyle } = useStyles();
   const isMobile = useMediaQuery("(max-width: 640px)");
   const watchlist = useWatchlist();
   const addItem = useAddWatchlistItem();
@@ -1009,7 +1009,7 @@ export default function WatchlistPage() {
         onSelectConcept={focusConceptGroup}
       />
 
-      <Card className="watchlist-page__toolbar-card" style={cardStyle}>
+      <Card className="watchlist-page__toolbar-card u-card">
         <div className="watchlist-page__toolbar">
           <div className="watchlist-page__add">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -1093,7 +1093,7 @@ export default function WatchlistPage() {
         </div>
       </Card>
 
-      <Card className="watchlist-page__content-card" style={cardStyle}>
+      <Card className="watchlist-page__content-card u-card">
         <div className="watchlist-page__content-heading">
           <div className="watchlist-page__content-title">
             <strong>{viewMode === "all" ? "全部自选" : "概念分组"}</strong>
@@ -1228,7 +1228,7 @@ export default function WatchlistPage() {
       />
 
       {previewStock ? (
-        <StockQuickPreviewModal
+        <StockWorkspaceDrawer
           open={Boolean(previewStock)}
           code={previewStock.code}
           name={previewStock.name}

@@ -4,15 +4,11 @@
 
 .earthscope-page {
   --es-bg: #05070a;
-  --es-surface: #0a0e14;
-  --es-surface-2: #101620;
   --es-border: #26303d;
   --es-border-strong: #3b4655;
   --es-text: #f5f7fa;
   --es-muted: #96a0ad;
-  --es-dim: #5f6a78;
   --es-accent: #54e7ff;
-  --es-accent-2: #8af2ff;
   min-height: 100vh;
   overflow: hidden;
   color: var(--es-text);

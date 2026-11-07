@@ -1,0 +1,41 @@
+/* 详情 Tab 与财务内容容器
+   自 stock-page.css 第 836–873 行拆出。
+   由同目录 index.css 按固定顺序 @import，顺序不可调整：同特异性规则靠源序决胜负。 */
+.stock-detail-tabs {
+  min-width: 0;
+  container-type: inline-size;
+}
+
+.stock-detail-tabs > .ant-tabs > .ant-tabs-nav {
+  margin-bottom: var(--c-space-4);
+  border-bottom: 1px solid var(--c-border);
+}
+
+.stock-detail-tabs > .ant-tabs > .ant-tabs-nav .ant-tabs-tab {
+  padding: 10px 20px;
+  font-size: var(--c-font-base);
+  font-weight: 500;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.stock-detail-tabs > .ant-tabs > .ant-tabs-nav .ant-tabs-tab:hover {
+  color: var(--c-primary);
+}
+
+.stock-detail-tabs > .ant-tabs > .ant-tabs-nav .ant-tabs-tab.ant-tabs-tab-active {
+  font-weight: 600;
+  color: var(--c-primary);
+}
+
+.stock-detail-tabs > .ant-tabs > .ant-tabs-nav .ant-tabs-ink-bar {
+  background: var(--c-primary);
+  height: 2px;
+  border-radius: 2px;
+}
+
+.stock-financial-content {
+  display: grid;
+  min-width: 0;
+  gap: var(--c-space-4);
+}
+

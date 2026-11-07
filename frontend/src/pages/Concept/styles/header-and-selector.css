@@ -1,0 +1,193 @@
+/* 概念页样式：页头、概念选择器、热门/最近概念 chip 与指数卡片顶部 KPI。 */
+
+/* 概念页样式：对齐全站设计令牌（--c-*），布局为「选择器 → 指数+侧栏 → 全宽成分股表」 */
+
+.concept-page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  width: 100%;
+}
+
+/* ── 页头 ── */
+.concept-page__desc {
+  margin: 0 0 2px;
+  font-size: var(--c-font-sm);
+  color: var(--c-text-muted);
+  line-height: var(--c-leading-normal);
+}
+
+/* ── 选择器卡片 ── */
+.concept-search-bar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.concept-search-input {
+  width: 100%;
+  max-width: 320px;
+}
+
+.concept-search-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.concept-picker__chips {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 8px;
+  min-width: 0;
+}
+
+.concept-picker__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--c-font-xs);
+  color: var(--c-text-muted);
+  flex-shrink: 0;
+}
+
+/* 热门/最近概念 chip：可点击按钮，带排名与涨幅 */
+.concept-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius-pill);
+  background: var(--c-hover-bg);
+  color: var(--c-text-primary);
+  font-size: var(--c-font-xs);
+  line-height: 20px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+}
+
+.concept-chip:hover {
+  border-color: var(--c-primary);
+  background: var(--c-primary-soft);
+}
+
+.concept-chip--active {
+  border-color: var(--c-primary);
+  background: var(--c-primary-soft);
+  color: var(--c-primary);
+}
+
+.concept-chip__rank {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  border-radius: var(--c-radius-sm);
+  background: var(--c-primary-2);
+  color: var(--c-primary);
+  font-size: 10px;
+  font-weight: var(--c-weight-semibold);
+  font-family: var(--c-font-mono);
+}
+
+.concept-chip__name {
+  max-width: 128px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.concept-chip__pct {
+  font-size: 11px;
+  font-weight: var(--c-weight-medium);
+}
+
+/* ── KPI 条（指数卡顶部） ── */
+.concept-kpi {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.concept-kpi__main {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.concept-kpi__name {
+  font-size: var(--c-font-md);
+  font-weight: var(--c-weight-semibold);
+  color: var(--c-text-primary);
+}
+
+.concept-kpi__close {
+  font-family: var(--c-font-mono);
+  font-size: 26px;
+  font-weight: var(--c-weight-bold);
+  line-height: 1.1;
+}
+
+.concept-kpi__period {
+  font-size: var(--c-font-xs);
+}
+
+.concept-kpi__stats {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: var(--c-font-xs);
+  color: var(--c-text-muted);
+}
+
+.concept-kpi__stat {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.concept-kpi__stat-label {
+  color: var(--c-text-muted);
+}
+
+.concept-kpi__stat-value {
+  color: var(--c-text-primary);
+  font-weight: var(--c-weight-semibold);
+}
+
+.concept-kpi__tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--c-font-xs);
+  color: var(--c-text-muted);
+  cursor: help;
+}
+
+.concept-index-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.concept-index-toolbar__controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}

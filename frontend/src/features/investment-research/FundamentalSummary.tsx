@@ -20,14 +20,13 @@ function renderTags(items: string[] | undefined, color: SemanticTagColor, tagSty
 
 export default function FundamentalSummary({ fundamental }: { fundamental?: AnalysisResult["fundamental"] | null }) {
   const c = useColors();
-  const { cardStyle, tagStyle } = useStyles();
+  const { tagStyle } = useStyles();
   if (!fundamental) return null;
 
   return (
     <Card
       size="small"
-      className="analysis-dimension-card"
-      style={{ ...cardStyle, borderTop: `3px solid ${c.primary}55` }}
+      className="analysis-dimension-card u-card" style={{ borderTop: `3px solid ${c.primary}55` }}
     >
       <AnalysisDimensionSummary label="基本面" score={fundamental.score}>
         <Paragraph className="analysis-dimension-summary__description">

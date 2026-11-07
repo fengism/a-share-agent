@@ -19,7 +19,7 @@ import {
 import ChangeValue from "./ChangeValue";
 import { formatAmount, formatHotValue } from "../utils/format";
 import type { MarketEmotionDistribution } from "../types/stock";
-import "./market-overview.css";
+import "./market-overview/index.css";
 
 interface MarketOverviewBoardProps {
   onNavigate: (tab: string) => void;

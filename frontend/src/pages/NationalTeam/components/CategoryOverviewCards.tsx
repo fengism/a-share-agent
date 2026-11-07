@@ -16,7 +16,7 @@ const CATEGORIES_CONFIG = [
   { key: "core_broad", label: "核心大盘", desc: "沪深300 · 上证50", color: "#1677ff", tagColor: "blue" },
   { key: "a500", label: "新质A500", desc: "中证A500新一代基准", color: "#faad14", tagColor: "gold" },
   { key: "growth", label: "中小成长", desc: "中证500/1000/2000 · 双创", color: "#13c2c2", tagColor: "cyan" },
-  { key: "dividend", label: "红利防御", desc: "红利低波高股息底仓", color: "#f5222d", tagColor: "red" },
+  { key: "dividend", label: "红利防御", desc: "红利低波高股息底仓", color: "#722ed1", tagColor: "purple" },
 ] as const;
 
 interface CategoryOverviewCardsProps {
@@ -70,7 +70,7 @@ export default function CategoryOverviewCards({ etfs = [], latestDailyFlow }: Ca
                 style={{
                   borderTop: `3px solid ${item.color}`,
                   borderRadius: 8,
-                  background: "var(--c-bg-card)",
+                  background: "var(--c-card-bg)",
                 }}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>

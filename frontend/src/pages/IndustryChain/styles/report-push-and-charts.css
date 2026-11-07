@@ -1,0 +1,88 @@
+/* 产业链报告：推送弹层与图表卡片样式。
+   原先写在 IndustryReport.tsx 的 style 对象里，逐条等价迁移。
+   弹层内容经 portal 挂到 body，因此用 [data-theme] 全局锚点；
+   Text/Button 需要 (0,2,0) 才能稳定压过 antd 的 :where() 规则。 */
+
+[data-theme] .industry-report__push-hint {
+  color: var(--c-text-secondary);
+  font-size: var(--c-font-sm);
+  display: block;
+  margin-bottom: 8px;
+}
+
+[data-theme] .industry-report__push-note {
+  color: var(--c-text-secondary);
+  font-size: var(--c-font-sm);
+  margin-top: 8px;
+}
+
+[data-theme] .industry-report__push-url {
+  color: var(--c-primary);
+  font-size: var(--c-font-sm);
+  word-break: break-all;
+}
+
+[data-theme] .industry-report__push-error-title {
+  color: var(--c-down);
+  font-size: var(--c-font-sm);
+  margin-bottom: 4px;
+}
+
+[data-theme] .industry-report__push-error-meta {
+  color: var(--c-text-secondary);
+  font-size: var(--c-font-xs);
+  margin-top: 4px;
+}
+
+[data-theme] .industry-report__aliases--spaced {
+  gap: 6px;
+}
+
+.industry-report__warnings {
+  margin: 0;
+  padding-left: 18px;
+}
+
+[data-theme] .industry-report__actions .industry-report__export-icon {
+  font-size: 10px;
+  margin-left: 2px;
+}
+
+.industry-report__chart-card {
+  padding: 16px 20px;
+  margin-bottom: 16px;
+}
+
+.industry-report__chart-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+[data-theme] .industry-report__chart-title {
+  color: var(--c-text-primary);
+  font-size: var(--c-font-base);
+}
+
+[data-theme] .industry-report__chart-expand {
+  color: var(--c-text-muted);
+}
+
+[data-theme] .industry-report__chart-desc {
+  color: var(--c-text-secondary);
+  font-size: var(--c-font-md);
+  margin-bottom: 12px;
+  display: block;
+  line-height: var(--c-leading-normal);
+}
+
+.industry-report__chart-scroll {
+  width: 100%;
+  overflow: auto;
+}
+
+.industry-report__chart-loading {
+  min-height: 360px;
+  width: 100%;
+}

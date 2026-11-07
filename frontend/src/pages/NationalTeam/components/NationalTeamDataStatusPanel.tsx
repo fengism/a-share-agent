@@ -53,7 +53,7 @@ export default function NationalTeamDataStatusPanel({
                 </span>
               }
             />
-            <Tag color={isComplete ? "green" : "gold"} style={{ fontSize: 10, lineHeight: "16px", padding: "0 4px", margin: 0 }}>
+            <Tag color={isComplete ? "blue" : "gold"} style={{ fontSize: 10, lineHeight: "16px", padding: "0 4px", margin: 0 }}>
               {isComplete ? "数据完整" : "部分覆盖"}
             </Tag>
           </Space>
@@ -63,7 +63,7 @@ export default function NationalTeamDataStatusPanel({
           </span>
 
           {data.calendar_degraded && (
-            <Tag color="volcano" icon={<WarningOutlined />} style={{ fontSize: 10, margin: 0 }}>
+            <Tag color="warning" icon={<WarningOutlined />} style={{ fontSize: 10, margin: 0 }}>
               交易日历降级
             </Tag>
           )}

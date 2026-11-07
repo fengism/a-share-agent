@@ -1,0 +1,330 @@
+/* 机构画像、资金热力图、盘中监控（Phase 3）
+   自 national-team.css 第 1142–1298 行拆出。
+   由同目录 index.css 按固定顺序 @import，顺序不可调整：同特异性规则靠源序决胜负。 */
+/* ── Phase 3: Strategic Institutional Portrait ─────────────────────────── */
+.national-team-view-switcher {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  margin-bottom: 12px;
+}
+
+.national-team-entity-card {
+  border-radius: 8px;
+  height: 100%;
+  border: 1px solid var(--c-border);
+  background: var(--c-card-bg);
+  transition: box-shadow 0.2s ease;
+}
+
+.national-team-entity-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.national-team-industry-card,
+.national-team-top-holdings-card {
+  border-radius: 8px;
+  border: 1px solid var(--c-border);
+  background: var(--c-card-bg);
+}
+
+/* ── Flow Heatmap Table & Macro Chart ─────────────────────────── */
+.national-team-heatmap-card {
+  border-radius: 8px;
+  border: 1px solid var(--c-border);
+  background: var(--c-card-bg);
+  margin-bottom: 12px;
+}
+
+.national-team-heatmap-grid .ant-table-cell {
+  padding: 4px 6px !important;
+  font-size: 11px;
+}
+
+.national-team-heatmap-grid .ant-table-thead > tr > th {
+  background: var(--c-nested-bg);
+  font-size: 11px;
+  padding: 6px 8px !important;
+  white-space: nowrap;
+}
+
+.national-team-tab-bar {
+  margin-bottom: 14px;
+}
+
+.national-team-tab-bar .ant-segmented {
+  background: var(--c-card-bg);
+  border: 1px solid var(--c-border);
+  padding: 3px;
+  border-radius: 8px;
+}
+
+.national-team-tab-bar .ant-segmented-item-selected {
+  font-weight: 600;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+@media (max-width: 640px) {
+  .national-team-tab-bar .ant-segmented {
+    display: flex;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+    scrollbar-width: none;
+  }
+
+  .national-team-tab-bar .ant-segmented::-webkit-scrollbar {
+    display: none;
+  }
+
+  .national-team-tab-bar .ant-segmented-group {
+    flex-wrap: nowrap;
+  }
+
+  .national-team-tab-bar .ant-segmented-item {
+    white-space: nowrap;
+    padding: 0 10px;
+  }
+}
+
+/* ── Intraday Monitor Polish ───────────────────────────────────── */
+.national-team-table-rank-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  font-family: var(--c-font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--c-text-muted);
+  background: var(--c-bg-subtle, rgba(140, 140, 140, 0.1));
+}
+
+.national-team-table-rank-badge--1 {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(245, 158, 11, 0.3);
+}
+
+.national-team-table-rank-badge--2 {
+  background: linear-gradient(135deg, #94a3b8, #64748b);
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(100, 116, 139, 0.25);
+}
+
+.national-team-table-rank-badge--3 {
+  background: linear-gradient(135deg, #d97706, #92400e);
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(217, 119, 6, 0.25);
+}
+
+.national-team-volume-signal-pills {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--c-bg-subtle, rgba(128, 128, 128, 0.04));
+  border: 1px solid var(--c-border);
+  margin-bottom: 12px;
+}
+
+.national-team-pill-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  padding: 3px 10px;
+  border-radius: 6px;
+  background: var(--c-card-bg, #fff);
+  border: 1px solid var(--c-border);
+  box-shadow: var(--c-shadow-xs, 0 1px 2px rgba(0, 0, 0, 0.03));
+}
+
+.national-team-pill-item__label {
+  color: var(--c-text-secondary);
+}
+
+.national-team-pill-item__value {
+  font-family: var(--c-font-mono);
+  font-weight: 700;
+}
+
+.national-team-pill-item--highlight {
+  border-color: rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.04);
+}
+
+/* ── NationalTeamPortraitPanel Scoped Styles ───────────────────── */
+.national-team-portrait__rank {
+  width: 22px;
+  height: 22px;
+  line-height: 22px;
+  font-size: 11px;
+  display: inline-block;
+}
+
+.national-team-portrait__stock-col {
+  display: flex;
+  flex-direction: column;
+}
+
+.national-team-portrait__stock-name {
+  font-weight: 600;
+  color: var(--c-primary);
+}
+
+.national-team-portrait__stock-code {
+  font-size: 11px;
+  color: var(--c-text-secondary);
+  font-family: var(--c-font-mono);
+}
+
+.national-team-portrait__tag.ant-tag {
+  font-size: 11px;
+  margin: 0;
+}
+
+.national-team-portrait__ratio-val {
+  font-family: var(--c-font-mono);
+  font-size: 13px;
+  color: var(--c-text-primary);
+}
+
+.national-team-portrait__mv-val {
+  font-family: var(--c-font-mono);
+  font-size: 12px;
+  color: var(--c-text-secondary);
+}
+
+.national-team-portrait__reference {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.national-team-portrait__source {
+  font-size: 11px;
+}
+
+.national-team-portrait__entities-wrap {
+  margin-bottom: 12px;
+}
+
+.national-team-portrait__entity-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.national-team-portrait__entity-name {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.national-team-portrait__entity-role {
+  font-size: 12px;
+  margin-bottom: 6px;
+  color: var(--c-text-primary);
+  line-height: 1.5;
+}
+
+.national-team-portrait__entity-focus {
+  font-size: 12px;
+  color: var(--c-text-secondary);
+  line-height: 1.5;
+}
+
+.national-team-portrait__card-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.national-team-portrait__card-title {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.national-team-portrait__meta-text {
+  font-size: 11px;
+  color: var(--c-text-secondary);
+}
+
+.national-team-portrait__card {
+  margin-bottom: 12px;
+}
+
+.national-team-portrait__alloc-card {
+  padding: var(--c-pad-inset, 7px 12px);
+  border-radius: 8px;
+  border: 1px solid var(--c-border);
+  background: var(--c-bg-subtle, rgba(128, 128, 128, 0.04));
+}
+
+.national-team-portrait__alloc-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 6px;
+}
+
+.national-team-portrait__alloc-industry {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--c-text-primary);
+}
+
+.national-team-portrait__alloc-weight {
+  font-family: var(--c-font-mono);
+  font-size: 14px;
+  color: var(--c-primary);
+}
+
+.national-team-portrait__bar-track {
+  height: 6px;
+  background: var(--c-border);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.national-team-portrait__bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #1677ff88, #1677ff);
+  border-radius: 3px;
+}
+
+.national-team-portrait__alloc-mv-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  color: var(--c-text-secondary);
+  margin-bottom: 6px;
+}
+
+.national-team-portrait__mono-val {
+  font-family: var(--c-font-mono);
+}
+
+.national-team-portrait__tags-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.national-team-portrait__stock-tag.ant-tag {
+  font-size: 10px;
+  line-height: 16px;
+  padding: 0 4px;
+  margin: 0;
+}
+

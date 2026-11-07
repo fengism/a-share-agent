@@ -1,0 +1,77 @@
+.financial-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.financial-metric--align-right {
+  align-items: flex-end;
+  text-align: right;
+}
+
+.financial-metric--align-center {
+  align-items: center;
+  text-align: center;
+}
+
+.financial-metric__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--c-font-xs, 12px);
+  color: var(--c-text-secondary);
+  line-height: var(--c-leading-normal, 1.5);
+}
+
+.financial-metric__label-info {
+  font-size: 11px;
+  color: var(--c-text-muted);
+  cursor: help;
+}
+
+.financial-metric__value-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.financial-metric__value {
+  font-family: var(--c-font-mono, "SF Mono", Consolas, Menlo, monospace);
+  font-weight: 600;
+  line-height: var(--c-leading-tight, 1.25);
+  letter-spacing: -0.02em;
+}
+
+.financial-metric--size-small .financial-metric__value {
+  font-size: 13px;
+}
+
+.financial-metric--size-middle .financial-metric__value {
+  font-size: 16px;
+}
+
+.financial-metric--size-large .financial-metric__value {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.financial-metric__unit {
+  font-size: 12px;
+  color: var(--c-text-muted);
+  font-weight: 400;
+}
+
+.financial-metric__change {
+  font-size: 12px;
+  margin-left: 2px;
+}
+
+.financial-metric__value--up {
+  color: var(--c-up);
+}
+
+.financial-metric__value--down {
+  color: var(--c-down);
+}
+

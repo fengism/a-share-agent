@@ -1,0 +1,89 @@
+/* containers —— 自 market-overview.css 第 683–769 行拆出。
+   由同目录 index.css 按固定顺序 @import，顺序不可调整：同特异性规则靠源序决胜负。 */
+@container market-board (max-width: 1100px) {
+  .market-board__metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .market-board-metric:nth-child(3) { border-right: 0; }
+  .market-board-metric:nth-child(-n + 3) { border-bottom: 1px solid var(--c-border); }
+  .market-board-panel--emotion,
+  .market-board-panel--ladder { grid-column: span 6; }
+}
+
+@container market-board (max-width: 767px) {
+  .market-board { --market-board-gap: var(--c-space-3); }
+  .market-board__toolbar { align-items: flex-start; }
+  .market-board__status { gap: 6px; }
+  .market-board__status > span:last-child { display: none; }
+  .market-board__indices { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .market-board-index {
+    padding: 10px 12px;
+    gap: 6px;
+  }
+  .market-board-index__identity strong {
+    font-size: var(--c-font-sm);
+  }
+  .market-board-index__quote {
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px;
+  }
+  .market-board-index__quote > strong {
+    font-size: clamp(16px, 4.2vw, 20px);
+  }
+  .market-board-index__quote .change-value {
+    font-size: 11px;
+    padding: 1px 5px;
+  }
+  .market-board-index__amount {
+    font-size: 11px;
+  }
+  .market-board-index:nth-child(3n) { border-right: 1px solid var(--c-border); }
+  .market-board-index:nth-child(2n) { border-right: 0; }
+  .market-board-index:nth-last-child(-n + 3) { border-bottom: 1px solid var(--c-border); }
+  .market-board-index:nth-last-child(-n + 2) { border-bottom: 0; }
+  .market-board__grid { grid-template-columns: 1fr; }
+  .market-board-panel,
+  .market-board-panel--emotion,
+  .market-board-panel--ladder { grid-column: 1; }
+}
+
+@container market-board (max-width: 520px) {
+  .market-board__metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .market-board-metric:nth-child(3) { border-right: 1px solid var(--c-border); }
+  .market-board-metric:nth-child(2n) { border-right: 0; }
+  .market-board-metric:nth-child(-n + 4) { border-bottom: 1px solid var(--c-border); }
+  .market-board-emotion { grid-template-columns: minmax(100px, 0.7fr) minmax(0, 1.3fr); min-width: 0; }
+  .market-board-emotion__score,
+  .market-board-emotion__breadth { padding: var(--c-space-3); min-width: 0; }
+  .market-board-emotion__breadth { gap: 8px var(--c-space-3); }
+  .market-board-emotion__breadth p { word-break: break-word; }
+  .market-board-distribution { padding: 12px var(--c-space-3) var(--c-space-3); min-width: 0; }
+  .market-board-distribution__heading { align-items: flex-start; flex-direction: column; gap: 2px; }
+  .market-board-distribution__header,
+  .market-board-distribution__row { grid-template-columns: minmax(0, 1fr) 52px minmax(0, 1fr); gap: 5px; }
+  .market-board-distribution__side { gap: 4px; }
+  .market-board-distribution__side strong { min-width: 24px; }
+  .market-board-panel__header { padding: 0 var(--c-space-3); }
+  .market-board-panel__title > span:last-child:not(.market-board-panel__icon) { display: none; }
+}
+
+@container market-board (max-width: 380px) {
+  .market-board-index {
+    padding: 8px 8px;
+    gap: 4px;
+  }
+  .market-board-index__quote > strong {
+    font-size: 15px;
+  }
+  .market-board-distribution__header,
+  .market-board-distribution__row {
+    grid-template-columns: minmax(0, 1fr) 46px minmax(0, 1fr);
+    gap: 4px;
+  }
+  .market-board-distribution__label {
+    font-size: 10px;
+  }
+  .market-board-distribution__side strong {
+    min-width: 20px;
+    font-size: 11px;
+  }
+}

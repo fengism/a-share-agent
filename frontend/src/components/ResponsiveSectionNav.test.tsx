@@ -101,6 +101,43 @@ describe("ResponsiveSectionNav", () => {
     expect(preloadMarket).not.toHaveBeenCalled();
   });
 
+  it("groups rail sections by their group label so crowded nav stays scannable", () => {
+    mocks.useMediaQuery.mockReturnValue(false);
+    const onChange = vi.fn();
+
+    render(
+      <ResponsiveSectionNav
+        activeKey="a-index"
+        onChange={onChange}
+        ariaLabel="市场数据分类"
+        desktopMode="rail"
+        items={[
+          { key: "a-index", group: "大盘", label: "A股大盘", children: <div>大盘内容</div> },
+          { key: "breadth", group: "大盘", label: "市场宽度", children: <div>宽度内容</div> },
+          { key: "emotion", group: "情绪", label: "市场情绪", children: <div>情绪内容</div> },
+          { key: "fund-flow", group: "资金", label: "北向资金", children: <div>资金内容</div> },
+        ]}
+      />,
+    );
+
+    const nav = screen.getByRole("navigation", { name: "市场数据分类" });
+    // 分组标题按 items 首次出现的顺序渲染，且每个条目只出现一次
+    const titles = Array.from(nav.querySelectorAll(".responsive-section-nav__rail-title")).map(
+      (node) => node.textContent,
+    );
+    expect(titles).toEqual(["大盘", "情绪", "资金"]);
+
+    const groupItems = Array.from(nav.querySelectorAll(".responsive-section-nav__rail-group")).map(
+      (group) => Array.from(group.querySelectorAll("button")).map((btn) => btn.textContent),
+    );
+    expect(groupItems).toEqual([["A股大盘", "市场宽度"], ["市场情绪"], ["北向资金"]]);
+
+    // 激活态用 aria-current 而非 tab 语义
+    expect(screen.getByRole("button", { name: "A股大盘" })).toHaveAttribute("aria-current", "page");
+    fireEvent.click(screen.getByRole("button", { name: "市场情绪" }));
+    expect(onChange).toHaveBeenCalledWith("emotion");
+  });
+
   it("preloads rail sections when keyboard focus expresses intent", () => {
     mocks.useMediaQuery.mockReturnValue(false);
     const preload = vi.fn();

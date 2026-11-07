@@ -45,25 +45,16 @@
   color: var(--c-primary);
 }
 
-.market-top-tabs > .ant-tabs-nav .ant-tabs-tab-active {
+.market-top-tabs.ant-tabs > .ant-tabs-nav .ant-tabs-tab.ant-tabs-tab-active {
   font-weight: 600;
-  color: var(--c-primary) !important;
+  color: var(--c-primary);
 }
 
-[data-theme="light"] .market-top-tabs > .ant-tabs-nav .ant-tabs-tab-active {
-  color: var(--c-primary) !important;
-}
-
-.market-top-tabs > .ant-tabs-nav .ant-tabs-ink-bar {
-  background: var(--c-primary) !important;
-  box-shadow: none !important;
-  height: 2px !important;
-  border-radius: 2px !important;
-}
-
-[data-theme="light"] .market-top-tabs > .ant-tabs-nav .ant-tabs-ink-bar {
-  background: var(--c-primary) !important;
-  box-shadow: none !important;
+.market-top-tabs.ant-tabs > .ant-tabs-nav .ant-tabs-ink-bar {
+  background: var(--c-primary);
+  box-shadow: none;
+  height: 2px;
+  border-radius: 2px;
 }
 
 /* ── 市场页双层导航分层：外层主 Tab（大、醒目），内层次级 Tab（小、弱化） ── */
@@ -78,8 +69,8 @@
 }
 
 /* 次级 Tab 统一为下划线指示，去掉背景块，避免与主 Tab 抢视觉焦点 */
-.market-page .responsive-section-nav__tabs .ant-tabs-tab-active {
-  background: transparent !important;
+[data-theme] .market-page .responsive-section-nav__tabs.ant-tabs .ant-tabs-tab.ant-tabs-tab-active {
+  background: transparent;
 }
 
 .market-page .responsive-section-nav__tabs .ant-tabs-tab:hover {
@@ -117,12 +108,17 @@
   display: block;
 }
 
+.market-volume__chart {
+  width: 100%;
+  height: 340px;
+}
+
 @media (max-width: 768px) {
   .market-page-header {
     margin-bottom: 8px;
   }
   .market-page-header .ant-typography {
-    font-size: 13px !important;
+    font-size: 13px;
     line-height: 1.5;
   }
   /* 窄屏首屏精简：隐藏长描述，避免标题与导航被推到首屏之外 */
@@ -143,8 +139,8 @@
 
 /* 手机端指数、两融、市场宽度、全市场成交额指标卡紧凑排版及图表自适应 */
 @media (max-width: 576px) {
-  .market-index-card .ant-card-body {
-    padding: 8px 10px !important;
+  .market-index-card.ant-card:not(.ant-card-small) > .ant-card-body {
+    padding: 8px 10px;
   }
   .market-index-card .ant-statistic-title {
     margin-bottom: 2px;
@@ -165,9 +161,9 @@
     margin-inline-start: 0;
   }
 
-  .market-margin__metrics .ant-card-body,
-  .market-breadth__metrics .ant-card-body {
-    padding: 10px 10px !important;
+  .market-margin__metrics .ant-card:not(.ant-card-small) > .ant-card-body,
+  .market-breadth__metrics .ant-card:not(.ant-card-small) > .ant-card-body {
+    padding: 10px 10px;
   }
   .market-margin__metrics .ant-statistic-title,
   .market-breadth__metrics .ant-statistic-title {
@@ -185,7 +181,7 @@
     height: 340px !important;
   }
   .market-volume__chart {
-    height: 240px !important;
+    height: 240px;
   }
 }
 
@@ -194,20 +190,20 @@
   .market-volume-card__subtitle {
     display: none;
   }
-  .emotion-distribution {
-    padding: 10px 4px !important;
+  .market-page .emotion-distribution {
+    padding: 10px 4px;
   }
-  .emotion-distribution__header,
-  .emotion-distribution__row {
-    grid-template-columns: minmax(62px, 1fr) 50px minmax(62px, 1fr) !important;
-    gap: 4px !important;
+  .market-page .emotion-distribution__header,
+  .market-page .emotion-distribution__row {
+    grid-template-columns: minmax(62px, 1fr) 50px minmax(62px, 1fr);
+    gap: 4px;
   }
-  .emotion-distribution__label {
-    font-size: 10px !important;
+  .market-page .emotion-distribution__label {
+    font-size: 10px;
   }
-  .emotion-distribution__side strong {
-    min-width: 20px !important;
-    font-size: 11px !important;
+  .market-page .emotion-distribution__side strong {
+    min-width: 20px;
+    font-size: 11px;
   }
 }
 

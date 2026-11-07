@@ -22,14 +22,13 @@ import {
 } from "../../api/queries";
 import SectionDataState from "../../components/SectionDataState";
 import { useStockSearchController } from "../../hooks/useStockSearchController";
-import { useStyles } from "../../styles/ui";
 import type { WatchlistAlertCondition, WatchlistItem } from "../../types/watchlist";
 import ChangeValue from "../../components/ChangeValue";
 import PreloadLink from "../../components/PreloadLink";
 import { buildWatchlistStockUrl, buildStockAnalysisUrl } from "../../utils/stockLinks";
 import { formatMarketClock } from "../../utils/marketTime";
 import { PriceRangeBar } from "../../components/PriceRangeBar";
-import StockQuickPreviewModal from "../../components/StockQuickPreviewModal";
+import StockWorkspaceDrawer from "../../components/StockWorkspaceDrawer";
 import { openGlobalCopilot, triggerStockAiDiagnosis } from "../../utils/copilotEvents";
 
 const { Text } = Typography;
@@ -59,7 +58,6 @@ function formatQuotedTime(value: string | undefined): string {
 }
 
 export default function WatchlistPanel() {
-  const { cardStyle } = useStyles();
   const navigate = useNavigate();
   const watchlist = useWatchlist();
   const addItem = useAddWatchlistItem();
@@ -133,8 +131,7 @@ export default function WatchlistPanel() {
 
   return (
     <Card
-      className="dashboard-watchlist-card"
-      style={cardStyle}
+      className="dashboard-watchlist-card u-card"
     >
       <header className="dashboard-watchlist__header">
         <div>
@@ -354,7 +351,7 @@ export default function WatchlistPanel() {
       </Modal>
 
       {previewStock ? (
-        <StockQuickPreviewModal
+        <StockWorkspaceDrawer
           open={Boolean(previewStock)}
           code={previewStock.code}
           name={previewStock.name}

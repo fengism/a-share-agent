@@ -1,0 +1,113 @@
+/* 安全审计与登录日志样式 */
+
+.security-audit-card.ant-card {
+  margin-bottom: 16px;
+}
+
+.security-audit__card-icon {
+  margin-right: 8px;
+}
+
+.security-audit__intro {
+  font-size: var(--c-font-sm);
+  color: var(--c-text-muted);
+  margin-bottom: 12px;
+}
+
+.security-audit__toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.security-audit__search-icon {
+  color: var(--c-text-muted);
+}
+
+.security-audit__search-input {
+  width: 160px;
+}
+
+.security-audit__search-input--narrow {
+  width: 100%;
+}
+
+.security-audit__select--status {
+  width: 140px;
+}
+
+.security-audit__select--action {
+  width: 160px;
+}
+
+.security-audit__username {
+  font-weight: 600;
+  color: var(--c-text-primary);
+}
+
+.security-audit__id-tag.ant-tag {
+  font-size: var(--c-font-xs, 11px);
+  line-height: 16px;
+  padding: 0 4px;
+}
+
+.security-audit__id-tag--mobile.ant-tag {
+  margin-left: 4px;
+  font-size: var(--c-font-xs, 11px);
+  line-height: 16px;
+  padding: 0 4px;
+}
+
+.security-audit__code {
+  font-family: var(--c-font-mono);
+  font-size: var(--c-font-sm);
+}
+
+.security-audit__ua-text {
+  color: var(--c-text-muted);
+  font-size: var(--c-font-sm);
+  cursor: pointer;
+}
+
+.security-audit__ua-mobile {
+  color: var(--c-text-muted);
+  font-size: var(--c-font-sm);
+  word-break: break-all;
+}
+
+.security-audit__text--muted {
+  color: var(--c-text-muted);
+}
+
+.security-audit__target-type {
+  color: var(--c-text-muted);
+  font-size: var(--c-font-xs);
+}
+
+.security-audit__summary {
+  font-size: var(--c-font-sm);
+}
+
+.security-audit__status-tag {
+  border-color: var(--c-border);
+  background: var(--c-hover-bg);
+}
+
+.security-audit__status-tag--up {
+  color: var(--c-up);
+}
+
+.security-audit__status-tag--down {
+  color: var(--c-down);
+}
+
+.security-audit__status-tag--warning {
+  color: var(--c-warning);
+}
+
+.security-audit__status-tag--info {
+  color: var(--c-info);
+}

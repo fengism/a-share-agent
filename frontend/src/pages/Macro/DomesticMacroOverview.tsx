@@ -3,7 +3,7 @@ import { Row, Col, Card, Statistic, Tag, Typography } from "antd";
 import { useMacroAllData } from "../../api/queries";
 import SectionDataState from "../../components/SectionDataState";
 import MacroIndicatorCard from "./MacroIndicatorCard";
-import { useColors, useStyles } from "../../styles/ui";
+import { useColors } from "../../styles/ui";
 import type { ThemeColors } from "../../theme/themes";
 
 const { Text } = Typography;
@@ -40,7 +40,6 @@ const LPR_FIELDS = (c: ThemeColors) => [
 
 export default memo(function DomesticMacroOverview() {
   const c = useColors();
-  const { cardStyle } = useStyles();
   const { data, isLoading, error, refetch } = useMacroAllData();
 
   const gdp = data?.growth?.gdp;
@@ -150,7 +149,7 @@ export default memo(function DomesticMacroOverview() {
       <div className="macro-overview-kpi-bar" style={{ marginBottom: 20 }}>
         <Row gutter={[12, 12]}>
           <Col xs={12} sm={8} xl={4}>
-            <Card size="small" style={cardStyle} className="u-card-interactive macro-kpi-card">
+            <Card size="small" className="u-card-interactive macro-kpi-card u-card">
               <Statistic
                 title="制造业 PMI (荣枯线)"
                 value={mfgPmi ?? "-"}
@@ -173,7 +172,7 @@ export default memo(function DomesticMacroOverview() {
           </Col>
 
           <Col xs={12} sm={8} xl={4}>
-            <Card size="small" style={cardStyle} className="u-card-interactive macro-kpi-card">
+            <Card size="small" className="u-card-interactive macro-kpi-card u-card">
               <Statistic
                 title="CPI-PPI 利润剪刀差"
                 value={profitScissors ?? "-"}
@@ -197,7 +196,7 @@ export default memo(function DomesticMacroOverview() {
           </Col>
 
           <Col xs={12} sm={8} xl={4}>
-            <Card size="small" style={cardStyle} className="u-card-interactive macro-kpi-card">
+            <Card size="small" className="u-card-interactive macro-kpi-card u-card">
               <Statistic
                 title="GDP 季度同比"
                 value={gdpYoY ?? "-"}
@@ -221,7 +220,7 @@ export default memo(function DomesticMacroOverview() {
           </Col>
 
           <Col xs={12} sm={8} xl={4}>
-            <Card size="small" style={cardStyle} className="u-card-interactive macro-kpi-card">
+            <Card size="small" className="u-card-interactive macro-kpi-card u-card">
               <Statistic
                 title="M2 货币总量"
                 value={m2Val ?? "-"}
@@ -244,7 +243,7 @@ export default memo(function DomesticMacroOverview() {
           </Col>
 
           <Col xs={12} sm={8} xl={4}>
-            <Card size="small" style={cardStyle} className="u-card-interactive macro-kpi-card">
+            <Card size="small" className="u-card-interactive macro-kpi-card u-card">
               <Statistic
                 title="1Y / 5Y LPR 利率"
                 value={lpr1y != null ? Number(lpr1y) : "-"}
@@ -268,7 +267,7 @@ export default memo(function DomesticMacroOverview() {
           </Col>
 
           <Col xs={12} sm={8} xl={4}>
-            <Card size="small" style={cardStyle} className="u-card-interactive macro-kpi-card">
+            <Card size="small" className="u-card-interactive macro-kpi-card u-card">
               <Statistic
                 title="出口同比增速"
                 value={expYoY ?? "-"}

@@ -1,0 +1,381 @@
+/* 设计 token 工具类、排版、金融数字、脉冲与闪价
+   自原 base.css 第 1997–2303 行拆出。
+   本目录内文件由 index.css 按固定顺序 @import，顺序不可调整：
+   同特异性规则靠源序决出胜负，重排会改变层叠结果。 */
+/* ── Design-token utility classes ──────────────────────────────────────────
+   These map structured tokens (radius/shadow/space/font) onto reusable
+   building blocks. Phase 1 only *defines* them; business components adopt
+   them incrementally in later phases. All values resolve through the CSS
+   custom properties injected on <html> by App.tsx. */
+
+/* Default content card: hairline border, subtle elevation, theme surface. */
+.u-card {
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius-md);
+  background: var(--c-card-bg);
+  box-shadow: var(--c-shadow-xs);
+}
+
+/* Soft/nested card: muted surface, no elevation (used inside cards). */
+.u-card-soft {
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius-md);
+  background: var(--c-nested-bg);
+}
+
+/* Metric tile: elevated surface, centered content. */
+.u-metric-tile {
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius-md);
+  background: var(--c-elevated-bg);
+  padding: var(--c-space-3) var(--c-space-4);
+  text-align: center;
+}
+
+/* ── Typography & spacing utilities ───────────────────────────────────
+   Replaces the inline `style={{ fontSize: <token> }}` / `margin: 0`
+   inline pairs that repeated across report-style pages. Keep these
+   presentational-only; layout stays in page CSS. */
+.u-text-xs {
+  font-size: var(--c-font-xs);
+}
+
+.u-text-sm {
+  font-size: var(--c-font-sm);
+}
+
+.u-text-base {
+  font-size: var(--c-font-base);
+}
+
+.u-text-md {
+  font-size: var(--c-font-md);
+}
+
+.u-text-bold {
+  font-weight: var(--c-weight-bold);
+}
+
+.u-text-semibold {
+  font-weight: var(--c-weight-semibold);
+}
+
+.u-text-primary {
+  color: var(--c-primary);
+}
+
+.u-text-secondary {
+  color: var(--c-text-secondary);
+}
+
+.u-text-muted {
+  color: var(--c-text-muted);
+}
+
+.u-text-warning {
+  color: var(--c-warning, #faad14);
+}
+
+.u-text-up {
+  color: var(--c-up);
+}
+
+.u-text-down {
+  color: var(--c-down);
+}
+
+.u-cursor-pointer {
+  cursor: pointer;
+}
+
+.u-flex-between {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.u-m-0 {
+  margin: 0;
+}
+
+.u-mb-0 {
+  margin-bottom: 0;
+}
+
+.u-mb-8 {
+  margin-bottom: 8px;
+}
+
+.u-mb-12 {
+  margin-bottom: 12px;
+}
+
+.u-mb-16 {
+  margin-bottom: 16px;
+}
+
+.u-mt-12 {
+  margin-top: 12px;
+}
+
+.u-w-full {
+  width: 100%;
+}
+
+.u-field-hint {
+  margin-top: 4px;
+  font-size: var(--c-font-xs);
+  color: var(--c-text-muted);
+}
+
+.u-field-label--row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+  color: var(--c-text-secondary);
+  font-size: var(--c-font-sm);
+}
+
+.u-hidden {
+  display: none;
+}
+
+.u-block {
+  display: block;
+}
+
+/* Flush a tag against its neighbours (antd default adds margin-inline-end). */
+.u-tag-flush {
+  margin: 0;
+}
+
+/* Paragraph note that follows a heading inside report blocks. */
+.u-note {
+  margin: 4px 0 0;
+  font-size: var(--c-font-sm);
+}
+
+.u-note--spaced {
+  margin: 6px 0 0;
+  font-size: var(--c-font-sm);
+  line-height: var(--c-leading-normal);
+}
+
+.u-note--below {
+  margin: 4px 0 12px;
+  font-size: var(--c-font-sm);
+}
+
+/* Bulleted list with the default marker indent, used in driver/risk lists. */
+.u-list {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.u-list__item {
+  margin-bottom: 8px;
+}
+
+/* Page title with a 3px primary accent bar (the Dashboard reference pattern).
+   Apply to the row that wraps the title element so every page shares one
+   heading treatment, light/dark consistent. */
+.u-page-title {
+  display: flex;
+  align-items: center;
+  gap: var(--c-space-3);
+  padding: var(--c-space-4) 0 var(--c-space-5);
+}
+.u-page-title::before {
+  content: "";
+  width: 3px;
+  height: var(--c-font-xl);
+  border-radius: var(--c-radius-sm);
+  background: var(--c-primary);
+  display: inline-block;
+  flex: none;
+}
+
+/* Compact variant: no top/bottom page padding, for headers that already sit
+   inside a pageHeaderStyle (marginBottom) wrapper. */
+.u-page-title--compact {
+  padding: 0;
+}
+
+/* Financial-terminal application frame */
+.app-command-header {
+  position: sticky;
+  top: 0;
+  display: flex;
+  height: 58px;
+  min-width: 0;
+  flex: 0 0 58px;
+  align-items: center;
+  box-sizing: border-box;
+  line-height: normal;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08), 0 1px 0 var(--c-border);
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.app-command-header__search {
+  position: relative;
+  width: 100%;
+  max-width: 620px;
+  min-width: 0;
+  height: 40px;
+  margin-left: auto;
+  flex: 1 1 420px;
+}
+
+/* ── Financial Number & Modern Terminal Utilities ── */
+.financial-num {
+  font-family: var(--c-font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  /* 数字永不折行：窄列里 "+206.59%" 被拆成两行会读成两个数 */
+  white-space: nowrap;
+}
+
+/* ── Global Statistic & Metric Typography ── */
+.ant-statistic-title {
+  color: var(--c-text-secondary);
+  font-size: var(--c-font-xs, 12px);
+  margin-bottom: 4px;
+}
+
+.ant-statistic-content {
+  font-family: var(--c-font-mono, monospace);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.ant-statistic-content-value {
+  font-family: var(--c-font-mono, monospace);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Live pulse dot for real-time streaming & running indicators */
+.live-pulse-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--c-primary);
+  box-shadow: none;
+  animation: pulse-ring 1.8s cubic-bezier(0.24, 0, 0.38, 1) infinite;
+}
+
+.live-pulse-dot--success {
+  background: var(--c-success, #3ec98f);
+  box-shadow: none;
+}
+
+.live-pulse-dot--danger {
+  background: var(--c-error, #ec5d52);
+  box-shadow: none;
+}
+
+.live-pulse-dot--up {
+  background: var(--c-up, #ec5d52);
+  box-shadow: none;
+}
+
+.live-pulse-dot--down {
+  background: var(--c-down, #3ec98f);
+  box-shadow: none;
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(8, 127, 152, 0.6);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 6px transparent;
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+/* Real-time price change tick flashes */
+@keyframes tick-flash-green {
+  0% { background-color: rgba(236, 93, 82, 0.2); }
+  100% { background-color: transparent; }
+}
+
+@keyframes tick-flash-red {
+  0% { background-color: rgba(46, 172, 102, 0.2); }
+  100% { background-color: transparent; }
+}
+
+.tick-flash-up {
+  animation: tick-flash-green 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  border-radius: var(--c-radius-sm);
+}
+
+.tick-flash-down {
+  animation: tick-flash-red 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  border-radius: var(--c-radius-sm);
+}
+
+/* Modern Card interactive lift */
+.u-card-interactive {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease;
+}
+
+.u-card-interactive:hover {
+  transform: translateY(-2px);
+  border-color: var(--c-primary-2);
+  box-shadow: var(--c-shadow-md);
+}
+
+.global-task-indicator__item {
+  display: flex;
+  min-width: 260px;
+  align-items: center;
+  gap: var(--c-space-2);
+}
+
+.global-task-indicator__item > button:first-child {
+  display: flex;
+  min-width: 0;
+  padding: var(--c-space-2);
+  flex: 1;
+  align-items: center;
+  gap: var(--c-space-2);
+  overflow: hidden;
+  border: 0;
+  color: var(--c-text-primary);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+[data-theme="stellar-blue"] .app-command-header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+/* ── 潜力股战术雷达特征 ── */
+.potential-signal-new-tag {
+  animation: cyberPulse 2.4s infinite cubic-bezier(0.4, 0, 0.6, 1);
+}
+
+.potential-score-badge--high {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: var(--c-radius-sm);
+  background: color-mix(in srgb, var(--c-accent) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--c-accent) 32%, transparent);
+}
+

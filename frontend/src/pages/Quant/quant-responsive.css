@@ -186,7 +186,8 @@
     padding-inline: 0;
   }
 
-  .quant-page .responsive-section-nav__tabs > .ant-tabs-nav .ant-tabs-tab {
+  .quant-page .responsive-section-nav__tabs.ant-tabs > .ant-tabs-nav .ant-tabs-tab,
+  .quant-page .responsive-section-nav__tabs.ant-tabs > .ant-tabs-nav .ant-tabs-tab + .ant-tabs-tab {
     padding-inline: 9px;
     font-size: var(--quant-font-label);
   }

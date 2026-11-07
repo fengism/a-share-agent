@@ -1,0 +1,105 @@
+/* 持仓股票表格与卡片视图样式 */
+
+.portfolio-stock-table__bar-track {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--c-nested-bg, rgba(0, 0, 0, 0.02));
+  overflow: hidden;
+  margin-top: 2px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.portfolio-stock-table__bar-fill {
+  height: 100%;
+  background: var(--c-primary);
+  border-radius: 2px;
+}
+
+.portfolio-stock-table__shares-sub {
+  font-size: 11px;
+  color: var(--c-text-muted);
+}
+
+.portfolio-stock-table__action-btn.ant-btn {
+  padding: 0 2px;
+}
+
+.portfolio-stock-table__search-icon {
+  color: var(--c-text-muted);
+}
+
+.portfolio-stock-table__search-input.ant-input-affix-wrapper {
+  width: 130px;
+}
+
+.portfolio-stock-card-item {
+  background: var(--c-nested-bg, rgba(0, 0, 0, 0.02));
+  border-radius: 8px;
+  border: 1px solid var(--c-border, rgba(128, 128, 128, 0.15));
+  padding: var(--c-pad-card, 16px 18px);
+  margin-bottom: 10px;
+}
+
+.portfolio-stock-table__card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.portfolio-stock-table__currency-tag.ant-tag {
+  margin-left: 4px;
+}
+
+.portfolio-stock-table__card-price {
+  text-align: right;
+}
+
+.portfolio-stock-table__change-val {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.portfolio-stock-table__sub-label {
+  font-size: 11px;
+  color: var(--c-text-muted);
+}
+
+.portfolio-stock-table__card-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  padding: 8px 0;
+  border-top: 1px dashed var(--c-border, rgba(128, 128, 128, 0.15));
+  border-bottom: 1px dashed var(--c-border, rgba(128, 128, 128, 0.15));
+  margin-bottom: 8px;
+}
+
+.portfolio-stock-table__metric-val {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.portfolio-stock-table__card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  font-size: 12px;
+}
+
+.portfolio-stock-table__holdings-text {
+  color: var(--c-text-muted);
+}
+
+.portfolio-stock-table__allocation-text {
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.portfolio-stock-table__card-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}

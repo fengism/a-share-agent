@@ -1,7 +1,7 @@
 import { SettingOutlined } from "@ant-design/icons";
 import { Card, Descriptions, Tag, Typography } from "antd";
 import type { QuantBacktestRun } from "../../api/queries";
-import { useStyles, semanticTagStyle } from "../../styles/ui";
+import { semanticTagStyle } from "../../styles/ui";
 import { formatMarketPattern } from "../../utils/marketTime";
 import { QUANT_RUN_STATUS_META, quantStrategyIdentity, quantStrategyParameterSummary, quantUniverseLabel } from "./quantRun";
 
@@ -13,7 +13,6 @@ function compactNumber(value: number): string {
 }
 
 export default function BacktestRunSummary({ run }: { run: QuantBacktestRun }) {
-  const { cardStyle } = useStyles();
   const status = QUANT_RUN_STATUS_META[run.status];
   const strategy = run.request.strategy ?? { type: "ma_cross" };
   const execution = run.request.execution;
@@ -28,8 +27,7 @@ export default function BacktestRunSummary({ run }: { run: QuantBacktestRun }) {
       title="当前回测"
       extra={<Tag style={semanticTagStyle(status.color)}>{status.label}</Tag>}
       size="small"
-      style={cardStyle}
-      className="quant-run-summary-card"
+      className="quant-run-summary-card u-card"
     >
       <div className="quant-run-summary-heading">
         <Text strong className="quant-run-summary-name">{run.name}</Text>

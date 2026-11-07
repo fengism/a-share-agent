@@ -1,0 +1,81 @@
+/* ladder-and-ranking —— 自 market-overview.css 第 604–682 行拆出。
+   由同目录 index.css 按固定顺序 @import，顺序不可调整：同特异性规则靠源序决胜负。 */
+.market-board-ladder,
+.market-board-ranking { display: grid; }
+
+.market-board-ladder__row,
+.market-board-ranking__row {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--c-space-3);
+  min-height: 47px;
+  padding: 7px var(--c-space-4);
+  border-bottom: 1px solid var(--c-border);
+}
+
+.market-board-ladder__row:last-child,
+.market-board-ranking__row:last-child { border-bottom: 0; }
+.market-board-ladder__row:hover,
+.market-board-ranking__row:hover { background: var(--c-hover-bg); }
+
+.market-board-rank {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border-radius: var(--c-radius-sm);
+  color: var(--c-text-muted);
+  font-size: var(--c-font-xs);
+  font-family: var(--c-font-mono);
+  font-variant-numeric: tabular-nums;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="light"] .market-board-rank {
+  background: var(--c-nested-bg);
+  border: 1px solid var(--c-border);
+  color: var(--c-text-secondary);
+}
+
+.market-board-rank.is-top {
+  color: var(--c-up);
+  font-weight: var(--c-weight-bold);
+  background: rgba(236, 93, 82, 0.16);
+  border-color: rgba(236, 93, 82, 0.4);
+  box-shadow: 0 0 8px rgba(236, 93, 82, 0.3);
+}
+
+[data-theme="light"] .market-board-rank.is-top {
+  background: var(--c-up-bg, rgba(217, 45, 32, 0.08));
+  border-color: rgba(217, 45, 32, 0.28);
+  box-shadow: none;
+}
+
+.market-board-ladder__stock,
+.market-board-ranking__name { display: grid; min-width: 0; gap: 2px; }
+.market-board-ladder__stock strong,
+.market-board-ranking__name strong { overflow: hidden; font-size: var(--c-font-sm); text-overflow: ellipsis; white-space: nowrap; }
+.market-board-ladder__stock small,
+.market-board-ranking__name small { overflow: hidden; color: var(--c-text-muted); font-size: var(--c-font-xs); text-overflow: ellipsis; white-space: nowrap; }
+.market-board-ladder__board {
+  min-width: 40px;
+  padding: 3px 9px;
+  border-radius: var(--c-radius-pill);
+  color: var(--c-up);
+  font-size: var(--c-font-xs);
+  font-family: var(--c-font-mono);
+  font-weight: var(--c-weight-bold);
+  text-align: center;
+  background: rgba(236, 93, 82, 0.15);
+  border: 1px solid rgba(236, 93, 82, 0.4);
+  box-shadow: 0 0 8px rgba(236, 93, 82, 0.25);
+}
+
+[data-theme="light"] .market-board-ladder__board {
+  background: var(--c-up-bg, rgba(217, 45, 32, 0.08));
+  border: 1px solid rgba(217, 45, 32, 0.28);
+  box-shadow: none;
+}
+

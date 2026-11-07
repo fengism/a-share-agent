@@ -3,14 +3,12 @@ import { DownOutlined, ProfileOutlined, UpOutlined } from "@ant-design/icons";
 import { Button, Card, Typography } from "antd";
 import { useStockBusinessIntro } from "../../api/queries";
 import SectionDataState from "../../components/SectionDataState";
-import { useStyles } from "../../styles/ui";
 import StockSectionTitle from "./StockSectionTitle";
 
 const { Text } = Typography;
 
 export default function StockBusinessIntro({ code }: { code: string }) {
   const query = useStockBusinessIntro(code);
-  const { cardStyle } = useStyles();
   const [expanded, setExpanded] = useState(false);
   const items = Object.entries(query.data?.items ?? {}).filter(([, value]) => Boolean(value));
 
@@ -18,7 +16,7 @@ export default function StockBusinessIntro({ code }: { code: string }) {
 
   return (
     <Card
-      className="stock-section-card stock-business-card"
+      className="stock-section-card stock-business-card u-card"
       title={<StockSectionTitle icon={<ProfileOutlined />} title="主营业务" description="公司经营范围与核心产品" />}
       extra={
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -36,7 +34,6 @@ export default function StockBusinessIntro({ code }: { code: string }) {
           {query.data?.source ? <Text type="secondary">来源：{query.data.source.toUpperCase()}</Text> : null}
         </div>
       }
-      style={cardStyle}
     >
       <SectionDataState
         isLoading={query.isLoading}

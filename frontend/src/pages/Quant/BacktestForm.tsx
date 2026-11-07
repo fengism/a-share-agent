@@ -9,7 +9,6 @@ import {
   useSaveQuantStrategy,
   type QuantBacktestRun,
 } from "../../api/queries";
-import { useStyles } from "../../styles/ui";
 import {
   SavedStrategyToolbar,
   StrategyFields,
@@ -37,7 +36,6 @@ interface BacktestFormProps {
 }
 
 export default function BacktestForm({ onCreated, initialCodes = [] }: BacktestFormProps) {
-  const { cardStyle } = useStyles();
   const [form] = Form.useForm<QuantFormValues>();
   const source = Form.useWatch("source", form) ?? INITIAL_VALUES.source;
   const strategyType = Form.useWatch("strategyType", form) ?? INITIAL_VALUES.strategyType;
@@ -179,8 +177,7 @@ export default function BacktestForm({ onCreated, initialCodes = [] }: BacktestF
           </span>
         </div>
       )}
-      style={cardStyle}
-      className="quant-form-card"
+      className="quant-form-card u-card"
     >
       <Form
         className="quant-form"

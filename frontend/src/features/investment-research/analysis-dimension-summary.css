@@ -1,5 +1,6 @@
-.analysis-dimension-card > .ant-card-body {
-  padding: 0 !important;
+.analysis-dimension-card.ant-card:not(.ant-card-small) > .ant-card-body,
+.analysis-dimension-card.ant-card > .ant-card-body {
+  padding: 0;
 }
 
 .analysis-dimension-summary {
@@ -52,9 +53,10 @@
   padding: var(--c-space-4);
 }
 
-.analysis-dimension-summary__description {
+.analysis-dimension-summary__description,
+.analysis-dimension-summary__description.ant-typography {
   min-width: 0;
-  margin: 0 !important;
+  margin: 0;
   color: var(--c-text-secondary);
   line-height: var(--c-leading-relaxed);
   overflow-wrap: anywhere;
@@ -82,7 +84,7 @@
 
 .analysis-dimension-summary__tags .ant-tag {
   max-width: 100%;
-  margin: 0 !important;
+  margin: 0;
   white-space: normal;
   overflow-wrap: anywhere;
 }

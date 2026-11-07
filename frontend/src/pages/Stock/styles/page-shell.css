@@ -1,0 +1,30 @@
+/* 页面骨架、图表卡基础与概览栅格
+   自 stock-page.css 第 1–27 行拆出。
+   由同目录 index.css 按固定顺序 @import，顺序不可调整：同特异性规则靠源序决胜负。 */
+.stock-page {
+  display: grid;
+  min-width: 0;
+  max-width: 100%;
+  gap: var(--c-space-5);
+}
+
+.stock-chart-card {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.stock-chart-card .ant-card-body {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.stock-page__overview-grid {
+  display: grid;
+  grid-template-columns: minmax(520px, 1.18fr) minmax(360px, 0.82fr);
+  gap: var(--c-space-5);
+  align-items: stretch;
+}
+
+.stock-page__overview-grid > .ant-card { height: 100%; }
+

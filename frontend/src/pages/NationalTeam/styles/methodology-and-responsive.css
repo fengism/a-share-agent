@@ -1,0 +1,199 @@
+/* 页尾方法论与断点响应式（原 §8–§9）
+   自 national-team.css 第 951–1141 行拆出。
+   由同目录 index.css 按固定顺序 @import，顺序不可调整：同特异性规则靠源序决胜负。 */
+/* ── 8. Methodology Note (底部方法论) ─────────────────────────────────────── */
+.national-team-methodology {
+  border-radius: 8px;
+  border: 1px dashed var(--c-border);
+  background: var(--c-bg-subtle, rgba(128, 128, 128, 0.02));
+}
+
+.national-team-methodology__icon {
+  font-size: 13px;
+  color: var(--c-primary);
+}
+
+.national-team-methodology__content {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--c-text-secondary);
+}
+
+.national-team-methodology__header {
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--c-text-primary);
+}
+
+.national-team-methodology__footer {
+  font-size: 11px;
+  line-height: 1.4;
+  opacity: 0.8;
+}
+
+/* ── 9. Responsive Breakpoints ───────────────────────────────────────────── */
+@media (max-width: 991px) {
+  .national-team-hero {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .national-team-hero__controls {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .national-team-rotation__list {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+}
+
+@media (max-width: 768px) {
+  .national-team-section-heading--table {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .national-team-table-filters {
+    width: 100%;
+  }
+
+  .national-team-table-filters > .ant-space {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .national-team-table-filters .ant-input-affix-wrapper {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+
+  .national-team-table-filters .ant-segmented {
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    touch-action: pan-x pan-y;
+  }
+
+  .national-team-table-filters .ant-segmented::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .national-team-table .ant-table-thead > tr > th {
+    padding: 6px 6px;
+    font-size: 11.5px;
+    white-space: nowrap;
+  }
+
+  .national-team-table .ant-table-tbody > tr > td {
+    padding: 6px 6px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  .national-team-shares-val {
+    font-size: 12px;
+  }
+
+  .national-team-delta-pill {
+    padding: 1px 4px;
+    font-size: 10.5px;
+    line-height: 16px;
+  }
+
+  .national-team-etf-fullname.ant-typography {
+    max-width: 110px;
+  }
+}
+
+@media (max-width: 575px) {
+  .national-team-hero {
+    padding: 10px 12px;
+  }
+
+  .national-team-hero__title-row {
+    gap: 6px;
+  }
+
+  .national-team-hero__title.ant-typography {
+    font-size: 17px;
+  }
+
+  .national-team-hero__meta {
+    flex-wrap: wrap;
+    font-size: 11px;
+  }
+
+  .national-team-hero__controls {
+    flex-wrap: wrap;
+  }
+
+  .national-team-segmented.ant-segmented {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    touch-action: pan-x pan-y;
+  }
+
+  .national-team-segmented.ant-segmented::-webkit-scrollbar {
+    display: none;
+  }
+
+  .national-team-rotation .ant-card-head-wrapper {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 8px 0;
+    gap: 8px;
+  }
+
+  .national-team-rotation .ant-card-extra {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .national-team-rotation .ant-card-extra .ant-segmented {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    touch-action: pan-x pan-y;
+  }
+
+  .national-team-rotation .ant-card-extra .ant-segmented::-webkit-scrollbar {
+    display: none;
+  }
+
+  .national-team-rotation__item {
+    grid-template-columns: 20px 85px minmax(40px, 1fr) 80px;
+    gap: 6px;
+  }
+
+  .national-team-index-card__header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+
+  .national-team-index-card__stat-col {
+    align-items: flex-start;
+  }
+
+  .national-team-index-card__delta-wrap {
+    justify-content: flex-start;
+  }
+
+  .national-team-summary .ant-statistic-content {
+    font-size: 16px;
+  }
+}
+

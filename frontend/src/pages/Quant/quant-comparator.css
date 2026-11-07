@@ -1,0 +1,175 @@
+/* 策略回测多维横向对比弹窗 (Backtest Runs Comparator Modal) */
+
+.quant-comp-metric-label {
+  font-weight: 600;
+  cursor: help;
+}
+
+.quant-comp-col-header {
+  padding: 4px 0;
+  min-width: 150px;
+}
+
+.quant-comp-col-header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.quant-comp-run-name {
+  max-width: 140px;
+}
+
+.quant-comp-icon-11 {
+  font-size: 11px;
+}
+
+.quant-comp-tags-row {
+  margin-top: 2px;
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.quant-comp-tag {
+  font-size: 11px;
+  padding: 0 4px;
+  margin: 0;
+}
+
+.quant-comp-action-row {
+  margin-top: 6px;
+}
+
+.quant-comp-btn-link.ant-btn {
+  padding: 0;
+  font-size: 12px;
+}
+
+.quant-comp-val-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.quant-comp-crown {
+  color: #faad14;
+  font-size: 13px;
+}
+
+.quant-comp-val {
+  font-weight: 500;
+  border-radius: 4px;
+}
+
+.quant-comp-val--mono {
+  font-family: var(--c-font-mono);
+}
+
+.quant-comp-val--best {
+  font-weight: 700;
+  background: rgba(250, 173, 20, 0.08);
+  padding: 1px 6px;
+}
+
+.quant-comp-modal-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.quant-comp-primary-icon {
+  color: var(--c-primary);
+}
+
+.quant-comp-empty {
+  padding: 40px 0;
+}
+
+.quant-comp-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+.quant-comp-highlight-box {
+  background: rgba(0, 0, 0, 0.02);
+  padding: 12px;
+  border-radius: 8px;
+}
+
+.quant-comp-highlight-card {
+  border-radius: 6px;
+}
+
+.quant-comp-highlight-card--up {
+  border-color: var(--c-up);
+}
+
+.quant-comp-highlight-card--primary {
+  border-color: var(--c-primary);
+}
+
+.quant-comp-highlight-card--green {
+  border-color: #52c41a;
+}
+
+.quant-comp-highlight-card--purple {
+  border-color: #722ed1;
+}
+
+.quant-comp-card-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.quant-comp-icon--up {
+  color: var(--c-up);
+}
+
+.quant-comp-icon--primary {
+  color: var(--c-primary);
+}
+
+.quant-comp-icon--green {
+  color: #52c41a;
+}
+
+.quant-comp-icon--purple {
+  color: #722ed1;
+}
+
+.quant-comp-card-label {
+  font-size: 12px;
+}
+
+.quant-comp-card-val {
+  font-size: 18px;
+  font-weight: 700;
+  font-family: var(--c-font-mono);
+}
+
+.quant-comp-card-val--up {
+  color: var(--c-up);
+}
+
+.quant-comp-card-val--primary {
+  color: var(--c-primary);
+}
+
+.quant-comp-card-val--green {
+  color: #52c41a;
+}
+
+.quant-comp-card-val--purple {
+  color: #722ed1;
+}
+
+.quant-comp-card-sub {
+  font-size: 11px;
+  display: block;
+}

@@ -20,7 +20,6 @@ import {
 } from "antd";
 import type { QuantBacktestResult } from "../../../api/queries";
 import PreloadLink from "../../../components/PreloadLink";
-import { useColors, useStyles, semanticTagStyle } from "../../../styles/ui";
 import { exportTradesCsv } from "./exportTearsheet";
 import { formatPercent } from "./formatters";
 import MonthlyReturnsHeatmap from "./MonthlyReturnsHeatmap";
@@ -40,8 +39,6 @@ export default function BacktestTables({
   metrics,
   marketSnapshots = [],
 }: BacktestTablesProps) {
-  const colors = useColors();
-  const { cardStyle } = useStyles();
   const [tradeViewMode, setTradeViewMode] = useState<"table" | "timeline">("table");
 
   // Build quick map for market snapshot bar by code + date
@@ -73,30 +70,29 @@ export default function BacktestTables({
             title="交易特征与持仓周期诊断 (Trade Horizon & Payoff Diagnostics)"
             extra={<Tag color="purple">交易行为深度穿透</Tag>}
             size="small"
-            style={cardStyle}
-            className="quant-result-card"
+            className="quant-result-card u-card"
           >
             <Row gutter={[16, 12]}>
               <Col xs={12} sm={6}>
                 <div>
-                  <div style={{ color: "var(--c-text-muted)", fontSize: 12 }}>平均持仓周期</div>
-                  <strong style={{ fontSize: 16 }}>{metrics.avg_holding_days} 天</strong>
+                  <div className="quant-diag-label">平均持仓周期</div>
+                  <strong className="quant-diag-val-lg">{metrics.avg_holding_days} 天</strong>
                 </div>
               </Col>
               <Col xs={12} sm={6}>
                 <div>
-                  <div style={{ color: "var(--c-text-muted)", fontSize: 12 }}>盈/亏平均持仓</div>
-                  <strong style={{ fontSize: 14 }}>
-                    <span style={{ color: colors.up }}>{metrics.avg_win_holding_days ?? "-"}天</span> /{" "}
-                    <span style={{ color: colors.down }}>{metrics.avg_loss_holding_days ?? "-"}天</span>
+                  <div className="quant-diag-label">盈/亏平均持仓</div>
+                  <strong className="quant-diag-val">
+                    <span className="u-text-up">{metrics.avg_win_holding_days ?? "-"}天</span> /{" "}
+                    <span className="u-text-down">{metrics.avg_loss_holding_days ?? "-"}天</span>
                   </strong>
                   {(metrics.avg_win_holding_days ?? 0) > (metrics.avg_loss_holding_days ?? 0) && (
-                    <Tag color="success" style={{ marginLeft: 6, fontSize: 11 }}>
+                    <Tag color="blue" className="quant-diag-tag">
                       让利润奔跑
                     </Tag>
                   )}
                   {metrics.avg_loss_holding_days && metrics.avg_loss_holding_days > 0 && metrics.avg_win_holding_days ? (
-                    <div style={{ fontSize: 11, color: "var(--c-text-muted)", marginTop: 2 }}>
+                    <div className="quant-diag-sub">
                       盈利时长期望: {(metrics.avg_win_holding_days / metrics.avg_loss_holding_days).toFixed(1)}x
                     </div>
                   ) : null}
@@ -104,18 +100,18 @@ export default function BacktestTables({
               </Col>
               <Col xs={12} sm={6}>
                 <div>
-                  <div style={{ color: "var(--c-text-muted)", fontSize: 12 }}>平均单笔盈亏额</div>
-                  <strong style={{ fontSize: 14 }}>
-                    <span style={{ color: colors.up }}>
+                  <div className="quant-diag-label">平均单笔盈亏额</div>
+                  <strong className="quant-diag-val">
+                    <span className="u-text-up">
                       {metrics.avg_win_pnl != null ? `+${metrics.avg_win_pnl}元` : "-"}
                     </span>{" "}
                     /{" "}
-                    <span style={{ color: colors.down }}>
+                    <span className="u-text-down">
                       {metrics.avg_loss_pnl != null ? `${metrics.avg_loss_pnl}元` : "-"}
                     </span>
                   </strong>
                   {metrics.avg_win_pnl && metrics.avg_loss_pnl && Math.abs(metrics.avg_loss_pnl) > 0 ? (
-                    <div style={{ fontSize: 11, color: "var(--c-text-muted)", marginTop: 2 }}>
+                    <div className="quant-diag-sub">
                       平均盈亏比: {(metrics.avg_win_pnl / Math.abs(metrics.avg_loss_pnl)).toFixed(2)}:1
                     </div>
                   ) : null}
@@ -123,13 +119,13 @@ export default function BacktestTables({
               </Col>
               <Col xs={12} sm={6}>
                 <div>
-                  <div style={{ color: "var(--c-text-muted)", fontSize: 12 }}>单笔极端盈亏率</div>
-                  <strong style={{ fontSize: 14 }}>
-                    <span style={{ color: colors.up }}>
+                  <div className="quant-diag-label">单笔极端盈亏率</div>
+                  <strong className="quant-diag-val">
+                    <span className="u-text-up">
                       {metrics.max_win_pct != null ? `+${metrics.max_win_pct}%` : "-"}
                     </span>{" "}
                     /{" "}
-                    <span style={{ color: colors.down }}>
+                    <span className="u-text-down">
                       {metrics.max_loss_pct != null ? `${metrics.max_loss_pct}%` : "-"}
                     </span>
                   </strong>
@@ -175,90 +171,61 @@ export default function BacktestTables({
             </Space>
           )}
           size="small"
-          style={cardStyle}
-          className="quant-result-card quant-table-card"
+          className="quant-result-card quant-table-card u-card"
         >
           {trades.length === 0 ? (
             <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无成交记录" />
           ) : tradeViewMode === "timeline" ? (
-            <div style={{ maxHeight: 420, overflowY: "auto", padding: "12px 16px 0" }}>
+            <div className="quant-trade-timeline-wrap">
               <Timeline
                 mode="left"
                 items={trades.map((trade) => {
                   const snap = snapshotMap.get(`${trade.code}_${trade.date}`);
                   const isBuy = trade.side === "buy";
                   return {
-                    color: isBuy ? colors.up : colors.down,
+                    color: isBuy ? "var(--c-up)" : "var(--c-down)",
                     children: (
-                      <div
-                        style={{
-                          marginBottom: 10,
-                          padding: "var(--c-pad-inset, 7px 12px)",
-                          borderRadius: "var(--c-radius-sm)",
-                          background: "var(--c-nested-bg)",
-                          border: "1px solid var(--c-border)",
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            flexWrap: "wrap",
-                            gap: 6,
-                          }}
-                        >
+                      <div className="quant-trade-timeline-card">
+                        <div className="quant-trade-card-top">
                           <Space size={6}>
-                            <Tag style={semanticTagStyle(isBuy ? "up" : "down")}>
+                            <Tag className={isBuy ? "quant-trade-tag--buy" : "quant-trade-tag--sell"}>
                               {isBuy ? "买入" : "卖出"}
                             </Tag>
                             <PreloadLink
                               to={`/analysis?code=${trade.code}`}
                               aria-label={`查看${trade.code}研报`}
-                              className="financial-num"
-                              style={{ fontWeight: 600 }}
+                              className="financial-num quant-trade-code-link"
                             >
                               {trade.code}
                             </PreloadLink>
-                            <span style={{ fontSize: 12, color: "var(--c-text-muted)" }}>{trade.date}</span>
+                            <span className="quant-trade-date">{trade.date}</span>
                           </Space>
                           <div>
-                            <span style={{ fontSize: 12, color: "var(--c-text-muted)" }}>价格: </span>
+                            <span className="quant-trade-label">价格: </span>
                             <strong className="financial-num">{trade.price.toFixed(2)}</strong>
-                            <span style={{ fontSize: 12, color: "var(--c-text-muted)", marginLeft: 8 }}>股数: </span>
+                            <span className="quant-trade-label--ml">股数: </span>
                             <span className="financial-num">{trade.shares.toLocaleString()}</span>
                           </div>
                         </div>
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            marginTop: 6,
-                            fontSize: 12,
-                            flexWrap: "wrap",
-                            gap: 6,
-                          }}
-                        >
+                        <div className="quant-trade-card-bottom">
                           <Space size={8}>
                             {snap?.turnover_pct != null && (
-                              <Tag color="default" style={{ margin: 0, fontSize: 11 }}>
+                              <Tag color="default" className="quant-trade-snap-tag">
                                 当日换手: {snap.turnover_pct.toFixed(2)}%
                               </Tag>
                             )}
                             {snap?.change_pct != null && (
-                              <span style={{ color: snap.change_pct >= 0 ? colors.up : colors.down }}>
+                              <span className={snap.change_pct >= 0 ? "u-text-up" : "u-text-down"}>
                                 当日涨跌: {formatPercent(snap.change_pct)}
                               </span>
                             )}
-                            <span style={{ color: "var(--c-text-muted)" }}>费用: ¥{trade.fee.toFixed(2)}</span>
+                            <span className="quant-trade-fee">费用: ¥{trade.fee.toFixed(2)}</span>
                           </Space>
                           {trade.realized_pnl != null && (
                             <div>
                               <span>平仓盈亏: </span>
                               <strong
-                                className="financial-num"
-                                style={{ color: trade.realized_pnl >= 0 ? colors.up : colors.down }}
+                                className={`financial-num ${trade.realized_pnl >= 0 ? "u-text-up" : "u-text-down"}`}
                               >
                                 {trade.realized_pnl > 0
                                   ? `+${trade.realized_pnl.toFixed(2)}`
@@ -302,7 +269,7 @@ export default function BacktestTables({
                   dataIndex: "side",
                   width: 70,
                   render: (side: string) => (
-                    <Tag style={semanticTagStyle(side === "buy" ? "up" : "down")}>
+                    <Tag className={side === "buy" ? "quant-trade-tag--buy" : "quant-trade-tag--sell"}>
                       {side === "buy" ? "买入" : "卖出"}
                     </Tag>
                   ),
@@ -328,22 +295,18 @@ export default function BacktestTables({
                   render: (_: unknown, record) => {
                     const snap = snapshotMap.get(`${record.code}_${record.date}`);
                     if (!snap || (snap.turnover_pct == null && snap.change_pct == null)) {
-                      return <span style={{ color: "var(--c-text-muted)" }}>-</span>;
+                      return <span className="u-text-muted">-</span>;
                     }
                     return (
                       <Space orientation="horizontal" size={6}>
                         {snap.turnover_pct != null ? (
-                          <span className="financial-num" style={{ fontSize: 12 }}>
+                          <span className="financial-num quant-trade-table-num">
                             {snap.turnover_pct.toFixed(2)}%
                           </span>
                         ) : null}
                         {snap.change_pct != null ? (
                           <Text
-                            className="financial-num"
-                            style={{
-                              fontSize: 11,
-                              color: snap.change_pct >= 0 ? colors.up : colors.down,
-                            }}
+                            className={`financial-num quant-trade-table-change ${snap.change_pct >= 0 ? "u-text-up" : "u-text-down"}`}
                           >
                             ({snap.change_pct >= 0 ? `+${snap.change_pct.toFixed(1)}%` : `${snap.change_pct.toFixed(1)}%`})
                           </Text>
@@ -366,7 +329,7 @@ export default function BacktestTables({
                   className: "financial-num",
                   render: (value?: number | null) => (
                     value == null ? "-" : (
-                      <Text style={{ color: value >= 0 ? colors.up : colors.down }}>
+                      <Text className={value >= 0 ? "u-text-up" : "u-text-down"}>
                         {value > 0 ? `+${value.toFixed(2)}` : value.toFixed(2)}
                       </Text>
                     )

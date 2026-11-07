@@ -21,7 +21,7 @@ import { useCreatePortfolioTransaction, usePreviewPortfolioTransaction } from ".
 import QueryErrorState from "../../components/QueryErrorState";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { useStockSearchController } from "../../hooks/useStockSearchController";
-import { useColors, useStyles } from "../../styles/ui";
+import { useColors } from "../../styles/ui";
 import type { PortfolioStockSummary, PortfolioTransactionCreate } from "../../types/portfolio";
 import { isHkStockCode } from "../../utils/stockLinks";
 import { errorMessage, formatInteger, formatPrice } from "./portfolioFormatters";
@@ -51,7 +51,6 @@ export interface TransactionEntryCardHandle {
 const TransactionEntryCard = forwardRef<TransactionEntryCardHandle, TransactionEntryCardProps>(
   function TransactionEntryCard({ stocks, onSuccess, isDrawer = false }, ref) {
   const colors = useColors();
-  const { cardStyle } = useStyles();
   const isMobile = useMediaQuery("(max-width: 768px)");
   const containerRef = useRef<HTMLDivElement>(null);
   const [form] = Form.useForm<TransactionFormValues>();
@@ -344,7 +343,7 @@ const TransactionEntryCard = forwardRef<TransactionEntryCardHandle, TransactionE
         <Card
           title="记录交易流水"
           size="small"
-          style={{ ...cardStyle, marginBottom: 16 }}
+          className="u-card" style={{ marginBottom: 16 }}
           styles={{ body: { padding: isMobile ? "16px 14px 4px" : "18px 20px 4px" } }}
         >
           {formElement}

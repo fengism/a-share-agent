@@ -16,7 +16,7 @@ import { useColors, useStyles } from "../../styles/ui";
 import type { SessionItem } from "../../types/auth";
 
 export default function SessionManagerCard() {
-  const { cardStyle, sectionCardBodyStyle } = useStyles();
+  const { sectionCardBodyStyle } = useStyles();
   const colors = useColors();
   const isNarrow = useMediaQuery("(max-width: 640px)");
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -53,7 +53,7 @@ export default function SessionManagerCard() {
             {device.icon === "mobile" ? <MobileOutlined /> : <DesktopOutlined />}
             <span style={{ color: colors.textPrimary }}>{device.label}</span>
             {record.is_current ? (
-              <Tag color="green" style={{ marginInlineStart: 4 }}>
+              <Tag color="processing" style={{ marginInlineStart: 4 }}>
                 当前
               </Tag>
             ) : null}
@@ -142,7 +142,7 @@ export default function SessionManagerCard() {
   return (
     <Card
       title={<span><SafetyOutlined style={{ marginRight: 8 }} />登录设备</span>}
-      style={{ ...cardStyle, marginBottom: 16 }}
+      className="u-card" style={{ marginBottom: 16 }}
       styles={{ body: sectionCardBodyStyle }}
       extra={
         <Button size="small" icon={<ReloadOutlined />} onClick={() => refetch()} loading={isLoading}>

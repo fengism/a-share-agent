@@ -1,0 +1,90 @@
+/* 报告页头、标题行、元信息、标签
+   自 industry-report.css 第 1–84 行拆出。
+   由同目录 index.css 按固定顺序 @import，顺序不可调整：同特异性规则靠源序决胜负。 */
+.industry-report__header {
+  margin-bottom: 18px;
+  padding: 2px 0 14px;
+  border-bottom: 1px solid var(--c-border);
+}
+
+.industry-report__title-row,
+.industry-report__actions,
+.industry-report__meta {
+  display: flex;
+  align-items: center;
+}
+
+.industry-report__title-row {
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.industry-report__actions,
+.industry-report__meta {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.industry-report__meta {
+  min-width: 0;
+  margin-top: 10px;
+  color: var(--c-text-secondary);
+  font-size: var(--c-font-sm);
+}
+
+.industry-report__title,
+.industry-report__aliases,
+.industry-report__scope-summary,
+.industry-wrap-tag-list {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.industry-report__title,
+.industry-report__scope-summary {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.industry-report__title,
+.industry-report__title.ant-typography {
+  flex: 1 1 260px;
+  color: var(--c-text-primary);
+  font-size: var(--c-font-lg);
+}
+
+.industry-report__alert,
+.industry-report__alert .ant-alert-message,
+.industry-report__alert .ant-alert-description,
+.industry-report__warning {
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.industry-wrap-tag,
+.industry-report__wrap-tag,
+.industry-chain-node__tag,
+.industry-chain-table__tag,
+.atlas-wrap-tag {
+  max-width: 100%;
+  height: auto;
+  margin: 0;
+  line-height: var(--c-leading-normal);
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.industry-nowrap-tag {
+  flex: none;
+  white-space: nowrap;
+}
+

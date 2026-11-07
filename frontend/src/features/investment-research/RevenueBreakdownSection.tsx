@@ -50,7 +50,7 @@ export default function RevenueBreakdownSection({
   isExportingPdf?: boolean;
 }) {
   const c = useColors();
-  const { cardStyle, sectionHeaderStyle } = useStyles();
+  const { sectionHeaderStyle } = useStyles();
   const query = useRevenueBreakdown(code);
   const data = exportData ?? query.data;
   const isLoading = !exportData && query.isLoading;
@@ -205,7 +205,7 @@ export default function RevenueBreakdownSection({
         skeletonRows={4}
         minHeight={180}
       >
-        <Card size="small" className="financial-revenue-card" style={cardStyle}>
+        <Card size="small" className="financial-revenue-card u-card">
           {availableDimensions.length > 1 ? (
             <Segmented
               block

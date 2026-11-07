@@ -1,0 +1,186 @@
+/* Trading Calendar Styles */
+
+.trading-calendar__header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--c-space-2, 8px);
+  margin-bottom: var(--c-space-3, 12px);
+}
+
+.trading-calendar__month-ctrl {
+  display: flex;
+  align-items: center;
+  gap: var(--c-space-2, 8px);
+  flex-wrap: wrap;
+}
+
+.trading-calendar__month-title {
+  font-size: var(--c-font-lg, 16px);
+  min-width: 96px;
+  text-align: center;
+}
+
+.trading-calendar__stat-tag--up {
+  color: var(--c-up);
+  border-color: rgba(245, 34, 45, 0.4);
+  background: rgba(245, 34, 45, 0.08);
+}
+
+.trading-calendar__stat-tag--down {
+  color: var(--c-down);
+  border-color: rgba(82, 196, 26, 0.4);
+  background: rgba(82, 196, 26, 0.08);
+}
+
+.trading-calendar__year-total {
+  font-size: var(--c-font-sm, 12px);
+}
+
+.trading-calendar__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--c-space-2, 8px);
+  font-size: var(--c-font-xs, 11px);
+  color: var(--c-text-secondary);
+  align-items: center;
+}
+
+.trading-calendar__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.trading-calendar__legend-chip {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+}
+
+.trading-calendar__legend-chip--up-deep {
+  background: rgba(245, 34, 45, 0.45);
+}
+
+.trading-calendar__legend-chip--up-light {
+  background: rgba(245, 34, 45, 0.12);
+}
+
+.trading-calendar__legend-chip--down-light {
+  background: rgba(82, 196, 26, 0.12);
+}
+
+.trading-calendar__legend-chip--down-deep {
+  background: rgba(82, 196, 26, 0.45);
+}
+
+.trading-calendar__weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: var(--c-space-1, 4px);
+  margin-bottom: var(--c-space-1, 4px);
+}
+
+.trading-calendar__weekday {
+  text-align: center;
+  font-size: var(--c-font-xs, 11px);
+  font-weight: var(--c-weight-semibold);
+  color: var(--c-text-secondary);
+  padding: var(--c-space-1, 4px) 0;
+}
+
+.trading-calendar__weekday--weekend {
+  color: var(--c-text-muted);
+}
+
+.trading-calendar__grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: var(--c-space-1, 4px);
+}
+
+.trading-calendar__cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  border-radius: var(--c-radius-md, 8px);
+  border: 1.5px solid transparent;
+  box-shadow: none;
+  background-color: transparent;
+}
+
+.trading-calendar__cell--today {
+  border-color: var(--c-primary);
+  box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.25);
+}
+
+.trading-calendar__cell--closed {
+  opacity: 0.5;
+}
+
+.trading-calendar__cell--trading-empty {
+  background-color: var(--c-hover-bg);
+}
+
+.trading-calendar__cell-closed-date {
+  font-size: var(--c-font-md, 14px);
+  color: var(--c-text-muted);
+  text-decoration: line-through;
+  text-decoration-color: var(--c-text-muted);
+}
+
+.trading-calendar__cell-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: var(--c-leading-tight);
+}
+
+.trading-calendar__cell-date {
+  font-size: var(--c-font-md, 14px);
+  color: var(--c-text-primary);
+}
+
+.trading-calendar__cell-pct {
+  font-size: var(--c-font-xs, 11px);
+  font-weight: var(--c-weight-semibold);
+}
+
+.trading-calendar__cell-pct--up {
+  color: var(--c-up);
+}
+
+.trading-calendar__cell-pct--down {
+  color: var(--c-down);
+}
+
+.trading-calendar__card-title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--c-space-2, 8px);
+}
+
+.trading-calendar__title-icon {
+  color: var(--c-primary);
+}
+
+.trading-calendar__title-sub {
+  font-size: var(--c-font-sm, 12px);
+  font-weight: var(--c-weight-normal);
+}
+
+.trading-calendar__extra-tags {
+  display: inline-flex;
+  gap: var(--c-space-2, 8px);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.trading-calendar__footer-note {
+  font-size: var(--c-font-xs, 11px);
+  display: block;
+  margin-top: var(--c-space-3, 12px);
+}

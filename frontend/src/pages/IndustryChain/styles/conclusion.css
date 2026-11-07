@@ -1,0 +1,371 @@
+/* 章节导航与结论卡（含折叠、指标、因子）
+   自 industry-report.css 第 319–686 行拆出。
+   由同目录 index.css 按固定顺序 @import，顺序不可调整：同特异性规则靠源序决胜负。 */
+.industry-report__chapter-nav a {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 1px 8px;
+  padding: 9px 12px;
+  border-right: 1px solid var(--c-border);
+  color: var(--c-text-secondary);
+}
+
+.industry-report__chapter-nav a:last-child {
+  border-right: 0;
+}
+
+.industry-report__chapter-nav a:hover,
+.industry-report__chapter-nav a:focus-visible {
+  color: var(--c-primary);
+  background: var(--c-primary-soft);
+}
+
+.industry-report__chapter-nav b {
+  grid-row: 1 / 3;
+  align-self: center;
+  color: var(--c-primary);
+  font-size: var(--c-font-xs);
+}
+
+.industry-report__chapter-nav span {
+  min-width: 0;
+  color: var(--c-text-primary);
+  font-size: var(--c-font-sm);
+  font-weight: var(--c-weight-semibold);
+  overflow-wrap: anywhere;
+}
+
+.industry-report__chapter-nav small {
+  color: var(--c-text-muted);
+  font-size: var(--c-font-xs);
+}
+
+.industry-conclusion {
+  margin-bottom: 16px;
+  overflow: hidden;
+  border: 1px solid var(--c-border);
+  border-top: 3px solid var(--c-primary);
+  border-radius: var(--c-radius-md);
+  background: var(--c-card-bg);
+  box-shadow: var(--c-shadow-xs);
+  scroll-margin-top: 82px;
+}
+
+.industry-conclusion__header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px 12px;
+}
+
+.industry-conclusion__eyebrow {
+  color: var(--c-primary);
+  font-size: var(--c-font-xs);
+  font-weight: var(--c-weight-bold);
+  letter-spacing: 0;
+}
+
+.industry-conclusion__header h2 {
+  margin: 3px 0 0;
+  color: var(--c-text-primary);
+  font-size: var(--c-font-xl);
+  line-height: var(--c-leading-tight);
+}
+
+.industry-conclusion__count {
+  display: block;
+  margin-top: 4px;
+  color: var(--c-text-muted);
+  font-size: var(--c-font-xs);
+}
+
+.industry-conclusion__summary {
+  min-width: 0;
+  padding: 18px 20px;
+  border-block: 1px solid var(--c-border);
+  background: color-mix(in srgb, var(--c-primary) 6%, var(--c-card-bg));
+}
+
+.industry-conclusion__label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 8px;
+  color: var(--c-primary);
+  font-size: var(--c-font-sm);
+  font-weight: var(--c-weight-semibold);
+}
+
+.industry-conclusion__summary > p {
+  max-width: 1000px;
+  margin: 0;
+  color: var(--c-text-primary);
+  font-size: var(--c-font-base);
+  font-weight: var(--c-weight-medium);
+  line-height: var(--c-leading-relaxed);
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.industry-conclusion__summary-content {
+  min-width: 0;
+  max-width: 1000px;
+}
+
+.industry-conclusion__summary-content.is-collapsed {
+  max-height: 280px;
+  overflow: hidden;
+  position: relative;
+  mask-image: linear-gradient(to bottom, black calc(100% - 70px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 70px), transparent 100%);
+}
+
+.industry-conclusion__summary-content.is-expanded {
+  max-height: none;
+  mask-image: none;
+  -webkit-mask-image: none;
+}
+
+.industry-conclusion__summary-toggle {
+  display: flex;
+  justify-content: center;
+  margin-top: 10px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--c-border);
+}
+
+.industry-conclusion__summary-toggle .ant-btn-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--c-font-sm);
+  color: var(--c-primary);
+  font-weight: var(--c-weight-medium);
+  padding: 0 8px;
+  height: auto;
+}
+
+.industry-conclusion__summary-content .industry-markdown {
+  color: var(--c-text-primary);
+  font-size: var(--c-font-base);
+  line-height: var(--c-leading-relaxed);
+}
+
+.industry-conclusion__summary-content .industry-markdown > :first-child {
+  margin-top: 0;
+}
+
+.industry-conclusion__summary-content .industry-markdown > :last-child {
+  margin-bottom: 0;
+}
+
+.industry-conclusion__summary-content .industry-markdown h1 {
+  margin: 14px 0 8px;
+  font-size: var(--c-font-xl);
+  font-weight: var(--c-weight-bold);
+  color: var(--c-text-primary);
+}
+
+.industry-conclusion__summary-content .industry-markdown h2 {
+  margin: 16px 0 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--c-border);
+  font-size: var(--c-font-lg);
+  font-weight: var(--c-weight-semibold);
+  color: var(--c-text-primary);
+}
+
+.industry-conclusion__summary-content .industry-markdown h3 {
+  margin: 12px 0 6px;
+  font-size: var(--c-font-base);
+  font-weight: var(--c-weight-semibold);
+  color: var(--c-text-primary);
+}
+
+.industry-conclusion__summary-content .industry-markdown p {
+  margin: 6px 0 10px;
+  color: var(--c-text-primary);
+  font-size: var(--c-font-base);
+  line-height: var(--c-leading-relaxed);
+}
+
+.industry-conclusion__summary-content .industry-markdown hr {
+  margin: 14px 0;
+  border: 0;
+  border-top: 1px solid var(--c-border);
+}
+
+.industry-conclusion__positioning {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 10px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--c-border);
+  color: var(--c-text-secondary);
+  font-size: var(--c-font-sm);
+  line-height: var(--c-leading-normal);
+}
+
+.industry-conclusion__positioning > span {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.industry-conclusion__metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  border-bottom: 1px solid var(--c-border);
+}
+
+.industry-conclusion__metrics > div {
+  display: flex;
+  min-width: 0;
+  min-height: 88px;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding: 14px 20px;
+  border-right: 1px solid var(--c-border);
+}
+
+.industry-conclusion__metrics > div:last-child {
+  border-right: 0;
+}
+
+.industry-conclusion__metrics span,
+.industry-conclusion__metrics small {
+  color: var(--c-text-secondary);
+  font-size: var(--c-font-sm);
+}
+
+.industry-conclusion__metrics span,
+.industry-conclusion__metrics strong,
+.industry-conclusion__metrics small {
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.industry-conclusion__metrics strong {
+  color: var(--c-text-primary);
+  font-size: var(--c-font-xl);
+  line-height: var(--c-leading-tight);
+}
+
+.industry-conclusion__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 0;
+}
+
+.industry-conclusion__factor {
+  min-width: 0;
+  padding: 16px 20px 18px;
+  border-right: 1px solid var(--c-border);
+}
+
+.industry-conclusion__factor:last-child {
+  border-right: 0;
+}
+
+.industry-conclusion__factor h3 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 12px;
+  color: var(--c-text-primary);
+  font-size: var(--c-font-base);
+}
+
+.industry-conclusion__factor.is-positive {
+  color: var(--c-up);
+  background: color-mix(in srgb, var(--c-up) 4%, var(--c-card-bg));
+}
+
+.industry-conclusion__factor.is-positive h3 {
+  color: var(--c-up);
+}
+
+.industry-conclusion__factor.is-negative {
+  color: var(--c-down);
+  background: color-mix(in srgb, var(--c-down) 4%, var(--c-card-bg));
+}
+
+.industry-conclusion__factor.is-negative h3 {
+  color: var(--c-down);
+}
+
+.industry-conclusion__factor ol,
+.industry-conclusion__companies {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.industry-conclusion__factor li {
+  min-width: 0;
+}
+
+.industry-conclusion__item-heading {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 6px 8px;
+}
+
+.industry-conclusion__item-title {
+  min-width: 0;
+  flex: 1 1 160px;
+  color: var(--c-text-primary);
+  font-size: var(--c-font-md);
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.industry-conclusion__confidence {
+  flex: none;
+  color: var(--c-text-muted);
+  font-size: var(--c-font-xs);
+  white-space: nowrap;
+}
+
+.industry-conclusion__factor li p {
+  display: -webkit-box;
+  margin: 3px 0 0;
+  overflow: hidden;
+  color: var(--c-text-secondary);
+  font-size: var(--c-font-sm);
+  line-height: var(--c-leading-normal);
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.industry-conclusion__companies .ant-tag {
+  flex: none;
+  margin: 0;
+}
+
+.industry-evidence-link {
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+

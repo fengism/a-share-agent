@@ -1,0 +1,10 @@
+/* watchlist.css 的拆分入口。
+   @import 顺序即层叠顺序，不可重排。 */
+@import "./page-shell.css";
+@import "./toolbar-and-filters.css";
+@import "./content-card.css";
+@import "./mobile-card-list.css";
+@import "./table.css";
+@import "./concept-tags.css";
+@import "./groups-and-batch.css";
+@import "./responsive.css";

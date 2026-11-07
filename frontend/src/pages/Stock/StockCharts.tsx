@@ -9,7 +9,6 @@ import LazyKlineChart from "../../charts/LazyKlineChart";
 import SectionDataState from "../../components/SectionDataState";
 import { useFullscreenChartHeight } from "../../hooks/useFullscreenChartHeight";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
-import { useStyles } from "../../styles/ui";
 import type { KlineItem } from "../../types/stock";
 import { analyzeChanlun } from "../../utils/chanlun";
 import { MAX_KLINE_HISTORY_YEARS, yearsAgoDate } from "../../utils/date";
@@ -417,7 +416,6 @@ export default function StockCharts({ code, market = "cn", name }: StockChartsPr
   const [historyYears, setHistoryYears] = useState(1);
   const [expanded, setExpanded] = useState(false);
   const isMobile = useMediaQuery("(max-width: 768px)");
-  const { cardStyle } = useStyles();
   const fullscreenHeight = useFullscreenChartHeight();
   const modalChartHeight = isMobile
     ? Math.max(260, (typeof window !== "undefined" ? window.innerHeight : 600) - 120)
@@ -500,7 +498,7 @@ export default function StockCharts({ code, market = "cn", name }: StockChartsPr
   return (
     <Card
       id="stock-charts"
-      className="stock-section-card stock-chart-card"
+      className="stock-section-card stock-chart-card u-card"
       title={cardTitle}
       extra={(
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -523,7 +521,6 @@ export default function StockCharts({ code, market = "cn", name }: StockChartsPr
           </Tooltip>
         </div>
       )}
-      style={cardStyle}
     >
       {activeView === "kline" ? (
         <KlinePanel

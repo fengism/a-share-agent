@@ -1,0 +1,150 @@
+/* 吸顶快速行情条（StockStickyBar）及其响应式
+   自 stock-page.css 第 874–1020 行拆出。
+   由同目录 index.css 按固定顺序 @import，顺序不可调整：同特异性规则靠源序决胜负。 */
+/* ── 个股详情页吸顶快速行情条 (StockStickyBar) ── */
+.stock-sticky-bar {
+  position: sticky;
+  top: 58px;
+  z-index: 95;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  height: 46px;
+  margin-top: -46px;
+  margin-bottom: 0;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(-8px);
+  pointer-events: none;
+  transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.stock-sticky-bar.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.stock-sticky-bar__container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--c-space-3);
+  height: 46px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 0 var(--c-space-4);
+  background: color-mix(in srgb, var(--c-card-bg) 88%, transparent);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius-lg);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.stock-sticky-bar__stock-info {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  padding: 4px 6px;
+  margin: -4px -6px;
+  border-radius: var(--c-radius-md);
+  cursor: pointer;
+  color: inherit;
+  transition: background-color 0.15s ease;
+}
+
+.stock-sticky-bar__stock-info:hover {
+  background: var(--c-hover-bg);
+}
+
+.stock-sticky-bar__top-icon {
+  font-size: 11px;
+  color: var(--c-text-muted);
+}
+
+.stock-sticky-bar__name {
+  font-size: var(--c-font-base);
+  color: var(--c-text-primary);
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stock-sticky-bar__code {
+  font-size: var(--c-font-xs);
+  font-family: var(--c-font-mono);
+  color: var(--c-text-muted);
+}
+
+.stock-sticky-bar__hk-tag {
+  margin: 0;
+  font-size: 10px;
+  line-height: 16px;
+}
+
+.stock-sticky-bar__quote {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.stock-sticky-bar__price {
+  font-size: 16px;
+  font-weight: 700;
+  padding: 0 4px;
+  border-radius: var(--c-radius-sm);
+  transition: background-color 0.3s ease;
+}
+
+.stock-sticky-bar__change {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.stock-sticky-bar__actions {
+  display: inline-flex;
+  align-items: center;
+}
+
+@media (max-width: 640px) {
+  .stock-sticky-bar__container {
+    padding: 0 8px;
+    gap: 6px;
+  }
+
+  .stock-sticky-bar__name {
+    max-width: 70px;
+    font-size: var(--c-font-sm);
+  }
+
+  .stock-sticky-bar__code {
+    display: none;
+  }
+
+  .stock-sticky-bar__quote {
+    gap: 4px;
+  }
+
+  .stock-sticky-bar__price {
+    font-size: 14px;
+    padding: 0 2px;
+  }
+
+  .stock-sticky-bar__change {
+    font-size: 12px;
+  }
+
+  .stock-sticky-bar__actions {
+    gap: 4px;
+  }
+
+  .stock-sticky-bar__report-btn.ant-btn {
+    display: none;
+  }
+}

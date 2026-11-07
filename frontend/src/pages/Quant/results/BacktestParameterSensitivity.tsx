@@ -30,7 +30,7 @@ import {
   type QuantParameterScanResult,
   type QuantStrategyConfig,
 } from "../../../api/queries";
-import { useColors, useStyles } from "../../../styles/ui";
+import { useColors } from "../../../styles/ui";
 import { formatPercent, formatRatio } from "./formatters";
 
 const { Text } = Typography;
@@ -82,7 +82,6 @@ export default function BacktestParameterSensitivity({
   onApplyOptimal,
 }: BacktestParameterSensitivityProps) {
   const colors = useColors();
-  const { cardStyle } = useStyles();
   const scanMutation = useScanQuantParameterSensitivity();
 
   const availableParams = useMemo(() => {
@@ -203,11 +202,10 @@ export default function BacktestParameterSensitivity({
         </Space>
       )}
       size="small"
-      style={cardStyle}
-      className="quant-result-card"
+      className="quant-result-card u-card"
     >
       <div style={{ marginBottom: 16 }}>
-        <p style={{ color: "var(--color-text-secondary, #8c8c8c)", fontSize: 13, margin: "0 0 12px" }}>
+        <p style={{ color: "var(--c-text-secondary, #8c8c8c)", fontSize: 13, margin: "0 0 12px" }}>
           基于当前回测的纯内存高速复算引擎，扫描策略参数空间网格。可识别策略是否处于「稳健高原」还是面临「参数过拟合悬崖」。
         </p>
 
@@ -334,7 +332,7 @@ export default function BacktestParameterSensitivity({
 
           {matrixData && (
             <div style={{ overflowX: "auto" }}>
-              <div style={{ marginBottom: 8, fontSize: 12, color: "var(--color-text-secondary, #8c8c8c)" }}>
+              <div style={{ marginBottom: 8, fontSize: 12, color: "var(--c-text-secondary, #8c8c8c)" }}>
                 表格单元格数值为 <strong>夏普比率 (Sharpe)</strong>，悬停查看收益率与回撤。绿色代表高风险报酬，红色代表弱势或亏损。
               </div>
 

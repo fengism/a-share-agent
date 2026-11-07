@@ -6,7 +6,7 @@ import MacroFeed from "../../features/feed/MacroFeed";
 import TwitterFeed from "../../features/feed/TwitterFeed";
 import FeedTabs from "./FeedTabs";
 import NewsAnalysisPanel from "./NewsAnalysisPanel";
-import "../../features/feed/feed.css";
+import "../../features/feed/styles/index.css";
 
 const FEED_SECTIONS = ["market", "macro", "twitter"] as const;
 type FeedSection = (typeof FEED_SECTIONS)[number];

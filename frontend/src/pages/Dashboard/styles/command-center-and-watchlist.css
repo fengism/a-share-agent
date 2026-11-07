@@ -1,0 +1,197 @@
+/* 首页看板页面级样式：自选股面板、三栏 Command Center 布局与容器查询。 */
+
+/* ==========================================================================
+   Inline-style migration (P1): reusable layout primitives
+   ========================================================================== */
+.dashboard-page .dashboard-section-heading {
+  margin-bottom: var(--c-space-4);
+}
+
+.dashboard-hero__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.dashboard-hero__meta-sep {
+  font-size: var(--c-font-xs);
+  color: var(--c-text-muted);
+}
+
+.dashboard-hero__date {
+  font-size: var(--c-font-xs);
+  color: var(--c-text-secondary);
+  font-family: var(--c-font-mono);
+}
+
+.dashboard-hero__shortcut-icon {
+  color: var(--c-primary);
+}
+
+.dashboard-hero__shortcut-icon--warning {
+  color: var(--c-warning, #faad14);
+}
+
+.dashboard-mainline__tags {
+  display: inline-flex;
+  gap: var(--c-space-1);
+}
+
+.dashboard-mainline__plates {
+  display: grid;
+  gap: var(--c-space-2);
+}
+
+.dashboard-mainline__plates--spaced {
+  margin-top: var(--c-space-2);
+}
+
+.dashboard-mainline__plate-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--c-space-2);
+  flex-wrap: wrap;
+}
+
+.dashboard-stock-cell {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--c-space-2);
+}
+
+.dashboard-stock-cell__code {
+  color: var(--c-text-secondary);
+  font-size: var(--c-font-xs);
+}
+
+.dashboard-quick-actions {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.dashboard-link-btn {
+  padding: 0 2px;
+  font-size: 12px;
+}
+
+.dashboard-link-btn--wide {
+  padding: 0 4px;
+  font-size: 12px;
+}
+
+.dashboard-mainline-section-body {
+  display: grid;
+  gap: var(--c-space-3);
+}
+
+.dashboard-style-block {
+  display: grid;
+  gap: 2px;
+}
+
+.dashboard-style-grid {
+  display: grid;
+  gap: var(--c-space-2);
+  min-width: 0;
+}
+
+.dashboard-mainline-card--stacked .ant-card-body {
+  display: grid;
+  gap: var(--c-space-3);
+}
+
+.dashboard-mainline-card--chance {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.dashboard-mainline-card--chance .ant-card-body {
+  flex: 1;
+  min-height: 0;
+}
+
+.dashboard-text-sm {
+  font-size: var(--c-font-sm);
+}
+
+.dashboard-text-xs {
+  font-size: var(--c-font-xs);
+}
+
+.dashboard-origin-tag {
+  margin-inline-end: 0;
+  font-size: 11px;
+}
+
+/* ==========================================================================
+   Three-column Command Center (P2)
+   左：市场状态仪表 + 国家队 ｜ 中：风向 + 主线 + 龙头 ｜ 右：自选 + 热榜
+   ========================================================================== */
+
+.dashboard-layout {
+  grid-template-columns:
+    clamp(280px, 21vw, 340px)
+    minmax(0, 1fr)
+    clamp(300px, 24vw, 400px);
+  gap: var(--c-space-4);
+}
+
+.dashboard-rail-left {
+  position: sticky;
+  top: 74px;
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  max-height: calc(100vh - 90px);
+  gap: var(--c-space-3);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.dashboard-rail-left > section {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* 中等宽度：左栏内容上移为整行，内部两列并排，避免挤压中栏。
+   这里必须用容器查询而不是视口媒体查询：侧边栏占掉约 240px，视口 1100px 时
+   内容区只有 860px 左右。用视口宽度判断会得出“还有三栏空间”的错误结论，
+   而容器查询量与 .dashboard-page 的实际宽度对齐（与 base/dashboard.css 一致）。 */
+@container dashboard-page (max-width: 1200px) {
+  .dashboard-layout {
+    grid-template-columns: minmax(0, 1fr) clamp(300px, 26vw, 400px);
+  }
+
+  .dashboard-rail-left {
+    position: static;
+    grid-column: 1 / -1;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    max-height: none;
+    overflow-y: visible;
+  }
+}
+
+@container dashboard-page (max-width: 900px) {
+  .dashboard-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dashboard-rail-left {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* 媒体查询兜底：不支持 @container 的环境（旧 WebView、微信浏览器）
+   与 base/dashboard.css 的单列兜底保持一致。 */
+@media (max-width: 900px) {
+  .dashboard-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dashboard-rail-left {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

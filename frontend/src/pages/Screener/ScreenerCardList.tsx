@@ -4,17 +4,9 @@ import { PlusOutlined, RobotOutlined, LineChartOutlined, CheckOutlined, EyeOutli
 import { useNavigate } from "react-router-dom";
 import type { ScreenerItem, ScreenerResult } from "../../types/stock";
 import ChangeValue from "../../components/ChangeValue";
-import StockQuickPreviewModal from "../../components/StockQuickPreviewModal";
+import StockWorkspaceDrawer from "../../components/StockWorkspaceDrawer";
 import { buildStockProfileUrl } from "../../utils/stockLinks";
-import * as uiStyles from "../../styles/ui";
-
-const DEFAULT_COLORS = {
-  primary: "#1677ff",
-  textPrimary: "rgba(0, 0, 0, 0.88)",
-  textMuted: "rgba(0, 0, 0, 0.45)",
-  up: "#f5222d",
-  down: "#52c41a",
-};
+import "./screener-card-list.css";
 
 interface ScreenerCardListProps {
   data: ScreenerResult | undefined;
@@ -33,7 +25,6 @@ export const ScreenerCardList: React.FC<ScreenerCardListProps> = ({
   onPageChange,
   onAddWatchlist,
 }) => {
-  const c = typeof uiStyles.useColors === "function" ? uiStyles.useColors() : DEFAULT_COLORS;
   const navigate = useNavigate();
   const [addedCodes, setAddedCodes] = React.useState<Set<string>>(new Set());
   const [previewStock, setPreviewStock] = React.useState<{ code: string; name: string } | null>(null);
@@ -67,11 +58,11 @@ export const ScreenerCardList: React.FC<ScreenerCardListProps> = ({
   };
 
   if (!isLoading && items.length === 0) {
-    return <Empty description="无匹配股票，请调整筛选条件" style={{ margin: "32px 0" }} />;
+    return <Empty description="无匹配股票，请调整筛选条件" className="screener-card-list__empty" />;
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+    <div className="screener-card-list__container">
       {items.map((record) => {
         const isSelected = selectedCodes.includes(record.code);
         const isAdded = addedCodes.has(record.code);
@@ -80,76 +71,66 @@ export const ScreenerCardList: React.FC<ScreenerCardListProps> = ({
           <Card
             key={record.code}
             size="small"
-            style={{
-              borderRadius: 8,
-              border: isSelected ? `1px solid ${c.primary}` : "1px solid var(--c-border, #f0f0f0)",
-              background: isSelected ? "var(--c-fill-quaternary, rgba(22, 119, 255, 0.02))" : undefined,
-              boxShadow: "0 1px 3px rgba(0, 0, 0, 0.03)",
-            }}
+            className={`screener-card-list__card ${isSelected ? "screener-card-list__card--selected" : ""}`}
             styles={{ body: { padding: "var(--c-pad-inset, 7px 12px)" } }}
           >
             {/* 卡片头部：勾选、名称、代码、异动 */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div className="screener-card-list__header">
+              <div className="screener-card-list__title-row">
                 <Checkbox
                   checked={isSelected}
                   disabled={!isSelected && selectedCodes.length >= 10}
                   onChange={() => handleToggleSelect(record.code)}
                 />
                 <div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                  <div className="screener-card-list__stock-info">
                     <span
-                      style={{
-                        fontWeight: 600,
-                        fontSize: 15,
-                        color: c.textPrimary,
-                        cursor: "pointer",
-                      }}
+                      className="screener-card-list__stock-name"
                       onClick={() => navigate(buildStockProfileUrl(record.code))}
                     >
                       {record.name}
                     </span>
-                    <span style={{ fontSize: 12, color: c.textMuted, fontFamily: "var(--c-font-mono)" }}>
+                    <span className="screener-card-list__stock-code">
                       {record.code}
                     </span>
                     {record.board || record.exchange ? (
-                      <Tag style={{ margin: 0, fontSize: 10, lineHeight: "16px", padding: "0 4px" }}>
+                      <Tag className="screener-card-list__badge">
                         {record.board || record.exchange}
                       </Tag>
                     ) : null}
                     {record.composite_score != null && (
                       <Tag
                         color={record.composite_score >= 80 ? "gold" : record.composite_score >= 65 ? "blue" : undefined}
-                        style={{ fontSize: 10, lineHeight: "16px", padding: "0 4px", margin: 0, fontWeight: 600 }}
+                        className="screener-card-list__score-tag"
                       >
                         {record.composite_score.toFixed(0)}分
                       </Tag>
                     )}
                   </div>
                   {/* 异动标签 */}
-                  <div style={{ display: "flex", gap: 4, marginTop: 4, flexWrap: "wrap" }}>
+                  <div className="screener-card-list__tag-list">
                     {record.change_pct != null && record.change_pct >= 9.8 && (
-                      <Tag color="error" style={{ margin: 0, fontSize: 10, lineHeight: "14px", padding: "0 4px" }}>
+                      <Tag color="red" className="screener-card-list__signal-tag">
                         涨停
                       </Tag>
                     )}
                     {record.change_pct != null && record.change_pct <= -9.8 && (
-                      <Tag color="success" style={{ margin: 0, fontSize: 10, lineHeight: "14px", padding: "0 4px" }}>
+                      <Tag color="green" className="screener-card-list__signal-tag">
                         跌停
                       </Tag>
                     )}
                     {record.turnover_pct != null && record.turnover_pct >= 8 && (
-                      <Tag color="warning" style={{ margin: 0, fontSize: 10, lineHeight: "14px", padding: "0 4px" }}>
+                      <Tag color="warning" className="screener-card-list__signal-tag">
                         高换手
                       </Tag>
                     )}
                     {record.volume_ratio != null && record.volume_ratio >= 2.0 && (
-                      <Tag color="purple" style={{ margin: 0, fontSize: 10, lineHeight: "14px", padding: "0 4px" }}>
+                      <Tag color="purple" className="screener-card-list__signal-tag">
                         放量
                       </Tag>
                     )}
                     {record.is_broken_net && (
-                      <Tag color="cyan" style={{ margin: 0, fontSize: 10, lineHeight: "14px", padding: "0 4px" }}>
+                      <Tag color="cyan" className="screener-card-list__signal-tag">
                         破净
                       </Tag>
                     )}
@@ -158,40 +139,29 @@ export const ScreenerCardList: React.FC<ScreenerCardListProps> = ({
               </div>
 
               {/* 现价与涨跌幅 */}
-              <div style={{ textAlign: "right" }}>
-                <div style={{ fontSize: 16, fontWeight: 600, fontFamily: "var(--c-font-mono)", color: c.textPrimary }}>
+              <div className="screener-card-list__price-col">
+                <div className="screener-card-list__price">
                   {record.price?.toFixed(2) ?? "-"}
                 </div>
-                <div style={{ fontSize: 12 }}>
+                <div className="screener-card-list__change">
                   <ChangeValue value={record.change_pct} fontWeight={600} />
                 </div>
               </div>
             </div>
 
             {/* 卡片核心指标网格 */}
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(4, 1fr)",
-                gap: "6px 8px",
-                background: "var(--c-fill-quaternary, rgba(0, 0, 0, 0.02))",
-                padding: "6px 8px",
-                borderRadius: 6,
-                fontSize: 11,
-                marginBottom: 8,
-              }}
-            >
+            <div className="screener-card-list__metric-grid">
               <div>
-                <span style={{ color: c.textMuted }}>PE(TTM): </span>
-                <span style={{ fontFamily: "var(--c-font-mono)", color: c.textPrimary }}>{record.pe_ttm?.toFixed(1) ?? "-"}</span>
+                <span className="screener-card-list__metric-label">PE(TTM): </span>
+                <span className="screener-card-list__metric-value">{record.pe_ttm?.toFixed(1) ?? "-"}</span>
               </div>
               <div>
-                <span style={{ color: c.textMuted }}>PB: </span>
-                <span style={{ fontFamily: "var(--c-font-mono)", color: c.textPrimary }}>{record.pb?.toFixed(2) ?? "-"}</span>
+                <span className="screener-card-list__metric-label">PB: </span>
+                <span className="screener-card-list__metric-value">{record.pb?.toFixed(2) ?? "-"}</span>
               </div>
               <div>
-                <span style={{ color: c.textMuted }}>市值: </span>
-                <span style={{ fontFamily: "var(--c-font-mono)", color: c.textPrimary }}>
+                <span className="screener-card-list__metric-label">市值: </span>
+                <span className="screener-card-list__metric-value">
                   {record.market_cap == null
                     ? "-"
                     : record.market_cap >= 10000
@@ -200,20 +170,20 @@ export const ScreenerCardList: React.FC<ScreenerCardListProps> = ({
                 </span>
               </div>
               <div>
-                <span style={{ color: c.textMuted }}>换手: </span>
-                <span style={{ fontFamily: "var(--c-font-mono)", color: c.textPrimary }}>
+                <span className="screener-card-list__metric-label">换手: </span>
+                <span className="screener-card-list__metric-value">
                   {record.turnover_pct != null ? `${record.turnover_pct.toFixed(1)}%` : "-"}
                 </span>
               </div>
             </div>
 
             {/* 概念与操作按钮 */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 6 }}>
-              <div style={{ fontSize: 11, color: c.textMuted, display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
+            <div className="screener-card-list__footer">
+              <div className="screener-card-list__concepts">
                 <span>{record.second_industry?.name || record.first_industry?.name || "未知行业"}</span>
                 {record.concepts && record.concepts.length > 0 ? (
                   <Tooltip title={record.concepts.join(" · ")}>
-                    <Tag style={{ margin: 0, fontSize: 10, lineHeight: "16px", padding: "0 4px" }}>
+                    <Tag className="screener-card-list__concept-tag">
                       {record.concepts[0]}
                       {record.concepts.length > 1 ? ` +${record.concepts.length - 1}` : ""}
                     </Tag>
@@ -224,7 +194,7 @@ export const ScreenerCardList: React.FC<ScreenerCardListProps> = ({
               <Space size={6}>
                 <Button
                   size="small"
-                  icon={isAdded ? <CheckOutlined style={{ color: "#52c41a" }} /> : <PlusOutlined />}
+                  icon={isAdded ? <CheckOutlined className="screener-card-list__added-icon" /> : <PlusOutlined />}
                   disabled={isAdded}
                   onClick={() => void handleAddWatchlist(record)}
                 >
@@ -261,7 +231,7 @@ export const ScreenerCardList: React.FC<ScreenerCardListProps> = ({
 
       {/* 紧凑移动端分页 */}
       {data && data.total > 0 && (
-        <div style={{ display: "flex", justifyContent: "center", marginTop: 8 }}>
+        <div className="screener-card-list__pagination-wrap">
           <Pagination
             size="small"
             current={data.page || 1}
@@ -274,7 +244,7 @@ export const ScreenerCardList: React.FC<ScreenerCardListProps> = ({
       )}
 
       {previewStock ? (
-        <StockQuickPreviewModal
+        <StockWorkspaceDrawer
           open={Boolean(previewStock)}
           code={previewStock.code}
           name={previewStock.name}

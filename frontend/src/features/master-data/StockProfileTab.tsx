@@ -528,7 +528,7 @@ export default function StockProfileTab() {
                 suffix={`/ ${totalStocks}`}
                 loading={isSummaryLoading}
               />
-              <Progress percent={businessPercent} size="small" strokeColor="#52c41a" style={{ marginTop: 6 }} />
+              <Progress percent={businessPercent} size="small" strokeColor="#1890ff" style={{ marginTop: 6 }} />
             </Card>
           </Col>
           <Col xs={12} sm={12} md={6}>

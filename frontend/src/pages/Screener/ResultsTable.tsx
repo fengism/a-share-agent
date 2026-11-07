@@ -6,11 +6,11 @@ import type { ColumnsType, TableProps } from "antd/es/table";
 import ChangeValue from "../../components/ChangeValue";
 import ResponsiveMetricGrid from "../../components/ResponsiveMetricGrid";
 import PreloadLink from "../../components/PreloadLink";
-import StockQuickPreviewModal from "../../components/StockQuickPreviewModal";
+import StockWorkspaceDrawer from "../../components/StockWorkspaceDrawer";
 import { buildStockProfileUrl } from "../../utils/stockLinks";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import type { ScreenerFilter, ScreenerItem, ScreenerResult } from "../../types/stock";
-import { useColors } from "../../styles/ui";
+import "./results-table.css";
 
 interface Props {
   data: ScreenerResult | undefined;
@@ -74,15 +74,7 @@ function renderStockBadges(record: ScreenerItem) {
     badges.push(
       <span
         key="limit-up"
-        style={{
-          fontSize: 10,
-          lineHeight: "14px",
-          padding: "0 3px",
-          borderRadius: 2,
-          backgroundColor: "rgba(245, 34, 45, 0.15)",
-          color: "#f5222d",
-          fontWeight: 600,
-        }}
+        className="screener-results__badge screener-results__badge--limit-up"
       >
         涨停
       </span>,
@@ -91,15 +83,7 @@ function renderStockBadges(record: ScreenerItem) {
     badges.push(
       <span
         key="limit-down"
-        style={{
-          fontSize: 10,
-          lineHeight: "14px",
-          padding: "0 3px",
-          borderRadius: 2,
-          backgroundColor: "rgba(82, 196, 26, 0.15)",
-          color: "#52c41a",
-          fontWeight: 600,
-        }}
+        className="screener-results__badge screener-results__badge--limit-down"
       >
         跌停
       </span>,
@@ -110,15 +94,7 @@ function renderStockBadges(record: ScreenerItem) {
     badges.push(
       <span
         key="high-turnover"
-        style={{
-          fontSize: 10,
-          lineHeight: "14px",
-          padding: "0 3px",
-          borderRadius: 2,
-          backgroundColor: "rgba(250, 140, 22, 0.15)",
-          color: "#fa8c16",
-          fontWeight: 600,
-        }}
+        className="screener-results__badge screener-results__badge--high-turnover"
       >
         高换手
       </span>,
@@ -129,15 +105,7 @@ function renderStockBadges(record: ScreenerItem) {
     badges.push(
       <span
         key="high-vol-ratio"
-        style={{
-          fontSize: 10,
-          lineHeight: "14px",
-          padding: "0 3px",
-          borderRadius: 2,
-          backgroundColor: "rgba(114, 46, 209, 0.15)",
-          color: "#722ed1",
-          fontWeight: 600,
-        }}
+        className="screener-results__badge screener-results__badge--volume"
       >
         放量
       </span>,
@@ -145,7 +113,7 @@ function renderStockBadges(record: ScreenerItem) {
   }
 
   return badges.length > 0 ? (
-    <span style={{ display: "inline-flex", gap: 3, alignItems: "center" }}>
+    <span className="screener-results__badges-wrap">
       {badges}
     </span>
   ) : null;
@@ -169,7 +137,6 @@ export default function ResultsTable({
   strategyDataSources,
   strategyFallbackCodes,
 }: Props) {
-  const c = useColors();
   const navigate = useNavigate();
   const isNarrow = useMediaQuery("(max-width: 768px)");
   const [addedCodes, setAddedCodes] = useState<Set<string>>(new Set());
@@ -235,30 +202,23 @@ export default function ResultsTable({
           key: "stock",
           width: 140,
           render: (_: unknown, record: ScreenerItem) => (
-            <PreloadLink to={buildStockProfileUrl(record.code)} style={{ display: "block", color: c.primary }}>
-              <span style={{ display: "block", color: c.textPrimary, fontWeight: "var(--c-weight-semibold)" }}>{record.name}</span>
-              <span style={{ display: "flex", alignItems: "center", gap: 4, color: c.textMuted, fontSize: "var(--c-font-xs)", flexWrap: "wrap", marginTop: 2 }}>
+            <PreloadLink to={buildStockProfileUrl(record.code)} className="screener-results__stock-link">
+              <span className="screener-results__stock-name">{record.name}</span>
+              <span className="screener-results__stock-meta">
                 <span>{record.code}{record.board || record.exchange ? ` · ${record.board || record.exchange}` : ""}</span>
                 {renderStockBadges(record)}
                 {record.composite_score != null ? (
                   <Tag
                     color={record.composite_score >= 80 ? "gold" : record.composite_score >= 65 ? "blue" : undefined}
-                    style={{ fontSize: 10, lineHeight: "14px", padding: "0 3px", margin: 0, fontWeight: 600 }}
+                    className="screener-results__score-tag"
                   >
                     {record.composite_score.toFixed(0)}分
                   </Tag>
                 ) : null}
                 {record.is_broken_net ? (
                   <span
-                    style={{
-                      fontSize: "var(--c-font-xs, 11px)",
-                      lineHeight: "14px",
-                      padding: "0 3px",
-                      borderRadius: 2,
-                      backgroundColor: "rgba(24, 144, 255, 0.12)",
-                      color: "#1890ff",
-                      fontWeight: 600,
-                    }}
+                    className="screener-results__badge--broken-net"
+                    title="破净标的 (PB <= 1.0)"
                   >
                     破净
                   </span>
@@ -320,7 +280,7 @@ export default function ResultsTable({
       width: 90,
       fixed: "left",
       render: (code: string) => (
-        <PreloadLink className="financial-num" to={buildStockProfileUrl(code)} style={{ color: c.primary, fontWeight: "var(--c-weight-medium)" }}>{code}</PreloadLink>
+        <PreloadLink className="financial-num screener-results__code-link" to={buildStockProfileUrl(code)}>{code}</PreloadLink>
       ),
     },
     {
@@ -330,7 +290,7 @@ export default function ResultsTable({
       ellipsis: true,
       fixed: "left",
       render: (name: string, record: ScreenerItem) => (
-        <span style={{ display: "inline-flex", flexDirection: "column", gap: 2 }}>
+        <span className="screener-results__price-stack">
           <span>{name}</span>
           {renderStockBadges(record)}
         </span>
@@ -354,7 +314,7 @@ export default function ResultsTable({
         if (v == null) return "-";
         const color = v >= 80 ? "gold" : v >= 65 ? "blue" : undefined;
         return (
-          <Tag color={color} style={{ fontWeight: 600, minWidth: 42, textAlign: "center", margin: 0 }}>
+          <Tag color={color} className="screener-results__strategy-age-tag">
             {v.toFixed(1)}
           </Tag>
         );
@@ -395,18 +355,10 @@ export default function ResultsTable({
       sorter: true,
       sortOrder: filters.sort_by === "pb" ? serverSortOrder : null,
       render: (v: number | null, record: ScreenerItem) => (
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 3, justifyContent: "flex-end", width: "100%" }}>
+        <span className="screener-results__cell-with-tag">
           {record.is_broken_net && (
             <span
-              style={{
-                fontSize: "var(--c-font-xs, 11px)",
-                lineHeight: "14px",
-                padding: "0 3px",
-                borderRadius: 2,
-                backgroundColor: "rgba(24, 144, 255, 0.12)",
-                color: "#1890ff",
-                fontWeight: 600,
-              }}
+              className="screener-results__badge--broken-net"
               title="破净标的 (PB <= 1.0)"
             >
               破净
@@ -459,8 +411,7 @@ export default function ResultsTable({
         const isHighlight = v >= 1.8;
         return (
           <span
-            className="financial-num"
-            style={isHighlight ? { color: c.up, fontWeight: "var(--c-weight-semibold)" } : undefined}
+            className={`financial-num ${isHighlight ? "screener-results__volume-ratio--high" : ""}`}
           >
             {v.toFixed(2)}
           </span>
@@ -522,7 +473,7 @@ export default function ResultsTable({
           <Tooltip title={concepts.join(" · ")}>
             <span>
               {concepts.slice(0, 2).map((c) => (
-                <Tag key={c} style={{ marginRight: 4, marginBottom: 2 }}>{c}</Tag>
+                <Tag key={c} className="screener-results__concept-tag">{c}</Tag>
               ))}
               {concepts.length > 2 && <Tag>+{concepts.length - 2}</Tag>}
             </span>
@@ -604,8 +555,8 @@ export default function ResultsTable({
           render: (_: unknown, record: ScreenerItem) => {
             const p = percentileMap.get(record.code);
             if (p == null) return <Spin size="small" />;
-            const color = p <= 30 ? c.down : p <= 70 ? c.warning : c.up;
-            return <span style={{ color, fontWeight: "var(--c-weight-medium)" }}>{p.toFixed(0)}%</span>;
+            const pCls = p <= 30 ? "screener-results__percentile--low" : p <= 70 ? "screener-results__percentile--mid" : "screener-results__percentile--high";
+            return <span className={pCls}>{p.toFixed(0)}%</span>;
           },
         },
         {
@@ -616,8 +567,8 @@ export default function ResultsTable({
           render: (_: unknown, record: ScreenerItem) => {
             const p = percentileMap.get(record.code + "_pb");
             if (p == null) return <Spin size="small" />;
-            const color = p <= 30 ? c.down : p <= 70 ? c.warning : c.up;
-            return <span style={{ color, fontWeight: "var(--c-weight-medium)" }}>{p.toFixed(0)}%</span>;
+            const pCls = p <= 30 ? "screener-results__percentile--low" : p <= 70 ? "screener-results__percentile--mid" : "screener-results__percentile--high";
+            return <span className={pCls}>{p.toFixed(0)}%</span>;
           },
         },
       );
@@ -637,7 +588,7 @@ export default function ResultsTable({
                 type="text"
                 size="small"
                 aria-label={`加自选-${record.code}`}
-                icon={isAdded ? <CheckOutlined style={{ color: "#52c41a" }} /> : <PlusOutlined />}
+                icon={isAdded ? <CheckOutlined className="screener-results__added-icon" /> : <PlusOutlined />}
                 disabled={isAdded}
                 onClick={() => void handleAddWatchlist(record)}
               />
@@ -656,7 +607,7 @@ export default function ResultsTable({
                 type="text"
                 size="small"
                 aria-label={`AI体检-${record.code}`}
-                icon={<RobotOutlined style={{ color: c.primary }} />}
+                icon={<RobotOutlined className="screener-results__ai-icon" />}
                 onClick={() => handleAiDiagnose(record)}
               />
             </Tooltip>
@@ -700,7 +651,7 @@ export default function ResultsTable({
     }
 
     return nextColumns;
-  }, [addedCodes, c, columnPerspective, filters.sort_by, handleAddWatchlist, handleAiDiagnose, isNarrow, localSort, navigate, percentileMap, serverSortOrder, showPercentile, strategyAverageAmounts, strategyDataSources, strategyFallbackCodes, strategyReturnsSinceSignal, strategySignalAges, strategySignalDates]);
+  }, [addedCodes, columnPerspective, filters.sort_by, handleAddWatchlist, handleAiDiagnose, isNarrow, localSort, navigate, percentileMap, serverSortOrder, showPercentile, strategyAverageAmounts, strategyDataSources, strategyFallbackCodes, strategyReturnsSinceSignal, strategySignalAges, strategySignalDates]);
 
   const displayedItems = useMemo(() => {
     const items = data?.items ?? [];
@@ -721,7 +672,7 @@ export default function ResultsTable({
     const pePercentile = percentileMap.get(record.code);
     const pbPercentile = percentileMap.get(`${record.code}_pb`);
     return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div className="screener-results__expanded-wrap">
         <ResponsiveMetricGrid
           items={[
           ...(record.composite_score != null ? [{ key: "composite-score", label: "综合评分", value: `${record.composite_score.toFixed(1)} 分` }] : []),
@@ -794,10 +745,10 @@ export default function ResultsTable({
           ] : []),
         ]}
       />
-      <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap", borderTop: "1px dashed var(--c-border)", paddingTop: 8 }}>
+      <div className="screener-results__expanded-actions">
         <Button
           size="small"
-          icon={addedCodes.has(record.code) ? <CheckOutlined style={{ color: "#52c41a" }} /> : <PlusOutlined />}
+          icon={addedCodes.has(record.code) ? <CheckOutlined className="screener-results__added-icon" /> : <PlusOutlined />}
           disabled={addedCodes.has(record.code)}
           onClick={() => void handleAddWatchlist(record)}
         >
@@ -827,14 +778,14 @@ export default function ResultsTable({
   return (
     <div>
       {!isNarrow && (
-        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8, alignItems: "center", gap: 6 }}>
-          <span style={{ fontSize: 12, color: c.textMuted }}>指标视角:</span>
+        <div className="screener-results__perspective-bar">
+          <span className="screener-results__perspective-label">指标视角:</span>
           <Space size={4}>
             <Button
               size="small"
               type={columnPerspective === "all" ? "primary" : "text"}
               onClick={() => setColumnPerspective("all")}
-              style={{ fontSize: 12, padding: "0 8px" }}
+              className="screener-results__perspective-btn"
             >
               全部指标
             </Button>
@@ -842,7 +793,7 @@ export default function ResultsTable({
               size="small"
               type={columnPerspective === "valuation" ? "primary" : "text"}
               onClick={() => setColumnPerspective("valuation")}
-              style={{ fontSize: 12, padding: "0 8px" }}
+              className="screener-results__perspective-btn"
             >
               估值核心
             </Button>
@@ -850,7 +801,7 @@ export default function ResultsTable({
               size="small"
               type={columnPerspective === "momentum" ? "primary" : "text"}
               onClick={() => setColumnPerspective("momentum")}
-              style={{ fontSize: 12, padding: "0 8px" }}
+              className="screener-results__perspective-btn"
             >
               量价动量
             </Button>
@@ -892,7 +843,7 @@ export default function ResultsTable({
         scroll={isNarrow ? { x: 380 } : { x: "max-content" }}
       />
       {previewStock ? (
-        <StockQuickPreviewModal
+        <StockWorkspaceDrawer
           open={Boolean(previewStock)}
           code={previewStock.code}
           name={previewStock.name}

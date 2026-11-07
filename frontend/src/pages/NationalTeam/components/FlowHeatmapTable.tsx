@@ -2,7 +2,6 @@ import { useCallback, useMemo, useState } from "react";
 import { Button, Card, Col, message, Modal, Row, Segmented, Space, Statistic, Table, Tag, Tooltip, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { DownloadOutlined, FallOutlined, InfoCircleOutlined, RiseOutlined, TableOutlined } from "@ant-design/icons";
-import { useColors } from "../../../styles/ui";
 import { formatNumberWithSeparators } from "../../../utils/format";
 import type { NationalTeamDailyFlow } from "../../../types/stock";
 import { useMediaQuery } from "../../../hooks/useMediaQuery";
@@ -34,7 +33,6 @@ interface FlowHeatmapTableProps {
 }
 
 export default function FlowHeatmapTable({ dailyFlows, asOfDate }: FlowHeatmapTableProps) {
-  const colors = useColors();
   const isMobile = useMediaQuery("(max-width: 640px)");
   const [range, setRange] = useState<"20" | "30" | "all">("20");
   const [selectedDateFlow, setSelectedDateFlow] = useState<NationalTeamDailyFlow | null>(null);
@@ -85,7 +83,7 @@ export default function FlowHeatmapTable({ dailyFlows, asOfDate }: FlowHeatmapTa
   // 根据资金流正负与相对强度计算热力单元格底色与字色
   const getCellStyle = useCallback((val: number | null | undefined): React.CSSProperties => {
     if (val == null || val === 0) {
-      return { textAlign: "right", fontFamily: "var(--c-font-mono)", color: colors.textSecondary };
+      return { textAlign: "right", fontFamily: "var(--c-font-mono)", color: "var(--c-text-secondary)" };
     }
     const ratio = Math.min(1, Math.max(0.12, Math.abs(val) / maxAbsFlow));
     const isPos = val > 0;
@@ -93,7 +91,7 @@ export default function FlowHeatmapTable({ dailyFlows, asOfDate }: FlowHeatmapTa
     const bg = isPos
       ? `rgba(245, 34, 45, ${0.08 + ratio * 0.42})`
       : `rgba(82, 196, 26, ${0.08 + ratio * 0.42})`;
-    const color = isPos ? colors.up : colors.down;
+    const color = isPos ? "var(--c-up)" : "var(--c-down)";
 
     return {
       background: bg,
@@ -106,7 +104,7 @@ export default function FlowHeatmapTable({ dailyFlows, asOfDate }: FlowHeatmapTa
       transition: "background 0.2s ease",
       cursor: "pointer",
     };
-  }, [colors.down, colors.textSecondary, colors.up, maxAbsFlow]);
+  }, [maxAbsFlow]);
 
   const columns: ColumnsType<NationalTeamDailyFlow> = useMemo(() => {
     const cols: ColumnsType<NationalTeamDailyFlow> = [
@@ -121,7 +119,7 @@ export default function FlowHeatmapTable({ dailyFlows, asOfDate }: FlowHeatmapTa
           <Button
             type="link"
             size="small"
-            style={{ padding: 0, height: "auto", fontFamily: "var(--c-font-mono)", fontSize: 12, fontWeight: 600 }}
+            className="national-team-heatmap__date-btn"
             onClick={() => setSelectedDateFlow(row)}
             title="点击下钻查看当日资金与板块细分"
           >
@@ -132,8 +130,8 @@ export default function FlowHeatmapTable({ dailyFlows, asOfDate }: FlowHeatmapTa
       {
         title: (
           <Tooltip title="当日所纳入全部核心宽基 ETF 的估算净申购总额；点击可下钻分析">
-            <span style={{ cursor: "help" }}>
-              宽基合计 <InfoCircleOutlined style={{ fontSize: 10, color: colors.textSecondary }} />
+            <span className="national-team-heatmap__help-span">
+              宽基合计 <InfoCircleOutlined className="national-team-heatmap__info-icon" />
             </span>
           </Tooltip>
         ),
@@ -143,19 +141,13 @@ export default function FlowHeatmapTable({ dailyFlows, asOfDate }: FlowHeatmapTa
         fixed: isMobile ? undefined : "left",
         sorter: (a, b) => (a.total_flow_100m ?? 0) - (b.total_flow_100m ?? 0),
         render: (val: number | null, row) => {
-          if (val == null) return <span style={{ color: colors.textSecondary }}>-</span>;
+          if (val == null) return <span className="u-text-muted">-</span>;
           const isPos = val > 0;
           return (
             <Tooltip title={`${row.date} 全市场宽基估算净申购合计：${formatSignedFlow(val, "亿元")} (点击下钻)`}>
               <div
                 onClick={() => setSelectedDateFlow(row)}
-                style={{
-                  textAlign: "right",
-                  fontWeight: 700,
-                  color: isPos ? colors.up : val < 0 ? colors.down : colors.textPrimary,
-                  fontFamily: "var(--c-font-mono)",
-                  cursor: "pointer",
-                }}
+                className={`national-team-heatmap__total-val ${isPos ? "u-text-up" : val < 0 ? "u-text-down" : ""}`}
               >
                 {formatSignedFlow(val)}
               </div>
@@ -185,7 +177,7 @@ export default function FlowHeatmapTable({ dailyFlows, asOfDate }: FlowHeatmapTa
     }
 
     return cols;
-  }, [colors, getCellStyle, isMobile]);
+  }, [getCellStyle, isMobile]);
 
   return (
     <Card
@@ -193,18 +185,18 @@ export default function FlowHeatmapTable({ dailyFlows, asOfDate }: FlowHeatmapTa
       size="small"
       data-testid="national-team-flow-heatmap-table"
       title={
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+        <div className="national-team-heatmap__header-top">
           <Space size={8}>
-            <TableOutlined style={{ color: colors.primary }} />
-            <span style={{ fontWeight: 600, fontSize: 14 }}>宽基日度资金流向热力矩阵</span>
-            <Tag color="cyan" style={{ fontSize: 11 }}>金额单位：亿元</Tag>
+            <TableOutlined className="national-team-heatmap__title-icon" />
+            <span className="national-team-heatmap__title-text">宽基日度资金流向热力矩阵</span>
+            <Tag color="cyan" className="national-team-heatmap__unit-tag">金额单位：亿元</Tag>
           </Space>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <div className="national-team-heatmap__header-controls">
             {/* 颜色图例说明 */}
-            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: colors.textSecondary }}>
+            <div className="national-team-heatmap__legend">
               <span>流出</span>
-              <span style={{ width: 14, height: 10, borderRadius: 2, background: "rgba(82, 196, 26, 0.45)" }} />
-              <span style={{ width: 14, height: 10, borderRadius: 2, background: "rgba(245, 34, 45, 0.45)" }} />
+              <span className="national-team-heatmap__legend-box national-team-heatmap__legend-box--out" />
+              <span className="national-team-heatmap__legend-box national-team-heatmap__legend-box--in" />
               <span>流入</span>
             </div>
             <Segmented
@@ -240,7 +232,7 @@ export default function FlowHeatmapTable({ dailyFlows, asOfDate }: FlowHeatmapTa
         size="small"
         className="national-team-heatmap-grid"
       />
-      <div style={{ padding: "8px 14px", borderTop: `1px solid ${colors.border}`, display: "flex", justifyContent: "space-between", fontSize: 11, color: colors.textSecondary }}>
+      <div className="national-team-heatmap__footer">
         <span>口径说明：申赎金额估算值 = 当日份额变动 × 收盘价，非交易所逐笔真实结算现金；支持点击表头排序与点击日期下钻明细。</span>
         {asOfDate && <span>截至 {asOfDate}</span>}
       </div>
@@ -249,10 +241,10 @@ export default function FlowHeatmapTable({ dailyFlows, asOfDate }: FlowHeatmapTa
         <Modal
           title={
             <Space size={8} align="center">
-              <span style={{ fontSize: 16 }}>📅</span>
+              <span className="national-team-heatmap__modal-icon">📅</span>
               <span>{selectedDateFlow.date} 宽基资金流向下钻分析</span>
               {selectedDateFlow.benchmark_close != null && (
-                <Tag color="blue" style={{ fontSize: 11, margin: 0 }}>
+                <Tag color="blue" className="national-team-heatmap__modal-tag">
                   基准收盘：{selectedDateFlow.benchmark_close.toFixed(1)} 点
                 </Tag>
               )}
@@ -272,44 +264,46 @@ export default function FlowHeatmapTable({ dailyFlows, asOfDate }: FlowHeatmapTa
           ]}
           width={680}
         >
-          <div style={{ padding: "8px 0" }}>
+          <div className="national-team-heatmap__modal-body">
             {/* 核心数据汇总 */}
-            <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
+            <Row gutter={[12, 12]} className="national-team-heatmap__stat-row">
               <Col span={8}>
-                <Card size="small" style={{ background: "var(--c-bg-layout)", borderRadius: 6 }}>
+                <Card size="small" className="national-team-heatmap__stat-card">
                   <Statistic
                     title="当日宽基估算净申购"
                     value={selectedDateFlow.total_flow_100m != null ? `${selectedDateFlow.total_flow_100m > 0 ? "+" : ""}${selectedDateFlow.total_flow_100m.toFixed(2)} 亿元` : "-"}
-                    valueStyle={{
-                      color: (selectedDateFlow.total_flow_100m ?? 0) > 0 ? colors.up : (selectedDateFlow.total_flow_100m ?? 0) < 0 ? colors.down : colors.textPrimary,
-                      fontFamily: "var(--c-font-mono)",
-                      fontSize: 16,
-                      fontWeight: 700,
-                    }}
+                    className={`national-team-heatmap__stat ${
+                      (selectedDateFlow.total_flow_100m ?? 0) > 0
+                        ? "national-team-heatmap__stat--up"
+                        : (selectedDateFlow.total_flow_100m ?? 0) < 0
+                          ? "national-team-heatmap__stat--down"
+                          : ""
+                    }`}
                     prefix={(selectedDateFlow.total_flow_100m ?? 0) > 0 ? <RiseOutlined /> : (selectedDateFlow.total_flow_100m ?? 0) < 0 ? <FallOutlined /> : undefined}
                   />
                 </Card>
               </Col>
               <Col span={8}>
-                <Card size="small" style={{ background: "var(--c-bg-layout)", borderRadius: 6 }}>
+                <Card size="small" className="national-team-heatmap__stat-card">
                   <Statistic
                     title="样本 ETF 成交额"
                     value={selectedDateFlow.total_amount_100m != null ? `${selectedDateFlow.total_amount_100m.toFixed(1)} 亿元` : "-"}
-                    valueStyle={{ fontFamily: "var(--c-font-mono)", fontSize: 16, fontWeight: 700, color: colors.primary }}
+                    className="national-team-heatmap__stat national-team-heatmap__stat--primary"
                   />
                 </Card>
               </Col>
               <Col span={8}>
-                <Card size="small" style={{ background: "var(--c-bg-layout)", borderRadius: 6 }}>
+                <Card size="small" className="national-team-heatmap__stat-card">
                   <Statistic
                     title="区间累计净申购"
                     value={selectedDateFlow.cumulative_flow_100m != null ? `${selectedDateFlow.cumulative_flow_100m > 0 ? "+" : ""}${selectedDateFlow.cumulative_flow_100m.toFixed(1)} 亿元` : "-"}
-                    valueStyle={{
-                      color: (selectedDateFlow.cumulative_flow_100m ?? 0) > 0 ? colors.up : (selectedDateFlow.cumulative_flow_100m ?? 0) < 0 ? colors.down : colors.textPrimary,
-                      fontFamily: "var(--c-font-mono)",
-                      fontSize: 16,
-                      fontWeight: 700,
-                    }}
+                    className={`national-team-heatmap__stat ${
+                      (selectedDateFlow.cumulative_flow_100m ?? 0) > 0
+                        ? "national-team-heatmap__stat--up"
+                        : (selectedDateFlow.cumulative_flow_100m ?? 0) < 0
+                          ? "national-team-heatmap__stat--down"
+                          : ""
+                    }`}
                   />
                 </Card>
               </Col>
@@ -317,25 +311,33 @@ export default function FlowHeatmapTable({ dailyFlows, asOfDate }: FlowHeatmapTa
 
             {/* 板块资金拆解 */}
             {selectedDateFlow.flows_by_category && Object.keys(selectedDateFlow.flows_by_category).length > 0 && (
-              <div style={{ marginBottom: 16 }}>
-                <Text strong style={{ fontSize: 13, marginBottom: 8, display: "block" }}>战术板块资金拆解</Text>
+              <div className="national-team-heatmap__category-section">
+                <Text strong className="national-team-heatmap__section-title">战术板块资金拆解</Text>
                 <Row gutter={[8, 8]}>
                   {[
                     { key: "core_broad", label: "核心大盘", color: "blue" },
                     { key: "a500", label: "新质A500", color: "gold" },
                     { key: "growth", label: "中小成长", color: "cyan" },
-                    { key: "dividend", label: "红利防御", color: "red" },
+                    { key: "dividend", label: "红利防御", color: "purple" },
                   ].map((cat) => {
                     const val = selectedDateFlow.flows_by_category?.[cat.key];
                     const isPos = (val ?? 0) > 0;
                     const isNeg = (val ?? 0) < 0;
                     return (
                       <Col span={6} key={cat.key}>
-                        <div style={{ padding: "8px 10px", borderRadius: 6, border: "1px solid var(--c-border)", background: "var(--c-bg-card)" }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                            <Tag color={cat.color} style={{ margin: 0, fontSize: 10, padding: "0 4px" }}>{cat.label}</Tag>
+                        <div className="national-team-heatmap__cat-card">
+                          <div className="national-team-heatmap__cat-header">
+                            <Tag color={cat.color} className="national-team-heatmap__cat-tag">{cat.label}</Tag>
                           </div>
-                          <div style={{ fontFamily: "var(--c-font-mono)", fontWeight: 700, fontSize: 14, color: isPos ? colors.up : isNeg ? colors.down : colors.textPrimary }}>
+                          <div
+                            className={`national-team-heatmap__cat-val ${
+                              isPos
+                                ? "national-team-heatmap__cat-val--up"
+                                : isNeg
+                                  ? "national-team-heatmap__cat-val--down"
+                                  : "national-team-heatmap__cat-val--neutral"
+                            }`}
+                          >
                             {val != null ? formatSignedFlow(val, "亿") : "-"}
                           </div>
                         </div>
@@ -348,8 +350,8 @@ export default function FlowHeatmapTable({ dailyFlows, asOfDate }: FlowHeatmapTa
 
             {/* 宽基指数资金明细列表 */}
             <div>
-              <Text strong style={{ fontSize: 13, marginBottom: 8, display: "block" }}>各宽基资金净申赎明细（降序）</Text>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <Text strong className="national-team-heatmap__section-title">各宽基资金净申赎明细（降序）</Text>
+              <div className="national-team-heatmap__index-list">
                 {HEATMAP_INDICES.map((name) => ({
                   name,
                   val: selectedDateFlow.flows_by_index?.[name] ?? 0,
@@ -362,26 +364,20 @@ export default function FlowHeatmapTable({ dailyFlows, asOfDate }: FlowHeatmapTa
                     return (
                       <div
                         key={item.name}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          padding: "5px 10px",
-                          borderRadius: 4,
-                          background: idx % 2 === 0 ? "var(--c-bg-layout)" : "transparent",
-                          fontSize: 12,
-                        }}
+                        className={`national-team-heatmap__index-row ${idx % 2 === 0 ? "national-team-heatmap__index-row--alt" : ""}`}
                       >
                         <Space size={8}>
-                          <span style={{ fontFamily: "var(--c-font-mono)", color: colors.textSecondary, width: 16 }}>{idx + 1}</span>
-                          <span style={{ fontWeight: 600 }}>{item.name}</span>
+                          <span className="national-team-heatmap__index-idx">{idx + 1}</span>
+                          <span className="national-team-heatmap__index-name">{item.name}</span>
                         </Space>
                         <span
-                          style={{
-                            fontFamily: "var(--c-font-mono)",
-                            fontWeight: 700,
-                            color: isPos ? colors.up : isNeg ? colors.down : colors.textSecondary,
-                          }}
+                          className={`national-team-heatmap__index-val ${
+                            isPos
+                              ? "national-team-heatmap__index-val--up"
+                              : isNeg
+                                ? "national-team-heatmap__index-val--down"
+                                : "national-team-heatmap__index-val--neutral"
+                          }`}
                         >
                           {item.hasData ? formatSignedFlow(item.val, "亿元") : "暂无"}
                         </span>

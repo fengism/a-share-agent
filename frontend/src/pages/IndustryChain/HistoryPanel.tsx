@@ -1,7 +1,7 @@
 import { DeleteOutlined, LoadingOutlined } from "@ant-design/icons";
 import { Button, Card, Input, Popconfirm, Tooltip, Typography } from "antd";
 import SectionDataState from "../../components/SectionDataState";
-import { useColors, useStyles } from "../../styles/ui";
+import { useColors } from "../../styles/ui";
 import type { IndustryChainHistoryItem } from "../../types/stock";
 
 const { Text } = Typography;
@@ -44,7 +44,6 @@ export default function HistoryPanel({
   onRetry,
 }: HistoryPanelProps) {
   const colors = useColors();
-  const { cardStyle } = useStyles();
 
   const content = (
     <>
@@ -150,5 +149,5 @@ export default function HistoryPanel({
 
   if (embedded) return content;
 
-  return <Card title="历史产业链" style={cardStyle}>{content}</Card>;
+  return <Card title="历史产业链" className="u-card">{content}</Card>;
 }

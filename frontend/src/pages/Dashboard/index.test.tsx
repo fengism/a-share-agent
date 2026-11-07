@@ -237,7 +237,7 @@ describe("Dashboard", () => {
     resetMainlineQuery();
   });
 
-  it("keeps market wind and mainline in the middle while hot rank and watchlist stay right", () => {
+  it("lays out three command-center columns with workspace-specific content", () => {
     const { container } = render(
       <MemoryRouter>
         <Dashboard />
@@ -247,14 +247,27 @@ describe("Dashboard", () => {
     // 看板页占满宽度由 PageShell 的 width="full" 类提供（不再写内联样式）
     expect(container.querySelector(".dashboard-page")).toHaveClass("page-shell--full");
     const layout = container.querySelector(".dashboard-layout");
+    const leftRail = screen.getByRole("region", { name: "首页市场状态与国家队" });
     const middle = screen.getByRole("region", { name: "首页中间内容" });
     const rail = screen.getByRole("complementary", { name: "首页热榜与自选栏" });
-    expect(layout?.firstElementChild).toBe(middle);
-    expect(layout?.lastElementChild).toBe(rail);
-    expect(within(middle).getByRole("region", { name: "首页市场看板" })).toBeInTheDocument();
+
+    // 左→中→右 的顺序就是信息架构，改动合应在测试里体现
+    expect(layout?.children).toHaveLength(3);
+    expect(layout?.children[0]).toBe(leftRail);
+    expect(layout?.children[1]).toBe(middle);
+    expect(layout?.children[2]).toBe(rail);
+
+    // 左栏：市场状态仪表（看板含温度计与涨跌家数）+ 国家队监控
+    expect(within(leftRail).getByRole("region", { name: "首页市场看板" })).toBeInTheDocument();
+    expect(within(leftRail).getByRole("region", { name: "国家队托底信号" })).toBeInTheDocument();
+
+    // 中栏：可操作信息（风向 + 主线 + 龙头股）
     expect(within(middle).getByRole("region", { name: "市场风向" })).toBeInTheDocument();
     expect(within(middle).getByRole("region", { name: "今日主线" })).toBeInTheDocument();
     expect(within(middle).getByText("政策与业绩共振")).toBeInTheDocument();
+    expect(within(middle).queryByRole("region", { name: "首页市场看板" })).not.toBeInTheDocument();
+
+    // 右栏：个人关注（热榜 + 自选）
     expect(within(rail).queryByRole("region", { name: "市场风向" })).not.toBeInTheDocument();
     const hotRank = within(rail).getByRole("region", { name: "热榜" });
     const watchlist = within(rail).getByTestId("watchlist-panel");

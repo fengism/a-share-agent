@@ -2,7 +2,7 @@ import { BarChartOutlined } from "@ant-design/icons";
 import { Card, Skeleton } from "antd";
 import type { HKStockQuote } from "../../api/queryHooks/hk";
 import type { StockBasicInfo } from "../../types/stock";
-import { useColors, useStyles } from "../../styles/ui";
+import { useColors } from "../../styles/ui";
 import { formatNumberWithSeparators } from "../../utils/format";
 import StockSectionTitle from "./StockSectionTitle";
 
@@ -58,7 +58,6 @@ function formatRatio(value: number | null, suffix = "") {
 
 export default function StockMetrics({ info, market = "cn", hkQuote }: StockMetricsProps) {
   const colors = useColors();
-  const { cardStyle } = useStyles();
   const isHK = market === "hk";
 
   const getPriceColor = (price: number | null | undefined, preClose: number | null | undefined) => {
@@ -76,9 +75,8 @@ export default function StockMetrics({ info, market = "cn", hkQuote }: StockMetr
 
     return (
       <Card
-        className="stock-section-card stock-metrics-card"
+        className="stock-section-card stock-metrics-card u-card"
         title={<StockSectionTitle icon={<BarChartOutlined />} title="关键行情指标" description="港股主板盘口与成交明细" />}
-        style={cardStyle}
         styles={{ body: { padding: 0 } }}
       >
         <dl className="stock-metrics-grid" aria-busy={hkQuote ? undefined : true}>
@@ -161,9 +159,8 @@ export default function StockMetrics({ info, market = "cn", hkQuote }: StockMetr
 
   return (
     <Card
-      className="stock-section-card stock-metrics-card"
+      className="stock-section-card stock-metrics-card u-card"
       title={<StockSectionTitle icon={<BarChartOutlined />} title="关键指标" description="规模、估值与交易活跃度" />}
-      style={cardStyle}
       styles={{ body: { padding: 0 } }}
     >
       <dl className="stock-metrics-grid" aria-busy={info ? undefined : true}>

@@ -1,0 +1,164 @@
+/* 产业链 Atlas 交互、K线/分时图响应式
+   自原 base.css 第 2478–2637 行拆出。
+   本目录内文件由 index.css 按固定顺序 @import，顺序不可调整：
+   同特异性规则靠源序决出胜负，重排会改变层叠结果。 */
+/* ── 产业链知识库（Atlas）交互态 ── */
+.atlas-chain-card {
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.atlas-chain-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--c-primary-2);
+  box-shadow: var(--c-shadow-md, 0 4px 12px rgba(0, 0, 0, 0.18));
+}
+.atlas-category-chip:hover {
+  color: var(--c-primary);
+  border-color: var(--c-primary-2);
+}
+.atlas-company-chip:hover {
+  border-color: var(--c-primary);
+  background: var(--c-hover-bg);
+}
+
+.chat-reasoning-block + .chat-reasoning-block {
+  margin-top: 12px;
+}
+
+/* ── K线图与分时图移动端响应式与成交量说明优化 ── */
+@media (max-width: 768px) {
+  /* 分时图与K线图顶部 HUD 紧凑排版 */
+  .kline-chart__hud,
+  .intraday-chart__hud {
+    font-size: 10px !important;
+    padding: 3px 6px !important;
+    column-gap: 6px !important;
+    row-gap: 3px !important;
+  }
+
+  .kline-chart__hud-btn {
+    font-size: 10px !important;
+    padding: 1px 4px !important;
+  }
+
+  .intraday-chart__hud-legend {
+    font-size: 10px !important;
+    gap: 5px !important;
+  }
+
+  /* 股价与成交量/副图区分栏移动端紧凑化 */
+  .kline-chart__separator-bar,
+  .intraday-chart__separator-bar {
+    padding: 0 4px !important;
+  }
+
+  /* 分时图成交量说明 */
+  .intraday-chart__volume-info {
+    gap: 6px !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    scrollbar-width: none !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+  .intraday-chart__volume-info::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .intraday-chart__volume-title {
+    font-size: 10px !important;
+    letter-spacing: normal !important;
+  }
+
+  .intraday-chart__volume-stat {
+    font-size: 10px !important;
+  }
+
+  /* K线图副图指标说明 (VOL / MACD / KDJ / RSI) */
+  .kline-chart__subindicator-info {
+    gap: 5px !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    scrollbar-width: none !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+  .kline-chart__subindicator-info::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .kline-chart__subindicator-tab-btn {
+    font-size: 9px !important;
+    padding: 0 3px !important;
+    height: 15px !important;
+    line-height: 13px !important;
+  }
+
+  .kline-chart__subindicator-stats {
+    gap: 5px !important;
+  }
+
+  .kline-chart__vol-stat {
+    font-size: 10px !important;
+  }
+
+  .kline-chart__separator-unit,
+  .intraday-chart__separator-unit {
+    font-size: 9px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .kline-chart__hud,
+  .intraday-chart__hud {
+    font-size: 9.5px !important;
+    padding: 2px 4px !important;
+    column-gap: 4px !important;
+  }
+
+  .intraday-chart__hud-legend {
+    font-size: 9.5px !important;
+    gap: 4px !important;
+  }
+
+  .intraday-chart__volume-info {
+    gap: 4px !important;
+  }
+
+  .intraday-chart__volume-title {
+    font-size: 9.5px !important;
+  }
+
+  .intraday-chart__volume-stat {
+    font-size: 9.5px !important;
+  }
+
+  .kline-chart__subindicator-info {
+    gap: 4px !important;
+  }
+
+  .kline-chart__subindicator-tabs {
+    gap: 1px !important;
+  }
+
+  .kline-chart__subindicator-tab-btn {
+    font-size: 8.5px !important;
+    padding: 0 2px !important;
+  }
+
+  .kline-chart__subindicator-stats {
+    gap: 4px !important;
+  }
+
+  .kline-chart__vol-stat {
+    font-size: 9.5px !important;
+  }
+
+  /* 超窄屏下隐藏非核心的单位/参数文字与缩小拖拽条，腾出空间防止指标说明挤压 */
+  .kline-chart__separator-unit,
+  .intraday-chart__separator-unit {
+    display: none !important;
+  }
+
+  .kline-chart__separator-drag > div:first-child,
+  .intraday-chart__separator-drag > div:first-child {
+    width: 14px !important;
+  }
+}

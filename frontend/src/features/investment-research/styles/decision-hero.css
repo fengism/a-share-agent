@@ -1,0 +1,151 @@
+/* decision-hero —— 自 research-framework.css 第 466–614 行拆出。
+   由同目录 index.css 按固定顺序 @import，顺序不可调整：同特异性规则靠源序决胜负。 */
+.research-decision-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 14px 16px;
+  border: 1px solid var(--c-border);
+  border-left: 3px solid var(--c-primary);
+  border-radius: var(--c-radius-sm);
+  background: var(--c-hover-bg);
+}
+
+.research-decision-hero__body {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.research-decision-hero__label {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--c-text-muted);
+  font-size: var(--stock-research-label-size, 11px);
+  font-weight: var(--c-weight-bold);
+  line-height: var(--c-leading-normal);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.research-decision-hero__text {
+  margin: 0;
+  color: var(--c-text-primary);
+  font-size: var(--stock-research-body-size, 14px);
+  font-weight: var(--c-weight-medium);
+  line-height: var(--c-leading-relaxed, 1.6);
+  overflow-wrap: anywhere;
+}
+
+.research-decision-hero__range {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  padding: 8px 14px;
+  border: 1px solid var(--c-primary);
+  border-radius: var(--c-radius-sm);
+  background: var(--c-hover-bg);
+}
+
+.research-decision-hero__range span {
+  color: var(--c-text-secondary);
+  font-size: var(--stock-research-label-size, 11px);
+  font-weight: var(--c-weight-medium);
+}
+
+.research-decision-hero__range strong {
+  color: var(--c-primary);
+  font-size: var(--c-font-base, 14px);
+  font-weight: var(--c-weight-bold);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--c-leading-tight);
+}
+
+.research-action-column {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius-sm);
+  background: var(--c-hover-bg);
+  overflow-wrap: anywhere;
+}
+
+.research-action-column__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--c-border);
+}
+
+.research-action-column__title {
+  color: var(--c-text-primary);
+  font-size: var(--stock-research-subhead-size, 13px);
+  font-weight: var(--c-weight-bold);
+  line-height: var(--c-leading-normal);
+}
+
+.research-action-column__triggers {
+  min-width: 0;
+}
+
+.research-action-column__triggers h5 {
+  margin: 0 0 6px;
+  color: var(--c-text-secondary);
+  font-size: var(--stock-research-label-size, 11px);
+  font-weight: var(--c-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.research-decision-tracking {
+  margin-top: 2px;
+}
+
+.research-decision-tracking-card {
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius-sm);
+  background: var(--c-hover-bg);
+  overflow-wrap: anywhere;
+}
+
+.research-decision-tracking-card--breakers {
+  border-left: 3px solid var(--c-warning);
+}
+
+.research-decision-tracking-card--metrics {
+  border-left: 3px solid var(--c-primary);
+}
+
+.research-decision-tracking-card h5 {
+  margin: 0 0 8px;
+  color: var(--c-text-primary);
+  font-size: var(--stock-research-subhead-size, 13px);
+  font-weight: var(--c-weight-semibold);
+  line-height: var(--c-leading-normal);
+}
+
+.research-legacy-state {
+  display: grid;
+  place-items: center;
+  min-height: 280px;
+  gap: 8px;
+  text-align: center;
+}
+.research-framework > .ant-alert {
+  margin: 0;
+}
+.research-section-pair {
+  gap: 12px;
+}
+.research-section-pair > .research-section {
+  padding: 18px 20px;
+}
+

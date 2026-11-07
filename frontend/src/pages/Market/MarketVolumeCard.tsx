@@ -456,7 +456,7 @@ export default function MarketVolumeCard({
           </Row>
         )}
 
-        <div className="market-volume__chart" style={{ width: "100%", height: 340 }}>
+        <div className="market-volume__chart">
           <ReactECharts
             echarts={echarts}
             option={chartOption}

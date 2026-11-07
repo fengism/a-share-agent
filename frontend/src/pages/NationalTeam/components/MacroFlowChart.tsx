@@ -49,7 +49,7 @@ export default function MacroFlowChart({
     { key: "core_broad", name: "核心大盘", color: "#1677ff" },
     { key: "a500", name: "新质A500", color: "#faad14" },
     { key: "growth", name: "中小成长", color: "#13c2c2" },
-    { key: "dividend", name: "红利防御", color: "#f5222d" },
+    { key: "dividend", name: "红利防御", color: "#722ed1" },
   ];
 
   const commonDataZoom = [
@@ -442,7 +442,7 @@ export default function MacroFlowChart({
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <span style={{ fontWeight: 600, fontSize: 14 }}>全市场宽基每日净申赎走势</span>
-            <Tag color={mode === "turnover" ? "blue" : mode === "stacked" ? "purple" : "red"} style={{ fontSize: 10, lineHeight: "18px", padding: "0 6px" }}>
+            <Tag color={mode === "turnover" ? "blue" : mode === "stacked" ? "purple" : "blue"} style={{ fontSize: 10, lineHeight: "18px", padding: "0 6px" }}>
               {mode === "turnover" ? "二级市场成交口径" : "申赎估算口径（Δ份额×价格）"}
             </Tag>
             <Text type="secondary" style={{ fontSize: 11 }}>

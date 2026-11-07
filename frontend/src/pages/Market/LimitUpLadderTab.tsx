@@ -17,6 +17,7 @@ import { formatAmount } from "../../utils/format";
 import { formatMarketDateTime } from "../../utils/marketTime";
 import { useColors, useTokens, semanticTagStyle } from "../../styles/ui";
 import LimitHistoryPanel from "./LimitHistoryPanel";
+import "./limit-up-ladder.css";
 
 const { Text } = Typography;
 
@@ -25,24 +26,10 @@ function formatFetchedAt(value: string | undefined) {
   return formatMarketDateTime(value, value);
 }
 
-function getLadderTagStyle(boardCount: number, colors: ReturnType<typeof useColors>) {
-  if (boardCount >= 5) {
-    return {
-      background: "linear-gradient(135deg, rgba(200, 52, 31, 0.15), rgba(247, 144, 9, 0.15))",
-      color: colors.up,
-      borderColor: colors.up,
-      fontWeight: 700,
-    };
-  }
-  if (boardCount >= 3) {
-    return {
-      background: "rgba(200, 52, 31, 0.1)",
-      color: colors.up,
-      borderColor: colors.up,
-      fontWeight: 600,
-    };
-  }
-  return semanticTagStyle("up");
+function getLadderTagClass(boardCount: number) {
+  if (boardCount >= 5) return "ladder-tag--5plus";
+  if (boardCount >= 3) return "ladder-tag--3plus";
+  return "";
 }
 
 function LimitUpLadderContent() {
@@ -100,13 +87,13 @@ function LimitUpLadderContent() {
           key: "stock",
           width: 140,
           render: (_value: unknown, stock: MarketLimitUpLadderStock) => (
-            <StockExternalLink code={stock.code} name={stock.name} style={{ display: "inline-flex" }}>
+            <StockExternalLink code={stock.code} name={stock.name} className="ladder-stock-link">
               <Space orientation="vertical" size={0}>
-                <Text strong style={{ fontSize: t.font.md }}>{stock.name}</Text>
+                <Text strong className="ladder-stock-name">{stock.name}</Text>
                 <Space size={4} wrap>
-                  <Text type="secondary" style={{ fontSize: t.font.xs, fontFamily: "var(--c-font-mono)" }}>{stock.code}</Text>
+                  <Text type="secondary" className="ladder-stock-code">{stock.code}</Text>
                   {stock.sector_name && (
-                    <Text type="secondary" style={{ fontSize: t.font.xs }}>· {stock.sector_name}</Text>
+                    <Text type="secondary" className="ladder-stock-sector">· {stock.sector_name}</Text>
                   )}
                 </Space>
               </Space>
@@ -120,18 +107,21 @@ function LimitUpLadderContent() {
           align: "center",
           defaultSortOrder: "descend",
           sorter: (left, right) => left.board_count - right.board_count,
-          render: (value: number) => (
-            <Tag style={getLadderTagStyle(value, colors)}>
-              {value}连板
-            </Tag>
-          ),
+          render: (value: number) => {
+            const tagClass = getLadderTagClass(value);
+            return (
+              <Tag style={tagClass ? undefined : semanticTagStyle("up")} className={tagClass || undefined}>
+                {value}连板
+              </Tag>
+            );
+          },
         },
         {
           title: "涨停时间",
           dataIndex: "limit_up_time",
           width: 86,
           align: "center",
-          render: (value: string) => <span style={{ fontFamily: "var(--c-font-mono)", fontSize: t.font.xs }}>{value || "-"}</span>,
+          render: (value: string) => <span className="ladder-time-text">{value || "-"}</span>,
         },
       ];
     }
@@ -143,10 +133,10 @@ function LimitUpLadderContent() {
         width: 150,
         fixed: "left",
         render: (_value: unknown, stock: MarketLimitUpLadderStock) => (
-          <StockExternalLink code={stock.code} name={stock.name} style={{ display: "inline-flex" }}>
+          <StockExternalLink code={stock.code} name={stock.name} className="ladder-stock-link">
             <Space orientation="vertical" size={0}>
-              <Text strong style={{ fontSize: t.font.md }}>{stock.name}</Text>
-              <Text type="secondary" style={{ fontSize: t.font.xs, fontFamily: "var(--c-font-mono)" }}>{stock.code}</Text>
+              <Text strong className="ladder-stock-name">{stock.name}</Text>
+              <Text type="secondary" className="ladder-stock-code">{stock.code}</Text>
             </Space>
           </StockExternalLink>
         ),
@@ -158,18 +148,21 @@ function LimitUpLadderContent() {
         align: "center",
         defaultSortOrder: "descend",
         sorter: (left, right) => left.board_count - right.board_count,
-        render: (value: number) => (
-          <Tag style={getLadderTagStyle(value, colors)}>
-            {value}连板
-          </Tag>
-        ),
+        render: (value: number) => {
+          const tagClass = getLadderTagClass(value);
+          return (
+            <Tag style={tagClass ? undefined : semanticTagStyle("up")} className={tagClass || undefined}>
+              {value}连板
+            </Tag>
+          );
+        },
       },
       {
         title: "涨停时间",
         dataIndex: "limit_up_time",
         width: 100,
         align: "center",
-        render: (value: string) => <span style={{ fontFamily: "var(--c-font-mono)" }}>{value || "-"}</span>,
+        render: (value: string) => <span className="ladder-mono">{value || "-"}</span>,
       },
       {
         title: "所属板块",
@@ -178,9 +171,9 @@ function LimitUpLadderContent() {
         ellipsis: true,
         render: (value: string, stock) => (
           <Space size={6}>
-            <span style={{ fontWeight: Number(t.weight.medium) }}>{value || "其他"}</span>
+            <span className="ladder-font-medium">{value || "其他"}</span>
             {stock.sector_limit_up_count > 0 ? (
-              <Tag style={{ borderRadius: 10, padding: "0 6px", fontSize: t.font.xs }}>
+              <Tag className="ladder-count-tag">
                 {stock.sector_limit_up_count}只
               </Tag>
             ) : null}
@@ -195,7 +188,7 @@ function LimitUpLadderContent() {
           <Space size={[4, 4]} wrap>
             {stock.one_word ? <Tag style={semanticTagStyle("warning")}>大单一字</Tag> : null}
             {stock.popular ? <Tag style={semanticTagStyle("primary")}>人气股</Tag> : null}
-            {!stock.one_word && !stock.popular ? <span style={{ color: colors.textMuted }}>-</span> : null}
+            {!stock.one_word && !stock.popular ? <span className="ladder-muted-dash">-</span> : null}
           </Space>
         ),
       },
@@ -205,13 +198,13 @@ function LimitUpLadderContent() {
         width: 110,
         align: "right",
         render: (value: number) => (
-          <span style={{ fontFamily: "var(--c-font-mono)", fontWeight: Number(t.weight.medium) }}>
+          <span className="ladder-amount-text">
             {formatAmount(value)}
           </span>
         ),
       },
     ];
-  }, [colors, isMobile, t]);
+  }, [isMobile]);
 
   return (
     <SectionDataState
@@ -225,13 +218,13 @@ function LimitUpLadderContent() {
       skeletonRows={10}
     >
       <div>
-        <div style={{ marginBottom: t.space[4] }}>
+        <div className="u-mb-16">
           <SectionToolbar
             ariaLabel="涨停板工具条"
             meta={
               <Space size={parseFloat(t.space[3])} wrap>
-                <span style={{ fontWeight: Number(t.weight.semibold), color: colors.textPrimary, display: "inline-flex", alignItems: "center", gap: 6 }}>
-                  <FireOutlined style={{ color: colors.up }} /> 涨停板
+                <span className="ladder-toolbar-title">
+                  <FireOutlined className="ladder-fire-icon" /> 涨停板
                 </span>
                 <Text type="secondary">数据日期：{query.data?.date || dateText}</Text>
                 <Text type="secondary">更新时间：{formatFetchedAt(query.data?.fetched_at)}</Text>
@@ -255,11 +248,11 @@ function LimitUpLadderContent() {
           />
         </div>
 
-        <Row gutter={[16, 16]} style={{ marginBottom: t.space[4] }}>
+        <Row gutter={[16, 16]} className="u-mb-16">
           <Col xs={12} lg={6}>
-            <Card size="small" style={{ height: "100%", borderRadius: t.radius.md, boxShadow: t.shadow.xs, borderLeft: `3px solid ${colors.up}` }}>
+            <Card size="small" className="ladder-stat-card ladder-stat-card--up">
               <Statistic
-                title={<span style={{ fontSize: t.font.sm, color: colors.textSecondary }}><FireOutlined /> 涨停家数</span>}
+                title={<span className="ladder-stat-title"><FireOutlined /> 涨停家数</span>}
                 value={query.data?.total ?? stocks.length}
                 suffix="家"
                 styles={{ content: { color: colors.up, fontWeight: Number(t.weight.bold) } }}
@@ -267,9 +260,9 @@ function LimitUpLadderContent() {
             </Card>
           </Col>
           <Col xs={12} lg={6}>
-            <Card size="small" style={{ height: "100%", borderRadius: t.radius.md, boxShadow: t.shadow.xs, borderLeft: `3px solid ${colors.accent}` }}>
+            <Card size="small" className="ladder-stat-card ladder-stat-card--accent">
               <Statistic
-                title={<span style={{ fontSize: t.font.sm, color: colors.textSecondary }}><TrophyOutlined /> 最高连板</span>}
+                title={<span className="ladder-stat-title"><TrophyOutlined /> 最高连板</span>}
                 value={maxBoardCount}
                 suffix="板"
                 styles={{ content: { color: colors.up, fontWeight: Number(t.weight.bold) } }}
@@ -277,9 +270,9 @@ function LimitUpLadderContent() {
             </Card>
           </Col>
           <Col xs={12} lg={6}>
-            <Card size="small" style={{ height: "100%", borderRadius: t.radius.md, boxShadow: t.shadow.xs }}>
+            <Card size="small" className="ladder-stat-card">
               <Statistic
-                title={<span style={{ fontSize: t.font.sm, color: colors.textSecondary }}><ThunderboltOutlined /> 大单一字</span>}
+                title={<span className="ladder-stat-title"><ThunderboltOutlined /> 大单一字</span>}
                 value={oneWordCount}
                 suffix="家"
                 styles={{ content: { color: colors.warning, fontWeight: Number(t.weight.bold) } }}
@@ -287,9 +280,9 @@ function LimitUpLadderContent() {
             </Card>
           </Col>
           <Col xs={12} lg={6}>
-            <Card size="small" style={{ height: "100%", borderRadius: t.radius.md, boxShadow: t.shadow.xs }}>
+            <Card size="small" className="ladder-stat-card">
               <Statistic
-                title={<span style={{ fontSize: t.font.sm, color: colors.textSecondary }}>人气股</span>}
+                title={<span className="ladder-stat-title">人气股</span>}
                 value={popularCount}
                 suffix="家"
                 styles={{ content: { color: colors.primary, fontWeight: Number(t.weight.bold) } }}
@@ -299,32 +292,25 @@ function LimitUpLadderContent() {
         </Row>
 
         <Card
-          title={<span style={{ fontWeight: Number(t.weight.semibold) }}>板块涨停分布</span>}
-          style={{ marginBottom: t.space[4], borderRadius: t.radius.md, boxShadow: t.shadow.xs }}
+          title={<span className="ladder-card-title">板块涨停分布</span>}
+          className="ladder-block-card u-mb-16"
         >
           <Row gutter={[12, 12]}>
             {sectors.map((sector, index) => (
               <Col xs={12} md={8} xl={6} key={`${sector.sector_code}-${sector.sector_name}`}>
                 <Card
                   size="small"
-                  style={{
-                    height: "100%",
-                    borderRadius: t.radius.md,
-                    background: colors.nestedBg,
-                    border: `1px solid ${colors.border}`,
-                    boxShadow: t.shadow.xs,
-                    transition: "all 0.2s ease",
-                  }}
+                  className="ladder-sector-card"
                 >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
-                    <Text strong style={{ fontSize: t.font.md }}>{sector.sector_name}</Text>
-                    <Tag style={{ borderRadius: 10, margin: 0, padding: "0 6px", fontSize: t.font.xs }}>
+                  <div className="ladder-sector-header">
+                    <Text strong className="ladder-sector-name">{sector.sector_name}</Text>
+                    <Tag className="ladder-top-tag">
                       TOP {index + 1}
                     </Tag>
                   </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <Text style={{ color: colors.up, fontWeight: Number(t.weight.bold) }}>{sector.stock_count} 家涨停</Text>
-                    <Text type="secondary" style={{ fontSize: t.font.xs }}>{formatAmount(sector.amount)}</Text>
+                  <div className="ladder-sector-footer">
+                    <Text className="ladder-sector-count">{sector.stock_count} 家涨停</Text>
+                    <Text type="secondary" className="ladder-sector-amount">{formatAmount(sector.amount)}</Text>
                   </div>
                 </Card>
               </Col>
@@ -333,8 +319,8 @@ function LimitUpLadderContent() {
         </Card>
 
         <Card
-          title={<span style={{ fontWeight: Number(t.weight.semibold) }}>涨停天梯</span>}
-          style={{ borderRadius: t.radius.md, boxShadow: t.shadow.xs }}
+          title={<span className="ladder-card-title">涨停天梯</span>}
+          className="ladder-block-card"
         >
           <Table<MarketLimitUpLadderStock>
             rowKey="code"
@@ -357,7 +343,6 @@ function LimitUpLadderContent() {
 const LIMIT_UP_MODES = ["ladder", "history"] as const;
 
 export default function LimitUpLadderTab() {
-  const t = useTokens();
   const [mode, setMode] = useUrlSearchParam("mode", "ladder", {
     allowedValues: LIMIT_UP_MODES,
     replace: true,
@@ -373,7 +358,7 @@ export default function LimitUpLadderTab() {
           { value: "ladder", label: "涨停天梯" },
           { value: "history", label: "历史复盘" },
         ]}
-        style={{ marginBottom: t.space[4] }}
+        className="u-mb-16"
       />
       {mode === "history" ? <LimitHistoryPanel /> : <LimitUpLadderContent />}
     </div>

@@ -1,0 +1,26 @@
+/* 通用工具类补充（u- 前缀）。
+   新类放在独立分片，避免 utilities.css 逼近单文件行数上限。 */
+
+.u-font-sans {
+  font-family: var(--c-font-sans);
+}
+
+.u-nowrap {
+  white-space: nowrap;
+}
+
+.u-mt-4 {
+  margin-top: 4px;
+}
+
+.u-mt-8 {
+  margin-top: 8px;
+}
+
+.u-mb-4 {
+  margin-bottom: 4px;
+}
+
+.u-mr-6 {
+  margin-right: 6px;
+}

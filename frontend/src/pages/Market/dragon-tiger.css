@@ -1,0 +1,151 @@
+/* 龙虎榜监控与席位明细 (Dragon Tiger Content & Seats Detail) */
+
+.dragon-tiger-tag.ant-tag {
+  margin-right: 6px;
+  font-size: var(--c-font-xs);
+}
+
+.dragon-tiger-branch-name {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+}
+
+.dragon-tiger-num--up {
+  color: var(--c-up);
+  font-weight: 600;
+}
+
+.dragon-tiger-num--down {
+  color: var(--c-down);
+  font-weight: 600;
+}
+
+.dragon-tiger-modal-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-right: 32px;
+}
+
+.dragon-tiger-modal-icon {
+  transform: rotate(90deg);
+  color: var(--c-primary);
+}
+
+.dragon-tiger-modal-date.ant-tag {
+  margin-left: auto;
+  font-size: var(--c-font-xs);
+}
+
+.dragon-tiger-seats-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.dragon-tiger-seats-title--up {
+  color: var(--c-up);
+}
+
+.dragon-tiger-seats-title--down {
+  color: var(--c-down);
+}
+
+.dragon-tiger-mobile-stock-link {
+  display: block;
+  color: var(--c-primary);
+}
+
+.dragon-tiger-mobile-stock-name {
+  display: block;
+  color: var(--c-text-primary);
+  font-weight: 600;
+}
+
+.dragon-tiger-mobile-stock-code {
+  display: block;
+  color: var(--c-text-muted);
+  font-size: var(--c-font-xs);
+  font-family: var(--c-font-mono);
+}
+
+.dragon-tiger-code-link {
+  color: var(--c-primary);
+  font-weight: 500;
+  font-family: var(--c-font-mono);
+}
+
+.dragon-tiger-name-link {
+  color: var(--c-text-primary);
+  font-weight: 500;
+}
+
+.dragon-tiger-font-mono {
+  font-family: var(--c-font-mono);
+}
+
+.dragon-tiger-mono-semibold {
+  font-family: var(--c-font-mono);
+  font-weight: 600;
+}
+
+.dragon-tiger-reason-tag.ant-tag {
+  font-size: var(--c-font-xs);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dragon-tiger-stat-card.ant-card {
+  border-radius: var(--c-radius-md);
+  box-shadow: var(--c-shadow-xs);
+}
+
+.dragon-tiger-stat-title {
+  font-size: var(--c-font-sm);
+  color: var(--c-text-secondary);
+}
+
+.dragon-tiger-toolbar-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.dragon-tiger-date-label {
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .dragon-tiger-date-picker {
+    width: 140px;
+  }
+}
+
+.dragon-tiger-toolbar-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.dragon-tiger-toolbar-hint {
+  color: var(--c-text-secondary);
+  font-size: var(--c-font-sm);
+}
+
+.dragon-tiger-main-card.ant-card {
+  border-radius: var(--c-radius-md);
+  border: 1px solid var(--c-border);
+  box-shadow: var(--c-shadow-xs);
+}
+
+.dragon-tiger-main-card .ant-card-body {
+  padding: 12px;
+}

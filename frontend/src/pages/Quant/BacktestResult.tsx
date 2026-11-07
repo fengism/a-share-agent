@@ -10,7 +10,7 @@ import BacktestTradeKline from "./results/BacktestTradeKline";
 import ConstituentPerformanceMatrix from "./results/ConstituentPerformanceMatrix";
 import { exportBacktestTearsheetMarkdown, exportEquityCurveCsv, exportTradesCsv } from "./results/exportTearsheet";
 import { quantStrategyIdentity, quantStrategyParameterSummary } from "./quantRun";
-import "./quant-results.css";
+import "./quant-results/index.css";
 
 export default function BacktestResult({
   result,

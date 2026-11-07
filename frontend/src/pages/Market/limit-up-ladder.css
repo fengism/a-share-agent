@@ -1,0 +1,142 @@
+/* 涨停天梯与板块涨停分布 (Limit Up Ladder Tab) */
+
+.ladder-stock-link {
+  display: inline-flex;
+}
+
+.ladder-stock-name {
+  font-size: var(--c-font-md);
+}
+
+.ladder-stock-code {
+  font-size: var(--c-font-xs);
+  font-family: var(--c-font-mono);
+}
+
+.ladder-stock-sector {
+  font-size: var(--c-font-xs);
+}
+
+.ladder-time-text {
+  font-family: var(--c-font-mono);
+  font-size: var(--c-font-xs);
+}
+
+.ladder-mono {
+  font-family: var(--c-font-mono);
+}
+
+.ladder-font-medium {
+  font-weight: 500;
+}
+
+.ladder-count-tag.ant-tag {
+  border-radius: 10px;
+  padding: 0 6px;
+  font-size: var(--c-font-xs);
+}
+
+.ladder-muted-dash {
+  color: var(--c-text-muted);
+}
+
+.ladder-amount-text {
+  font-family: var(--c-font-mono);
+  font-weight: 500;
+}
+
+.ladder-toolbar-title {
+  font-weight: 600;
+  color: var(--c-text-primary);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ladder-fire-icon {
+  color: var(--c-up);
+}
+
+.ladder-stat-card.ant-card {
+  height: 100%;
+  border-radius: var(--c-radius-md);
+  box-shadow: var(--c-shadow-xs);
+}
+
+.ladder-stat-card--up.ant-card {
+  border-left: 3px solid var(--c-up);
+}
+
+.ladder-stat-card--accent.ant-card {
+  border-left: 3px solid var(--c-accent);
+}
+
+.ladder-stat-title {
+  font-size: var(--c-font-sm);
+  color: var(--c-text-secondary);
+}
+
+.ladder-card-title {
+  font-weight: 600;
+}
+
+.ladder-block-card.ant-card {
+  border-radius: var(--c-radius-md);
+  box-shadow: var(--c-shadow-xs);
+}
+
+.ladder-sector-card.ant-card {
+  height: 100%;
+  border-radius: var(--c-radius-md);
+  background: var(--c-nested-bg);
+  border: 1px solid var(--c-border);
+  box-shadow: var(--c-shadow-xs);
+  transition: all 0.2s ease;
+}
+
+.ladder-sector-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 6px;
+}
+
+.ladder-sector-name {
+  font-size: var(--c-font-md);
+}
+
+.ladder-top-tag.ant-tag {
+  border-radius: 10px;
+  margin: 0;
+  padding: 0 6px;
+  font-size: var(--c-font-xs);
+}
+
+.ladder-sector-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.ladder-sector-count {
+  color: var(--c-up);
+  font-weight: 700;
+}
+
+.ladder-sector-amount {
+  font-size: var(--c-font-xs);
+}
+
+.ladder-tag--5plus.ant-tag {
+  background: linear-gradient(135deg, rgba(200, 52, 31, 0.15), rgba(247, 144, 9, 0.15));
+  color: var(--c-up);
+  border-color: var(--c-up);
+  font-weight: 700;
+}
+
+.ladder-tag--3plus.ant-tag {
+  background: rgba(200, 52, 31, 0.1);
+  color: var(--c-up);
+  border-color: var(--c-up);
+  font-weight: 600;
+}

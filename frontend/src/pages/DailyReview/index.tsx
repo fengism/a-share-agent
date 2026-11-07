@@ -58,13 +58,13 @@ import WorkflowWorkspace from "../../components/workflows/WorkflowWorkspace";
 import { useUrlSearchParam } from "../../hooks/useUrlSearchParam";
 import { useWorkflowPush } from "../../hooks/useWorkflowPush";
 import type { PushRequest } from "../../types/stock";
-import { useColors, useStyles } from "../../styles/ui";
+import { useStyles } from "../../styles/ui";
 import { normalizeIsoDate } from "../../utils/date";
 import DailyReviewCharts from "./DailyReviewCharts";
 import DailyReviewHero from "./DailyReviewHero";
 import DailyReviewPosterModal from "./DailyReviewPosterModal";
 import ReviewDatePillsBar from "./ReviewDatePillsBar";
-import StockQuickPreviewModal from "../../components/StockQuickPreviewModal";
+import StockWorkspaceDrawer from "../../components/StockWorkspaceDrawer";
 import SectionAnchorNav from "../../components/SectionAnchorNav";
 import CollapsibleSection from "../../components/CollapsibleSection";
 import PreviousCheckCard from "./sections/PreviousCheckCard";
@@ -96,8 +96,7 @@ function formatDate(value: dayjs.Dayjs | null) {
 const { Paragraph, Text } = Typography;
 
 export default function DailyReviewPage() {
-  const { cardStyle, pageContainerStyle } = useStyles();
-  const c = useColors();
+  const { pageContainerStyle } = useStyles();
   const defaultDate = dayjs().format("YYYY-MM-DD");
   const [dateParam, setDate] = useUrlSearchParam("date", defaultDate, { replace: true });
   const date = normalizeIsoDate(dateParam, defaultDate);
@@ -292,7 +291,7 @@ export default function DailyReviewPage() {
                 }}
               >
                 <Button type="primary" loading={isGenerating} disabled={isExportingPdf}>
-                  {review ? "重新生成" : "生成复盘"} <DownOutlined style={{ fontSize: 10, marginLeft: 2 }} />
+                  {review ? "重新生成" : "生成复盘"} <DownOutlined className="daily-review-btn-arrow" />
                 </Button>
               </Dropdown>
             )}
@@ -317,7 +316,7 @@ export default function DailyReviewPage() {
               disabled={!review || isGenerating}
             >
               <Button icon={<DownloadOutlined />} loading={isExportingPdf} aria-label="导出">
-                导出 <DownOutlined style={{ fontSize: 10, marginLeft: 2 }} />
+                导出 <DownOutlined className="daily-review-btn-arrow" />
               </Button>
             </Dropdown>
             <Dropdown
@@ -376,34 +375,24 @@ export default function DailyReviewPage() {
             {historyItems.length > 3 ? (
               <Input
                 size="small"
-                prefix={<SearchOutlined style={{ color: "var(--c-text-muted)" }} />}
+                prefix={<SearchOutlined className="u-text-muted" />}
                 placeholder="搜索历史复盘..."
                 value={historyFilter}
                 onChange={(e) => setHistoryFilter(e.target.value)}
                 allowClear
-                style={{ marginBottom: 8 }}
+                className="u-mb-8"
               />
             ) : null}
-            <ul aria-label="复盘历史记录" style={{ listStyle: "none", margin: 0, padding: 0 }}>
+            <ul aria-label="复盘历史记录" className="daily-review-history__list">
               {filteredHistoryItems.map((item) => (
-                <li key={item.date} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <li key={item.date} className="daily-review-history__item">
                   <button
                     type="button"
                     onClick={() => setDate(item.date)}
                     aria-pressed={item.date === date}
-                    style={{
-                      flex: 1,
-                      minWidth: 0,
-                      textAlign: "left",
-                      padding: "12px 8px",
-                      cursor: "pointer",
-                      background: item.date === date ? c.activeBg : "transparent",
-                      border: 0,
-                      borderLeft: item.date === date ? `3px solid ${c.primary}` : "3px solid transparent",
-                      borderRadius: 4,
-                    }}
+                    className={`daily-review-history__btn ${item.date === date ? "is-active" : ""}`}
                   >
-                    <span style={{ display: "block", fontWeight: "var(--c-weight-medium)" }}>{item.title}</span>
+                    <span className="daily-review-history__title">{item.title}</span>
                     <Text type="secondary">{item.date}</Text>
                   </button>
                   {item.can_delete ? (
@@ -433,7 +422,7 @@ export default function DailyReviewPage() {
               ))}
             </ul>
             {hasNextPage ? (
-              <Button block loading={isFetchingNextPage} onClick={() => fetchNextPage()} style={{ marginTop: 12 }}>
+              <Button block loading={isFetchingNextPage} onClick={() => fetchNextPage()} className="u-mt-12">
                 加载更多
               </Button>
             ) : null}
@@ -448,15 +437,15 @@ export default function DailyReviewPage() {
             disabled={isGenerating || isExportingPdf}
           />
           {isReviewLoading ? (
-            <Card style={cardStyle}>
-              <div aria-label="复盘内容加载中" style={{ minHeight: 420, padding: 16 }}>
+            <Card className="u-card">
+              <div aria-label="复盘内容加载中" className="daily-review-loading">
                 <Skeleton active paragraph={{ rows: 10 }} />
               </div>
             </Card>
           ) : isReviewError && !(reviewError instanceof ApiError && reviewError.status === 404) ? (
             <QueryErrorState error={reviewError} onRetry={() => retryReview()} title="复盘内容加载失败" />
           ) : review ? (
-            <Space orientation="vertical" size={16} style={{ width: "100%" }}>
+            <Space orientation="vertical" size={16} className="u-w-full">
             {(review.quality_status === "degraded" || review.session_status === "adjusted" || Boolean(review.warnings?.length)) && (
               <Alert
                 type={review.quality_status === "degraded" ? "warning" : "info"}
@@ -467,7 +456,7 @@ export default function DailyReviewPage() {
                     {review.requested_date && review.effective_date && review.requested_date !== review.effective_date && (
                       <div>请求日期 {review.requested_date}，实际复盘交易日 {review.effective_date}</div>
                     )}
-                    {review.warnings?.length ? <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>{review.warnings.map((item) => <li key={item}>{item}</li>)}</ul> : null}
+                    {review.warnings?.length ? <ul className="u-list u-note--spaced">{review.warnings.map((item) => <li key={item}>{item}</li>)}</ul> : null}
                   </div>
                 )}
               />
@@ -478,7 +467,7 @@ export default function DailyReviewPage() {
                 showIcon
                 title="部分辅助数据缺失（不影响复盘结论）"
                 description={(
-                  <ul style={{ margin: 0, paddingLeft: 18 }}>
+                  <ul className="u-list">
                     {review.notes.map((item) => <li key={item}>{item}</li>)}
                   </ul>
                 )}
@@ -561,13 +550,13 @@ export default function DailyReviewPage() {
             {review.sentiment_cycle ? (
               <div className="daily-review-block">
                 <Space wrap>
-                  <Tag color="processing" style={{ fontSize: "var(--c-font-base)" }}>{review.sentiment_cycle.stage}</Tag>
+                  <Tag color="processing" className="u-text-base">{review.sentiment_cycle.stage}</Tag>
                   {review.sentiment_cycle.ladder_health ? (
                     <Text type="secondary">梯队健康度：{review.sentiment_cycle.ladder_health}</Text>
                   ) : null}
                 </Space>
                 {review.sentiment_cycle.evidence?.length ? (
-                  <ul style={{ margin: "10px 0 0", paddingLeft: 18 }}>
+                  <ul className="u-list u-mt-12">
                     {review.sentiment_cycle.evidence.map((item) => (
                       <li key={item}>{item}</li>
                     ))}
@@ -587,14 +576,14 @@ export default function DailyReviewPage() {
               >
             {review.scenario_plans?.length ? (
               <div className="daily-review-block">
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 10 }}>
+                <div className="daily-review-scenarios-grid">
                   {review.scenario_plans.map((scenario) => (
-                    <div key={scenario.name} style={{ padding: "var(--c-pad-inset, 7px 12px)", borderRadius: "var(--c-radius-md)", background: c.nestedBg }}>
+                    <div key={scenario.name} className="daily-review-scenario-card">
                       <Text strong>{scenario.name}</Text>
-                      <Paragraph style={{ margin: "6px 0 0" }}><Text strong>触发：</Text>{scenario.trigger || "待补充"}</Paragraph>
-                      <Paragraph style={{ margin: "4px 0 0" }}><Text strong>应对：</Text>{scenario.playbook || "待补充"}</Paragraph>
+                      <Paragraph className="u-note--spaced"><Text strong>触发：</Text>{scenario.trigger || "待补充"}</Paragraph>
+                      <Paragraph className="u-note"><Text strong>应对：</Text>{scenario.playbook || "待补充"}</Paragraph>
                       {scenario.watch_levels?.length ? (
-                        <Paragraph type="secondary" style={{ margin: "4px 0 0" }}>观察信号：{scenario.watch_levels.join("；")}</Paragraph>
+                        <Paragraph type="secondary" className="u-note">观察信号：{scenario.watch_levels.join("；")}</Paragraph>
                       ) : null}
                     </div>
                   ))}
@@ -613,10 +602,10 @@ export default function DailyReviewPage() {
               >
             {review.next_day_watchlist?.length ? (
               <div className="daily-review-block">
-                <div style={{ display: "flex", flexDirection: "column", gap: 8, width: "100%" }}>
+                <div className="daily-review-tactics-list">
                   {review.next_day_watchlist.map((item) => (
-                    <div key={`${item.name}-${item.role}`} style={{ padding: "var(--c-pad-inset, 7px 12px)", borderRadius: "var(--c-radius-md)", background: c.nestedBg }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div key={`${item.name}-${item.role}`} className="daily-review-tactic-card">
+                      <div className="u-flex-between">
                         <Space wrap>
                           <Text strong>{item.name}</Text>
                           <Tag color="blue">{item.role}</Tag>
@@ -635,8 +624,8 @@ export default function DailyReviewPage() {
                           K线速查
                         </Button>
                       </div>
-                      <Paragraph style={{ margin: "6px 0 0" }}>{item.reason || "待补充"}</Paragraph>
-                      <Paragraph type="secondary" style={{ margin: "4px 0 0" }}>触发：{item.trigger || "待补充"}</Paragraph>
+                      <Paragraph className="u-note--spaced">{item.reason || "待补充"}</Paragraph>
+                      <Paragraph type="secondary" className="u-note">触发：{item.trigger || "待补充"}</Paragraph>
                     </div>
                   ))}
                 </div>
@@ -654,7 +643,7 @@ export default function DailyReviewPage() {
               >
             {review.key_levels?.length ? (
               <div className="daily-review-block">
-                <ul style={{ margin: 0, paddingLeft: 18 }}>
+                <ul className="u-list">
                   {review.key_levels.map((item) => (
                     <li key={item}>{item}</li>
                   ))}
@@ -718,7 +707,7 @@ export default function DailyReviewPage() {
                 onOpenChange={(next) => handleSectionToggle("review-report", next)}
               >
             {review.llm_review ? (
-              <Card title="复盘报告" style={{ ...cardStyle, background: c.nestedBg }}>
+              <Card title="复盘报告" className="u-card daily-review-report-card">
                 <div className="daily-review-markdown">
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm, remarkBreaks]}
@@ -742,38 +731,38 @@ export default function DailyReviewPage() {
                   review.dragon_tiger_review,
                   review.news_policy_review,
                 ].filter((section): section is NonNullable<typeof section> => Boolean(section)).map((section) => (
-                  <Card key={section.title} title={section.title} style={cardStyle}>
+                  <Card key={section.title} title={section.title} className="u-card">
                     <Paragraph>{section.summary}</Paragraph>
                     <ul>
                       {section.bullets.map((item) => <li key={item}>{item}</li>)}
                     </ul>
                   </Card>
                 ))}
-                <Card title="机会与风险" style={cardStyle}>
-                  <div style={{ display: "grid", gap: 10 }}>
-                    <div style={{ padding: "var(--c-pad-inset, 7px 12px)", borderRadius: "var(--c-radius-md)", background: "color-mix(in srgb, var(--c-up) 8%, var(--c-card-bg))", borderLeft: "3px solid var(--c-up)" }}>
-                      <Text strong style={{ color: "var(--c-up)" }}><RiseOutlined style={{ marginRight: 6 }} />机会：</Text>
-                      <Text style={{ marginLeft: 6 }}>{review.opportunities.join("；") || "-"}</Text>
+                <Card title="机会与风险" className="u-card">
+                  <div className="daily-review-callouts">
+                    <div className="daily-review-callout daily-review-callout--opportunity">
+                      <Text strong className="u-text-up"><RiseOutlined className="daily-review-callout-icon" />机会：</Text>
+                      <Text className="daily-review-callout-text">{review.opportunities.join("；") || "-"}</Text>
                     </div>
-                    <div style={{ padding: "var(--c-pad-inset, 7px 12px)", borderRadius: "var(--c-radius-md)", background: "color-mix(in srgb, var(--c-warning) 8%, var(--c-card-bg))", borderLeft: "3px solid var(--c-warning)" }}>
-                      <Text strong style={{ color: "var(--c-warning)" }}><WarningOutlined style={{ marginRight: 6 }} />风险：</Text>
-                      <Text style={{ marginLeft: 6 }}>{review.risk_alerts.join("；") || "-"}</Text>
+                    <div className="daily-review-callout daily-review-callout--risk">
+                      <Text strong className="u-text-warning"><WarningOutlined className="daily-review-callout-icon" />风险：</Text>
+                      <Text className="daily-review-callout-text">{review.risk_alerts.join("；") || "-"}</Text>
                     </div>
-                    <div style={{ padding: "var(--c-pad-inset, 7px 12px)", borderRadius: "var(--c-radius-md)", background: "color-mix(in srgb, var(--c-primary) 8%, var(--c-card-bg))", borderLeft: "3px solid var(--c-primary)" }}>
-                      <Text strong style={{ color: "var(--c-primary)" }}><BulbOutlined style={{ marginRight: 6 }} />策略：</Text>
-                      <Text style={{ marginLeft: 6 }}>{review.strategy_notes.join("；") || "-"}</Text>
+                    <div className="daily-review-callout daily-review-callout--strategy">
+                      <Text strong className="u-text-primary"><BulbOutlined className="daily-review-callout-icon" />策略：</Text>
+                      <Text className="daily-review-callout-text">{review.strategy_notes.join("；") || "-"}</Text>
                     </div>
                   </div>
                 </Card>
-                <Card title="原始数据快照" style={cardStyle}>
+                <Card title="原始数据快照" className="u-card">
                   <Paragraph><Text strong>指数样本：</Text>{review.data_snapshot.indices.slice(0, 3).map((item) => String(item.name || item.code || "")).join("、") || "-"}</Paragraph>
-                  <Divider style={{ margin: "12px 0" }} />
+                  <Divider className="daily-review-divider" />
                   <Paragraph><Text strong>领涨板块：</Text>{review.data_snapshot.top_sectors?.slice(0, 5).map((item: Record<string, unknown>) => `${String(item.name || "")}(${String(item.change_pct ?? "-") }%)`).join("、") || "-"}</Paragraph>
-                  <Divider style={{ margin: "12px 0" }} />
+                  <Divider className="daily-review-divider" />
                   <Paragraph><Text strong>领跌板块：</Text>{review.data_snapshot.bottom_sectors?.slice(0, 5).map((item: Record<string, unknown>) => `${String(item.name || "")}(${String(item.change_pct ?? "-") }%)`).join("、") || "-"}</Paragraph>
-                  <Divider style={{ margin: "12px 0" }} />
+                  <Divider className="daily-review-divider" />
                   <Paragraph><Text strong>热点概念样本：</Text>{review.data_snapshot.hot_concepts.slice(0, 5).map((item) => String(item.name || item.code || "")).join("、") || "-"}</Paragraph>
-                  <Divider style={{ margin: "12px 0" }} />
+                  <Divider className="daily-review-divider" />
                   <Paragraph><Text strong>龙虎榜样本：</Text>{review.data_snapshot.dragon_tiger.slice(0, 5).map((item) => String(item.name || item.code || "")).join("、") || "-"}</Paragraph>
                 </Card>
               </>
@@ -781,13 +770,13 @@ export default function DailyReviewPage() {
               </CollapsibleSection>
             </Space>
           ) : (
-            <Card style={cardStyle}><Paragraph type="secondary">请选择日期后生成复盘。</Paragraph></Card>
+            <Card className="u-card"><Paragraph type="secondary">请选择日期后生成复盘。</Paragraph></Card>
           )}
         </div>
       </WorkflowWorkspace>
 
       {previewStock ? (
-        <StockQuickPreviewModal
+        <StockWorkspaceDrawer
           open={Boolean(previewStock)}
           code={previewStock.code}
           name={previewStock.name}

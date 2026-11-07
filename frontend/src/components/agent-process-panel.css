@@ -1,0 +1,249 @@
+/* Agent 思考与执行面板 (Agent Process Panel) */
+
+.agent-proc-section {
+  margin-top: var(--c-space-5);
+  padding-top: var(--c-space-4);
+  border-top: 1px solid var(--c-border);
+}
+
+.agent-proc-tool-groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--c-space-2);
+  margin-top: var(--c-space-1);
+}
+
+.agent-proc-tool-group {
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius-md);
+  padding: var(--c-space-2) var(--c-space-3);
+}
+
+.agent-proc-tool-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--c-space-2);
+  cursor: pointer;
+}
+
+.agent-proc-tool-names {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--c-space-2);
+}
+
+.agent-proc-tool-call {
+  margin-top: var(--c-space-2);
+  padding-top: var(--c-space-2);
+  border-top: 1px solid var(--c-border);
+}
+
+.agent-proc-tool-call-header {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--c-space-2);
+}
+
+.agent-proc-tool-args {
+  max-height: 180px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.agent-proc-sm-label {
+  font-size: var(--c-font-sm);
+}
+
+.agent-proc-field-value {
+  margin-top: var(--c-space-1);
+  color: var(--c-text-primary);
+}
+
+.agent-proc-round-list {
+  margin: 0;
+  padding-inline-start: 20px;
+}
+
+.agent-proc-rounds-container {
+  margin-top: var(--c-space-4);
+}
+
+.agent-proc-rounds-header {
+  display: flex;
+  align-items: center;
+  gap: var(--c-space-2);
+  margin-bottom: var(--c-space-2);
+}
+
+.agent-proc-accent-icon {
+  color: var(--c-accent);
+}
+
+.agent-proc-rounds-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--c-space-3);
+}
+
+.agent-proc-round-card {
+  padding: var(--c-space-3);
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius-md);
+  background: var(--c-hover-bg);
+}
+
+.agent-proc-round-card--primary {
+  border-left: 3px solid var(--c-primary);
+}
+
+.agent-proc-round-card--degraded {
+  border-left: 3px solid var(--c-warning);
+}
+
+.agent-proc-round-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--c-space-2);
+  margin-bottom: var(--c-space-3);
+}
+
+.agent-proc-round-title-group {
+  display: flex;
+  align-items: center;
+  gap: var(--c-space-2);
+}
+
+.agent-proc-round-body {
+  display: grid;
+  gap: var(--c-space-3);
+}
+
+.agent-proc-tool-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--c-space-2);
+}
+
+.agent-proc-toggle-btn {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--c-space-3);
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.agent-proc-toggle-left {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--c-space-2);
+}
+
+.agent-proc-robot-icon {
+  color: var(--c-primary);
+}
+
+.agent-proc-toggle-detail {
+  color: var(--c-text-muted);
+  font-size: var(--c-font-sm);
+}
+
+.agent-proc-toggle-right {
+  display: flex;
+  align-items: center;
+  gap: var(--c-space-2);
+}
+
+.agent-proc-down-icon {
+  transition: transform 0.2s;
+}
+
+.agent-proc-down-icon--expanded {
+  transform: rotate(180deg);
+}
+
+.agent-proc-content {
+  margin-top: var(--c-space-3);
+}
+
+.agent-proc-status-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--c-space-2);
+  color: var(--c-text-secondary);
+  font-size: var(--c-font-md);
+  margin-bottom: var(--c-space-3);
+}
+
+.agent-proc-status-bar--running {
+  color: var(--c-primary);
+  padding: var(--c-space-2) var(--c-space-3);
+  background: var(--c-hover-bg);
+  border-left: 3px solid var(--c-primary);
+  border-radius: var(--c-radius-md);
+  font-weight: var(--c-weight-semibold);
+}
+
+.agent-proc-loading-icon {
+  color: var(--c-primary);
+}
+
+.agent-proc-status-text {
+  flex: 1;
+}
+
+.agent-proc-elapsed-time {
+  color: var(--c-text-muted);
+  font-size: var(--c-font-sm);
+  font-weight: normal;
+}
+
+.agent-proc-plan-summary-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--c-space-2);
+  margin-bottom: var(--c-space-3);
+  color: var(--c-text-secondary);
+}
+
+.agent-proc-bulb-icon {
+  margin-top: 3px;
+  color: var(--c-accent);
+}
+
+.agent-proc-plan-text {
+  margin-top: var(--c-space-1);
+}
+
+.agent-proc-degraded-box {
+  margin-bottom: var(--c-space-3);
+  padding: var(--c-space-3);
+  border: 1px solid var(--c-border);
+  border-left: 3px solid var(--c-warning);
+  border-radius: var(--c-radius-md);
+  background: var(--c-hover-bg);
+}
+
+.agent-proc-degraded-header {
+  display: flex;
+  align-items: center;
+  gap: var(--c-space-2);
+  color: var(--c-warning);
+  font-weight: var(--c-weight-semibold);
+}
+
+.agent-proc-degraded-item {
+  margin-top: var(--c-space-2);
+  color: var(--c-text-secondary);
+}

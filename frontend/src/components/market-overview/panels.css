@@ -1,0 +1,69 @@
+/* panels —— 自 market-overview.css 第 337–403 行拆出。
+   由同目录 index.css 按固定顺序 @import，顺序不可调整：同特异性规则靠源序决胜负。 */
+.market-board-panel {
+  grid-column: span 6;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: var(--c-radius-md);
+  transition: all 0.2s ease;
+}
+
+[data-theme="stellar-blue"] .market-board-panel {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--c-card-bg);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="stellar-blue"] .market-board-panel:hover {
+  border-color: rgba(255, 255, 255, 0.16);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+}
+
+[data-theme="light"] .market-board-panel {
+  border: 1px solid var(--c-border);
+  background: var(--c-card-bg);
+  box-shadow: 0 1px 3px rgba(44, 34, 20, 0.04);
+}
+
+[data-theme="light"] .market-board-panel:hover {
+  border-color: var(--c-focus-ring);
+  box-shadow: 0 4px 12px rgba(44, 34, 20, 0.06);
+}
+
+.market-board-panel--emotion,
+.market-board-panel--ladder { grid-column: span 6; }
+
+.market-board-panel__header {
+  min-height: 48px;
+  justify-content: space-between;
+  gap: var(--c-space-2);
+  padding: 0 var(--c-space-4);
+}
+
+[data-theme="stellar-blue"] .market-board-panel__header {
+  background: var(--c-nested-bg);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+[data-theme="light"] .market-board-panel__header {
+  background: var(--c-nested-bg);
+  border-bottom: 1px solid var(--c-border);
+}
+
+.market-board-panel__title { min-width: 0; gap: var(--c-space-2); }
+.market-board-panel__title strong { font-size: var(--c-font-md); font-weight: var(--c-weight-semibold); white-space: nowrap; }
+.market-board-panel__title > span:last-child:not(.market-board-panel__icon) { overflow: hidden; color: var(--c-text-muted); font-size: var(--c-font-xs); text-overflow: ellipsis; white-space: nowrap; }
+.market-board-panel__icon {
+  color: var(--c-primary);
+  filter: none;
+}
+
+[data-theme="light"] .market-board-panel__icon {
+  color: var(--c-primary);
+  filter: none;
+}
+
+.market-board-panel__more { color: var(--c-text-secondary); font-size: var(--c-font-xs); }
+.market-board-panel__placeholder { display: grid; min-height: 180px; place-items: center; padding: var(--c-space-5); color: var(--c-text-muted); font-size: var(--c-font-sm); text-align: center; }
+.market-board-panel > .ant-skeleton { padding: var(--c-space-4); }
+

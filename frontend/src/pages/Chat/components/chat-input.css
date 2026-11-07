@@ -1,0 +1,150 @@
+/* 对话输入区：快捷提示、股票联想、指令菜单与发送栏。
+   原为 TSX 内联样式，逐条等价迁移；antd 组件（Button/TextArea）用
+   `.chat-input__row` 祖先提升特异性，避免与 cssinjs 同权后源序落败。 */
+
+.chat-input__root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--c-space-2);
+}
+
+.chat-input__quick-row {
+  display: flex;
+  gap: var(--c-space-1);
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.chat-input__quick-chip {
+  font-size: var(--c-font-xs);
+  color: var(--c-text-secondary);
+  background: var(--c-nested-bg);
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius-pill);
+  padding: 2px 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.chat-input__row {
+  display: flex;
+  gap: var(--c-space-2);
+  align-items: flex-end;
+  position: relative;
+}
+
+.chat-input__dropdown {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  z-index: 1000;
+  background: var(--c-elevated-bg);
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius-md);
+  box-shadow: var(--c-shadow-md);
+  padding: 6px 8px;
+  min-width: 260px;
+  max-width: 320px;
+}
+
+.chat-input__picker-head {
+  font-size: 11px;
+  color: var(--c-text-muted);
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.chat-input__picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.chat-input__picker-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px;
+  background: transparent;
+  border: none;
+  border-radius: var(--c-radius-sm);
+  cursor: pointer;
+  text-align: left;
+  color: var(--c-text-primary);
+  font-size: 12px;
+  transition: background 0.15s ease;
+}
+
+.chat-input__picker-name {
+  font-weight: 500;
+}
+
+.chat-input__picker-code {
+  color: var(--c-text-muted);
+  font-family: monospace;
+  font-size: 11px;
+}
+
+.chat-input__field {
+  flex: 1;
+  position: relative;
+}
+
+.chat-input__row .chat-input__input {
+  width: 100%;
+  border-radius: var(--c-radius-lg);
+  background: var(--c-hover-bg);
+}
+
+.chat-input__row .chat-input__action {
+  border-radius: var(--c-radius-lg);
+  min-width: 80px;
+  height: 40px;
+}
+
+.chat-input__footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 4px;
+}
+
+.chat-input__hint {
+  font-size: 11px;
+  color: var(--c-text-muted);
+}
+
+.chat-input__icon {
+  color: var(--c-primary);
+}
+
+.chat-input__cmd-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 2px 0;
+}
+
+.chat-input__cmd-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chat-input__cmd-name {
+  font-weight: 600;
+  color: var(--c-primary);
+  font-family: monospace;
+}
+
+.chat-input__cmd-label {
+  color: var(--c-text-primary);
+  font-weight: 500;
+}
+
+.chat-input__cmd-desc {
+  font-size: 11px;
+  color: var(--c-text-muted);
+}

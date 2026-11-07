@@ -1,0 +1,128 @@
+/* Screener Page Styles */
+
+.screener-page__card {
+  margin-bottom: 16px;
+}
+
+.screener-page__card-title {
+  font-weight: var(--c-weight-semibold);
+}
+
+.screener-page__horizontal-scroll {
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  white-space: nowrap;
+  padding-bottom: 4px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.screener-page__preset-btn {
+  font-size: var(--c-font-md);
+  font-weight: var(--c-weight-medium);
+  flex-shrink: 0;
+}
+
+.screener-page__strategy-section {
+  margin-bottom: 14px;
+}
+
+.screener-page__strategy-title {
+  margin-bottom: 8px;
+  font-size: var(--c-font-md);
+  font-weight: var(--c-weight-semibold);
+}
+
+.screener-page__strategy-btn {
+  flex-shrink: 0;
+}
+
+.screener-page__strategy-box {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--c-border);
+  border-radius: 8px;
+}
+
+.screener-page__strategy-box-title {
+  margin-bottom: 10px;
+  font-weight: var(--c-weight-semibold);
+}
+
+.screener-page__strategy-params {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.screener-page__param-label {
+  display: grid;
+  gap: 4px;
+  font-size: var(--c-font-sm);
+}
+
+.screener-page__param-input {
+  width: 100%;
+}
+
+.screener-page__info-icon {
+  color: var(--c-text-muted);
+}
+
+.screener-page__radio-group {
+  display: inline-block;
+}
+
+.screener-page__radio-btn {
+  text-align: center;
+}
+
+@media (max-width: 768px) {
+  .screener-page__param-label {
+    width: calc(50% - 6px);
+  }
+
+  .screener-page__param-label--full {
+    width: 100%;
+  }
+
+  .screener-page__radio-group {
+    width: 100%;
+  }
+
+  .screener-page__radio-btn {
+    width: 50%;
+  }
+}
+
+.screener-page__mobile-filter-btn {
+  margin-top: 12px;
+}
+
+.screener-page__alert--inline {
+  margin-top: 12px;
+  border-radius: 8px;
+}
+
+.screener-page__alert--section {
+  margin-bottom: 16px;
+  border-radius: 8px;
+}
+
+.screener-page__excluded-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.screener-page__excluded-item {
+  padding: 8px 0;
+}
+
+.screener-page__bottom-spacer {
+  height: 72px;
+}

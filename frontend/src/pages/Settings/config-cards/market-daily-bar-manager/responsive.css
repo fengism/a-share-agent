@@ -1,0 +1,92 @@
+/* 日线行情同步管理卡片：窄屏与移动端响应式适配。 */
+
+@media (max-width: 1100px) {
+  .market-daily-config__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .market-daily-backfill__grid,
+  .market-daily-manual__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .market-daily-overwrite,
+  .market-daily-field--segments {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 720px) {
+  .market-daily-manager > .ant-card-head {
+    padding-inline: 16px;
+  }
+
+  .market-daily-manager .ant-card-head-wrapper,
+  .market-daily-panel__header,
+  .market-daily-job__topline,
+  .market-daily-history__day-header,
+  .market-daily-factor__summary {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .market-daily-manager .ant-card-head-wrapper {
+    gap: 8px;
+    padding: 12px 0;
+  }
+
+  .market-daily-manager .ant-card-extra {
+    margin-inline-start: 0;
+    width: 100%;
+  }
+
+  .market-daily-manager .ant-card-extra > .ant-space {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .market-daily-manager > .ant-card-body {
+    padding: 16px;
+  }
+
+  .market-daily-config,
+  .market-daily-panel {
+    padding: 16px;
+  }
+
+  .market-daily-config__grid,
+  .market-daily-backfill__grid,
+  .market-daily-manual__grid,
+  .market-daily-factor__toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .market-daily-overwrite,
+  .market-daily-field--segments {
+    grid-column: auto;
+  }
+
+  .market-daily-field--segments .ant-checkbox-group {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .market-daily-panel__extra,
+  .market-daily-panel__extra .ant-btn,
+  .market-daily-backfill__actions .ant-btn,
+  .market-daily-manual__actions .ant-btn,
+  .market-daily-factor__toolbar .ant-btn,
+  .market-daily-factor__toolbar .ant-input {
+    width: 100%;
+  }
+
+  .market-daily-history__header > div {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .market-daily-history__error {
+    position: static;
+    width: 100%;
+  }
+}

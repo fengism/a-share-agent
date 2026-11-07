@@ -1,6 +1,5 @@
 import { Card } from "antd";
 import { useMemo, type ReactNode } from "react";
-import { useStyles } from "../../styles/ui";
 
 const TABLE_BODY_STYLES = { body: { padding: 0 } };
 
@@ -19,11 +18,7 @@ export default function PortfolioTableCard({
   bare = false,
   children,
 }: PortfolioTableCardProps) {
-  const { cardStyle } = useStyles();
-  const style = useMemo(
-    () => (stacked ? { ...cardStyle, marginBottom: 16 } : cardStyle),
-    [cardStyle, stacked],
-  );
+  const style = useMemo(() => (stacked ? { marginBottom: 16 } : undefined), [stacked]);
 
   if (bare) {
     return (
@@ -39,7 +34,7 @@ export default function PortfolioTableCard({
   }
 
   return (
-    <Card title={title} extra={extra} size="small" style={style} styles={TABLE_BODY_STYLES}>
+    <Card title={title} extra={extra} size="small" className="u-card" style={style} styles={TABLE_BODY_STYLES}>
       {children}
     </Card>
   );

@@ -190,7 +190,7 @@
   width: 100%;
   height: auto;
   min-height: 150px;
-  font-family: var(--c-font-family);
+  font-family: var(--c-font-sans);
 }
 
 .daily-review-charts-empty {
@@ -261,3 +261,105 @@
 .daily-review-block {
   min-width: 0;
 }
+
+/* Daily review page elements */
+.daily-review-btn-arrow {
+  font-size: 10px;
+  margin-left: 2px;
+}
+
+.daily-review-history__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.daily-review-history__item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.daily-review-history__btn.ant-btn {
+  text-align: left;
+  flex: 1;
+  padding: 8px 12px;
+  height: auto;
+}
+
+.daily-review-history__title {
+  display: block;
+  font-weight: var(--c-weight-medium);
+}
+
+.daily-review-loading {
+  min-height: 420px;
+  padding: 16px;
+}
+
+.daily-review-scenarios-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+}
+
+.daily-review-scenario-card {
+  padding: var(--c-pad-inset, 7px 12px);
+  border-radius: var(--c-radius-md);
+  background: var(--c-nested-bg);
+}
+
+.daily-review-tactics-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.daily-review-tactic-card {
+  padding: var(--c-pad-inset, 7px 12px);
+  border-radius: var(--c-radius-md);
+  background: var(--c-nested-bg);
+}
+
+.daily-review-report-card.ant-card {
+  background: var(--c-nested-bg);
+}
+
+.daily-review-callouts {
+  display: grid;
+  gap: 10px;
+}
+
+.daily-review-callout {
+  padding: var(--c-pad-inset, 7px 12px);
+  border-radius: var(--c-radius-md);
+}
+
+.daily-review-callout--opportunity {
+  background: color-mix(in srgb, var(--c-up) 8%, var(--c-card-bg));
+  border-left: 3px solid var(--c-up);
+}
+
+.daily-review-callout--risk {
+  background: color-mix(in srgb, var(--c-warning) 8%, var(--c-card-bg));
+  border-left: 3px solid var(--c-warning);
+}
+
+.daily-review-callout--strategy {
+  background: color-mix(in srgb, var(--c-primary) 8%, var(--c-card-bg));
+  border-left: 3px solid var(--c-primary);
+}
+
+.daily-review-callout-icon {
+  margin-right: 6px;
+}
+
+.daily-review-callout-text {
+  margin-left: 6px;
+}
+
+.daily-review-divider.ant-divider {
+  margin: 12px 0;
+}
+

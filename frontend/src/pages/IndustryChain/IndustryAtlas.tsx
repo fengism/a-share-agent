@@ -50,7 +50,7 @@ import {
 import { queryKeys } from "../../api/queryKeys";
 import { useAuthStore } from "../../store/authStore";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
-import { useColors, useStyles } from "../../styles/ui";
+import { useColors } from "../../styles/ui";
 import type {
   AtlasChain,
   AtlasHubCompany,
@@ -70,7 +70,6 @@ interface IndustryAtlasProps {
 
 export default function IndustryAtlas({ onAnalyze }: IndustryAtlasProps) {
   const colors = useColors();
-  const { cardStyle } = useStyles();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const isAdmin = useAuthStore((s) => s.user?.is_admin ?? false);
@@ -140,7 +139,7 @@ export default function IndustryAtlas({ onAnalyze }: IndustryAtlasProps) {
           返回知识库
         </Button>
         {chainQuery.isLoading && (
-          <div style={{ ...cardStyle, padding: 60, textAlign: "center" }}>
+          <div className="u-card" style={{ padding: 60, textAlign: "center" }}>
             <Spin />
             <div style={{ marginTop: 12, color: colors.textMuted }}>正在加载产业链图谱…</div>
           </div>
@@ -166,7 +165,7 @@ export default function IndustryAtlas({ onAnalyze }: IndustryAtlasProps) {
   return (
     <div>
       {/* 头部控制栏：模式切换、自动挖掘状态与管理操作 */}
-      <div style={{ ...cardStyle, padding: isMobile ? "12px 14px" : "16px 20px", marginBottom: 16 }}>
+      <div className="u-card" style={{ padding: isMobile ? "12px 14px" : "16px 20px", marginBottom: 16 }}>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
           <div style={{ width: isMobile ? "100%" : "auto" }}>
             <Segmented
@@ -320,7 +319,7 @@ export default function IndustryAtlas({ onAnalyze }: IndustryAtlasProps) {
       ) : (
         <>
           {catalogQuery.isLoading && (
-            <div style={{ ...cardStyle, padding: 60, textAlign: "center" }}>
+            <div className="u-card" style={{ padding: 60, textAlign: "center" }}>
               <Spin />
               <div style={{ marginTop: 12, color: colors.textMuted }}>正在加载产业链知识库…</div>
             </div>
@@ -332,7 +331,7 @@ export default function IndustryAtlas({ onAnalyze }: IndustryAtlasProps) {
             />
           )}
           {catalog && filteredChains.length === 0 && (
-            <div style={{ ...cardStyle, padding: 40, textAlign: "center" }}>
+            <div className="u-card" style={{ padding: 40, textAlign: "center" }}>
               {sourceFilter === "user" ? (
                 <Empty
                   description={
@@ -369,20 +368,10 @@ export default function IndustryAtlas({ onAnalyze }: IndustryAtlasProps) {
               {filteredChains.map((chain) => (
                 <div
                   key={chain.slug}
-                  className="atlas-chain-card"
-                  style={{
-                    ...cardStyle,
-                    padding: isMobile ? "12px 14px" : "16px 18px",
-                    cursor: "pointer",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 10,
-                    borderColor: chain.source === "user" ? "rgba(114, 46, 209, 0.4)" : undefined,
-                    background:
+                  className="atlas-chain-card u-card" style={{ padding: isMobile ? "12px 14px" : "16px 18px", cursor: "pointer", display: "flex", flexDirection: "column", gap: 10, borderColor: chain.source === "user" ? "rgba(114, 46, 209, 0.4)" : undefined, background:
                       chain.source === "user"
                         ? "linear-gradient(180deg, rgba(114, 46, 209, 0.05), transparent 70%)"
-                        : undefined,
-                  }}
+                        : undefined }}
                   onClick={() => setSelectedSlug(chain.slug)}
                 >
                   <div
@@ -404,10 +393,7 @@ export default function IndustryAtlas({ onAnalyze }: IndustryAtlasProps) {
                     >
                       <ApartmentOutlined />
                     </span>
-                    <strong
-                      className="atlas-chain-card__name"
-                      style={{ fontSize: "var(--c-font-lg)", color: colors.textPrimary }}
-                    >
+                    <strong className="atlas-chain-card__name">
                       {chain.name}
                     </strong>
                     {chain.source === "user" && <Tag color="purple">个人专属</Tag>}
@@ -573,11 +559,10 @@ function AtlasReverseLookup({
   onCompanyClick: (code: string) => void;
 }) {
   const colors = useColors();
-  const { cardStyle } = useStyles();
   const isMobile = useMediaQuery("(max-width: 576px)");
 
   return (
-    <Card style={cardStyle} styles={{ body: { padding: isMobile ? "14px 16px" : 20 } }}>
+    <Card className="u-card" styles={{ body: { padding: isMobile ? "14px 16px" : 20 } }}>
       <div style={{ maxWidth: 600, marginBottom: 16 }}>
         <h3 style={{ fontSize: isMobile ? "var(--c-font-base)" : "var(--c-font-lg)", marginBottom: 8, color: colors.textPrimary }}>
           🔍 从个股反查产业链分布
@@ -679,7 +664,6 @@ function AtlasGlobalGraph({
   onSelectChain: (slug: string) => void;
 }) {
   const colors = useColors();
-  const { cardStyle } = useStyles();
   const chartRef = useRef<ReactEChartsCore | null>(null);
   const isNarrow = useMediaQuery("(max-width: 768px)");
   const isMobile = useMediaQuery("(max-width: 576px)");
@@ -870,7 +854,7 @@ function AtlasGlobalGraph({
   };
 
   return (
-    <Card style={cardStyle} styles={{ body: { padding: isMobile ? 12 : 18 } }}>
+    <Card className="u-card" styles={{ body: { padding: isMobile ? 12 : 18 } }}>
       {/* 子标签：力导向图谱 / 跨链枢纽龙头榜 / 产业协同矩阵 */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, flexWrap: "wrap", gap: 10 }}>
         <div style={{ width: isMobile ? "100%" : "auto" }}>
@@ -1168,7 +1152,7 @@ function ChainSynergyMatrix({
             </div>
 
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              <Tag color="volcano" style={{ fontWeight: 600 }}>
+              <Tag color="cyan" style={{ fontWeight: 600 }}>
                 共享 {s.shared_companies_count} 家龙头
               </Tag>
               <span style={{ fontSize: "var(--c-font-xs)", color: colors.textSecondary, overflowWrap: "anywhere", wordBreak: "break-word" }}>
@@ -1196,7 +1180,6 @@ function ChainAtlasDetail({
   onDeleteSuccess?: () => void;
 }) {
   const colors = useColors();
-  const { cardStyle } = useStyles();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const isAdmin = useAuthStore((s) => s.user?.is_admin ?? false);
@@ -1207,15 +1190,9 @@ function ChainAtlasDetail({
 
   return (
     <div>
-      <div style={{ ...cardStyle, padding: isMobile ? "14px 16px" : "18px 22px", marginBottom: 16 }}>
-        <div
-          className="atlas-detail__heading"
-          style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}
-        >
-          <strong
-            className="atlas-detail__name"
-            style={{ fontSize: isMobile ? "var(--c-font-lg)" : "var(--c-font-xl)", color: colors.textPrimary }}
-          >
+      <div className="u-card" style={{ padding: isMobile ? "14px 16px" : "18px 22px", marginBottom: 16 }}>
+        <div className="atlas-detail__heading">
+          <strong className="atlas-detail__name">
             {chain.name}
           </strong>
           {chain.source === "user" && <Tag color="purple">个人专属</Tag>}
@@ -1397,7 +1374,6 @@ function SingleChainGraph({
   onCompanyClick: (code: string) => void;
 }) {
   const colors = useColors();
-  const { cardStyle } = useStyles();
   const chartRef = useRef<ReactEChartsCore | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [containerWidth, setContainerWidth] = useState<number>(0);
@@ -1649,7 +1625,7 @@ function SingleChainGraph({
   const isSmall = (containerWidth || (typeof window !== "undefined" ? window.innerWidth : 800)) < 640;
 
   return (
-    <Card style={cardStyle} styles={{ body: { padding: isSmall ? 12 : 16 } }}>
+    <Card className="u-card" styles={{ body: { padding: isSmall ? 12 : 16 } }}>
       {/* 搜索与导出工具栏 */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 10 }}>
         <Input

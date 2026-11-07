@@ -9,7 +9,7 @@ import { useColors } from "../../styles/ui";
 import { getRelativeTimeRefreshDelay } from "./feedHelpers";
 import PaginatedList from "./PaginatedList";
 import TwitterAnalysisPanel from "./TwitterAnalysisPanel";
-import "./feed.css";
+import "./styles/index.css";
 
 dayjs.extend(relativeTime);
 dayjs.locale("zh-cn");

@@ -7,7 +7,7 @@ import { useStyles, useColors } from "../styles/ui";
 /** Account-security card: change the login password (verifies the old one and,
  *  on success, the backend revokes the user's other sessions). */
 export default function ChangePasswordCard() {
-  const { cardStyle, sectionCardBodyStyle } = useStyles();
+  const { sectionCardBodyStyle } = useStyles();
   const c = useColors();
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
@@ -31,7 +31,7 @@ export default function ChangePasswordCard() {
   return (
     <Card
       title={<span><SafetyOutlined style={{ marginRight: 8 }} />账号安全</span>}
-      style={{ ...cardStyle, marginBottom: 16 }}
+      className="u-card" style={{ marginBottom: 16 }}
       styles={{ body: sectionCardBodyStyle }}
     >
       <div style={{ fontSize: "var(--c-font-sm)", color: c.textMuted, marginBottom: 12 }}>

@@ -27,7 +27,7 @@ export default function StockRetailCommentsPanel({ code }: { code: string }) {
   const retailSentiment = query.data;
   const c = useColors();
   const t = useTokens();
-  const { cardStyle, tagStyle } = useStyles();
+  const { tagStyle } = useStyles();
   const tileColors = { textSecondary: c.textSecondary, textPrimary: c.textPrimary, hoverBg: c.hoverBg, border: c.border };
   const bullishRatio = retailSentiment?.bullish_ratio;
   const bullishPct = bullishRatio != null ? Math.round(bullishRatio * 100) : null;
@@ -43,7 +43,7 @@ export default function StockRetailCommentsPanel({ code }: { code: string }) {
       errorTitle="散户评论加载失败"
       minHeight={260}
     >
-      <Card size="small" title={`散户评论（${retailSentiment?.guba_post_count ?? 0}条）`} extra={<Text type="secondary">股吧帖子聚合</Text>} style={{ ...cardStyle, marginBottom: t.space[4] }} styles={{ body: { padding: t.space[4] } }}>
+      <Card size="small" title={`散户评论（${retailSentiment?.guba_post_count ?? 0}条）`} extra={<Text type="secondary">股吧帖子聚合</Text>} className="u-card" style={{ marginBottom: t.space[4] }} styles={{ body: { padding: t.space[4] } }}>
         <div className="metric-grid cols-3" style={{ gap: t.space[3], marginBottom: t.space[3] }}>
           <Indicator label="情绪评分" value={retailSentiment?.score != null ? String(retailSentiment.score) : "-"} colors={tileColors} t={t} />
           <Indicator label="讨论帖数" value={`${retailSentiment?.post_count ?? 0}条`} colors={tileColors} t={t} />

@@ -1,0 +1,125 @@
+/* 港股行业地位与同业对比样式 */
+
+.hk-industry-comparison__link {
+  font-family: var(--c-font-mono);
+  font-weight: 500;
+}
+
+.hk-industry-comparison__link--current {
+  font-weight: 700;
+  color: var(--c-primary);
+}
+
+.hk-industry-comparison__current-tag.ant-tag {
+  font-size: 10px;
+  margin-inline-end: 0;
+}
+
+.hk-industry-comparison__stock-name {
+  font-weight: 400;
+}
+
+.hk-industry-comparison__stock-name--current {
+  font-weight: 700;
+}
+
+.hk-industry-comparison__loss-text {
+  font-size: 12px;
+}
+
+.hk-industry-comparison__mono-cell {
+  font-family: var(--c-font-mono);
+}
+
+.hk-industry-comparison__profit-val {
+  font-family: var(--c-font-mono);
+  font-weight: 600;
+}
+
+.hk-industry-comparison__profit-val--up {
+  color: var(--c-up);
+}
+
+.hk-industry-comparison__profit-val--down {
+  color: var(--c-down);
+}
+
+.hk-industry-comparison__f10-link {
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.hk-industry-comparison__stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.hk-industry-comparison__stat-box {
+  padding: var(--c-pad-inset, 7px 12px);
+  background: var(--c-nested-bg, rgba(0, 0, 0, 0.02));
+  border-radius: 8px;
+}
+
+.hk-industry-comparison__stat-box--primary {
+  border-left: 3px solid var(--c-primary);
+}
+
+.hk-industry-comparison__stat-box--info {
+  border-left: 3px solid var(--c-info);
+}
+
+.hk-industry-comparison__stat-box--accent {
+  border-left: 3px solid var(--c-accent, #722ed1);
+}
+
+.hk-industry-comparison__stat-box--warning {
+  border-left: 3px solid var(--c-warning);
+}
+
+.hk-industry-comparison__stat-box--success {
+  border-left: 3px solid var(--c-success, #52c41a);
+}
+
+.hk-industry-comparison__stat-label {
+  font-size: 12px;
+  color: var(--c-text-secondary);
+}
+
+.hk-industry-comparison__stat-title {
+  font-weight: 600;
+  font-size: 13px;
+  margin-top: 2px;
+  color: var(--c-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hk-industry-comparison__stat-val {
+  font-weight: 600;
+  font-size: 14px;
+  margin-top: 2px;
+  color: var(--c-text-primary);
+}
+
+.hk-industry-comparison__stat-val--mono {
+  font-family: var(--c-font-mono);
+}
+
+.hk-industry-comparison__rank-primary {
+  color: var(--c-primary);
+}
+
+.hk-industry-comparison__rank-accent {
+  color: var(--c-accent, #722ed1);
+}
+
+.hk-industry-comparison__footnote {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--c-text-secondary);
+}

@@ -85,7 +85,7 @@ export default function FinanceTab() {
         <Card size="small" className="macro-kpi-card" variant="borderless">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <span style={{ fontSize: 12, color: c.textSecondary }}>1年期 LPR (短端贷款)</span>
-            <Tag color="green" icon={<BankOutlined />}>企业融资基准</Tag>
+            <Tag color="blue" icon={<BankOutlined />}>企业融资基准</Tag>
           </div>
           <Statistic
             value={lpr1y != null ? `${lpr1y.toFixed(2)}%` : "-"}

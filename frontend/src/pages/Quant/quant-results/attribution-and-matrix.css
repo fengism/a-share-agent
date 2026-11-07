@@ -1,0 +1,249 @@
+/* 回测 AI 战术归因与多标的盈亏矩阵样式 */
+
+/* AI 策略战术归因 */
+.quant-ai-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.quant-ai-title-icon {
+  color: var(--c-primary);
+  font-size: 16px;
+}
+
+.quant-ai-card {
+  margin-bottom: var(--c-space-4);
+}
+
+.quant-ai-score-box {
+  padding: var(--c-space-4);
+  height: 100%;
+  border-radius: var(--c-radius-sm);
+  background: color-mix(in srgb, var(--c-primary) 5%, var(--c-nested-bg));
+  border: 1px solid color-mix(in srgb, var(--c-primary) 18%, var(--c-border));
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.quant-ai-score-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.quant-ai-score-label {
+  font-size: 13px;
+  color: var(--c-text-muted);
+}
+
+.quant-ai-score-val {
+  font-size: 24px;
+  font-weight: 800;
+  font-family: var(--c-font-mono);
+  color: var(--c-text-primary);
+}
+
+.quant-ai-score-val--high {
+  color: var(--c-up);
+}
+
+.quant-ai-score-total {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--c-text-muted);
+}
+
+.quant-ai-progress {
+  margin-top: 6px;
+  margin-bottom: 12px;
+}
+
+.quant-ai-eval-text {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--c-text-primary);
+}
+
+.quant-ai-p-reset {
+  margin: 0;
+}
+
+.quant-ai-p-muted {
+  margin: 0;
+  color: var(--c-text-muted);
+}
+
+.quant-ai-p-sub {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--c-text-muted);
+}
+
+.quant-ai-badges-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 12px;
+}
+
+.quant-ai-factors-col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.quant-ai-factor-card {
+  padding: var(--c-pad-inset, 7px 12px);
+  border-radius: var(--c-radius-sm);
+  background: var(--c-nested-bg);
+  border: 1px solid var(--c-border);
+}
+
+.quant-ai-factor-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.quant-ai-thunder-icon {
+  color: var(--c-warning, #fa8c16);
+}
+
+.quant-ai-primary-icon {
+  color: var(--c-primary);
+}
+
+.quant-ai-factor-title {
+  font-size: 13px;
+}
+
+.quant-ai-tag.ant-tag {
+  margin: 0;
+  font-size: 11px;
+}
+
+.quant-ai-paragraph.ant-typography {
+  margin: 0;
+  font-size: 12px;
+  color: var(--c-text-muted);
+  line-height: 1.6;
+}
+
+/* 多标的盈亏矩阵 (Constituent Performance Matrix) */
+.quant-cpm-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.quant-cpm-title-icon {
+  color: var(--c-primary);
+  font-size: 16px;
+}
+
+.quant-cpm-card {
+  margin-bottom: var(--c-space-4);
+}
+
+.quant-cpm-highlights-row {
+  margin-bottom: var(--c-space-4);
+}
+
+.quant-cpm-highlight-card {
+  padding: var(--c-pad-inset, 7px 12px);
+  border-radius: var(--c-radius-sm);
+  background: var(--c-nested-bg);
+  border: 1px solid var(--c-border);
+}
+
+.quant-cpm-highlight-card--up {
+  background: color-mix(in srgb, var(--c-up) 8%, var(--c-nested-bg));
+  border-color: color-mix(in srgb, var(--c-up) 22%, var(--c-border));
+}
+
+.quant-cpm-highlight-card--primary {
+  background: color-mix(in srgb, var(--c-primary) 8%, var(--c-nested-bg));
+  border-color: color-mix(in srgb, var(--c-primary) 22%, var(--c-border));
+}
+
+.quant-cpm-highlight-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--c-text-muted);
+}
+
+.quant-cpm-highlight-body {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-top: 4px;
+}
+
+.quant-cpm-stock-name {
+  font-size: 14px;
+}
+
+.quant-cpm-pnl--up {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--c-up);
+}
+
+.quant-cpm-icon--primary {
+  color: var(--c-primary);
+}
+
+.quant-cpm-icon--warning {
+  color: var(--c-warning, #fa8c16);
+}
+
+.quant-cpm-winrate-tag.ant-tag {
+  margin: 0;
+  font-weight: 600;
+}
+
+.quant-cpm-trades-count {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.quant-cpm-code-link {
+  font-weight: 600;
+}
+
+.quant-cpm-stock-subname {
+  color: var(--c-text-muted);
+  font-size: 12px;
+}
+
+.quant-cpm-cell-pnl {
+  font-weight: 700;
+}
+
+.quant-cpm-table-tag.ant-tag {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.quant-cpm-num-sm {
+  font-size: 12px;
+}
+
+.quant-cpm-trades-sub {
+  color: var(--c-text-muted);
+  margin-left: 4px;
+}
+
+.quant-cpm-fee-num {
+  font-size: 12px;
+  color: var(--c-text-muted);
+}
+
+.quant-cpm-action-link {
+  font-size: 12px;
+}

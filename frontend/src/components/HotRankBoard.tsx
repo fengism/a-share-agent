@@ -19,8 +19,9 @@ import {
 } from "../api/queries";
 import type { ThsHotPlate, ThsHotStock } from "../types/stock";
 import { formatHotValue } from "../utils/format";
-import { useColors, useTokens, semanticTagStyle } from "../styles/ui";
+import { useColors, useTokens } from "../styles/ui";
 import { rankBadge } from "./rankBadge";
+import "./hot-rank-board.css";
 
 type TabKey = "stock" | "concept" | "industry";
 
@@ -57,6 +58,7 @@ interface HorizontalScrollAreaProps {
 }
 
 function HorizontalScrollArea({ children, contentWidth, label }: HorizontalScrollAreaProps) {
+  const contentStyle = useMemo(() => ({ minWidth: contentWidth }), [contentWidth]);
   const dragState = useRef({
     pointerId: -1,
     startX: 0,
@@ -131,7 +133,7 @@ function HorizontalScrollArea({ children, contentWidth, label }: HorizontalScrol
     >
       <div
         className="hot-rank-horizontal-scroll__content"
-        style={{ minWidth: contentWidth }}
+        style={contentStyle}
       >
         {children}
       </div>
@@ -156,67 +158,35 @@ function StockTable({ enabled, scrollY }: { enabled: boolean; scrollY: number })
           render: (_: unknown, record: ThsHotStock) => {
             const conceptTags = record.concept_tag ? record.concept_tag.split(";").filter(Boolean).slice(0, 2) : [];
             return (
-              <div style={{ display: "flex", alignItems: "flex-start", gap: t.space[2] }}>
-                <div style={{ marginTop: 2, flexShrink: 0 }}>{rankBadge(record.rank, c, t)}</div>
-                <div style={{ minWidth: 0, flex: 1 }}>
+              <div className="hot-rank-stock-row">
+                <div className="hot-rank-badge-wrap">{rankBadge(record.rank, c, t)}</div>
+                <div className="hot-rank-stock-col">
                   <StockExternalLink
                     code={record.code}
                     name={record.name}
                     className="hot-rank-stock-link"
-                    style={{ minWidth: 0, color: c.primary }}
                   >
-                    <div style={{ display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
-                      <span
-                        style={{
-                          color: c.textPrimary,
-                          fontWeight: Number(t.weight.semibold),
-                          fontSize: t.font.sm,
-                          lineHeight: "1.3",
-                        }}
-                      >
+                    <div className="hot-rank-name-row">
+                      <span className="hot-rank-name-text">
                         {record.name}
                       </span>
-                      <span
-                        style={{
-                          color: c.textMuted,
-                          fontSize: t.font.xs,
-                          fontFamily: "var(--c-font-mono)",
-                        }}
-                      >
+                      <span className="hot-rank-code-text">
                         {record.code}
                       </span>
                     </div>
                   </StockExternalLink>
                   {(conceptTags.length > 0 || record.pop_tag) ? (
-                    <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 3 }}>
+                    <div className="hot-rank-tags-row">
                       {conceptTags.map((tag) => (
                         <span
                           key={tag}
-                          style={{
-                            fontSize: 10,
-                            lineHeight: "14px",
-                            padding: "0 4px",
-                            borderRadius: 3,
-                            background: `${c.primary}18`,
-                            color: c.primary,
-                            whiteSpace: "nowrap",
-                          }}
+                          className="hot-rank-concept-badge"
                         >
                           {tag}
                         </span>
                       ))}
                       {record.pop_tag ? (
-                        <span
-                          style={{
-                            fontSize: 10,
-                            lineHeight: "14px",
-                            padding: "0 4px",
-                            borderRadius: 3,
-                            background: `${c.warning}18`,
-                            color: c.warning,
-                            whiteSpace: "nowrap",
-                          }}
-                        >
+                        <span className="hot-rank-pop-badge">
                           {record.pop_tag}
                         </span>
                       ) : null}
@@ -240,7 +210,7 @@ function StockTable({ enabled, scrollY }: { enabled: boolean; scrollY: number })
           width: 76,
           align: "right",
           render: (value: number | null) => (
-            <span style={{ fontWeight: Number(t.weight.semibold), color: c.up, fontSize: t.font.sm, whiteSpace: "nowrap" }}>
+            <span className="hot-rank-val--up-sm">
               {formatHotValue(value)}
             </span>
           ),
@@ -259,7 +229,6 @@ function StockTable({ enabled, scrollY }: { enabled: boolean; scrollY: number })
           code={code}
           name={record.name}
           className="hot-rank-stock-link hot-rank-stock-code"
-          style={{ color: c.primary, fontWeight: Number(t.weight.medium), fontFamily: "var(--c-font-mono)" }}
         >
           {code}
         </StockExternalLink>
@@ -275,7 +244,6 @@ function StockTable({ enabled, scrollY }: { enabled: boolean; scrollY: number })
           code={record.code}
           name={name}
           className="hot-rank-stock-link hot-rank-stock-name"
-          style={{ color: c.textPrimary, fontWeight: Number(t.weight.medium) }}
         >
           {name}
         </StockExternalLink>
@@ -294,7 +262,7 @@ function StockTable({ enabled, scrollY }: { enabled: boolean; scrollY: number })
       width: 80,
       align: "right",
       render: (value: number | null) => (
-        <span style={{ fontWeight: Number(t.weight.semibold), color: c.up }}>
+        <span className="hot-rank-val--up">
           {formatHotValue(value)}
         </span>
       ),
@@ -309,7 +277,7 @@ function StockTable({ enabled, scrollY }: { enabled: boolean; scrollY: number })
               .split(";")
               .slice(0, 3)
               .map((tag, index) => (
-                <Tag key={index} style={{ fontSize: t.font.xs, marginBottom: t.space[1] }}>
+                <Tag key={index} className="hot-rank-concept-tag">
                   {tag}
                 </Tag>
               ))
@@ -329,7 +297,7 @@ function StockTable({ enabled, scrollY }: { enabled: boolean; scrollY: number })
 
   return (
     <div ref={containerRef}>
-      <div style={{ minHeight: 22, display: "flex", justifyContent: "flex-end" }}>
+      <div className="hot-rank-refresh-row">
         <DataRefreshIndicator active={isFetching && !isLoading} />
       </div>
       <SectionDataState
@@ -357,7 +325,7 @@ function StockTable({ enabled, scrollY }: { enabled: boolean; scrollY: number })
               columnWidth: 32,
             } : undefined}
             scroll={{ x: isNarrow ? undefined : WIDE_STOCK_TABLE_WIDTH, y: scrollY }}
-            style={{ width: "100%" }}
+            className="u-w-full"
           />
         </HorizontalScrollArea>
       </SectionDataState>
@@ -389,53 +357,24 @@ function PlateTable({
           title: type === "concept" ? "概念" : "行业",
           key: "plate",
           render: (_: unknown, record: ThsHotPlate) => (
-            <div style={{ display: "flex", alignItems: "flex-start", gap: t.space[2] }}>
-              <div style={{ marginTop: 2, flexShrink: 0 }}>{rankBadge(record.rank, c, t)}</div>
-              <div style={{ minWidth: 0, flex: 1 }}>
+            <div className="hot-rank-stock-row">
+              <div className="hot-rank-badge-wrap">{rankBadge(record.rank, c, t)}</div>
+              <div className="hot-rank-stock-col">
                 <span
-                  style={{
-                    display: "block",
-                    color: c.textPrimary,
-                    fontWeight: Number(t.weight.semibold),
-                    fontSize: t.font.sm,
-                    lineHeight: "1.3",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
+                  className="hot-rank-plate-name"
                   title={record.name}
                 >
                   {record.name}
                 </span>
                 {(record.hot_tag || record.tag) ? (
-                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 3 }}>
+                  <div className="hot-rank-tags-row">
                     {record.hot_tag ? (
-                      <span
-                        style={{
-                          fontSize: 10,
-                          lineHeight: "14px",
-                          padding: "0 4px",
-                          borderRadius: 3,
-                          background: `${c.primary}18`,
-                          color: c.primary,
-                          whiteSpace: "nowrap",
-                        }}
-                      >
+                      <span className="hot-rank-concept-badge">
                         {record.hot_tag}
                       </span>
                     ) : null}
                     {record.tag ? (
-                      <span
-                        style={{
-                          fontSize: 10,
-                          lineHeight: "14px",
-                          padding: "0 4px",
-                          borderRadius: 3,
-                          background: `${c.warning}18`,
-                          color: c.warning,
-                          whiteSpace: "nowrap",
-                        }}
-                      >
+                      <span className="hot-rank-pop-badge">
                         {record.tag}
                       </span>
                     ) : null}
@@ -458,7 +397,7 @@ function PlateTable({
           width: 76,
           align: "right",
           render: (value: number | null) => (
-            <span style={{ fontWeight: Number(t.weight.semibold), color: c.up, fontSize: t.font.sm, whiteSpace: "nowrap" }}>
+            <span className="hot-rank-val--up-sm">
               {formatHotValue(value)}
             </span>
           ),
@@ -473,7 +412,7 @@ function PlateTable({
       dataIndex: "name",
       width: 160,
       ellipsis: true,
-      render: (name: string) => <span style={{ fontWeight: Number(t.weight.medium) }}>{name}</span>,
+      render: (name: string) => <span className="hot-rank-name--medium">{name}</span>,
     },
     {
       title: "涨跌幅",
@@ -488,7 +427,7 @@ function PlateTable({
       width: 80,
       align: "right",
       render: (value: number | null) => (
-        <span style={{ fontWeight: Number(t.weight.semibold), color: c.up }}>
+        <span className="hot-rank-val--up">
           {formatHotValue(value)}
         </span>
       ),
@@ -498,14 +437,14 @@ function PlateTable({
       dataIndex: "hot_tag",
       width: 140,
       render: (tag: string) =>
-        tag ? <Tag style={{ ...semanticTagStyle("primary"), fontSize: t.font.xs }}>{tag}</Tag> : "-",
+        tag ? <Tag className="hot-rank-tag-primary">{tag}</Tag> : "-",
     },
     {
       title: "涨跌停",
       dataIndex: "tag",
       width: 110,
       render: (tag: string) =>
-        tag ? <Tag style={{ ...semanticTagStyle("warning"), fontSize: t.font.xs }}>{tag}</Tag> : "-",
+        tag ? <Tag className="hot-rank-tag-warning">{tag}</Tag> : "-",
     },
     ];
   }, [c, t, isNarrow, type]);
@@ -521,7 +460,7 @@ function PlateTable({
 
   return (
     <div ref={containerRef}>
-      <div style={{ minHeight: 22, display: "flex", justifyContent: "flex-end" }}>
+      <div className="hot-rank-refresh-row">
         <DataRefreshIndicator active={isFetching && !isLoading} />
       </div>
       <SectionDataState
@@ -548,7 +487,7 @@ function PlateTable({
               expandedRowRender: renderExpandedRow,
               columnWidth: 32,
             } : undefined}
-            style={{ width: "100%" }}
+            className="u-w-full"
           />
         </HorizontalScrollArea>
       </SectionDataState>
@@ -561,8 +500,6 @@ interface HotRankContentProps {
 }
 
 export function HotRankContent({ embedded = false }: HotRankContentProps) {
-  const c = useColors();
-  const t = useTokens();
   const [tab, setTab] = useState<TabKey>("stock");
   const tableScrollY = embedded ? 440 : 600;
 
@@ -570,48 +507,23 @@ export function HotRankContent({ embedded = false }: HotRankContentProps) {
     <>
       <Card
         size="small"
-        style={{
-          marginBottom: embedded ? t.space[3] : t.space[4],
-          borderRadius: t.radius.lg,
-          border: "none",
-          boxShadow: t.shadow.xs,
-        }}
-        styles={{ body: { padding: embedded ? `${t.space[2]} ${t.space[3]}` : `${t.space[3]} ${t.space[4]}` } }}
+        className={`hot-rank-card ${embedded ? "hot-rank-card--embedded-header" : "hot-rank-card--header"}`}
       >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            flexWrap: "wrap",
-            gap: "6px 12px",
-          }}
-        >
+        <div className="hot-rank-header-content">
           <Segmented
             size={embedded ? "small" : "middle"}
             options={TAB_OPTIONS}
             value={tab}
             onChange={(value) => setTab(value as TabKey)}
           />
-          <span style={{ color: c.textSecondary, fontSize: t.font.xs, whiteSpace: "nowrap" }}>
+          <span className="hot-rank-update-text">
             {embedded ? "每分钟自动更新" : "5分钟更新"}
           </span>
         </div>
       </Card>
       <Card
         size="small"
-        style={{
-          borderRadius: t.radius.lg,
-          border: "none",
-          boxShadow: t.shadow.xs,
-        }}
-        styles={{
-          body: {
-            padding: embedded
-              ? `${t.space[1]} ${t.space[1]}`
-              : `${t.space[2]} ${t.space[4]}`,
-          },
-        }}
+        className={`hot-rank-card ${embedded ? "hot-rank-card--embedded-body" : "hot-rank-card--body"}`}
       >
         {tab === "stock" && (
           <StockTable enabled={tab === "stock"} scrollY={tableScrollY} />

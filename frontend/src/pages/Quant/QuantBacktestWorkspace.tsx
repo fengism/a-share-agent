@@ -42,8 +42,6 @@ export default function QuantBacktestWorkspace({
         onChange={(key) => setActivePanel(key as BacktestPanel)}
         ariaLabel="量化回测视图"
         size="middle"
-        tabBarGutter={12}
-        tabBarStyle={{ marginBottom: 20, fontWeight: "var(--c-weight-bold)" }}
         preserveVisited
         items={[
           {

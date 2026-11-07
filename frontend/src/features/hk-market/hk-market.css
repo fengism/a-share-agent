@@ -15,7 +15,7 @@
 }
 
 .hk-market-header--embedded {
-  margin-bottom: 4px;
+  margin-bottom: 12px;
 }
 
 .hk-market-header-actions {
@@ -277,12 +277,13 @@
   transition: background-color 0.15s ease;
 }
 
-.hk-stock-row-selected > td {
-  background: var(--c-primary-soft, rgba(22, 119, 255, 0.08)) !important;
+.hk-market-page .ant-table-wrapper .ant-table-tbody > tr.hk-stock-row-selected > td,
+.hk-market-page .ant-table-wrapper .ant-table-tbody > tr.hk-stock-row-selected:hover > td {
+  background: var(--c-primary-soft, rgba(22, 119, 255, 0.08));
 }
 
-.hk-stock-row-selected > td:first-child {
-  border-left: 3px solid var(--c-primary) !important;
+.hk-market-page .ant-table-wrapper .ant-table-tbody > tr.hk-stock-row-selected > td:first-child {
+  border-left: 3px solid var(--c-primary);
 }
 
 .hk-stock-name-cell {
@@ -336,8 +337,9 @@
     max-width: 100%;
     overflow-x: auto;
   }
-  .hk-index-button .ant-card-body {
-    padding: 10px 12px !important;
+  .hk-index-button .ant-card:not(.ant-card-small) > .ant-card-body,
+  .hk-index-button .ant-card > .ant-card-body {
+    padding: 10px 12px;
   }
   .hk-index-price {
     font-size: clamp(16px, 4.2vw, 20px);

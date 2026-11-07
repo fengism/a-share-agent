@@ -9,6 +9,7 @@ import ToolResultSummary from "../features/agent-process/ToolResultSummary";
 import { formatToolArguments } from "../utils/toolCall";
 import { semanticTagStyle } from "../styles/ui";
 import type { SemanticTagColor } from "../styles/ui";
+import "./agent-process-panel.css";
 
 const { Text } = Typography;
 
@@ -77,14 +78,14 @@ function ToolCallGroups({ toolCalls }: { toolCalls: ToolCallDisplay[] }) {
   if (toolGroups.length === 0) return null;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "var(--c-space-2)", marginTop: "var(--c-space-1)" }}>
+    <div className="agent-proc-tool-groups">
       {toolGroups.map(([name, tools]) => {
         const state = groupedToolStatus(tools);
         return (
-          <details key={name} style={{ border: "1px solid var(--c-border)", borderRadius: "var(--c-radius-md)", padding: "var(--c-space-2) var(--c-space-3)" }}>
-            <summary style={{ display: "flex", alignItems: "center", gap: "var(--c-space-2)", cursor: "pointer" }}>
+          <details key={name} className="agent-proc-tool-group">
+            <summary className="agent-proc-tool-summary">
               <ToolOutlined />
-              <span style={{ display: "flex", minWidth: 0, flex: 1, flexWrap: "wrap", alignItems: "center", gap: "var(--c-space-2)" }}>
+              <span className="agent-proc-tool-names">
                 <Text>{toolDisplayName(name)}</Text>
                 {toolDisplayName(name) !== name ? <Text code>{name}</Text> : null}
               </span>
@@ -93,12 +94,12 @@ function ToolCallGroups({ toolCalls }: { toolCalls: ToolCallDisplay[] }) {
             {tools.map((tool, index) => {
               const callState = toolStatus(tool);
               return (
-                <div key={tool.id} style={{ marginTop: "var(--c-space-2)", paddingTop: "var(--c-space-2)", borderTop: "1px solid var(--c-border)" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: "var(--c-space-2)" }}>
+                <div key={tool.id} className="agent-proc-tool-call">
+                  <div className="agent-proc-tool-call-header">
                     <Text type="secondary">{tools.length > 1 ? `第 ${index + 1} 次调用` : "调用参数"}</Text>
                     {tools.length > 1 ? <Text type="secondary">{callState.label}</Text> : null}
                   </div>
-                  <pre style={{ maxHeight: 180, overflow: "auto", whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{formatToolArguments(tool.arguments)}</pre>
+                  <pre className="agent-proc-tool-args">{formatToolArguments(tool.arguments)}</pre>
                   <ToolResultSummary value={tool.resultSummary} />
                 </div>
               );
@@ -113,8 +114,8 @@ function ToolCallGroups({ toolCalls }: { toolCalls: ToolCallDisplay[] }) {
 function RoundField({ label, children }: { label: string; children: ReactElement | string }) {
   return (
     <div>
-      <Text type="secondary" style={{ fontSize: "var(--c-font-sm)" }}>{label}</Text>
-      <div style={{ marginTop: "var(--c-space-1)", color: "var(--c-text-primary)" }}>{children}</div>
+      <Text type="secondary" className="agent-proc-sm-label">{label}</Text>
+      <div className="agent-proc-field-value">{children}</div>
     </div>
   );
 }
@@ -122,7 +123,7 @@ function RoundField({ label, children }: { label: string; children: ReactElement
 function RoundList({ values, emptyText = "暂无" }: { values: string[]; emptyText?: string }) {
   if (values.length === 0) return <Text type="secondary">{emptyText}</Text>;
   return (
-    <ul style={{ margin: 0, paddingInlineStart: 20 }}>
+    <ul className="agent-proc-round-list">
       {values.map((value, index) => <li key={`${value}-${index}`}>{value}</li>)}
     </ul>
   );
@@ -148,36 +149,30 @@ function ResearchRounds({ rounds }: { rounds: AgentProcessRound[] }) {
   if (rounds.length === 0) return null;
 
   return (
-    <div aria-label="调研轮次" style={{ marginTop: "var(--c-space-4)" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: "var(--c-space-2)", marginBottom: "var(--c-space-2)" }}>
-        <BulbOutlined style={{ color: "var(--c-accent)" }} />
+    <div aria-label="调研轮次" className="agent-proc-rounds-container">
+      <div className="agent-proc-rounds-header">
+        <BulbOutlined className="agent-proc-accent-icon" />
         <Text strong>调研轮次</Text>
         <Text type="secondary">结构化推理摘要</Text>
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: "var(--c-space-3)" }}>
+      <div className="agent-proc-rounds-list">
         {rounds.map((round) => {
           const state = roundStatus(round);
           return (
             <section
               key={`${round.phase ?? "research"}:${round.roundIndex}`}
               aria-label={`${round.phase === "verification_repair" ? "补证 · " : ""}第 ${round.roundIndex} 轮调研`}
-              style={{
-                padding: "var(--c-space-3)",
-                border: "1px solid var(--c-border)",
-                borderLeft: `3px solid ${round.status === "degraded" ? "var(--c-warning)" : "var(--c-primary)"}`,
-                borderRadius: "var(--c-radius-md)",
-                background: "var(--c-hover-bg)",
-              }}
+              className={`agent-proc-round-card ${round.status === "degraded" ? "agent-proc-round-card--degraded" : "agent-proc-round-card--primary"}`}
             >
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--c-space-2)", marginBottom: "var(--c-space-3)" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "var(--c-space-2)" }}>
+              <div className="agent-proc-round-header">
+                <div className="agent-proc-round-title-group">
                   <Text strong>{round.phase === "verification_repair" ? "定向补证 · " : round.phase === "research" ? "主调研 · " : ""}第 {round.roundIndex} 轮</Text>
                   <Text type="secondary">计划最多 {round.roundTotal} 轮</Text>
                 </div>
                 <Tag icon={state.icon} style={semanticTagStyle(state.color)}>{state.label}</Tag>
               </div>
 
-              <div style={{ display: "grid", gap: "var(--c-space-3)" }}>
+              <div className="agent-proc-round-body">
                 <RoundField label="研究目标">{round.objective || "待确定"}</RoundField>
                 <RoundField label="当前证据缺口">
                   <RoundList values={round.evidenceGaps} emptyText="无" />
@@ -185,7 +180,7 @@ function ResearchRounds({ rounds }: { rounds: AgentProcessRound[] }) {
                 <RoundField label="工具选择依据">{round.toolSelectionReason || "待确定"}</RoundField>
                 <RoundField label="工具名称">
                   {round.toolNames.length > 0 ? (
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--c-space-2)" }}>
+                    <div className="agent-proc-tool-tags">
                       {round.toolNames.map((name) => <Text code key={name}>{name}</Text>)}
                     </div>
                   ) : <Text type="secondary">暂无</Text>}
@@ -201,7 +196,7 @@ function ResearchRounds({ rounds }: { rounds: AgentProcessRound[] }) {
                 <RoundField label="下一轮计划">{round.nextStep || (round.status === "running" ? "待本轮完成后生成" : "暂无")}</RoundField>
                 {round.toolCalls.length > 0 ? (
                   <div>
-                    <Text type="secondary" style={{ fontSize: "var(--c-font-sm)" }}>工具调用</Text>
+                    <Text type="secondary" className="agent-proc-sm-label">工具调用</Text>
                     <ToolCallGroups toolCalls={round.toolCalls} />
                   </div>
                 ) : null}
@@ -288,50 +283,38 @@ export default function AgentProcessPanel({
   ].filter(Boolean).join(" · ");
 
   return (
-    <section className="agent-process-panel pdf-hide" style={{ marginTop: "var(--c-space-5)", paddingTop: "var(--c-space-4)", borderTop: "1px solid var(--c-border)" }}>
+    <section className="agent-process-panel pdf-hide agent-proc-section">
       <button
         type="button"
         aria-expanded={expanded}
         onClick={() => setExpanded((current) => !current)}
-        style={{ display: "flex", width: "100%", alignItems: "center", justifyContent: "space-between", gap: "var(--c-space-3)", padding: 0, border: 0, color: "inherit", background: "transparent", textAlign: "left", cursor: "pointer" }}
+        className="agent-proc-toggle-btn"
       >
-        <div style={{ display: "flex", minWidth: 0, alignItems: "center", gap: "var(--c-space-2)" }}>
-          <RobotOutlined style={{ color: "var(--c-primary)" }} />
+        <div className="agent-proc-toggle-left">
+          <RobotOutlined className="agent-proc-robot-icon" />
           <div>
             <Text strong>Agent 思考与执行</Text>
-            {detail ? <div style={{ color: "var(--c-text-muted)", fontSize: "var(--c-font-sm)" }}>{detail}</div> : null}
+            {detail ? <div className="agent-proc-toggle-detail">{detail}</div> : null}
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "var(--c-space-2)" }}>
+        <div className="agent-proc-toggle-right">
           <Tag icon={badge.icon} style={semanticTagStyle(badge.color)}>
             {badge.label}
           </Tag>
-          <DownOutlined style={{ transform: expanded ? "rotate(180deg)" : undefined, transition: "transform .2s" }} />
+          <DownOutlined className={`agent-proc-down-icon ${expanded ? "agent-proc-down-icon--expanded" : ""}`} />
         </div>
       </button>
 
       {expanded ? (
-        <div style={{ marginTop: "var(--c-space-3)" }}>
+        <div className="agent-proc-content">
           {status && (
             <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "var(--c-space-2)",
-                color: isRunning ? "var(--c-primary)" : "var(--c-text-secondary)",
-                fontSize: "var(--c-font-md)",
-                marginBottom: "var(--c-space-3)",
-                padding: isRunning ? "var(--c-space-2) var(--c-space-3)" : undefined,
-                background: isRunning ? "var(--c-hover-bg)" : undefined,
-                borderLeft: isRunning ? "3px solid var(--c-primary)" : undefined,
-                borderRadius: isRunning ? "var(--c-radius-md)" : undefined,
-                fontWeight: isRunning ? "var(--c-weight-semibold)" : undefined,
-              }}
+              className={`agent-proc-status-bar ${isRunning ? "agent-proc-status-bar--running" : ""}`}
             >
-              {isRunning ? <LoadingOutlined spin style={{ color: "var(--c-primary)" }} /> : null}
-              <span style={{ flex: 1 }}>{status}</span>
+              {isRunning ? <LoadingOutlined spin className="agent-proc-loading-icon" /> : null}
+              <span className="agent-proc-status-text">{status}</span>
               {isRunning && elapsedSeconds > 0 ? (
-                <span style={{ color: "var(--c-text-muted)", fontSize: "var(--c-font-sm)", fontWeight: "normal" }}>
+                <span className="agent-proc-elapsed-time">
                   已耗时 {elapsedSeconds}s
                 </span>
               ) : null}
@@ -339,11 +322,11 @@ export default function AgentProcessPanel({
           )}
 
           {plan?.summary ? (
-            <div style={{ display: "flex", alignItems: "flex-start", gap: "var(--c-space-2)", marginBottom: "var(--c-space-3)", color: "var(--c-text-secondary)" }}>
-              <BulbOutlined style={{ marginTop: 3, color: "var(--c-accent)" }} />
+            <div className="agent-proc-plan-summary-row">
+              <BulbOutlined className="agent-proc-bulb-icon" />
               <div>
                 <Text strong>思路摘要</Text>
-                <div style={{ marginTop: "var(--c-space-1)" }}>{plan.summary}</div>
+                <div className="agent-proc-plan-text">{plan.summary}</div>
               </div>
             </div>
           ) : null}
@@ -362,13 +345,13 @@ export default function AgentProcessPanel({
           ) : null}
 
           {degradedSteps.length > 0 ? (
-            <div aria-label="Agent 数据缺口" style={{ marginBottom: "var(--c-space-3)", padding: "var(--c-space-3)", border: "1px solid var(--c-border)", borderLeft: "3px solid var(--c-warning)", borderRadius: "var(--c-radius-md)", background: "var(--c-hover-bg)" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "var(--c-space-2)", color: "var(--c-warning)", fontWeight: "var(--c-weight-semibold)" }}>
+            <div aria-label="Agent 数据缺口" className="agent-proc-degraded-box">
+              <div className="agent-proc-degraded-header">
                 <WarningOutlined />
                 数据缺口
               </div>
               {degradedSteps.map((step) => (
-                <div key={step.id} style={{ marginTop: "var(--c-space-2)", color: "var(--c-text-secondary)" }}>
+                <div key={step.id} className="agent-proc-degraded-item">
                   <strong>{step.title}</strong>
                   {step.detail || step.description ? ` · ${step.detail || step.description}` : ""}
                 </div>

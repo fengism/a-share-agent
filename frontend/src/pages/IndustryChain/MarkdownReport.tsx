@@ -4,7 +4,7 @@ import remarkGfm from "remark-gfm";
 import { readableReferences } from "./reportPresentation";
 import { tryExtractFromJson } from "./reportHelpers";
 import type { IndustryChainEvidence } from "../../types/stock";
-import "./industry-report.css";
+import "./styles/index.css";
 
 const markdownPlugins = [remarkGfm, remarkBreaks];
 

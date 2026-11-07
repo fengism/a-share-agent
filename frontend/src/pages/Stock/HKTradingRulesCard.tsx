@@ -1,17 +1,15 @@
 import { CompassOutlined } from "@ant-design/icons";
 import { Card } from "antd";
-import { useColors, useStyles } from "../../styles/ui";
+import { useColors } from "../../styles/ui";
 import StockSectionTitle from "./StockSectionTitle";
 
 export default function HKTradingRulesCard() {
   const colors = useColors();
-  const { cardStyle } = useStyles();
 
   return (
     <Card
-      className="stock-section-card stock-business-intro-card"
+      className="stock-section-card stock-business-intro-card u-card"
       title={<StockSectionTitle icon={<CompassOutlined />} title="港股交易规则" description="香港证券市场交易机制速览" />}
-      style={cardStyle}
     >
       <div style={{ display: "grid", gap: 12 }}>
         <div style={{ padding: "var(--c-pad-inset, 7px 12px)", background: colors.nestedBg, borderRadius: 8, borderLeft: `3px solid ${colors.primary}` }}>

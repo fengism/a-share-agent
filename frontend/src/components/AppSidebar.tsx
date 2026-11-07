@@ -11,7 +11,7 @@ import { themes } from "../theme/themes";
 import type { ThemeKey } from "../styles/ui";
 import { useRoutePreload } from "../routes/RoutePreloadContext";
 import { loadMobileSidebarDrawer } from "./mobileSidebarDrawerLoader";
-import { NAV_GROUPS } from "./navConfig";
+import { NAV_GROUPS, NAV_UTILITY_ITEMS } from "./navConfig";
 import type { NavItemConfig } from "./navConfig";
 
 const MobileSidebarDrawer = lazy(loadMobileSidebarDrawer);
@@ -144,25 +144,42 @@ export default function AppSidebar({
           aria-label="主导航"
         >
           {isCollapsed
-            ? NAV_GROUPS.map((group, groupIdx) => (
-                <div key={group.key} className="app-sidebar-nav__collapsed-group">
-                  {groupIdx > 0 && <div className="app-sidebar-nav__divider" aria-hidden="true" />}
-                  {group.items.map(renderRoute)}
-                </div>
-              ))
-            : NAV_GROUPS.map((group) => (
-                <div className="app-sidebar-nav__group" key={group.key}>
-                  <div className="app-sidebar-nav__group-title">
-                    {group.icon && (
-                      <span className="app-sidebar-nav__group-icon" aria-hidden="true">
-                        {group.icon}
-                      </span>
-                    )}
-                    <span>{group.label}</span>
+            ? (
+                <>
+                  {NAV_GROUPS.map((group, groupIdx) => (
+                    <div key={group.key} className="app-sidebar-nav__collapsed-group">
+                      {groupIdx > 0 && <div className="app-sidebar-nav__divider" aria-hidden="true" />}
+                      {group.items.map(renderRoute)}
+                    </div>
+                  ))}
+                  <div className="app-sidebar-nav__collapsed-group">
+                    <div className="app-sidebar-nav__divider" aria-hidden="true" />
+                    {NAV_UTILITY_ITEMS.map(renderRoute)}
                   </div>
-                  {group.items.map(renderRoute)}
-                </div>
-              ))}
+                </>
+              )
+            : (
+                <>
+                  {NAV_GROUPS.map((group) => (
+                    <div className="app-sidebar-nav__group" key={group.key}>
+                      <div className="app-sidebar-nav__group-title">
+                        {group.icon && (
+                          <span className="app-sidebar-nav__group-icon" aria-hidden="true">
+                            {group.icon}
+                          </span>
+                        )}
+                        <span>{group.label}</span>
+                      </div>
+                      {group.items.map(renderRoute)}
+                    </div>
+                  ))}
+                  {/* 运维工具区：无分组标题，仅分隔线，避免与业务工作区争注意力 */}
+                  <div className="app-sidebar-nav__utility">
+                    <div className="app-sidebar-nav__divider" aria-hidden="true" />
+                    {NAV_UTILITY_ITEMS.map(renderRoute)}
+                  </div>
+                </>
+              )}
         </nav>
 
         <div
