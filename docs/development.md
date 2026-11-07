@@ -121,7 +121,8 @@ cd frontend && npx playwright install chromium  # 前端 E2E 与 README 配图�
   与 CSS `!important` 设有**总量预算**，并对单个 CSS 文件设有**行数上限**与**结构体检**：
   都只允许下降，不允许上调。收敛一批后请同步下调脚本里的 `INLINE_STYLE_BUDGET` /
   `IMPORTANT_BUDGET` / `MAX_CSS_LINES`。新样式优先写成页面 CSS 类并复用 `--c-*` 变量，
-  不要把布局与颜色继续塞进行内样式。
+  不要把布局与颜色继续塞进行内样式。本地可用 `npm run lint:all` 额外执行 `api:check`
+  校验 OpenAPI 生成物是否与后端一致（需本地 `uv` 可用）。
 - **A 股色彩纪律门禁**：`frontend/scripts/check-color-discipline.mjs`（已接入 `npm run lint`）。
   A 股交易软件有极其严格的心智模型：**红（涨 / 净流入 / 涨停）、绿（跌 / 净流出 / 跌停）必须专用于价格与资金**。
   严禁在非价格维度（如业务分类、阶段标识、普通成功/失败标签、主营构成条）滥用 `color="red"` / `color="green"` /
@@ -211,6 +212,9 @@ cd frontend && npx playwright install chromium  # 前端 E2E 与 README 配图�
   元素数供差分脚本报警；
   ④ 仍残留的单点差异，先用「同一份代码单独跑」排除指针 hover/focus 状态抖动
   （如 antd 单选按钮的琥珀色派生色、fund-flow 卡片阴影翻转），再判定为回归。
+  ⑤ **把内联样式改成 className 时，不能用默认差分脚本**：dump 的键包含 className，
+  类名变化会让同一元素变成「新增/删除」而被忽略，得出假“零差异”。类名迁移的 A/B
+  必须按 dump 的文档顺序对齐（`Object.entries` 顺序）逐属性比较，并允许“预期内的颜色/规格变更”清单。
 
   **判定任何差异前先跑一次同代码对照**：这是唯一能把「回归」和「噪声」分开的手段。
   本仓库已两次靠它避免误判（ant-steps 字体度量竞态、滚动条 18px 级联）。
@@ -218,13 +222,13 @@ cd frontend && npx playwright install chromium  # 前端 E2E 与 README 配图�
   声明和孤立的 `}`。浏览器静默跳过，所以没人发现，但它让 postcss/压缩器/`@import` 直接报
   `Unexpected }`。**构建通过不等于 CSS 合法**；门禁按“顶层语句边界”判定（不猜属性名，
   避免把 `::before`、`:hover` 误判），已能拦住这类残渣。
-- **全局样式目录**：`frontend/src/styles/base/` 是原 2637 行 `base.css` 按关注点拆出的 13 个分片，
+- **全局样式目录**：`frontend/src/styles/base/` 是原 2637 行 `base.css` 按关注点拆出的 15 个分片，
   由同目录 `index.css` 按固定顺序 `@import`。页面级巨型样式同样拆到页内的
   `styles/` 或同名子目录（`NationalTeam` 9 片、`IndustryChain` 8 片、`Stock` 6 片、`Macro` 5 片、
   `Watchlist` 7 片、`Chat` 4 片、`Concept` 4 片、`Dashboard` 3 片、`Settings` 3 片、
   `Analysis/workspace` 3 片、`Quant/quant-results` 3 片、`Market/market-emotion` 3 片、
-  `Settings/config-cards/market-daily-bar-manager` 4 片，`features/feed` 6 片、
-  `features/investment-research` 8 片）；
+  `Settings/config-cards/market-daily-bar-manager` 4 片、`Portfolio` 5 片、`Potential` 1 片、
+  `features/feed` 6 片、`features/investment-research` 8 片）；
   组件级巨型样式放在与样式同名的子目录里（如 `components/market-overview/` 7 片、
   `components/market-wind/` 3 片，入口 `index.css`）。**不要重排 `@import` 顺序**——同特异性规则靠源序决胜负，
   重排会改变层叠结果。拆分时必须用 postcss 顶层节点边界（`node.source.start.line`）切，
