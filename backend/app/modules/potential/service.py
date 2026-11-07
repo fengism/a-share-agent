@@ -45,6 +45,10 @@ _TRADING_CALENDAR_LOOKBACK_DAYS = constants._TRADING_CALENDAR_LOOKBACK_DAYS
 _DAILY_MINING_CUTOFF = constants._DAILY_MINING_CUTOFF
 _THEME_CONCEPT_LIMIT = constants._THEME_CONCEPT_LIMIT
 
+# 风格判定阈值（集中在此处，便于后续做成可配置项）
+_MIN_ANCHOR_MARKET_CAP = 300.0  # 亿元
+_MIN_QUALITY_FUNDAMENTAL_SCORE = 0.6
+
 _mining_singleflight: AsyncSingleFlight[PotentialDailyResult] = AsyncSingleFlight()
 
 def _assign_stock_category(item: dict) -> tuple[str, str]:
@@ -55,7 +59,9 @@ def _assign_stock_category(item: dict) -> tuple[str, str]:
     fundamental_score = item.get("fundamental_score") or 0.0
 
     # 1. 机构中军：大市值（>=300亿）且走趋势或稳健形态
-    if market_cap >= 300 and ("trend" in signal_types or any("趋势" in s or "均线" in s for s in strategies)):
+    if market_cap >= _MIN_ANCHOR_MARKET_CAP and (
+        "trend" in signal_types or any("趋势" in s or "均线" in s for s in strategies)
+    ):
         return "anchor", "机构中军"
 
     # 2. 超跌反转：底部放量、超跌、单阳等反转信号
@@ -63,7 +69,7 @@ def _assign_stock_category(item: dict) -> tuple[str, str]:
         return "reversal", "超跌反转"
 
     # 3. 价值优选：基本面评分突出
-    if fundamental_score >= 0.6:
+    if fundamental_score >= _MIN_QUALITY_FUNDAMENTAL_SCORE:
         return "quality", "价值优选"
 
     # 4. 默认/高弹性题材突破：趋势先锋
@@ -73,19 +79,24 @@ def _assign_stock_category(item: dict) -> tuple[str, str]:
 def _select_top_picks(items: list[PotentialStockItem]) -> list[PotentialStockItem]:
     """精选最多 3 只涵盖不同投资风格（先锋、中军、反转/优质）的核心标的。"""
     picks: list[PotentialStockItem] = []
+    picked_codes: set[str] = set()
     seen_categories: set[str] = set()
     for item in items:
-        if item.category not in seen_categories:
-            picks.append(item)
-            seen_categories.add(item.category)
-            if len(picks) >= 3:
-                break
+        if item.code in picked_codes or item.category in seen_categories:
+            continue
+        picks.append(item)
+        picked_codes.add(item.code)
+        seen_categories.add(item.category)
+        if len(picks) >= 3:
+            break
     if len(picks) < 3:
         for item in items:
-            if item not in picks:
-                picks.append(item)
-                if len(picks) >= 3:
-                    break
+            if item.code in picked_codes:
+                continue
+            picks.append(item)
+            picked_codes.add(item.code)
+            if len(picks) >= 3:
+                break
     return picks
 
 

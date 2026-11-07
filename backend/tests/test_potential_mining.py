@@ -726,6 +726,40 @@ def test_assign_stock_category_and_select_top_picks() -> None:
     assert pick_categories == {"anchor", "pioneer", "reversal"}
 
 
+def test_assign_stock_category_thresholds() -> None:
+    """风栌阈值以常量为准：300 亿市值、0.6 基本面分。"""
+    base = {"code": "x", "name": "x", "market_cap": 100.0, "signal_types": [], "strategies": []}
+
+    assert service._assign_stock_category({**base, "fundamental_score": 0.599}) == ("pioneer", "趋势先锋")
+    assert service._assign_stock_category({**base, "fundamental_score": 0.6}) == ("quality", "价值优选")
+
+    anchor_base = {**base, "signal_types": ["trend"], "fundamental_score": 0.9}
+    assert service._assign_stock_category({**anchor_base, "market_cap": 299.9}) == ("quality", "价值优选")
+    assert service._assign_stock_category({**anchor_base, "market_cap": 300.0}) == ("anchor", "机构中军")
+
+
+def test_select_top_picks_dedupes_same_code() -> None:
+    """同一股票不得因重复行或不同风格而重复入选。"""
+    stocks = [
+        PotentialStockItem(code="600519", name="茅台", category="anchor", score=9.0),
+        PotentialStockItem(code="600519", name="茅台", category="quality", score=9.0),
+        PotentialStockItem(code="000001", name="平安", category="reversal", score=8.5),
+        PotentialStockItem(code="300274", name="阳光", category="pioneer", score=8.2),
+    ]
+    assert [p.code for p in service._select_top_picks(stocks)] == ["600519", "000001", "300274"]
+
+
+def test_select_top_picks_fills_when_categories_repeat() -> None:
+    """类别不足 3 种时按顺位补齐，且保持不超过 3 只。"""
+    stocks = [
+        PotentialStockItem(code="600519", name="茅台", category="anchor", score=9.0),
+        PotentialStockItem(code="300274", name="阳光", category="anchor", score=8.8),
+        PotentialStockItem(code="000001", name="平安", category="anchor", score=8.5),
+        PotentialStockItem(code="002459", name="晶澳", category="anchor", score=8.2),
+    ]
+    assert [p.code for p in service._select_top_picks(stocks)] == ["600519", "300274", "000001"]
+
+
 async def test_fetch_daily_bars_prefers_kline(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[str] = []
 
