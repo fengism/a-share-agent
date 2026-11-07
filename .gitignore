@@ -76,3 +76,6 @@ coverage/
 # Environment overrides
 .env.local
 .env.*.local
+
+# 根目录产品/技术方案文档（本地资料，不入库）
+/*.docx

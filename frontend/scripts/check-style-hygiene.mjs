@@ -16,7 +16,8 @@ import path from "node:path";
 const srcRoot = path.resolve("src");
 
 /** 当前基线。只允许下调，不允许上调。 */
-const INLINE_STYLE_BUDGET = 1848;
+// 实际 1783，预留 20 处缓冲，避免正常功能开发被门禁直接卡死；下轮清理后同步下调。
+const INLINE_STYLE_BUDGET = 1803;
 const IMPORTANT_BUDGET = 177;
 
 /**
@@ -26,8 +27,8 @@ const IMPORTANT_BUDGET = 177;
  * 与 1872 行的 `industry-report.css` 已拆到各自页面的 `styles/` 目录。巨型样式单文件
  * 一旦重现就会退回“找不到规则、只能加 !important”的老路，所以设这道上限兜底。
  *
- * 当前最大为 `app-shell-chrome.css` 的 391 行，距上限 394 仅 3 行余量。
- * auth.css（原 394 行）已拆到 `src/components/auth/`，继续拆分大文件后请同步下调此值。
+ * 当前最大为 `app-header.css` 的 381 行，距上限 394 有 13 行余量；
+ * `app-shell-chrome.css` 与 `portfolio.css` 已各拆为两个分片。继续拆分大文件后请同步下调此值。
  */
 const MAX_CSS_LINES = 394;
 
