@@ -14,11 +14,11 @@ from app.financial_data.market.public import get_trading_calendar_view
 from app.financial_data.market.trading_session import SHANGHAI_TIMEZONE
 from app.financial_data.stock.public import (
     get_exchange_stock_master,
-    get_historical_bars,
     get_spot_snapshot,
 )
 from app.modules.potential import constants
 from app.modules.potential.fundamentals import _apply_fundamental_overlay
+from app.modules.potential.market_data import fetch_daily_bars
 from app.modules.potential.persistence import repository
 from app.modules.potential.regime import _combine_regime, _market_emotion, _resolve_market_regime
 from app.modules.potential.schemas import (
@@ -46,6 +46,48 @@ _DAILY_MINING_CUTOFF = constants._DAILY_MINING_CUTOFF
 _THEME_CONCEPT_LIMIT = constants._THEME_CONCEPT_LIMIT
 
 _mining_singleflight: AsyncSingleFlight[PotentialDailyResult] = AsyncSingleFlight()
+
+def _assign_stock_category(item: dict) -> tuple[str, str]:
+    """为单只候选股票判定风格定位：pioneer(趋势先锋) / anchor(机构中军) / reversal(超跌反转) / quality(价值优选)。"""
+    market_cap = item.get("market_cap") or 0.0
+    signal_types = item.get("signal_types") or []
+    strategies = item.get("strategies") or []
+    fundamental_score = item.get("fundamental_score") or 0.0
+
+    # 1. 机构中军：大市值（>=300亿）且走趋势或稳健形态
+    if market_cap >= 300 and ("trend" in signal_types or any("趋势" in s or "均线" in s for s in strategies)):
+        return "anchor", "机构中军"
+
+    # 2. 超跌反转：底部放量、超跌、单阳等反转信号
+    if "reversal" in signal_types or any("反转" in s or "底部" in s for s in strategies):
+        return "reversal", "超跌反转"
+
+    # 3. 价值优选：基本面评分突出
+    if fundamental_score >= 0.6:
+        return "quality", "价值优选"
+
+    # 4. 默认/高弹性题材突破：趋势先锋
+    return "pioneer", "趋势先锋"
+
+
+def _select_top_picks(items: list[PotentialStockItem]) -> list[PotentialStockItem]:
+    """精选最多 3 只涵盖不同投资风格（先锋、中军、反转/优质）的核心标的。"""
+    picks: list[PotentialStockItem] = []
+    seen_categories: set[str] = set()
+    for item in items:
+        if item.category not in seen_categories:
+            picks.append(item)
+            seen_categories.add(item.category)
+            if len(picks) >= 3:
+                break
+    if len(picks) < 3:
+        for item in items:
+            if item not in picks:
+                picks.append(item)
+                if len(picks) >= 3:
+                    break
+    return picks
+
 
 def _diversify_items(items: list[dict], max_output: int, max_per_industry: int) -> list[dict]:
     """按行业分散输出，避免榜单被单一热门行业占满。"""
@@ -171,7 +213,7 @@ async def mine_potential_stocks(
         async with semaphore:
             try:
                 bars = await asyncio.wait_for(
-                    get_historical_bars(code, start_date, end_date, period="daily", adjust="qfq"),
+                    fetch_daily_bars(code, start_date, end_date),
                     timeout=_BAR_FETCH_TIMEOUT_SECONDS,
                 )
             except Exception as error:
@@ -210,6 +252,14 @@ async def mine_potential_stocks(
     items.sort(key=lambda item: (-item["score"], -(item.get("amount") or 0)))
     selected = _diversify_items(items, _MAX_OUTPUT, _MAX_PER_INDUSTRY)
 
+    for item in selected:
+        category, category_label = _assign_stock_category(item)
+        item["category"] = category
+        item["category_label"] = category_label
+
+    stock_items = [PotentialStockItem(**item) for item in selected]
+    top_picks = _select_top_picks(stock_items)
+
     return PotentialDailyResult(
         date=market_date_text,
         generated_at=datetime.now(UTC).isoformat(timespec="seconds"),
@@ -224,7 +274,8 @@ async def mine_potential_stocks(
         limit_down_count=emotion["limit_down_count"],
         median_change_pct=emotion["median_change_pct"],
         hot_themes=hot_themes,
-        items=[PotentialStockItem(**item) for item in selected],
+        top_picks=top_picks,
+        items=stock_items,
     )
 
 async def _mine_and_save(market_date: date) -> PotentialDailyResult:

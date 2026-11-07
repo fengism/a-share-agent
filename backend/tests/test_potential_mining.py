@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime
+from datetime import date, datetime
 from types import SimpleNamespace
 
 import pandas as pd
@@ -11,7 +11,7 @@ import pytest
 
 from app.financial_data.market.trading_session import SHANGHAI_TIMEZONE
 from app.financial_data.stock.fundamentals.schemas import FinancialMetrics
-from app.modules.potential import fundamentals, regime, screening, service, signals, themes
+from app.modules.potential import fundamentals, market_data, regime, screening, service, signals, themes
 from app.modules.potential.schemas import PotentialDailyResult, PotentialStockItem
 from app.modules.quant.public import CURATED_STRATEGY_KEYS
 
@@ -686,3 +686,81 @@ async def test_run_daily_mining_blocks_weekday_pre_close(monkeypatch: pytest.Mon
 
     assert result is existing
     assert called["mine"] is False
+
+
+def test_assign_stock_category_and_select_top_picks() -> None:
+    """验证投资风格定位与核心三大金股精选机制。"""
+    anchor_item = {
+        "code": "600519", "name": "贵州茅台", "market_cap": 2000.0,
+        "signal_types": ["trend"], "strategies": ["多头趋势"], "fundamental_score": 0.5,
+    }
+    cat1, label1 = service._assign_stock_category(anchor_item)
+    assert cat1 == "anchor"
+    assert label1 == "机构中军"
+
+    reversal_item = {
+        "code": "000001", "name": "平安银行", "market_cap": 200.0,
+        "signal_types": ["reversal"], "strategies": ["底部放量"], "fundamental_score": 0.3,
+    }
+    cat2, label2 = service._assign_stock_category(reversal_item)
+    assert cat2 == "reversal"
+    assert label2 == "超跌反转"
+
+    pioneer_item = {
+        "code": "300274", "name": "阳光电源", "market_cap": 150.0,
+        "signal_types": ["breakout"], "strategies": ["放量突破"], "fundamental_score": 0.3,
+    }
+    cat3, label3 = service._assign_stock_category(pioneer_item)
+    assert cat3 == "pioneer"
+    assert label3 == "趋势先锋"
+
+    stocks = [
+        PotentialStockItem(code="600519", name="茅台", category="anchor", score=9.0),
+        PotentialStockItem(code="300274", name="阳光", category="pioneer", score=8.8),
+        PotentialStockItem(code="000001", name="平安", category="reversal", score=8.5),
+        PotentialStockItem(code="002459", name="晶澳", category="pioneer", score=8.2),
+    ]
+    picks = service._select_top_picks(stocks)
+    assert len(picks) == 3
+    pick_categories = {p.category for p in picks}
+    assert pick_categories == {"anchor", "pioneer", "reversal"}
+
+
+async def test_fetch_daily_bars_prefers_kline(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[str] = []
+
+    async def fake_kline(code, period, start, end, *, adjust="qfq"):
+        calls.append("kline")
+        return "new-bars"
+
+    async def fake_historical(code, start, end, *, period, adjust):
+        calls.append("historical")
+        return "legacy-bars"
+
+    monkeypatch.setattr(market_data, "get_kline", fake_kline)
+    monkeypatch.setattr(market_data, "get_historical_bars", fake_historical)
+
+    bars = await market_data.fetch_daily_bars("600001", date(2026, 10, 1), date(2026, 10, 20))
+
+    assert bars == "new-bars"
+    assert calls == ["kline"]
+
+
+async def test_fetch_daily_bars_falls_back_when_kline_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[str] = []
+
+    async def failing_kline(*args, **kwargs):
+        calls.append("kline")
+        raise RuntimeError("upstream timeout")
+
+    async def fake_historical(code, start, end, *, period, adjust):
+        calls.append("historical")
+        return "legacy-bars"
+
+    monkeypatch.setattr(market_data, "get_kline", failing_kline)
+    monkeypatch.setattr(market_data, "get_historical_bars", fake_historical)
+
+    bars = await market_data.fetch_daily_bars("600001", date(2026, 10, 1), date(2026, 10, 20))
+
+    assert bars == "legacy-bars"
+    assert calls == ["kline", "historical"]
