@@ -1,7 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import { Button, Card, message, Segmented, Table, Tag, Typography } from "antd";
-import { LineChartOutlined, RadarChartOutlined, ThunderboltOutlined } from "@ant-design/icons";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { Button, Card, message, Segmented, Table, Tag, Tooltip, Typography } from "antd";
+import {
+  FireOutlined,
+  LineChartOutlined,
+  RadarChartOutlined,
+  RobotOutlined,
+  StarFilled,
+  StarOutlined,
+  ThunderboltOutlined,
+} from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 import {
   usePotentialDates,
@@ -9,14 +17,18 @@ import {
   usePotentialPerformance,
   usePotentialRun,
   usePotentialRunStatus,
+  useWatchlist,
+  useAddWatchlistItem,
+  useDeleteWatchlistItem,
 } from "../../api/queries";
 import ChangeValue from "../../components/ChangeValue";
 import SectionDataState from "../../components/SectionDataState";
 import StateTrajectoryBadge from "../../components/StateTrajectoryBadge";
 import StockExternalLink from "../../components/StockExternalLink";
-import StockQuickPreviewModal from "../../components/StockQuickPreviewModal";
+import StockWorkspaceDrawer from "../../components/StockWorkspaceDrawer";
 import { useColors, useTokens, semanticTagStyle } from "../../styles/ui";
 import type { PotentialPerformanceItem, PotentialStockItem } from "../../types/stock";
+import { triggerStockAiDiagnosis } from "../../utils/copilotEvents";
 
 const { Text } = Typography;
 
@@ -49,9 +61,48 @@ function signalTypeLabel(value: string) {
   return labels[value] ?? value;
 }
 
+function getCategoryMeta(category?: string, categoryLabel?: string) {
+  switch (category) {
+    case "anchor":
+      return {
+        label: categoryLabel || "机构中军",
+        icon: "🛡️",
+        color: "#1890ff",
+        bg: "rgba(24, 144, 255, 0.08)",
+        border: "rgba(24, 144, 255, 0.3)",
+      };
+    case "reversal":
+      return {
+        label: categoryLabel || "超跌反转",
+        icon: "💎",
+        color: "#722ed1",
+        bg: "rgba(114, 46, 209, 0.08)",
+        border: "rgba(114, 46, 209, 0.3)",
+      };
+    case "quality":
+      return {
+        label: categoryLabel || "价值优选",
+        icon: "⭐",
+        color: "#52c41a",
+        bg: "rgba(82, 196, 26, 0.08)",
+        border: "rgba(82, 196, 26, 0.3)",
+      };
+    case "pioneer":
+    default:
+      return {
+        label: categoryLabel || "趋势先锋",
+        icon: "🏹",
+        color: "#fa8c16",
+        bg: "rgba(250, 140, 22, 0.08)",
+        border: "rgba(250, 140, 22, 0.3)",
+      };
+  }
+}
+
 export default function PotentialPage() {
   const c = useColors();
   const t = useTokens();
+  const navigate = useNavigate();
   const datesQuery = usePotentialDates();
   const dates = useMemo(() => datesQuery.data ?? [], [datesQuery.data]);
   const [chosenDate, setChosenDate] = useState<string | null>(null);
@@ -65,6 +116,28 @@ export default function PotentialPage() {
   const refetchDates = datesQuery.refetch;
   const refetchResult = resultQuery.refetch;
   const runStatus = runStatusQuery.data;
+
+  // Watchlist integration
+  const { data: watchlistData } = useWatchlist();
+  const addWatchlistMutation = useAddWatchlistItem();
+  const deleteWatchlistMutation = useDeleteWatchlistItem();
+  const watchlistCodes = useMemo(() => {
+    return new Set((watchlistData?.items ?? []).map((item) => item.stock_code));
+  }, [watchlistData]);
+
+  const handleToggleWatchlist = useCallback((record: { code: string; name: string }) => {
+    if (watchlistCodes.has(record.code)) {
+      deleteWatchlistMutation.mutate(record.code, {
+        onSuccess: () => message.success(`已从自选移除 ${record.name}`),
+        onError: (err: unknown) => message.error(`移除自选失败：${err instanceof Error ? err.message : String(err)}`),
+      });
+    } else {
+      addWatchlistMutation.mutate({ stock_code: record.code, note: record.name }, {
+        onSuccess: () => message.success(`已添加 ${record.name} 到自选`),
+        onError: (err: unknown) => message.error(`添加自选失败：${err instanceof Error ? err.message : String(err)}`),
+      });
+    }
+  }, [watchlistCodes, deleteWatchlistMutation, addWatchlistMutation]);
 
   useEffect(() => {
     if (!runStarted || !runStatus || runStatus.running) {
@@ -82,37 +155,50 @@ export default function PotentialPage() {
 
   const items = useMemo(() => resultQuery.data?.items ?? [], [resultQuery.data?.items]);
 
+  const topPicks = useMemo(() => {
+    if (resultQuery.data?.top_picks && resultQuery.data.top_picks.length > 0) {
+      return resultQuery.data.top_picks;
+    }
+    return items.slice(0, 3);
+  }, [resultQuery.data?.top_picks, items]);
+
   const [previewStock, setPreviewStock] = useState<{ code: string; name: string } | null>(null);
   const [intentFilter, setIntentFilter] = useState<string>("ALL");
 
   const { filteredItems, counts } = useMemo(() => {
-    let breakout = 0;
-    let pullback = 0;
+    let pioneer = 0;
+    let anchor = 0;
     let reversal = 0;
+    let quality = 0;
     let risk = 0;
 
     items.forEach((item) => {
-      const isBreakout = item.signal_types?.includes("breakout") || item.strategies?.some((s) => s.includes("突破"));
-      const isPullback = item.signal_types?.includes("pullback") || item.strategies?.some((s) => s.includes("回踩"));
-      const isReversal = item.signal_types?.includes("reversal") || item.strategies?.some((s) => s.includes("底部") || s.includes("反转"));
+      const isPioneer = item.category === "pioneer" || item.signal_types?.includes("breakout") || item.strategies?.some((s) => s.includes("突破"));
+      const isAnchor = item.category === "anchor" || (item.market_cap != null && item.market_cap >= 300 && (item.signal_types?.includes("trend") || item.strategies?.some((s) => s.includes("趋势"))));
+      const isReversal = item.category === "reversal" || item.signal_types?.includes("reversal") || item.strategies?.some((s) => s.includes("底部") || s.includes("反转"));
+      const isQuality = item.category === "quality" || item.quality_score >= 1.0 || item.fundamental_score >= 1.0;
       const isRisk = Boolean(item.risk_flags && item.risk_flags.length > 0);
 
-      if (isBreakout) breakout += 1;
-      if (isPullback) pullback += 1;
+      if (isPioneer) pioneer += 1;
+      if (isAnchor) anchor += 1;
       if (isReversal) reversal += 1;
+      if (isQuality) quality += 1;
       if (isRisk) risk += 1;
     });
 
     const filtered = items.filter((item) => {
       if (intentFilter === "ALL") return true;
-      if (intentFilter === "breakout") {
-        return item.signal_types?.includes("breakout") || item.strategies?.some((s) => s.includes("突破"));
+      if (intentFilter === "pioneer") {
+        return item.category === "pioneer" || item.signal_types?.includes("breakout") || item.strategies?.some((s) => s.includes("突破"));
       }
-      if (intentFilter === "pullback") {
-        return item.signal_types?.includes("pullback") || item.strategies?.some((s) => s.includes("回踩"));
+      if (intentFilter === "anchor") {
+        return item.category === "anchor" || (item.market_cap != null && item.market_cap >= 300 && (item.signal_types?.includes("trend") || item.strategies?.some((s) => s.includes("趋势"))));
       }
       if (intentFilter === "reversal") {
-        return item.signal_types?.includes("reversal") || item.strategies?.some((s) => s.includes("底部") || s.includes("反转"));
+        return item.category === "reversal" || item.signal_types?.includes("reversal") || item.strategies?.some((s) => s.includes("底部") || s.includes("反转"));
+      }
+      if (intentFilter === "quality") {
+        return item.category === "quality" || item.quality_score >= 1.0 || item.fundamental_score >= 1.0;
       }
       if (intentFilter === "risk") {
         return Boolean(item.risk_flags && item.risk_flags.length > 0);
@@ -122,7 +208,7 @@ export default function PotentialPage() {
 
     return {
       filteredItems: filtered,
-      counts: { breakout, pullback, reversal, risk },
+      counts: { pioneer, anchor, reversal, quality, risk },
     };
   }, [items, intentFilter]);
 
@@ -132,7 +218,7 @@ export default function PotentialPage() {
     {
       title: "#",
       key: "rank",
-      width: 52,
+      width: 48,
       align: "center",
       render: (_: unknown, __: PotentialStockItem, index: number) => {
         let rankBg = c.nestedBg;
@@ -164,48 +250,56 @@ export default function PotentialPage() {
       },
     },
     {
+      title: "风格",
+      key: "category",
+      width: 96,
+      render: (_: unknown, record: PotentialStockItem) => {
+        const meta = getCategoryMeta(record.category, record.category_label);
+        return (
+          <Tag
+            style={{
+              color: meta.color,
+              background: meta.bg,
+              borderColor: meta.border,
+              fontSize: t.font.xs,
+              margin: 0,
+              fontWeight: Number(t.weight.medium),
+            }}
+          >
+            {meta.icon} {meta.label}
+          </Tag>
+        );
+      },
+    },
+    {
       title: "股票",
       key: "stock",
-      width: 170,
+      width: 140,
       render: (_: unknown, record: PotentialStockItem) => (
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4 }}>
-          <StockExternalLink code={record.code} name={record.name} style={{ color: c.primary, display: "flex", flexDirection: "column", minWidth: 0 }}>
-            <span style={{ color: c.textPrimary, fontWeight: Number(t.weight.semibold) }}>{record.name}</span>
-            <span style={{ color: c.textMuted, fontSize: t.font.xs }}>{record.code}</span>
-          </StockExternalLink>
-          <Button
-            type="text"
-            size="small"
-            icon={<LineChartOutlined />}
-            title="K线速查"
-            aria-label={`速查 ${record.name} K线`}
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setPreviewStock({ code: record.code, name: record.name });
-            }}
-          />
-        </div>
+        <StockExternalLink code={record.code} name={record.name} style={{ color: c.primary, display: "flex", flexDirection: "column", minWidth: 0 }}>
+          <span style={{ color: c.textPrimary, fontWeight: Number(t.weight.semibold) }}>{record.name}</span>
+          <span style={{ color: c.textMuted, fontSize: t.font.xs }}>{record.code}</span>
+        </StockExternalLink>
       ),
     },
     {
       title: isLatestDate ? "收盘价" : "选出收盘价",
       dataIndex: "price",
-      width: 100,
+      width: 90,
       align: "right",
       render: (value: number | null) => formatValue(value),
     },
     {
       title: isLatestDate ? "涨跌幅" : "当日涨跌",
       dataIndex: "change_pct",
-      width: 90,
+      width: 85,
       align: "right",
       render: (value: number | null) => <ChangeValue value={value} fontWeight={Number(t.weight.medium)} />,
     },
     {
       title: "行业",
       dataIndex: "industry",
-      width: 100,
+      width: 95,
       render: (value: string | null) => (
         value ? <Tag style={{ ...semanticTagStyle("info"), fontSize: t.font.xs }}>{value}</Tag> : <span style={{ color: c.textMuted }}>-</span>
       ),
@@ -213,7 +307,7 @@ export default function PotentialPage() {
     {
       title: "形态轨迹",
       key: "trajectory",
-      width: 170,
+      width: 150,
       render: (_: unknown, record: PotentialStockItem) => (
         <StateTrajectoryBadge
           signalTypes={record.signal_types}
@@ -224,36 +318,61 @@ export default function PotentialPage() {
     {
       title: "综合评分",
       dataIndex: "score",
-      width: 100,
+      width: 90,
       align: "right",
       sorter: (a: PotentialStockItem, b: PotentialStockItem) => a.score - b.score,
-      render: (value: number) => {
+      render: (value: number, record: PotentialStockItem) => {
         const isHigh = value >= 4.5;
+        const tooltipContent = (
+          <div style={{ display: "grid", gap: 4, fontSize: t.font.xs, minWidth: 150 }}>
+            <div style={{ fontWeight: Number(t.weight.bold), borderBottom: `1px solid ${c.border}`, paddingBottom: 2 }}>
+              评分明细拆解 (总分: {value.toFixed(1)})
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <span style={{ color: c.textSecondary }}>策略信号分:</span>
+              <span style={{ fontWeight: Number(t.weight.semibold), fontFamily: "var(--c-font-mono)" }}>+{record.signal_score.toFixed(1)}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <span style={{ color: c.textSecondary }}>技术质量分:</span>
+              <span style={{ fontWeight: Number(t.weight.semibold), fontFamily: "var(--c-font-mono)", color: record.quality_score < 0 ? c.warning : undefined }}>
+                {record.quality_score >= 0 ? `+${record.quality_score.toFixed(1)}` : record.quality_score.toFixed(1)}
+              </span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <span style={{ color: c.textSecondary }}>基本面分:</span>
+              <span style={{ fontWeight: Number(t.weight.semibold), fontFamily: "var(--c-font-mono)" }}>+{record.fundamental_score.toFixed(1)}</span>
+            </div>
+            {record.theme_score > 0 ? (
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span style={{ color: c.textSecondary }}>热门题材分:</span>
+                <span style={{ fontWeight: Number(t.weight.semibold), fontFamily: "var(--c-font-mono)", color: c.accent }}>+{record.theme_score.toFixed(1)}</span>
+              </div>
+            ) : null}
+            {record.sector_strength != null ? (
+              <div style={{ display: "flex", justifyContent: "space-between", color: c.textMuted }}>
+                <span>行业中位强度:</span>
+                <span>{record.sector_strength.toFixed(1)}%</span>
+              </div>
+            ) : null}
+          </div>
+        );
         return (
-          <span
-            className={isHigh ? "potential-score-badge--high" : "potential-score-badge"}
-            style={{
-              fontWeight: Number(t.weight.bold),
-              color: isHigh ? c.accent : c.primary,
-              fontFamily: "var(--c-font-mono)",
-            }}
-          >
-            {value.toFixed(1)}
-          </span>
+          <Tooltip title={tooltipContent} placement="topRight">
+            <span
+              className={isHigh ? "potential-score-badge--high" : "potential-score-badge"}
+              style={{
+                fontWeight: Number(t.weight.bold),
+                color: isHigh ? c.accent : c.primary,
+                fontFamily: "var(--c-font-mono)",
+                cursor: "help",
+                borderBottom: "1px dashed currentColor",
+              }}
+            >
+              {value.toFixed(1)}
+            </span>
+          </Tooltip>
         );
       },
-    },
-    {
-      title: "质量分",
-      dataIndex: "quality_score",
-      width: 84,
-      align: "right",
-      sorter: (a: PotentialStockItem, b: PotentialStockItem) => a.quality_score - b.quality_score,
-      render: (value: number) => (
-        <span style={{ color: value < 0 ? c.warning : c.textSecondary, fontFamily: "var(--c-font-mono)" }}>
-          {value.toFixed(1)}
-        </span>
-      ),
     },
     {
       title: "命中策略",
@@ -269,7 +388,7 @@ export default function PotentialPage() {
     {
       title: "信号日期",
       dataIndex: "signal_date",
-      width: 110,
+      width: 105,
       render: (value: string, record: PotentialStockItem) => (
         <span style={{ fontFamily: "var(--c-font-mono)" }}>
           {value || "-"}
@@ -292,11 +411,60 @@ export default function PotentialPage() {
     {
       title: "成交额(亿)",
       dataIndex: "amount",
-      width: 100,
+      width: 90,
       align: "right",
       render: (value: number | null) => formatValue(value),
     },
-  ], [c, t, isLatestDate]);
+    {
+      title: "快捷操作",
+      key: "actions",
+      width: 110,
+      align: "center",
+      render: (_: unknown, record: PotentialStockItem) => {
+        const isFavorited = watchlistCodes.has(record.code);
+        return (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
+            <Button
+              type="text"
+              size="small"
+              icon={isFavorited ? <StarFilled style={{ color: "#faad14" }} /> : <StarOutlined />}
+              title={isFavorited ? "从自选移除" : "加入自选"}
+              aria-label={`${isFavorited ? "移除" : "加入"} ${record.name} 自选`}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleToggleWatchlist(record);
+              }}
+            />
+            <Button
+              type="text"
+              size="small"
+              icon={<LineChartOutlined />}
+              title="K线速查"
+              aria-label={`速查 ${record.name} K线`}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setPreviewStock({ code: record.code, name: record.name });
+              }}
+            />
+            <Button
+              type="text"
+              size="small"
+              icon={<RobotOutlined style={{ color: c.primary }} />}
+              title="AI 深度诊断"
+              aria-label={`AI诊断 ${record.name}`}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                triggerStockAiDiagnosis(record.code, record.name, navigate);
+              }}
+            />
+          </div>
+        );
+      },
+    },
+  ], [c, t, isLatestDate, watchlistCodes, navigate, handleToggleWatchlist]);
 
   const performanceColumns: ColumnsType<PotentialPerformanceItem> = useMemo(() => [
     {
@@ -447,6 +615,207 @@ export default function PotentialPage() {
             </div>
           ) : null}
         </div>
+
+        {/* 今日三大精选金股高光看板 */}
+        {topPicks.length > 0 ? (
+          <div style={{ marginBottom: t.space[4] }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: t.space[2] }}>
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                <FireOutlined style={{ color: "#fa541c", fontSize: 16 }} />
+                <span style={{ fontWeight: Number(t.weight.bold), fontSize: t.font.sm, color: c.textPrimary }}>
+                  今日精选金股
+                </span>
+                <Tag style={{ ...semanticTagStyle("accent"), fontSize: t.font.xs, margin: 0 }}>
+                  Top Picks
+                </Tag>
+              </div>
+              <Text type="secondary" style={{ fontSize: t.font.xs }}>
+                多头共振、安全边际与题材热度综合遴选核心标的
+              </Text>
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+                gap: t.space[3],
+              }}
+            >
+              {topPicks.map((pick) => {
+                const meta = getCategoryMeta(pick.category, pick.category_label);
+                const isFavorited = watchlistCodes.has(pick.code);
+                return (
+                  <div
+                    key={pick.code}
+                    style={{
+                      background: c.nestedBg,
+                      borderRadius: t.radius.lg,
+                      border: `1px solid ${c.border}`,
+                      padding: `${t.space[3]}px ${t.space[3]}px`,
+                      display: "flex",
+                      flexDirection: "column",
+                      justifyContent: "space-between",
+                      gap: t.space[2],
+                      position: "relative",
+                    }}
+                  >
+                    <div>
+                      {/* Header */}
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: t.space[2] }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <Tag
+                            style={{
+                              color: meta.color,
+                              background: meta.bg,
+                              borderColor: meta.border,
+                              fontSize: t.font.xs,
+                              margin: 0,
+                              fontWeight: Number(t.weight.bold),
+                            }}
+                          >
+                            {meta.icon} {meta.label}
+                          </Tag>
+                          {pick.industry ? (
+                            <Tag style={{ ...semanticTagStyle("info"), fontSize: t.font.xs, margin: 0 }}>
+                              {pick.industry}
+                            </Tag>
+                          ) : null}
+                        </div>
+                        <span
+                          style={{
+                            fontFamily: "var(--c-font-mono)",
+                            fontWeight: Number(t.weight.bold),
+                            fontSize: t.font.sm,
+                            color: pick.score >= 4.5 ? c.accent : c.primary,
+                          }}
+                        >
+                          综合 {pick.score.toFixed(1)}
+                        </span>
+                      </div>
+
+                      {/* Stock Main */}
+                      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: t.space[2] }}>
+                        <div>
+                          <StockExternalLink code={pick.code} name={pick.name} style={{ display: "inline-flex", alignItems: "baseline", gap: 6 }}>
+                            <span style={{ fontSize: t.font.md, fontWeight: Number(t.weight.bold), color: c.textPrimary }}>
+                              {pick.name}
+                            </span>
+                            <span style={{ fontSize: t.font.xs, color: c.textMuted }}>
+                              {pick.code}
+                            </span>
+                          </StockExternalLink>
+                        </div>
+                        <div style={{ textAlign: "right" }}>
+                          <span style={{ fontFamily: "var(--c-font-mono)", fontWeight: Number(t.weight.semibold), fontSize: t.font.md, marginRight: 6 }}>
+                            {formatValue(pick.price)}
+                          </span>
+                          <ChangeValue value={pick.change_pct} fontWeight={Number(t.weight.bold)} />
+                        </div>
+                      </div>
+
+                      {/* 4-Dim Mini Scores */}
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "repeat(4, 1fr)",
+                          gap: 4,
+                          background: c.cardBg,
+                          borderRadius: t.radius.sm,
+                          padding: "4px 8px",
+                          fontSize: t.font.xs,
+                          textAlign: "center",
+                          marginBottom: t.space[2],
+                        }}
+                      >
+                        <div>
+                          <div style={{ color: c.textMuted }}>信号</div>
+                          <div style={{ fontWeight: Number(t.weight.semibold), fontFamily: "var(--c-font-mono)" }}>
+                            {pick.signal_score.toFixed(1)}
+                          </div>
+                        </div>
+                        <div>
+                          <div style={{ color: c.textMuted }}>质量</div>
+                          <div style={{ fontWeight: Number(t.weight.semibold), fontFamily: "var(--c-font-mono)", color: pick.quality_score < 0 ? c.warning : undefined }}>
+                            {pick.quality_score.toFixed(1)}
+                          </div>
+                        </div>
+                        <div>
+                          <div style={{ color: c.textMuted }}>基本面</div>
+                          <div style={{ fontWeight: Number(t.weight.semibold), fontFamily: "var(--c-font-mono)" }}>
+                            {pick.fundamental_score.toFixed(1)}
+                          </div>
+                        </div>
+                        <div>
+                          <div style={{ color: c.textMuted }}>题材</div>
+                          <div style={{ fontWeight: Number(t.weight.semibold), fontFamily: "var(--c-font-mono)", color: pick.theme_score > 0 ? c.accent : undefined }}>
+                            {pick.theme_score.toFixed(1)}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Reason */}
+                      <div
+                        style={{
+                          fontSize: t.font.xs,
+                          color: c.textSecondary,
+                          lineHeight: 1.4,
+                          display: "-webkit-box",
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: "vertical",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          minHeight: 34,
+                        }}
+                        title={pick.reason}
+                      >
+                        {pick.reason || "符合多维量化筛选模型"}
+                      </div>
+                    </div>
+
+                    {/* Action Bar */}
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 8,
+                        marginTop: t.space[2],
+                        paddingTop: t.space[2],
+                        borderTop: `1px dashed ${c.border}`,
+                      }}
+                    >
+                      <Button
+                        type="primary"
+                        ghost
+                        size="small"
+                        icon={<RobotOutlined />}
+                        style={{ flex: 1 }}
+                        onClick={() => triggerStockAiDiagnosis(pick.code, pick.name, navigate)}
+                      >
+                        AI诊断
+                      </Button>
+                      <Button
+                        size="small"
+                        icon={<LineChartOutlined />}
+                        onClick={() => setPreviewStock({ code: pick.code, name: pick.name })}
+                      >
+                        K线
+                      </Button>
+                      <Button
+                        size="small"
+                        icon={isFavorited ? <StarFilled style={{ color: "#faad14" }} /> : <StarOutlined />}
+                        onClick={() => handleToggleWatchlist(pick)}
+                      >
+                        {isFavorited ? "已选" : "自选"}
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
+
+        {/* 策略风格分类筛选 */}
         {items.length > 0 ? (
           <div style={{ marginBottom: t.space[3] }}>
             <Segmented
@@ -454,15 +823,17 @@ export default function PotentialPage() {
               value={intentFilter}
               options={[
                 { label: `全部候选 (${items.length})`, value: "ALL" },
-                { label: `🎯 顺势突破 (${counts.breakout})`, value: "breakout" },
-                { label: `💎 回踩企稳 (${counts.pullback})`, value: "pullback" },
-                { label: `⚡ 底部反转 (${counts.reversal})`, value: "reversal" },
+                { label: `🏹 趋势先锋/顺势突破 (${counts.pioneer})`, value: "pioneer" },
+                { label: `🛡️ 机构中军 (${counts.anchor})`, value: "anchor" },
+                { label: `💎 超跌反转 (${counts.reversal})`, value: "reversal" },
+                { label: `⭐ 价值优选 (${counts.quality})`, value: "quality" },
                 { label: `⚠️ 风险预警 (${counts.risk})`, value: "risk" },
               ]}
               onChange={(val) => setIntentFilter(String(val))}
             />
           </div>
         ) : null}
+
         <SectionDataState
           isLoading={resultQuery.isLoading}
           error={resultQuery.error}
@@ -541,11 +912,25 @@ export default function PotentialPage() {
         ) : performanceQuery.data ? (
           performanceQuery.data.evaluated_count > 0 ? (
             <div style={{ display: "grid", gap: t.space[3] }}>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: t.space[2] }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: t.space[2] }}>
                 <div style={{ background: c.nestedBg, borderRadius: t.radius.md, padding: t.space[3], textAlign: "center" }}>
                   <div style={{ color: c.textSecondary, fontSize: t.font.xs }}>胜率</div>
                   <div style={{ color: c.textPrimary, fontWeight: Number(t.weight.bold), fontFamily: "var(--c-font-mono)" }}>
                     {performanceQuery.data.win_rate != null ? `${(performanceQuery.data.win_rate * 100).toFixed(0)}%` : "-"}
+                  </div>
+                </div>
+                <div style={{ background: c.nestedBg, borderRadius: t.radius.md, padding: t.space[3], textAlign: "center" }}>
+                  <div style={{ color: c.textSecondary, fontSize: t.font.xs }}>盈亏比</div>
+                  <div style={{ color: c.textPrimary, fontWeight: Number(t.weight.bold), fontFamily: "var(--c-font-mono)" }}>
+                    {performanceQuery.data.profit_loss_ratio != null ? performanceQuery.data.profit_loss_ratio.toFixed(2) : "-"}
+                  </div>
+                </div>
+                <div style={{ background: c.nestedBg, borderRadius: t.radius.md, padding: t.space[3], textAlign: "center" }}>
+                  <div style={{ color: c.textSecondary, fontSize: t.font.xs }}>涨跌分布</div>
+                  <div style={{ fontSize: t.font.xs, fontWeight: Number(t.weight.semibold), fontFamily: "var(--c-font-mono)", marginTop: 2 }}>
+                    <span style={{ color: c.up }}>{performanceQuery.data.positive_count ?? 0}涨</span>
+                    <span style={{ color: c.textMuted, margin: "0 2px" }}>/</span>
+                    <span style={{ color: c.down }}>{performanceQuery.data.negative_count ?? 0}跌</span>
                   </div>
                 </div>
                 <div style={{ background: c.nestedBg, borderRadius: t.radius.md, padding: t.space[3], textAlign: "center" }}>
@@ -589,7 +974,7 @@ export default function PotentialPage() {
       </Card>
 
       {previewStock ? (
-        <StockQuickPreviewModal
+        <StockWorkspaceDrawer
           open={Boolean(previewStock)}
           code={previewStock.code}
           name={previewStock.name}
