@@ -67,7 +67,7 @@ cd frontend && npx playwright install chromium  # 前端 E2E 与 README 配图�
 | `make backend-test` | `pytest -q` |
 | `make backend-coverage` | 覆盖率下限 44%，可用 `COVERAGE_MIN=50 make backend-coverage` 覆盖 |
 | `make frontend-test` | `vitest run` |
-| `make frontend-lint` | `eslint .` + 页面边界检查 + 时区门禁（见下一节「硬约束」） |
+| `make frontend-lint` | `eslint .` + 页面边界检查 + 时区门禁 + 样式卫生门禁 + 色彩纪律门禁（见下一节「硬约束」） |
 | `make frontend-e2e` | Playwright 浏览器 smoke 测试（首次需 `cd frontend && npx playwright install chromium`） |
 | `make frontend-api-check` | 校验 OpenAPI 生成产物是否与后端一致 |
 
@@ -117,6 +117,122 @@ cd frontend && npx playwright install chromium  # 前端 E2E 与 README 配图�
 - **前端 Hook 依赖**：`react-hooks/exhaustive-deps` 在 `frontend/eslint.config.js` 里已从插件的
   默认 `warn` 升为 **`error`**。CI 跑的是不带 `--max-warnings` 的 `eslint .`，`warn` 不会阻断流水线，
   而漏写依赖数组会导致 stale closure（读到上一次渲染的 state/props，极难复现）。
+- **样式卫生（棘轮）**：`frontend/scripts/check-style-hygiene.mjs` 对内联样式 `style={{ ... }}`
+  与 CSS `!important` 设有**总量预算**，并对单个 CSS 文件设有**行数上限**与**结构体检**：
+  都只允许下降，不允许上调。收敛一批后请同步下调脚本里的 `INLINE_STYLE_BUDGET` /
+  `IMPORTANT_BUDGET` / `MAX_CSS_LINES`。新样式优先写成页面 CSS 类并复用 `--c-*` 变量，
+  不要把布局与颜色继续塞进行内样式。
+- **A 股色彩纪律门禁**：`frontend/scripts/check-color-discipline.mjs`（已接入 `npm run lint`）。
+  A 股交易软件有极其严格的心智模型：**红（涨 / 净流入 / 涨停）、绿（跌 / 净流出 / 跌停）必须专用于价格与资金**。
+  严禁在非价格维度（如业务分类、阶段标识、普通成功/失败标签、主营构成条）滥用 `color="red"` / `color="green"` /
+  `color="volcano"` / `color="lime"` 或以 `error` / `success` 充当通用状态。
+  规范用法：
+  - 业务与产业链分类：统一使用 `blue` (上游/科技)、`purple` (中游/集成)、`cyan` (下游/量化)、`orange/gold` (热度/特征)；
+  - 状态与提示：当前/运行中 `processing` 或 `blue`；预警/异常 `warning` (金黄)；中性/无数据 `default` (灰)；
+  - 自选与勾选：已加入图标使用主题色 `var(--c-primary)`，禁止使用绿勾；
+  - 语义化样式复用：优先使用 `src/theme/hooks.ts` 的 `semanticTagStyle(color)`。
+- **三层字阶与视觉降噪规范 (Three-Tier Typography)**：
+  金融终端信息密度高，杜绝字重与字号失控，全站严格遵循三层阶梯与等宽数字对齐：
+  - **Primary 主文本 / 核心指标**：`var(--c-text-primary)`，字重 `600` 或 `700`。用于大字号核心指标数值（如 `3120.45`）、模块主标题、关键股票简称；
+  - **Secondary 次级文本 / 描述说明**：`var(--c-text-secondary)`，字重 `400` 或 `500`。用于字段标签名、表格表头、描述段落、次级参数；
+  - **Tertiary 弱化文本 / 辅助元数据**：`var(--c-text-muted)`，字重 `400`。用于更新时间戳、单位提示、辅助说明、空状态占位符与微注；
+  - **核心数字对齐**：所有动态指标与浮点数值统一挂载 `.financial-num`（等宽字体 `var(--c-font-mono)`、`tabular-nums`、`white-space: nowrap`），严禁拆行折叠。
+- **低对比度边框与表格边框收敛规范 (Border Token Discipline)**：
+  - 严禁在页面或组件中使用硬编码的高对比度硬描边（如 `#444`、`#000` 或强对比实线），杜绝任何生硬的高对比度斑马纹（harsh striped borders）；
+  - 全站卡片、表格与分栏边框一律使用低侵入性语义变量 `var(--c-border)`（暗色主题下柔和微透明、明色主题下浅灰淡边）；
+  - 嵌套区域与次级分割使用 `var(--c-border-subtle)` 或 `rgba(255, 255, 255, 0.05)`；表格单元格悬浮一律使用 `var(--c-hover-bg)` 或 `rgba(255, 255, 255, 0.035)` 微底色，保持平滑呼吸感。
+- **改视觉样式前先量计算样式**：CSS 改动对单测不可见（`npm run test` 全绿不代表样式没变），
+  也不能只看截图。可靠做法是用 Playwright 临时夹具在每个 e2e 用例结束时 dump
+  所有元素的计算样式，改动前后逐条 diff，**零差异**才算安全。三个必踩的坑：
+  dev server 不能当基准（Vite 以 `<style>` 注入路由 CSS，同特异性平局的胜负与生产的
+  `<link>` 不同，必须 `build && preview`）；过渡/波纹动画会污染采样（静置后再连采两次，
+  只保留两次一致的属性）；字体加载有竞态（用两次对照运行建「不稳定属性掩码」再排除）。
+- **卡片外观只由 CSS 类决定，不要用 JS 内联样式下发**。历史上 `useStyles().cardStyle`
+  会把圆角/描边/阴影/背景写进元素 `style`（用了 189 次），而 `reset.css` 又用
+  `!important` 去覆盖它——同一份外观定义两遍、互相打架。现在统一用 `.u-card` /
+  `.u-card-soft`（与旧 `cardStyle` 逐声明等价的 CSS 变量实现）。内联样式只能用
+  `!important` 覆盖，靠提高选择器特异性或 `@layer` 都无效，所以别再把外观写回 JS。
+- **不要机械删除 `!important`**，先判断它属于哪一类（三类处理方式完全不同）：
+  ① **压制 JS 内联样式** —— 把外观改回 CSS 类后即可删除（如 `cardStyle` → `.u-card`）；
+  ② **压制页面自身意图** —— 例如页面想给某张卡片加渐变，全局规则用 `!important` 强行
+  改回纯色，删掉会让页面样式「复活」（`reset.css` 的 `background` 类多属此类），
+  属于视觉变更，要设计决策而不是重构；
+  ③ **antd 选择器与我们平局** —— antd v6 的规则是
+  `:where(.css-hash).ant-table-wrapper .ant-table-thead > tr > th`。`:where()` **不计分**，
+  所以它只有 (0,2,1)，与 `[data-theme] .ant-table-thead > tr > th` 的 (0,2,1) **平局**；
+  平局时后注入的 antd 胜出。这类必须保留 `!important`，或迁到 `theme.components.*` token。
+  ⚠ **不要**用“给全局规则再加一级类”的方式提特异性：它会同时压过页面自己写的
+  (0,2,1) 覆盖规则（实测 NationalTeam 热力图表头被从 11px 抬到 12px）。
+- **CSS 变量必须先定义，否则声明会静默失效**。`background: var(--c-bg-card)` 中若该变量从未定义，
+  整个声明在 computed-value 阶段变为无效 → 背景透明（`font-family` 则退回继承）；
+  若写了 fallback，则会永远停在硬编码值上、不跟随主题（暗色下出现白卡片这类问题）。
+  新增 `var(--x)` 前先确认 `--x` 在 `App.tsx` 的 `tokensToCssVars` 或 `theme/hooks.ts` 里有定义，
+  并避免“变体拼写”（`--c-card-bg` 写成 `--c-bg-card`）。
+- **`useStyles()` 会订阅主题 store**（`useStyles` → `useColors` → `useThemeStore`）。
+  删掉一个组件的 `useStyles()` 调用同时移除了它的 store 订阅，会改变重渲染时序，
+  纯 className 重构也可能因此暴露出依赖时序的 e2e 抖动。
+- **样式改动要用计算样式差分验证，不能只靠单测**。工具已入库：
+
+  | 文件 | 作用 |
+  | :--- | :--- |
+  | `e2e/base.ts` | 统一基座：所有 spec 从 `./base` 导入；按 `PROBE_OUT` / `DENSITY_OUT` 自动挂载采样 |
+  | `e2e/instrument/probe.ts` | 计算样式采样实现（整页 `body *` 的计算值） |
+  | `e2e/instrument/density.ts` | 布局密度采样实现（卡片/表格/表单间距分布） |
+  | `playwright.probe.config.ts` | 生产构建（`build && preview`）下跑探针，非 dev server |
+  | `scripts/diff-style-probe.mjs` | 比对两次探针产物，输出差异属性值统计 |
+
+  用法（无需修改 spec，环境变量开启采样）：
+
+  ```bash
+  npx vite build
+  SKIP_BUILD=1 PROBE_OUT=/tmp/probe-before npx playwright test --config playwright.probe.config.ts
+  # 改样式……
+  npx vite build
+  SKIP_BUILD=1 PROBE_OUT=/tmp/probe-after npx playwright test --config playwright.probe.config.ts
+  node scripts/diff-style-probe.mjs /tmp/probe-before /tmp/probe-after
+  ```
+
+  判定标准：**差异属性值必须为 0**。五个必踩的坑：
+
+  ⓪ **属性名必须用 kebab-case**。`getComputedStyle().getPropertyValue()` 只认
+  `font-size`，不认 `fontSize`；传驼峰会**静默返回空串**，导致 `fontSize`、`lineHeight`、
+  `backgroundColor`、`borderTopColor`、`boxShadow`、`borderRadius`、`padding*`、`margin*`、
+  `min/max-Width/Height` 等属性永远“相等”。夹具已做驼峰→短横线转换；
+  写任何新的采样列表时务必同样处理，否则结论会漏掉字号/颜色/边框这类最关键的变化。
+
+  ① 必须用生产构建 —— dev server 以 `<style>` 注入路由 CSS，同特异性平局的胜负
+  与生产 `<link>` 相反；
+  ② 动画/波纹会污染采样 —— 夹具已内置「静置 + 连采两次取稳定值」，但**跨运行**的
+  抖动它挡不住；
+  ③ 跨运行噪声里量级最大的不是滚动条，而是**容器查询重排**：估值页同代码两跑可出现成片
+  `+70px / +210px` 的宽度差异（远大于多数真实回归）。因此**先跑同代码对照对**，
+  建立不稳定 `(场景, 元素, 属性)` 集合，再从待判定差异中剔除（掩码差分），只报稳定差；
+  纵向滚动条出现/消失会使内容宽度整体收缩 18px（差值恒为 18px），夹具已记录滚动条
+  元素数供差分脚本报警；
+  ④ 仍残留的单点差异，先用「同一份代码单独跑」排除指针 hover/focus 状态抖动
+  （如 antd 单选按钮的琥珀色派生色、fund-flow 卡片阴影翻转），再判定为回归。
+
+  **判定任何差异前先跑一次同代码对照**：这是唯一能把「回归」和「噪声」分开的手段。
+  本仓库已两次靠它避免误判（ant-steps 字体度量竞态、滚动条 18px 级联）。
+- **CSS 结构体检为何存在**：`feed.css` 曾残留一条改坏的编辑——规则已闭合，后面又跟了一行
+  声明和孤立的 `}`。浏览器静默跳过，所以没人发现，但它让 postcss/压缩器/`@import` 直接报
+  `Unexpected }`。**构建通过不等于 CSS 合法**；门禁按“顶层语句边界”判定（不猜属性名，
+  避免把 `::before`、`:hover` 误判），已能拦住这类残渣。
+- **全局样式目录**：`frontend/src/styles/base/` 是原 2637 行 `base.css` 按关注点拆出的 13 个分片，
+  由同目录 `index.css` 按固定顺序 `@import`。页面级巨型样式同样拆到页内的
+  `styles/` 或同名子目录（`NationalTeam` 9 片、`IndustryChain` 8 片、`Stock` 6 片、`Macro` 5 片、
+  `Watchlist` 7 片、`Chat` 4 片、`Concept` 4 片、`Dashboard` 3 片、`Settings` 3 片、
+  `Analysis/workspace` 3 片、`Quant/quant-results` 3 片、`Market/market-emotion` 3 片、
+  `Settings/config-cards/market-daily-bar-manager` 4 片，`features/feed` 6 片、
+  `features/investment-research` 8 片）；
+  组件级巨型样式放在与样式同名的子目录里（如 `components/market-overview/` 7 片、
+  `components/market-wind/` 3 片，入口 `index.css`）。**不要重排 `@import` 顺序**——同特异性规则靠源序决胜负，
+  重排会改变层叠结果。拆分时必须用 postcss 顶层节点边界（`node.source.start.line`）切，
+  不能按行号硬切：跨行的选择器列表（`a,\nb { }`）被切开会让构建直接 `Unknown word` 失败。
+  拆分后的硬标准是：**构建产物 CSS 与拆分前逐字节相同**（含哈希文件名）。
+- **CSS Modules**：组件私有样式用 `Xxx.module.css` + `import styles from "./Xxx.module.css"`，
+  类名取短名（`root` / `meta` / `actions`），不再手写 `xxx__yyy` 前缀。试点见
+  `frontend/src/components/SectionToolbar.module.css`。
 
 ### 前端请求超时
 
