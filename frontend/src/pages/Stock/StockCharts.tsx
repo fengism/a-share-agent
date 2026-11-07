@@ -127,11 +127,11 @@ function CNKlinePanel({
             <Switch aria-label="缠论" size="small" checked={chanlunEnabled} onChange={onChanlunChange} />
           </label>
         </Tooltip>
-        <div className="stock-kline-ma-legend" style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: "var(--c-font-xs)", fontFamily: "var(--c-font-mono)", opacity: 0.9 }}>
-          <span style={{ color: "#faad14" }}>● MA5</span>
-          <span style={{ color: "#13c2c2" }}>● MA10</span>
-          <span style={{ color: "#722ed1" }}>● MA20</span>
-          <span style={{ color: "#52c41a" }}>● MA60</span>
+        <div className="stock-kline-ma-legend" >
+          <span className="stock-kline-ma-legend__ma5">● MA5</span>
+          <span className="stock-kline-ma-legend__ma10">● MA10</span>
+          <span className="stock-kline-ma-legend__ma20">● MA20</span>
+          <span className="stock-kline-ma-legend__ma60">● MA60</span>
         </div>
         <span className="stock-chart-hint" data-testid="kline-history-range">
           {historyLimitReached
@@ -256,11 +256,11 @@ function HKKlinePanel({
           onChange={(value) => setAdjust(String(value))}
           size="small"
         />
-        <div className="stock-kline-ma-legend" style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: "var(--c-font-xs)", fontFamily: "var(--c-font-mono)", opacity: 0.9 }}>
-          <span style={{ color: "#faad14" }}>● MA5</span>
-          <span style={{ color: "#13c2c2" }}>● MA10</span>
-          <span style={{ color: "#722ed1" }}>● MA20</span>
-          <span style={{ color: "#52c41a" }}>● MA60</span>
+        <div className="stock-kline-ma-legend" >
+          <span className="stock-kline-ma-legend__ma5">● MA5</span>
+          <span className="stock-kline-ma-legend__ma10">● MA10</span>
+          <span className="stock-kline-ma-legend__ma20">● MA20</span>
+          <span className="stock-kline-ma-legend__ma60">● MA60</span>
         </div>
         <span className="stock-chart-hint" data-testid="kline-history-range">
           {historyLimitReached
@@ -325,21 +325,21 @@ function IntradayPanel({
 
   return (
     <>
-      <div className="stock-chart-toolbar stock-chart-toolbar--intraday" style={{ justifyContent: "space-between" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, fontSize: "var(--c-font-sm)", color: "var(--c-text-secondary)" }}>
+      <div className="stock-chart-toolbar stock-chart-toolbar--intraday" >
+        <div className="stock-chart-toolbar-meta">
           {latestTime && (
             <span>
-              数据时间: <strong style={{ color: "var(--c-text-primary)", fontFamily: "var(--c-font-mono)" }}>{latestTime}</strong>
+              数据时间: <strong className="stock-chart-toolbar-strong">{latestTime}</strong>
             </span>
           )}
-          {query.isFetching && <span style={{ color: "var(--c-primary)" }}>刷新中...</span>}
+          {query.isFetching && <span className="u-text-primary">刷新中...</span>}
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <label className="stock-chart-chanlun-toggle" style={{ cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, fontSize: "var(--c-font-sm)" }}>
+        <div className="stock-chart-toolbar-actions">
+          <label className="stock-chart-chanlun-toggle stock-chart-chanlun-toggle--tight" >
             均价线
             <Switch aria-label="均价线" size="small" checked={showAvgLine} onChange={setShowAvgLine} />
           </label>
-          <label className="stock-chart-chanlun-toggle" style={{ cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, fontSize: "var(--c-font-sm)" }}>
+          <label className="stock-chart-chanlun-toggle stock-chart-chanlun-toggle--tight" >
             昨收线
             <Switch aria-label="昨收线" size="small" checked={showPrevClose} onChange={setShowPrevClose} />
           </label>
@@ -349,7 +349,7 @@ function IntradayPanel({
             icon={<ReloadOutlined spin={query.isFetching} />}
             onClick={() => query.refetch()}
             title="刷新分时数据"
-            style={{ color: "var(--c-text-secondary)" }}
+            className="stock-chart-icon-button"
           >
             刷新
           </Button>
@@ -501,7 +501,7 @@ export default function StockCharts({ code, market = "cn", name }: StockChartsPr
       className="stock-section-card stock-chart-card u-card"
       title={cardTitle}
       extra={(
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div className="stock-chart-toolbar-inline">
           <Segmented
             aria-label={isHK ? "走势类型" : undefined}
             options={viewOptions}
@@ -516,7 +516,7 @@ export default function StockCharts({ code, market = "cn", name }: StockChartsPr
               icon={<FullscreenOutlined />}
               aria-label={isHK ? "全屏查看行情" : "全屏查看图表"}
               onClick={() => setExpanded(true)}
-              style={{ color: "var(--c-text-secondary)" }}
+              className="stock-chart-icon-button"
             />
           </Tooltip>
         </div>
@@ -538,7 +538,7 @@ export default function StockCharts({ code, market = "cn", name }: StockChartsPr
       ) : activeView === "intraday" ? (
         <IntradayPanel code={code} market={market} />
       ) : activeView === "macd" || activeView === "rsi" || activeView === "kdj" ? (
-        <div className="stock-macd-panel" style={{ minHeight: 436 }}>
+        <div className="stock-macd-panel stock-macd-panel--fixed" >
           <IndicatorSubCharts
             code={code}
             types={["macd", "rsi", "kdj"]}
@@ -569,7 +569,7 @@ export default function StockCharts({ code, market = "cn", name }: StockChartsPr
             }`
           ) : (
             <div style={{ display: "flex", alignItems: "center", gap: 12, justifyContent: "space-between", paddingRight: isMobile ? 16 : 32 }}>
-              <span style={{ fontWeight: 600 }}>
+              <span className="u-text-semibold">
                 {`${name ? `${name} · ` : ""}${code} · ${
                   activeView === "kline"
                     ? "K 线图全屏"
@@ -581,7 +581,7 @@ export default function StockCharts({ code, market = "cn", name }: StockChartsPr
                 }`}
               </span>
               {activeView === "kline" && (
-                <span style={{ fontSize: "var(--c-font-xs)", color: "var(--c-text-secondary)", fontWeight: "normal" }}>
+                <span className="stock-chart-modal-hint">
                   {period === "daily" ? "日K" : period === "weekly" ? "周K" : period === "monthly" ? "月K" : "年K"}
                 </span>
               )}

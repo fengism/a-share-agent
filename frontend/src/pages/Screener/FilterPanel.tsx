@@ -47,9 +47,9 @@ function RangeField({
   return (
     <Col xs={xs} sm={sm} md={md}>
       <div style={fieldLabelStyle}>{label}</div>
-      <Space.Compact style={{ width: "100%" }}>
+      <Space.Compact className="screener-field-full">
         <InputNumber
-          style={{ width: "50%" }}
+          className="screener-field-half"
           value={min}
           onChange={onMinChange}
           onPressEnter={onPressEnter}
@@ -58,7 +58,7 @@ function RangeField({
           size="small"
         />
         <InputNumber
-          style={{ width: "50%" }}
+          className="screener-field-half"
           value={max}
           onChange={onMaxChange}
           onPressEnter={onPressEnter}
@@ -154,19 +154,9 @@ export default function FilterPanel({
       {/* 题材与低估值快捷场景模版：移动端横滑优化 */}
       {presets && presets.length > 0 && (
         <div
-          style={{
-            marginBottom: 12,
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            overflowX: "auto",
-            whiteSpace: "nowrap",
-            paddingBottom: 4,
-            WebkitOverflowScrolling: "touch",
-            scrollbarWidth: "none",
-          }}
+          className="screener-preset-row"
         >
-          <span style={{ fontSize: "var(--c-font-sm)", color: mutedTextStyle.color, fontWeight: 600, flexShrink: 0 }}>
+          <span className="screener-preset-label">
             场景挖掘:
           </span>
           {presets.map((preset) => {
@@ -210,7 +200,7 @@ export default function FilterPanel({
           <div style={fieldLabelStyle}>市场板块</div>
           <Select
             mode="multiple"
-            style={{ width: "100%" }}
+            className="screener-field-full"
             placeholder="全部市场"
             value={filters.markets || []}
             onChange={(v) => set({ markets: v.length > 0 ? v : null, page: 1 })}
@@ -230,7 +220,7 @@ export default function FilterPanel({
           <div style={fieldLabelStyle}>行业板块</div>
           <Select
             mode="multiple"
-            style={{ width: "100%" }}
+            className="screener-field-full"
             placeholder="选择行业（可多选）"
             value={filters.industries || []}
             onChange={(v) => set({ industries: v.length > 0 ? v : null, page: 1 })}
@@ -247,7 +237,7 @@ export default function FilterPanel({
           <div style={fieldLabelStyle}>概念题材</div>
           <Select
             mode="multiple"
-            style={{ width: "100%" }}
+            className="screener-field-full"
             placeholder="选择概念（可多选）"
             value={filters.concepts || []}
             onChange={(v) => set({ concepts: v.length > 0 ? v : null, page: 1 })}
@@ -262,12 +252,12 @@ export default function FilterPanel({
 
         <Col xs={12} sm={12} md={6}>
           <div style={fieldLabelStyle}>排序维度</div>
-          <Space.Compact style={{ width: "100%" }}>
+          <Space.Compact className="screener-field-full">
             <Select
               size="small"
               value={filters.sort_by}
               onChange={(v) => set({ sort_by: v })}
-              style={{ width: "65%" }}
+              className="screener-field-65"
               options={[
                 { label: "综合评分", value: "composite_score" },
                 { label: "市值", value: "market_cap" },
@@ -286,7 +276,7 @@ export default function FilterPanel({
               size="small"
               value={filters.sort_order}
               onChange={(v) => set({ sort_order: v as "asc" | "desc" })}
-              style={{ width: "35%" }}
+              className="screener-field-35"
               options={[
                 { label: "降序", value: "desc" },
                 { label: "升序", value: "asc" },
@@ -298,36 +288,29 @@ export default function FilterPanel({
 
       {/* 快捷开关与折叠控制条 */}
       <div
-        style={{
-          marginTop: 10,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          flexWrap: "wrap",
-          gap: 8,
-        }}
+        className="screener-row-between"
       >
         <Space size="middle" wrap>
           <Space>
             <Switch size="small" checked={filters.exclude_st || false} onChange={(v) => set({ exclude_st: v, page: 1 })} />
-            <Text style={{ fontSize: "var(--c-font-sm)", color: mutedTextStyle.color }}>剔除ST风险股</Text>
+            <Text className="u-text-secondary u-text-sm">剔除ST风险股</Text>
           </Space>
           <Space>
             <Switch size="small" checked={filters.is_broken_net || false} onChange={(v) => set({ is_broken_net: v, page: 1 })} />
-            <Text style={{ fontSize: "var(--c-font-sm)", color: mutedTextStyle.color }}>仅破净股 (PB≤1.0)</Text>
+            <Text className="u-text-secondary u-text-sm">仅破净股 (PB≤1.0)</Text>
           </Space>
           <Button
             type="text"
             size="small"
             icon={<ControlOutlined />}
             onClick={() => setAdvancedOpen((v) => !v)}
-            style={{ fontSize: "var(--c-font-sm)" }}
+            className="screener-btn-sm"
           >
             高级筛选{" "}
             {activeAdvancedCount > 0 ? (
               <Badge count={activeAdvancedCount} size="small" style={{ backgroundColor: "#1890ff" }} />
             ) : null}
-            {advancedOpen ? <UpOutlined style={{ fontSize: 10, marginLeft: 4 }} /> : <DownOutlined style={{ fontSize: 10, marginLeft: 4 }} />}
+            {advancedOpen ? <UpOutlined className="screener-expand-icon" /> : <DownOutlined className="screener-expand-icon" />}
           </Button>
         </Space>
 
@@ -340,15 +323,9 @@ export default function FilterPanel({
       {/* 高级筛选区（折叠/展开，量价动量与估值百分位） */}
       {advancedOpen && (
         <div
-          style={{
-            marginTop: 12,
-            padding: "var(--c-pad-inset, 7px 12px)",
-            borderRadius: 6,
-            background: "var(--c-nested-bg)",
-            border: "1px dashed var(--c-border)",
-          }}
+          className="screener-hint-box"
         >
-          <div style={{ marginBottom: 8, fontSize: "var(--c-font-sm)", fontWeight: 600, color: mutedTextStyle.color }}>
+          <div className="screener-hint-title">
             量价动量与风险控制
           </div>
           <Row gutter={[12, 10]}>
@@ -360,7 +337,7 @@ export default function FilterPanel({
             <Col xs={12} sm={12} md={6}>
               <div style={fieldLabelStyle}>最低日成交额(亿)</div>
               <InputNumber
-                style={{ width: "100%" }}
+                className="screener-field-full"
                 size="small"
                 min={0}
                 step={0.5}
@@ -372,11 +349,11 @@ export default function FilterPanel({
             </Col>
           </Row>
 
-          <Row gutter={[12, 10]} style={{ marginTop: 10, paddingTop: 10, borderTop: "1px dashed var(--c-border)" }}>
+          <Row gutter={[12, 10]} className="screener-footer-row">
             <Col span={24}>
               <Space>
                 <Switch size="small" checked={showPercentile} onChange={onShowPercentileChange} />
-                <Text style={{ fontSize: "var(--c-font-sm)", color: mutedTextStyle.color }}>估值百分位过滤</Text>
+                <Text className="u-text-secondary u-text-sm">估值百分位过滤</Text>
                 {showPercentile && <Text type="secondary" style={{ ...mutedTextStyle, fontSize: "var(--c-font-xs)" }}>（近三年历史分位）</Text>}
               </Space>
             </Col>

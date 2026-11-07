@@ -206,3 +206,44 @@
     font-size: 11px;
   }
 }
+
+/* 成交额卡片：自 MarketVolumeCard 内联样式迁出 */
+[data-theme] .market-volume-tile {
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius-sm);
+  background: var(--c-nested-bg);
+}
+
+.market-volume-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.market-volume-caption {
+  font-size: var(--c-font-xs);
+  font-weight: normal;
+}
+
+.market-volume-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.market-volume-chips {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+[data-theme] .market-volume-tag {
+  margin: 0;
+  padding: 0 4px;
+  font-size: 10px;
+  line-height: 16px;
+}

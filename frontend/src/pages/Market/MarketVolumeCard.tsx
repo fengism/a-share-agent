@@ -270,16 +270,16 @@ export default function MarketVolumeCard({
         ...style,
       }}
       title={
-        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-          <BarChartOutlined style={{ color: c.primary }} />
-          <span style={{ fontWeight: Number(t.weight.semibold) }}>A股全市场成交额走势</span>
-          <Text type="secondary" className="market-volume-card__subtitle" style={{ fontSize: t.font.xs, fontWeight: "normal" }}>
+        <div className="market-volume-title">
+          <BarChartOutlined className="u-text-primary" />
+          <span className="u-text-semibold">A股全市场成交额走势</span>
+          <Text type="secondary" className="market-volume-card__subtitle market-volume-caption" >
             沪深北全市场合计
           </Text>
         </div>
       }
       extra={
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <div className="market-volume-meta">
           <Segmented
             aria-label="成交额统计区间"
             size="small"
@@ -314,18 +314,14 @@ export default function MarketVolumeCard({
         minHeight={320}
       >
         {stats && (
-          <Row gutter={[16, 12]} style={{ marginBottom: t.space[3] }}>
+          <Row gutter={[16, 12]} className="u-mb-12">
             <Col xs={12} sm={6}>
               <Card
                 size="small"
-                style={{
-                  background: c.nestedBg,
-                  borderRadius: t.radius.sm,
-                  border: `1px solid ${c.border}`,
-                }}
+                className="market-volume-tile"
               >
                 <Statistic
-                  title={<span style={{ fontSize: t.font.xs, color: c.textSecondary }}>最新全市场成交</span>}
+                  title={<span className="u-text-xs u-text-secondary">最新全市场成交</span>}
                   value={stats.latest.amountYi}
                   precision={1}
                   suffix="亿元"
@@ -337,7 +333,7 @@ export default function MarketVolumeCard({
                     },
                   }}
                 />
-                <div style={{ marginTop: 4, display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
+                <div className="market-volume-chips">
                   <Text
                     style={{
                       fontSize: t.font.xs,
@@ -352,7 +348,7 @@ export default function MarketVolumeCard({
                   </Text>
                   <Tag
                     color={stats.latest.isHigherThanPrev ? "error" : "success"}
-                    style={{ fontSize: 10, lineHeight: "16px", padding: "0 4px", margin: 0 }}
+                    className="market-volume-tag"
                   >
                     {stats.latest.isHigherThanPrev ? "放量" : "缩量"}
                   </Tag>
@@ -363,14 +359,10 @@ export default function MarketVolumeCard({
             <Col xs={12} sm={6}>
               <Card
                 size="small"
-                style={{
-                  background: c.nestedBg,
-                  borderRadius: t.radius.sm,
-                  border: `1px solid ${c.border}`,
-                }}
+                className="market-volume-tile"
               >
                 <Statistic
-                  title={<span style={{ fontSize: t.font.xs, color: c.textSecondary }}>20日均量 (MA20)</span>}
+                  title={<span className="u-text-xs u-text-secondary">20日均量 (MA20)</span>}
                   value={stats.latest.ma20}
                   precision={1}
                   suffix="亿元"
@@ -383,8 +375,8 @@ export default function MarketVolumeCard({
                     },
                   }}
                 />
-                <div style={{ marginTop: 4 }}>
-                  <Text type="secondary" style={{ fontSize: t.font.xs }}>
+                <div className="u-mt-4">
+                  <Text type="secondary" className="u-text-xs">
                     量比 {stats.volumeRatio ?? "-"} ·{" "}
                     {stats.volumeRatio != null ? (stats.volumeRatio >= 1 ? "高于均量" : "低于均量") : "计算中"}
                   </Text>
@@ -395,14 +387,10 @@ export default function MarketVolumeCard({
             <Col xs={12} sm={6}>
               <Card
                 size="small"
-                style={{
-                  background: c.nestedBg,
-                  borderRadius: t.radius.sm,
-                  border: `1px solid ${c.border}`,
-                }}
+                className="market-volume-tile"
               >
                 <Statistic
-                  title={<span style={{ fontSize: t.font.xs, color: c.textSecondary }}>区间最高 (天量)</span>}
+                  title={<span className="u-text-xs u-text-secondary">区间最高 (天量)</span>}
                   value={stats.maxItem.amountYi}
                   precision={1}
                   suffix="亿元"
@@ -415,8 +403,8 @@ export default function MarketVolumeCard({
                     },
                   }}
                 />
-                <div style={{ marginTop: 4 }}>
-                  <Text type="secondary" style={{ fontSize: t.font.xs }}>
+                <div className="u-mt-4">
+                  <Text type="secondary" className="u-text-xs">
                     {stats.maxItem.date}
                   </Text>
                 </div>
@@ -426,14 +414,10 @@ export default function MarketVolumeCard({
             <Col xs={12} sm={6}>
               <Card
                 size="small"
-                style={{
-                  background: c.nestedBg,
-                  borderRadius: t.radius.sm,
-                  border: `1px solid ${c.border}`,
-                }}
+                className="market-volume-tile"
               >
                 <Statistic
-                  title={<span style={{ fontSize: t.font.xs, color: c.textSecondary }}>区间最低 (地量)</span>}
+                  title={<span className="u-text-xs u-text-secondary">区间最低 (地量)</span>}
                   value={stats.minItem.amountYi}
                   precision={1}
                   suffix="亿元"
@@ -446,8 +430,8 @@ export default function MarketVolumeCard({
                     },
                   }}
                 />
-                <div style={{ marginTop: 4 }}>
-                  <Text type="secondary" style={{ fontSize: t.font.xs }}>
+                <div className="u-mt-4">
+                  <Text type="secondary" className="u-text-xs">
                     {stats.minItem.date}
                   </Text>
                 </div>

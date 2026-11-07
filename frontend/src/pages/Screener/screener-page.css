@@ -126,3 +126,77 @@
 .screener-page__bottom-spacer {
   height: 72px;
 }
+
+/* 筛选面板：自 FilterPanel 内联样式迁出 */
+.screener-field-full {
+  width: 100%;
+}
+
+.screener-field-half {
+  width: 50%;
+}
+
+.screener-field-65 {
+  width: 65%;
+}
+
+.screener-field-35 {
+  width: 35%;
+}
+
+.screener-preset-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding-bottom: 4px;
+  overflow-x: auto;
+  white-space: nowrap;
+  -webkit-overflow-scrolling: touch;
+}
+
+.screener-preset-label {
+  flex-shrink: 0;
+  color: var(--c-text-secondary);
+  font-size: var(--c-font-sm);
+  font-weight: 600;
+}
+
+.screener-row-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.screener-hint-box {
+  margin-top: 12px;
+  padding: var(--c-pad-inset, 7px 12px);
+  border: 1px dashed var(--c-border);
+  border-radius: 6px;
+  background: var(--c-nested-bg);
+}
+
+.screener-hint-title {
+  margin-bottom: 8px;
+  color: var(--c-text-secondary);
+  font-size: var(--c-font-sm);
+  font-weight: 600;
+}
+
+.screener-footer-row {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--c-border);
+}
+
+[data-theme] .ant-btn.screener-btn-sm {
+  font-size: var(--c-font-sm);
+}
+
+[data-theme] .screener-expand-icon {
+  margin-left: 4px;
+  font-size: 10px;
+}

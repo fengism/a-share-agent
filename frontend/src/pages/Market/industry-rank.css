@@ -29,7 +29,7 @@
   color: var(--c-down);
 }
 
-.industry-rank__tag--up {
+[data-theme] .industry-rank__tag--up {
   color: var(--c-up);
 }
 
@@ -82,6 +82,6 @@
   font-size: var(--c-font-sm);
 }
 
-.industry-rank__table-transparent {
+[data-theme] .industry-rank__table-transparent {
   background: transparent;
 }

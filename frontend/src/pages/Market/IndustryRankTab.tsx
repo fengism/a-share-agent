@@ -40,7 +40,6 @@ function SectorStocksDrawer({
   onClose: () => void;
 }) {
   const c = useColors();
-  const t = useTokens();
   const isNarrow = useMediaQuery("(max-width: 768px)");
   const [previewStock, setPreviewStock] = useState<{ code: string; name: string } | null>(null);
   const query = useMarketSectorStocksHistory(sector ? dateText : "", sector?.code ?? "");
@@ -55,11 +54,11 @@ function SectorStocksDrawer({
       fixed: isNarrow ? undefined : ("left" as const),
       width: 156,
       render: (_value: unknown, stock: MarketSectorStocksHistoryItem) => (
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4 }}>
-          <StockExternalLink code={stock.code} name={stock.name} style={{ display: "inline-flex" }}>
+        <div className="industry-rank__stock-cell">
+          <StockExternalLink code={stock.code} name={stock.name} className="industry-rank__stock-link">
             <Space orientation="vertical" size={0}>
-              <span style={{ fontWeight: Number(t.weight.medium) }}>{stock.name}</span>
-              <span style={{ color: c.textSecondary, fontSize: t.font.xs, fontFamily: "var(--c-font-mono)" }}>{stock.code}</span>
+              <span className="industry-rank__stock-name">{stock.name}</span>
+              <span className="industry-rank__stock-code">{stock.code}</span>
             </Space>
           </StockExternalLink>
           <Button
@@ -82,7 +81,7 @@ function SectorStocksDrawer({
       dataIndex: "price",
       width: 80,
       align: "right" as const,
-      render: (value: number | null) => <span style={{ fontFamily: "var(--c-font-mono)" }}>{value === null ? "-" : value.toFixed(2)}</span>,
+      render: (value: number | null) => <span className="u-font-mono">{value === null ? "-" : value.toFixed(2)}</span>,
     };
     const changeColumn = {
       title: "涨跌幅",
@@ -100,7 +99,7 @@ function SectorStocksDrawer({
       dataIndex: "amount",
       width: 110,
       align: "right" as const,
-      render: (value: number | null) => <span style={{ fontFamily: "var(--c-font-mono)" }}>{formatAmount(value)}</span>,
+      render: (value: number | null) => <span className="u-font-mono">{formatAmount(value)}</span>,
     };
     const netColumn = {
       title: "主力净额",
@@ -130,7 +129,7 @@ function SectorStocksDrawer({
         width: 100,
         align: "center" as const,
         render: (value: string, stock: MarketSectorStocksHistoryItem) => value ? (
-          <Tag style={{ color: c.up }}>{value}{(stock.limit_count ?? 0) > 0 ? ` · ${stock.limit_count}板` : ""}</Tag>
+          <Tag className="industry-rank__tag--up">{value}{(stock.limit_count ?? 0) > 0 ? ` · ${stock.limit_count}板` : ""}</Tag>
         ) : "-",
       },
       {
@@ -147,7 +146,7 @@ function SectorStocksDrawer({
         dataIndex: "turnover_rate",
         width: 90,
         align: "right" as const,
-        render: (value: number | null) => <span style={{ fontFamily: "var(--c-font-mono)" }}>{formatRate(value)}</span>,
+        render: (value: number | null) => <span className="u-font-mono">{formatRate(value)}</span>,
       },
       {
         title: "近期涨幅",
@@ -161,10 +160,10 @@ function SectorStocksDrawer({
         dataIndex: "float_amount",
         width: 120,
         align: "right" as const,
-        render: (value: number | null) => <span style={{ fontFamily: "var(--c-font-mono)" }}>{formatMarketCap(value)}</span>,
+        render: (value: number | null) => <span className="u-font-mono">{formatMarketCap(value)}</span>,
       },
     ];
-  }, [c, historyDetailsAvailable, isNarrow, t]);
+  }, [c, historyDetailsAvailable, isNarrow]);
 
   const renderExpandedRow = useCallback((record: MarketSectorStocksHistoryItem) => (
     <ResponsiveMetricGrid
@@ -192,7 +191,7 @@ function SectorStocksDrawer({
       destroyOnHidden
     >
       {query.data ? (
-        <Space wrap style={{ marginBottom: t.space[3], color: c.textSecondary }}>
+        <Space wrap className="industry-rank__detail-meta">
           <span>
             {query.data.date === query.data.constituent_date ? "成分日期" : "成分口径"}：
             {query.data.date === query.data.constituent_date ? "" : "开盘红 "}
@@ -304,9 +303,9 @@ export default function IndustryRankTab() {
       width: isNarrow ? 130 : 140,
       ellipsis: true,
       render: (value: string, record: IndustryRankItem) => (
-        <div style={{ display: "flex", alignItems: "center", gap: t.space[2] }}>
+        <div className="industry-rank__industry-cell">
           {isNarrow ? rankBadge(record.rank, c, t) : null}
-          <span style={{ minWidth: 0, color: c.textPrimary, fontWeight: Number(t.weight.semibold) }}>
+          <span className="industry-rank__industry-name">
             {value}
           </span>
         </div>
@@ -359,24 +358,24 @@ export default function IndustryRankTab() {
         align: "right",
         render: (value: number | null) => <ChangeValue value={value} />,
       },
-      { title: "成交额", dataIndex: "amount", width: 110, align: "right", render: (val) => <span style={{ fontFamily: "var(--c-font-mono)" }}>{formatAmount(val)}</span> },
+      { title: "成交额", dataIndex: "amount", width: 110, align: "right", render: (val) => <span className="u-font-mono">{formatAmount(val)}</span> },
       netColumn,
       {
         title: "主买",
         dataIndex: "buy_amount",
         width: 110,
         align: "right",
-        render: (value: number | null) => <span style={{ color: c.up, fontFamily: "var(--c-font-mono)" }}>{formatAmount(value)}</span>,
+        render: (value: number | null) => <span className="industry-rank__num--up u-font-mono">{formatAmount(value)}</span>,
       },
       {
         title: "主卖",
         dataIndex: "sell_amount",
         width: 110,
         align: "right",
-        render: (value: number | null) => <span style={{ color: c.down, fontFamily: "var(--c-font-mono)" }}>{formatAmount(value)}</span>,
+        render: (value: number | null) => <span className="industry-rank__num--down u-font-mono">{formatAmount(value)}</span>,
       },
-      { title: "换手率", dataIndex: "turnover_rate", width: 90, align: "right", render: (val) => <span style={{ fontFamily: "var(--c-font-mono)" }}>{formatRate(val)}</span> },
-      { title: "行业市值", dataIndex: "market_cap", width: 120, align: "right", render: (val) => <span style={{ fontFamily: "var(--c-font-mono)" }}>{formatMarketCap(val)}</span> },
+      { title: "换手率", dataIndex: "turnover_rate", width: 90, align: "right", render: (val) => <span className="u-font-mono">{formatRate(val)}</span> },
+      { title: "行业市值", dataIndex: "market_cap", width: 120, align: "right", render: (val) => <span className="u-font-mono">{formatMarketCap(val)}</span> },
       stocksActionColumn,
     ];
   }, [c, isNarrow, drillDownDisabled, drillDownTooltip, t]);
@@ -398,25 +397,22 @@ export default function IndustryRankTab() {
   ), []);
 
   return (
-    <div className="u-card" style={{ padding: 0, borderRadius: t.radius.md, boxShadow: t.shadow.xs }}>
+    <div className="u-card industry-rank__card" >
       <div
-        style={{
-          padding: `${t.space[3]} ${t.space[4]}`,
-          borderBottom: `1px solid ${c.border}`,
-        }}
+        className="industry-rank__card-header"
       >
         <SectionToolbar
           ariaLabel="行业资金与涨跌排行工具条"
           meta={
-            <div style={{ display: "flex", alignItems: "center", gap: t.space[2], flexWrap: "wrap" }}>
-              <AppstoreOutlined style={{ color: c.primary }} />
-              <span style={{ color: c.textPrimary, fontWeight: Number(t.weight.medium) }}>
+            <div className="industry-rank__header-title-wrap">
+              <AppstoreOutlined className="industry-rank__header-icon" />
+              <span className="industry-rank__header-title">
                 行业资金与涨跌排行
               </span>
               <Tag>{source}</Tag>
               {!data?.fund_data_available ? <Tag color="warning">资金数据降级</Tag> : null}
               {dateWasResolved ? <Tag color="warning">已回退至最近交易日</Tag> : null}
-              <span style={{ color: c.textSecondary, fontSize: t.font.sm }}>
+              <span className="industry-rank__header-subtitle">
                 数据日期：{actualDate}
               </span>
             </div>
@@ -475,7 +471,7 @@ export default function IndustryRankTab() {
             } : undefined}
             scroll={{ x: isNarrow ? 360 : 1180, y: 600 }}
             size="small"
-            style={{ background: "transparent" }}
+            className="industry-rank__table-transparent"
           />
         )}
       </SectionDataState>
