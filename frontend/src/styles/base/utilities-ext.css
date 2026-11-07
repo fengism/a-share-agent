@@ -5,6 +5,10 @@
   font-family: var(--c-font-sans);
 }
 
+.u-font-mono {
+  font-family: var(--c-font-mono);
+}
+
 .u-nowrap {
   white-space: nowrap;
 }
