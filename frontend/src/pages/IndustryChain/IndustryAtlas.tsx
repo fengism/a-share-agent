@@ -134,14 +134,14 @@ export default function IndustryAtlas({ onAnalyze }: IndustryAtlasProps) {
           type="text"
           icon={<ArrowLeftOutlined />}
           onClick={() => setSelectedSlug("")}
-          style={{ marginBottom: 12, color: colors.textSecondary }}
+          className="atlas-back-button"
         >
           返回知识库
         </Button>
         {chainQuery.isLoading && (
-          <div className="u-card" style={{ padding: 60, textAlign: "center" }}>
+          <div className="u-card atlas-loading-block" >
             <Spin />
-            <div style={{ marginTop: 12, color: colors.textMuted }}>正在加载产业链图谱…</div>
+            <div className="u-mt-12 u-text-muted">正在加载产业链图谱…</div>
           </div>
         )}
         {chainQuery.isError && (
@@ -163,10 +163,10 @@ export default function IndustryAtlas({ onAnalyze }: IndustryAtlasProps) {
   }
 
   return (
-    <div>
+    <div className="industry-atlas">
       {/* 头部控制栏：模式切换、自动挖掘状态与管理操作 */}
       <div className="u-card" style={{ padding: isMobile ? "12px 14px" : "16px 20px", marginBottom: 16 }}>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+        <div className="atlas-row atlas-row--gap-10">
           <div style={{ width: isMobile ? "100%" : "auto" }}>
             <Segmented
               block={isMobile}
@@ -183,7 +183,7 @@ export default function IndustryAtlas({ onAnalyze }: IndustryAtlasProps) {
           {activeView === "catalog" && (
             <Input
               allowClear
-              prefix={<SearchOutlined style={{ color: colors.textMuted }} />}
+              prefix={<SearchOutlined className="atlas-search-icon" />}
               placeholder="搜索产业链、标签或别名…"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
@@ -191,8 +191,8 @@ export default function IndustryAtlas({ onAnalyze }: IndustryAtlasProps) {
             />
           )}
 
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-            <span style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)" }}>
+          <div className="atlas-row">
+            <span className="u-text-muted u-text-sm">
               {catalog
                 ? `${catalog.total_chains} 条产业链 · ${catalog.total_companies} 家核心公司`
                 : "加载中…"}
@@ -201,17 +201,17 @@ export default function IndustryAtlas({ onAnalyze }: IndustryAtlasProps) {
             <Popover
               title="产业链知识库与自动挖掘机制"
               content={
-                <div style={{ maxWidth: 360, fontSize: "var(--c-font-sm)", lineHeight: 1.6 }}>
-                  <p style={{ margin: "0 0 8px" }}>
+                <div className="atlas-popover-body">
+                  <p className="atlas-popover-text">
                     <b>AI 自动挖掘已启用</b>：每次执行产业链深度研究并生成分析报告后，后台将自动提取上中下游企业节点与所属环节。
                   </p>
-                  <p style={{ margin: "0 0 8px" }}>
+                  <p className="atlas-popover-text">
                     <b>双向核验防幻觉</b>：公司名称与股票代码必须完全通过 A 股官方名录校验才允许入库，防止模型幻觉污染知识库。
                   </p>
-                  <p style={{ margin: "0 0 8px" }}>
+                  <p className="atlas-popover-text">
                     <b>质量门禁与更新</b>：仅通过质量校验且具备完整环节与标的之报告才沉淀为知识库，同名链条稳定覆盖更新。
                   </p>
-                  <p style={{ margin: 0, color: colors.textMuted }}>
+                  <p className="u-m-0 u-text-muted">
                     知识库条目后续在同主题分析时将作为先验证据输入模型，形成持续演进的正向反馈闭环。
                   </p>
                 </div>
@@ -220,9 +220,9 @@ export default function IndustryAtlas({ onAnalyze }: IndustryAtlasProps) {
               <Tag
                 icon={<RobotOutlined />}
                 color="cyan"
-                style={{ cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 }}
+                className="atlas-ai-tag"
               >
-                {isMobile ? "AI 挖掘已开" : "自动挖掘已开启"} <InfoCircleOutlined style={{ fontSize: 11 }} />
+                {isMobile ? "AI 挖掘已开" : "自动挖掘已开启"} <InfoCircleOutlined className="atlas-icon-xs" />
               </Tag>
             </Popover>
           </div>
@@ -256,9 +256,9 @@ export default function IndustryAtlas({ onAnalyze }: IndustryAtlasProps) {
 
         {/* 目录视图：分类与来源标签 */}
         {activeView === "catalog" && catalog && (
-          <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 8 }}>
+          <div className="atlas-catalog-filters">
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-              <span style={{ fontSize: "var(--c-font-sm)", color: colors.textMuted, marginRight: 4 }}>
+              <span className="u-text-muted u-text-sm atlas-mr-4">
                 分类:
               </span>
               <CategoryChip
@@ -279,7 +279,7 @@ export default function IndustryAtlas({ onAnalyze }: IndustryAtlasProps) {
             </div>
 
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-              <span style={{ fontSize: "var(--c-font-sm)", color: colors.textMuted, marginRight: 4 }}>
+              <span className="u-text-muted u-text-sm atlas-mr-4">
                 来源:
               </span>
               <Radio.Group
@@ -319,9 +319,9 @@ export default function IndustryAtlas({ onAnalyze }: IndustryAtlasProps) {
       ) : (
         <>
           {catalogQuery.isLoading && (
-            <div className="u-card" style={{ padding: 60, textAlign: "center" }}>
+            <div className="u-card atlas-loading-block" >
               <Spin />
-              <div style={{ marginTop: 12, color: colors.textMuted }}>正在加载产业链知识库…</div>
+              <div className="u-mt-12 u-text-muted">正在加载产业链知识库…</div>
             </div>
           )}
           {catalogQuery.isError && (
@@ -331,19 +331,19 @@ export default function IndustryAtlas({ onAnalyze }: IndustryAtlasProps) {
             />
           )}
           {catalog && filteredChains.length === 0 && (
-            <div className="u-card" style={{ padding: 40, textAlign: "center" }}>
+            <div className="u-card atlas-empty-block" >
               {sourceFilter === "user" ? (
                 <Empty
                   description={
-                    <div style={{ maxWidth: 420, margin: "0 auto", lineHeight: "1.8" }}>
-                      <p style={{ fontWeight: 500, marginBottom: 4 }}>暂无个人专属图谱</p>
-                      <span style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)" }}>
+                    <div className="atlas-empty-inner">
+                      <p className="atlas-empty-title">暂无个人专属图谱</p>
+                      <span className="u-text-muted u-text-sm">
                         您可以从已有的产业链分析研报中点击「沉淀到知识库」，或直接通过上方按钮导入 YAML 文件建立您的私有知识库。
                       </span>
                     </div>
                   }
                 >
-                  <div style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 12 }}>
+                  <div className="atlas-empty-actions">
                     <Button type="primary" icon={<CloudDownloadOutlined />} onClick={() => setMineOpen(true)}>
                       沉淀个人图谱
                     </Button>
@@ -375,8 +375,8 @@ export default function IndustryAtlas({ onAnalyze }: IndustryAtlasProps) {
                   onClick={() => setSelectedSlug(chain.slug)}
                 >
                   <div
-                    className="atlas-chain-card__heading"
-                    style={{ display: "flex", alignItems: "center", gap: 8 }}
+                    className="atlas-chain-card__heading atlas-inline-row"
+                    
                   >
                     <span
                       style={{
@@ -399,30 +399,19 @@ export default function IndustryAtlas({ onAnalyze }: IndustryAtlasProps) {
                     {chain.source === "user" && <Tag color="purple">个人专属</Tag>}
                     {chain.source === "mined" && <Tag color="processing">AI 挖掘</Tag>}
                     {chain.source === "imported" && <Tag color="gold">外部导入</Tag>}
-                    <Tag className="atlas-wrap-tag" style={{ marginLeft: "auto" }}>
+                    <Tag className="atlas-wrap-tag atlas-ml-auto" >
                       {chain.category}
                     </Tag>
                   </div>
                   <div
-                    className="atlas-chain-card__summary"
-                    style={{
-                      color: colors.textSecondary,
-                      fontSize: "var(--c-font-md)",
-                      lineHeight: "var(--c-leading-normal)",
-                      flex: 1,
-                    }}
+                    className="atlas-chain-card__summary atlas-chain-summary"
+                    
                   >
                     {chain.summary}
                   </div>
                   <div
-                    className="atlas-chain-card__stats"
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                      fontSize: "var(--c-font-sm)",
-                      color: colors.textMuted,
-                    }}
+                    className="atlas-chain-card__stats atlas-chain-stats"
+                    
                   >
                     <span>{chain.segment_count} 个环节</span>
                     <span>·</span>
@@ -563,16 +552,16 @@ function AtlasReverseLookup({
 
   return (
     <Card className="u-card" styles={{ body: { padding: isMobile ? "14px 16px" : 20 } }}>
-      <div style={{ maxWidth: 600, marginBottom: 16 }}>
+      <div className="atlas-reverse-intro">
         <h3 style={{ fontSize: isMobile ? "var(--c-font-base)" : "var(--c-font-lg)", marginBottom: 8, color: colors.textPrimary }}>
           🔍 从个股反查产业链分布
         </h3>
-        <p style={{ color: colors.textSecondary, fontSize: "var(--c-font-sm)", marginBottom: 12 }}>
+        <p className="u-text-secondary u-text-sm atlas-mb-12">
           输入股票代码（如 002371）或企业名称（如 北方华创、中科创达），即可穿透查看该企业在全市场知识库中参与的所有产业链、所属上中下游及具体细分环节。
         </p>
         <Input
           allowClear
-          prefix={<SearchOutlined style={{ color: colors.textMuted }} />}
+          prefix={<SearchOutlined className="atlas-search-icon" />}
           placeholder="输入股票代码或名称，如：中科创达、300496、宁德时代"
           value={keyword}
           onChange={(e) => onKeywordChange(e.target.value)}
@@ -581,13 +570,13 @@ function AtlasReverseLookup({
       </div>
 
       {!keyword.trim() ? (
-        <div style={{ textAlign: "center", padding: "40px 0", color: colors.textMuted }}>
+        <div className="atlas-empty-center">
           请输入股票代码或名称开始反查
         </div>
       ) : matchedNodes.length === 0 ? (
         <Empty description="未在现有产业链知识库中检索到该股票" />
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <div className="atlas-chain-detail">
           {matchedNodes.map((node) => (
             <div
               key={node.id}
@@ -598,7 +587,7 @@ function AtlasReverseLookup({
                 padding: isMobile ? "12px 14px" : "16px 20px",
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+              <div className="atlas-detail-header">
                 <span
                   style={{
                     fontSize: isMobile ? "var(--c-font-lg)" : "var(--c-font-xl)",
@@ -610,7 +599,7 @@ function AtlasReverseLookup({
                 >
                   {node.name}
                 </span>
-                <Tag color="blue" style={{ fontSize: 12, cursor: "pointer" }} onClick={() => onCompanyClick(node.id)}>
+                <Tag color="blue" className="atlas-detail-tag" onClick={() => onCompanyClick(node.id)}>
                   {node.id}
                 </Tag>
                 <Tag color={node.layer === "upstream" ? "orange" : node.layer === "midstream" ? "blue" : "green"}>
@@ -621,8 +610,8 @@ function AtlasReverseLookup({
                 </span>
               </div>
 
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-                <span style={{ fontSize: "var(--c-font-sm)", color: colors.textSecondary }}>所属产业链：</span>
+              <div className="atlas-tag-row">
+                <span className="u-text-secondary u-text-sm">所属产业链：</span>
                 {node.chains.map((slug) => {
                   const chainName = chainIndex[slug] || slug;
                   return (
@@ -640,7 +629,7 @@ function AtlasReverseLookup({
               </div>
 
               {node.segments.length > 0 && (
-                <div style={{ marginTop: 10, fontSize: "var(--c-font-sm)", color: colors.textMuted }}>
+                <div className="atlas-note">
                   细分环节：{node.segments.join("、")}
                 </div>
               )}
@@ -856,7 +845,7 @@ function AtlasGlobalGraph({
   return (
     <Card className="u-card" styles={{ body: { padding: isMobile ? 12 : 18 } }}>
       {/* 子标签：力导向图谱 / 跨链枢纽龙头榜 / 产业协同矩阵 */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, flexWrap: "wrap", gap: 10 }}>
+      <div className="atlas-graph-header">
         <div style={{ width: isMobile ? "100%" : "auto" }}>
           <Segmented
             block={isMobile}
@@ -871,11 +860,11 @@ function AtlasGlobalGraph({
         </div>
 
         {graphData && (
-          <div style={{ fontSize: "var(--c-font-xs)", color: colors.textMuted }}>
+          <div className="u-text-muted u-text-xs">
             <span>已合并 <b>{graphData.summary.total_nodes}</b> 家公司</span>
-            <span style={{ margin: "0 6px" }}>·</span>
+            <span className="atlas-mx-6">·</span>
             <span><b>{graphData.summary.total_edges}</b> 条传导关系</span>
-            <span style={{ margin: "0 6px" }}>·</span>
+            <span className="atlas-mx-6">·</span>
             <span>覆盖 <b>{graphData.summary.total_chains}</b> 条产业链</span>
           </div>
         )}
@@ -885,13 +874,7 @@ function AtlasGlobalGraph({
         <>
           {/* 筛选过滤工具栏 */}
           <div
-            style={{
-              display: "flex",
-              gap: 10,
-              flexWrap: "wrap",
-              alignItems: "center",
-              marginBottom: 12,
-            }}
+            className="atlas-graph-controls"
           >
             <Select
               mode="multiple"
@@ -917,7 +900,7 @@ function AtlasGlobalGraph({
 
             <Input
               allowClear
-              prefix={<SearchOutlined style={{ color: colors.textMuted }} />}
+              prefix={<SearchOutlined className="atlas-search-icon" />}
               placeholder="高亮公司代码或名称…"
               style={{ width: isNarrow ? "100%" : 190 }}
               value={nodeSearch}
@@ -953,7 +936,7 @@ function AtlasGlobalGraph({
           )}
 
           {graphData && graphData.nodes.length === 0 && (
-            <div style={{ height: 320, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <div className="atlas-chart-loading">
               <Empty description="所选产业链中未包含公司节点" />
             </div>
           )}
@@ -976,14 +959,7 @@ function AtlasGlobalGraph({
                 style={{ width: "100%", height: "100%" }}
               />
               <div
-                style={{
-                  position: "absolute",
-                  bottom: 12,
-                  right: 16,
-                  fontSize: "var(--c-font-xs)",
-                  color: colors.textMuted,
-                  pointerEvents: "none",
-                }}
+                className="atlas-chart-hint"
               >
                 支持鼠标滚轮缩放与拖拽画布 · 节点尺寸随跨链协同度动态缩放
               </div>
@@ -1024,12 +1000,12 @@ function HubCompaniesRanking({
   const colors = useColors();
 
   if (hubCompanies.length === 0) {
-    return <Empty description="暂无跨足多条产业链的枢纽龙头" style={{ padding: 40 }} />;
+    return <Empty description="暂无跨足多条产业链的枢纽龙头" className="atlas-empty-pad" />;
   }
 
   return (
     <div>
-      <div style={{ marginBottom: 12, color: colors.textSecondary, fontSize: "var(--c-font-sm)" }}>
+      <div className="u-text-secondary u-text-sm atlas-mb-12">
         💡 <b>跨链枢纽标的</b>：跨足 2 条及以上结构性高景气产业链的平台型或核心龙头企业，具备极强的跨产业抗周期与协同共振特征。
       </div>
 
@@ -1037,17 +1013,9 @@ function HubCompaniesRanking({
         {hubCompanies.map((comp, idx) => (
           <Col xs={24} sm={12} md={8} key={comp.id}>
             <div
-              style={{
-                border: `1px solid ${colors.border}`,
-                borderRadius: 10,
-                background: colors.nestedBg,
-                padding: "var(--c-pad-card, 16px 18px)",
-                display: "flex",
-                flexDirection: "column",
-                gap: 8,
-              }}
+              className="atlas-hub-card"
             >
-              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <div className="atlas-inline-row atlas-inline-row--wrap">
                 <span
                   style={{
                     width: 22,
@@ -1065,25 +1033,25 @@ function HubCompaniesRanking({
                   {idx + 1}
                 </span>
                 <strong
-                  style={{ fontSize: "var(--c-font-base)", color: colors.textPrimary, cursor: "pointer" }}
+                  className="atlas-hub-name"
                   onClick={() => onCompanyClick(comp.id)}
                 >
                   {comp.name}
                 </strong>
-                <Tag color="blue" style={{ cursor: "pointer", fontSize: 11 }} onClick={() => onCompanyClick(comp.id)}>
+                <Tag color="blue" className="atlas-chip-tag" onClick={() => onCompanyClick(comp.id)}>
                   {comp.id}
                 </Tag>
-                <Tag color="purple" style={{ marginLeft: "auto", fontSize: 11 }}>
+                <Tag color="purple" className="atlas-chip-tag atlas-ml-auto">
                   跨 {comp.chain_count} 链
                 </Tag>
               </div>
 
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              <div className="atlas-chip-row">
                 {comp.chains.map((slug, i) => (
                   <Tag
                     key={slug}
                     color="cyan"
-                    style={{ cursor: "pointer", fontSize: 11 }}
+                    className="atlas-chip-tag"
                     onClick={() => onSelectChain(slug)}
                   >
                     {comp.chain_names[i] || slug}
@@ -1092,7 +1060,7 @@ function HubCompaniesRanking({
               </div>
 
               {comp.segments.length > 0 && (
-                <div style={{ fontSize: "var(--c-font-xs)", color: colors.textMuted }}>
+                <div className="u-text-muted u-text-xs">
                   环节：{comp.segments.slice(0, 3).join("、")}
                 </div>
               )}
@@ -1113,49 +1081,37 @@ function ChainSynergyMatrix({
   synergies: NonNullable<ReturnType<typeof useIndustryChainAtlasGraph>["data"]>["chain_synergies"];
   onSelectChain: (slug: string) => void;
 }) {
-  const colors = useColors();
-
   if (!synergies || synergies.length === 0) {
-    return <Empty description="暂无跨产业链共现协同分析数据" style={{ padding: 40 }} />;
+    return <Empty description="暂无跨产业链共现协同分析数据" className="atlas-empty-pad" />;
   }
 
   return (
     <div>
-      <div style={{ marginBottom: 12, color: colors.textSecondary, fontSize: "var(--c-font-sm)" }}>
+      <div className="u-text-secondary u-text-sm atlas-mb-12">
         ⚡ <b>跨产业链协同共振</b>：两两产业之间共有供应链企业越多，表明产业间的需求协同、技术传导与共振效应越强。
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div className="atlas-reverse-list">
         {synergies.map((s) => (
           <div
             key={`${s.source_slug}-${s.target_slug}`}
-            style={{
-              border: `1px solid ${colors.border}`,
-              borderRadius: 8,
-              background: colors.nestedBg,
-              padding: "var(--c-pad-card, 16px 18px)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              flexWrap: "wrap",
-              gap: 8,
-            }}
+            className="atlas-reverse-card"
           >
-            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              <Button type="link" style={{ padding: 0 }} onClick={() => onSelectChain(s.source_slug)}>
+            <div className="atlas-inline-row atlas-inline-row--wrap">
+              <Button type="link" className="atlas-link-button" onClick={() => onSelectChain(s.source_slug)}>
                 <b>{s.source_name}</b>
               </Button>
-              <span style={{ color: colors.accent, fontWeight: 700 }}>⇄</span>
-              <Button type="link" style={{ padding: 0 }} onClick={() => onSelectChain(s.target_slug)}>
+              <span className="atlas-accent-strong">⇄</span>
+              <Button type="link" className="atlas-link-button" onClick={() => onSelectChain(s.target_slug)}>
                 <b>{s.target_name}</b>
               </Button>
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              <Tag color="cyan" style={{ fontWeight: 600 }}>
+            <div className="atlas-inline-row atlas-inline-row--wrap">
+              <Tag color="cyan" className="atlas-chip-tag--strong">
                 共享 {s.shared_companies_count} 家龙头
               </Tag>
-              <span style={{ fontSize: "var(--c-font-xs)", color: colors.textSecondary, overflowWrap: "anywhere", wordBreak: "break-word" }}>
+              <span className="atlas-wrap-xs">
                 共有关联企业：{s.shared_companies.join("、")}
               </span>
             </div>
@@ -1206,7 +1162,7 @@ function ChainAtlasDetail({
           ))}
 
           {chain.mined_at && (
-            <span style={{ fontSize: "var(--c-font-xs)", color: colors.textMuted }}>
+            <span className="u-text-muted u-text-xs">
               挖掘入库: {chain.mined_at}
             </span>
           )}
@@ -1289,19 +1245,14 @@ function ChainAtlasDetail({
         </div>
 
         <div
-          className="atlas-detail__summary"
-          style={{
-            color: colors.textSecondary,
-            fontSize: "var(--c-font-md)",
-            lineHeight: "var(--c-leading-relaxed)",
-            marginTop: 8,
-          }}
+          className="atlas-detail__summary atlas-subtitle"
+          
         >
           {chain.summary}
         </div>
 
         {(chain.drivers ?? []).length > 0 && (
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+          <div className="atlas-wrap-row">
             {(chain.drivers ?? []).map((driver) => (
               <span
                 key={driver}
@@ -1325,24 +1276,17 @@ function ChainAtlasDetail({
       {detailMode === "graph" ? (
         <SingleChainGraph chain={chain} onCompanyClick={onCompanyClick} />
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <div className="atlas-report-stack">
           {chain.layers.map((layer, index) => (
             <div key={layer.key}>
               <AtlasLayerBand layer={layer} onCompanyClick={onCompanyClick} />
               {index < chain.layers.length - 1 && (
                 <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "center",
-                    alignItems: "center",
-                    gap: 8,
-                    padding: "8px 0",
-                    color: colors.textMuted,
-                  }}
+                  className="atlas-loading-inline"
                 >
-                  <span style={{ height: 1, width: 40, background: colors.border }} />
-                  <span style={{ fontSize: 12, opacity: 0.7, letterSpacing: 2 }}>↓ 传导流向</span>
-                  <span style={{ height: 1, width: 40, background: colors.border }} />
+                  <span className="atlas-divider-line" />
+                  <span className="atlas-divider-label">↓ 传导流向</span>
+                  <span className="atlas-divider-line" />
                 </div>
               )}
             </div>
@@ -1351,12 +1295,7 @@ function ChainAtlasDetail({
       )}
 
       <div
-        style={{
-          color: colors.textMuted,
-          fontSize: "var(--c-font-sm)",
-          marginTop: 16,
-          textAlign: "center",
-        }}
+        className="atlas-footnote"
       >
         点击公司节点可跳转个股研究 · 知识库由官方名录核验并持续支持 AI 分析闭环挖掘
       </div>
@@ -1627,11 +1566,11 @@ function SingleChainGraph({
   return (
     <Card className="u-card" styles={{ body: { padding: isSmall ? 12 : 16 } }}>
       {/* 搜索与导出工具栏 */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 10 }}>
+      <div className="atlas-graph-header atlas-graph-header--tight">
         <Input
           allowClear
           placeholder="在当前拓扑图中高亮公司或细分环节…"
-          prefix={<SearchOutlined style={{ color: colors.textMuted }} />}
+          prefix={<SearchOutlined className="atlas-search-icon" />}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           style={{ width: isSmall ? "100%" : 260 }}

@@ -1,0 +1,332 @@
+/* 知识库图谱工作区布局类
+   自 IndustryAtlas.tsx 内联样式迁出；仅承载静态样式，动态计算值（移动端宽度、
+   图表高度、来源色、名次徽标等）仍保留在 JSX 中。 */
+
+.industry-atlas {
+  min-width: 0;
+}
+
+/* antd 组件的覆盖需要 >= (0,3,0)：antd v6 以 :where() 包裹根类，运行期注入。 */
+[data-theme] .industry-atlas .atlas-back-button {
+  margin-bottom: 12px;
+  color: var(--c-text-secondary);
+}
+
+[data-theme] .industry-atlas .atlas-search-icon {
+  color: var(--c-text-muted);
+}
+
+[data-theme] .industry-atlas .atlas-icon-xs {
+  font-size: 11px;
+}
+
+[data-theme] .industry-atlas .atlas-ai-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+[data-theme] .industry-atlas .atlas-detail-tag {
+  font-size: 12px;
+  cursor: pointer;
+}
+
+[data-theme] .industry-atlas .atlas-chip-tag {
+  font-size: 11px;
+  cursor: pointer;
+}
+
+[data-theme] .industry-atlas .atlas-chip-tag--strong {
+  font-weight: 600;
+}
+
+[data-theme] .industry-atlas .atlas-link-button {
+  height: auto;
+  padding: 0;
+}
+
+[data-theme] .industry-atlas .atlas-empty-pad {
+  padding: 40px;
+}
+
+.atlas-loading-block {
+  padding: 60px;
+  text-align: center;
+}
+
+.atlas-empty-block {
+  padding: 40px;
+  text-align: center;
+}
+
+.atlas-empty-center {
+  padding: 40px 0;
+  text-align: center;
+  color: var(--c-text-muted);
+}
+
+.atlas-empty-inner {
+  max-width: 420px;
+  margin: 0 auto;
+  line-height: 1.8;
+}
+
+.atlas-empty-title {
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+
+.atlas-empty-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.atlas-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.atlas-row--gap-10 {
+  gap: 10px;
+}
+
+.atlas-inline-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 保持内联时期在所有断点下都是 8px：panels.css 的移动端规则为 (0,1,0)，此处需 (0,2,0)。 */
+.atlas-chain-card__heading.atlas-inline-row {
+  gap: 8px;
+}
+
+.atlas-inline-row--wrap {
+  flex-wrap: wrap;
+}
+
+.atlas-popover-body {
+  max-width: 360px;
+  font-size: var(--c-font-sm);
+  line-height: 1.6;
+}
+
+.atlas-popover-text {
+  margin: 0 0 8px;
+}
+
+.atlas-catalog-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.atlas-mr-4 {
+  margin-right: 4px;
+}
+
+.atlas-ml-auto {
+  margin-left: auto;
+}
+
+.atlas-chain-summary {
+  flex: 1;
+  color: var(--c-text-secondary);
+  font-size: var(--c-font-md);
+  line-height: var(--c-leading-normal);
+}
+
+.atlas-chain-stats {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--c-font-sm);
+  color: var(--c-text-muted);
+}
+
+.atlas-reverse-intro {
+  max-width: 600px;
+  margin-bottom: 16px;
+}
+
+.atlas-mb-12 {
+  margin-bottom: 12px;
+}
+
+.atlas-chain-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.atlas-detail-header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.atlas-tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.atlas-mt-10 {
+  margin-top: 10px;
+}
+
+.atlas-note {
+  margin-top: 10px;
+  font-size: var(--c-font-sm);
+  color: var(--c-text-muted);
+}
+
+.atlas-graph-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.atlas-graph-header--tight {
+  margin-bottom: 12px;
+}
+
+.atlas-mx-6 {
+  margin: 0 6px;
+}
+
+.atlas-graph-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.atlas-chart-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 320px;
+}
+
+.atlas-chart-hint {
+  position: absolute;
+  right: 16px;
+  bottom: 12px;
+  font-size: var(--c-font-xs);
+  color: var(--c-text-muted);
+  pointer-events: none;
+}
+
+.atlas-hub-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid var(--c-border);
+  border-radius: 10px;
+  background: var(--c-nested-bg);
+  padding: var(--c-pad-card, 16px 18px);
+}
+
+.atlas-hub-name {
+  color: var(--c-text-primary);
+  font-size: var(--c-font-base);
+  cursor: pointer;
+}
+
+.atlas-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.atlas-reverse-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.atlas-reverse-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  border: 1px solid var(--c-border);
+  border-radius: 8px;
+  background: var(--c-nested-bg);
+  padding: var(--c-pad-card, 16px 18px);
+}
+
+.atlas-accent-strong {
+  color: var(--c-accent);
+  font-weight: 700;
+}
+
+.atlas-wrap-xs {
+  font-size: var(--c-font-xs);
+  color: var(--c-text-secondary);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.atlas-subtitle {
+  margin-top: 8px;
+  color: var(--c-text-secondary);
+  font-size: var(--c-font-md);
+  line-height: var(--c-leading-relaxed);
+}
+
+.atlas-wrap-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.atlas-report-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.atlas-loading-inline {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 0;
+  color: var(--c-text-muted);
+}
+
+.atlas-divider-line {
+  width: 40px;
+  height: 1px;
+  background: var(--c-border);
+}
+
+.atlas-divider-label {
+  font-size: 12px;
+  letter-spacing: 2px;
+  opacity: 0.7;
+}
+
+.atlas-footnote {
+  margin-top: 16px;
+  color: var(--c-text-muted);
+  font-size: var(--c-font-sm);
+  text-align: center;
+}

@@ -8,6 +8,7 @@
 @import "./responsive.css";
 @import "./markdown.css";
 @import "./atlas.css";
+@import "./atlas-workspace.css";
 @import "./panels.css";
 @import "./decision-research.css";
 @import "./report-push-and-charts.css";
