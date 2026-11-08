@@ -226,6 +226,7 @@
   margin: 0;
   font-size: var(--c-font-md);
   font-weight: var(--c-weight-semibold);
+  color: var(--c-text-primary);
 }
 
 .concept-missing__desc {

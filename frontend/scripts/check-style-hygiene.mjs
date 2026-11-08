@@ -16,8 +16,8 @@ import path from "node:path";
 const srcRoot = path.resolve("src");
 
 /** 当前基线。只允许下调，不允许上调。 */
-// 实际 1511，预留 20 处缓冲，避免正常功能开发被门禁直接卡死；下轮清理后同步下调。
-const INLINE_STYLE_BUDGET = 1531;
+// 实际 1354，预留 20 处缓冲，避免正常功能开发被门禁直接卡死；下轮清理后同步下调。
+const INLINE_STYLE_BUDGET = 1374;
 const IMPORTANT_BUDGET = 177;
 
 /**

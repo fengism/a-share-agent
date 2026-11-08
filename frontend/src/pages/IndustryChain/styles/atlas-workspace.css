@@ -330,3 +330,22 @@
   font-size: var(--c-font-sm);
   text-align: center;
 }
+
+/* 图表/图层图例：自 IndustryAtlas 内联样式迁出 */
+
+.atlas-chart-fill {
+  width: 100%;
+  height: 100%;
+}
+
+.atlas-layer-upstream {
+  color: #f59e0b;
+}
+
+.atlas-layer-midstream {
+  color: #3b82f6;
+}
+
+.atlas-layer-downstream {
+  color: #10b981;
+}

@@ -247,3 +247,86 @@
   font-size: 10px;
   line-height: 16px;
 }
+
+/* A 股指数页：自 AIndexTab 内联样式迁出 */
+
+.a-index-section {
+  margin-bottom: var(--c-space-4);
+}
+
+.a-index-card-button {
+  cursor: pointer;
+  border: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  text-align: left;
+  outline: none;
+}
+
+.a-index-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-width: 0;
+  gap: 4px;
+}
+
+.a-index-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--c-primary);
+  flex-shrink: 0;
+}
+
+.a-index-meta-row {
+  margin-top: var(--c-space-2);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-width: 0;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+[data-theme] .a-index-mono.ant-typography {
+  font-size: var(--c-font-xs);
+  font-family: var(--c-font-mono);
+  flex-shrink: 0;
+}
+
+.a-index-change-row {
+  margin-top: var(--c-space-2);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+  overflow: hidden;
+}
+
+[data-theme] .a-index-xs-text.ant-typography {
+  font-size: var(--c-font-xs);
+  max-width: 100%;
+}
+
+[data-theme] .ant-btn.a-index-refresh-btn {
+  color: var(--c-text-secondary);
+}
+
+.a-index-chart-block {
+  margin-top: var(--c-space-4);
+}
+
+.a-index-chip-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.a-index-hint {
+  font-size: var(--c-font-xs);
+  color: var(--c-text-secondary);
+}

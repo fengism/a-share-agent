@@ -86,3 +86,19 @@ test("regular users cannot access the global AnySearch settings", async ({ page 
   await expect(page.getByRole("button", { name: "数据源管理", exact: true })).toHaveCount(0);
   await expect(page.getByText("AnySearch 网页搜索（全局）", { exact: true })).toHaveCount(0);
 });
+
+test("admin tools section renders research budget settings", async ({ page }) => {
+  await page.route(/^http:\/\/127\.0\.0\.1:4173\/api\//, async (route) => {
+    const pathname = new URL(route.request().url()).pathname;
+    if (pathname === "/api/config") {
+      await route.fulfill({ json: configResponse(true) });
+      return;
+    }
+    await fulfillCommonApi(route, admin);
+  });
+
+  await page.goto("/settings");
+  await page.getByRole("button", { name: "管理员工具", exact: false }).click();
+
+  await expect(page.getByText("研究预算与超时（全局）", { exact: true })).toBeVisible();
+});

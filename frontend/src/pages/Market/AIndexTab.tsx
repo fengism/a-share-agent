@@ -93,7 +93,7 @@ export default function AIndexTab() {
 
   return (
     <div>
-      <div style={{ marginBottom: t.space[4] }}>
+      <div className="a-index-section">
         <SectionDataState
           isLoading={indicesLoading && mainIndices.length === 0}
           error={mainIndices.length > 0 ? undefined : indicesError}
@@ -113,16 +113,7 @@ export default function AIndexTab() {
                     type="button"
                     onClick={() => setActiveSymbol(idx.code)}
                     aria-pressed={isActive}
-                    style={{
-                      cursor: "pointer",
-                      border: 0,
-                      padding: 0,
-                      width: "100%",
-                      height: "100%",
-                      background: "transparent",
-                      textAlign: "left",
-                      outline: "none",
-                    }}
+                    className="a-index-card-button"
                   >
                     <Card
                       hoverable
@@ -142,7 +133,7 @@ export default function AIndexTab() {
                     >
                       <Statistic
                         title={
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", minWidth: 0, gap: 4 }}>
+                          <div className="a-index-card-head">
                             <span style={{
                               color: isActive ? c.primary : c.textSecondary,
                               fontSize: t.font.md,
@@ -154,7 +145,7 @@ export default function AIndexTab() {
                               {idx.name}
                             </span>
                             {isActive && (
-                              <span style={{ width: 6, height: 6, borderRadius: "50%", backgroundColor: c.primary, flexShrink: 0 }} />
+                              <span className="a-index-dot" />
                             )}
                           </div>
                         }
@@ -175,12 +166,12 @@ export default function AIndexTab() {
                           },
                         }}
                       />
-                      <div style={{ marginTop: t.space[2], display: "flex", justifyContent: "space-between", alignItems: "center", minWidth: 0, gap: 4, flexWrap: "wrap" }}>
+                      <div className="a-index-meta-row">
                         <ChangeValue value={idx.change_pct} showIcon />
-                        <Text type="secondary" style={{ fontSize: t.font.xs, fontFamily: "var(--c-font-mono)", flexShrink: 0 }}>{idx.code}</Text>
+                        <Text type="secondary" className="a-index-mono">{idx.code}</Text>
                       </div>
-                      <div style={{ marginTop: t.space[2], display: "flex", alignItems: "center", justifyContent: "space-between", minWidth: 0, overflow: "hidden" }}>
-                        <Text type="secondary" ellipsis style={{ fontSize: t.font.xs, maxWidth: "100%" }}>成交额 {formatAmount(idx.amount)}</Text>
+                      <div className="a-index-change-row">
+                        <Text type="secondary" ellipsis className="a-index-xs-text">成交额 {formatAmount(idx.amount)}</Text>
                       </div>
                     </Card>
                   </button>
@@ -209,16 +200,15 @@ export default function AIndexTab() {
             size="small"
             className="market-kline-card"
             title={
-              <span style={{ fontWeight: Number(t.weight.semibold) }}>
+              <span className="u-text-semibold">
                 {activeIndex?.name || "大盘指数"} · K线趋势
               </span>
             }
             extra={
-              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <div className="a-index-chip-row">
                 <span
-                  className="stock-chart-hint"
+                  className="stock-chart-hint a-index-hint"
                   data-testid="index-kline-history-range"
-                  style={{ fontSize: t.font.xs, color: c.textSecondary }}
                 >
                   {historyLimitReached
                     ? `已加载近 ${MAX_KLINE_HISTORY_YEARS} 年（上限）`
@@ -231,7 +221,7 @@ export default function AIndexTab() {
                   icon={<FullscreenOutlined />}
                   aria-label="放大K线图"
                   onClick={() => setKlineExpanded(true)}
-                  style={{ color: c.textSecondary }}
+                  className="a-index-refresh-btn"
                 />
               </div>
             }
@@ -260,14 +250,14 @@ export default function AIndexTab() {
         </Col>
       </Row>
 
-      <div style={{ marginTop: t.space[4] }}>
+      <div className="a-index-chart-block">
         <MarketVolumeCard />
       </div>
 
       <Modal
         title={
           <div style={{ display: "flex", alignItems: "center", gap: 12, justifyContent: "space-between", paddingRight: isMobile ? 16 : 32, flexWrap: "wrap", minWidth: 0 }}>
-            <span style={{ fontWeight: 600 }}>{`${activeIndex?.name || "大盘指数"} · ${period === "daily" ? "日K" : period === "weekly" ? "周K" : period === "monthly" ? "月K" : "年K"}线全屏`}</span>
+            <span className="u-text-semibold">{`${activeIndex?.name || "大盘指数"} · ${period === "daily" ? "日K" : period === "weekly" ? "周K" : period === "monthly" ? "月K" : "年K"}线全屏`}</span>
           </div>
         }
         open={klineExpanded}
@@ -305,7 +295,7 @@ export default function AIndexTab() {
             flexShrink: 0,
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <div className="a-index-chip-row">
             <Segmented
               size="small"
               aria-label="全屏切换指数"
@@ -316,8 +306,7 @@ export default function AIndexTab() {
             {periodControl}
           </div>
           <span
-            className="stock-chart-hint"
-            style={{ fontSize: t.font.xs, color: c.textSecondary }}
+            className="stock-chart-hint a-index-hint"
           >
             {historyLimitReached
               ? `已加载近 ${MAX_KLINE_HISTORY_YEARS} 年（上限）`

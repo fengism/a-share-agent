@@ -257,7 +257,7 @@ export default function IndustryAtlas({ onAnalyze }: IndustryAtlasProps) {
         {/* 目录视图：分类与来源标签 */}
         {activeView === "catalog" && catalog && (
           <div className="atlas-catalog-filters">
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <div className="atlas-inline-row atlas-inline-row--wrap">
               <span className="u-text-muted u-text-sm atlas-mr-4">
                 分类:
               </span>
@@ -278,7 +278,7 @@ export default function IndustryAtlas({ onAnalyze }: IndustryAtlasProps) {
               ))}
             </div>
 
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <div className="atlas-inline-row atlas-inline-row--wrap">
               <span className="u-text-muted u-text-sm atlas-mr-4">
                 来源:
               </span>
@@ -956,7 +956,7 @@ function AtlasGlobalGraph({
                 option={chartOption}
                 notMerge
                 onEvents={{ click: onChartClick }}
-                style={{ width: "100%", height: "100%" }}
+                className="atlas-chart-fill"
               />
               <div
                 className="atlas-chart-hint"
@@ -1600,13 +1600,13 @@ function SingleChainGraph({
           fontWeight: 600,
         }}
       >
-        <span style={{ color: LAYER_COLORS.upstream }}>
+        <span className="atlas-layer-upstream">
           {isSmall ? "上游·材料/设备" : "上游 · 核心原材料 / 关键设备"}
         </span>
-        <span style={{ color: LAYER_COLORS.midstream }}>
+        <span className="atlas-layer-midstream">
           {isSmall ? "中游·制造/集成" : "中游 · 制造封测 / 模组与系统集成"}
         </span>
-        <span style={{ color: LAYER_COLORS.downstream }}>
+        <span className="atlas-layer-downstream">
           {isSmall ? "下游·终端/应用" : "下游 · 终端产品 / 行业应用场景"}
         </span>
       </div>
@@ -1626,7 +1626,7 @@ function SingleChainGraph({
           option={chartOption}
           notMerge
           onEvents={{ click: onChartClick }}
-          style={{ width: "100%", height: "100%" }}
+          className="atlas-chart-fill"
         />
         <div
           style={{

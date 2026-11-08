@@ -260,7 +260,7 @@ export default function PotentialPage() {
       key: "stock",
       width: 140,
       render: (_: unknown, record: PotentialStockItem) => (
-        <StockExternalLink code={record.code} name={record.name} style={{ color: c.primary, display: "flex", flexDirection: "column", minWidth: 0 }}>
+        <StockExternalLink code={record.code} name={record.name} className="potential-name-link">
           <span className="potential-text-primary u-text-semibold">{record.name}</span>
           <span className="u-text-muted u-text-xs">{record.code}</span>
         </StockExternalLink>
@@ -308,8 +308,8 @@ export default function PotentialPage() {
       render: (value: number, record: PotentialStockItem) => {
         const isHigh = value >= 4.5;
         const tooltipContent = (
-          <div style={{ display: "grid", gap: 4, fontSize: t.font.xs, minWidth: 150 }}>
-            <div style={{ fontWeight: Number(t.weight.bold), borderBottom: `1px solid ${c.border}`, paddingBottom: 2 }}>
+          <div className="potential-score-grid">
+            <div className="potential-score-head">
               评分明细拆解 (总分: {value.toFixed(1)})
             </div>
             <div className="potential-row-split">
@@ -329,11 +329,11 @@ export default function PotentialPage() {
             {record.theme_score > 0 ? (
               <div className="potential-row-split">
                 <span className="u-text-secondary">热门题材分:</span>
-                <span style={{ fontWeight: Number(t.weight.semibold), fontFamily: "var(--c-font-mono)", color: c.accent }}>+{record.theme_score.toFixed(1)}</span>
+                <span className="potential-mono-accent">+{record.theme_score.toFixed(1)}</span>
               </div>
             ) : null}
             {record.sector_strength != null ? (
-              <div style={{ display: "flex", justifyContent: "space-between", color: c.textMuted }}>
+              <div className="potential-row-between-muted">
                 <span>行业中位强度:</span>
                 <span>{record.sector_strength.toFixed(1)}%</span>
               </div>
@@ -411,7 +411,7 @@ export default function PotentialPage() {
             <Button
               type="text"
               size="small"
-              icon={isFavorited ? <StarFilled style={{ color: "#faad14" }} /> : <StarOutlined />}
+              icon={isFavorited ? <StarFilled className="potential-star" /> : <StarOutlined />}
               title={isFavorited ? "从自选移除" : "加入自选"}
               aria-label={`${isFavorited ? "移除" : "加入"} ${record.name} 自选`}
               onClick={(e) => {
@@ -455,7 +455,7 @@ export default function PotentialPage() {
       title: "股票",
       key: "stock",
       render: (_: unknown, record: PotentialPerformanceItem) => (
-        <StockExternalLink code={record.code} name={record.name} style={{ color: c.primary, display: "flex", flexDirection: "column" }}>
+        <StockExternalLink code={record.code} name={record.name} className="potential-name-link--plain">
           <span className="potential-text-primary u-text-semibold">{record.name}</span>
           <span className="u-text-muted u-text-xs">{record.code}</span>
         </StockExternalLink>
@@ -509,7 +509,7 @@ export default function PotentialPage() {
       align: "right",
       render: (value: number | null) => <ChangeValue value={value} />,
     },
-  ], [c, t]);
+  ], [t]);
 
   return (
     <div aria-label="潜力股挖掘页">
@@ -519,14 +519,7 @@ export default function PotentialPage() {
             <RadarChartOutlined className="u-text-primary" />
             <span>每日潜力股</span>
             <Tag
-              style={{
-                fontFamily: "var(--c-font-mono)",
-                fontSize: t.font.xs,
-                color: c.primary,
-                borderColor: "color-mix(in srgb, var(--c-primary) 35%, transparent)",
-                background: "color-mix(in srgb, var(--c-primary) 10%, transparent)",
-                letterSpacing: "0.06em",
-              }}
+              className="potential-signal-tag"
             >
               QUANT RADAR
             </Tag>
@@ -605,8 +598,8 @@ export default function PotentialPage() {
           <div className="u-mb-16">
             <div className="potential-row-between">
               <div className="potential-inline-tight">
-                <FireOutlined style={{ color: "#fa541c", fontSize: 16 }} />
-                <span style={{ fontWeight: Number(t.weight.bold), fontSize: t.font.sm, color: c.textPrimary }}>
+                <FireOutlined className="potential-fire-icon" />
+                <span className="potential-strong">
                   今日精选金股
                 </span>
                 <Tag style={{ ...semanticTagStyle("accent"), fontSize: t.font.xs, margin: 0 }}>
@@ -618,11 +611,7 @@ export default function PotentialPage() {
               </Text>
             </div>
             <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-                gap: t.space[3],
-              }}
+              className="potential-picks-grid"
             >
               {topPicks.map((pick) => {
                 const meta = getCategoryMeta(pick.category, pick.category_label);
@@ -630,22 +619,12 @@ export default function PotentialPage() {
                 return (
                   <div
                     key={pick.code}
-                    style={{
-                      background: c.nestedBg,
-                      borderRadius: t.radius.lg,
-                      border: `1px solid ${c.border}`,
-                      padding: `${t.space[3]}px ${t.space[3]}px`,
-                      display: "flex",
-                      flexDirection: "column",
-                      justifyContent: "space-between",
-                      gap: t.space[2],
-                      position: "relative",
-                    }}
+                    className="potential-pick-card"
                   >
                     <div>
                       {/* Header */}
                       <div className="potential-row-between">
-                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <div className="potential-inline-row">
                           <Tag className={`potential-category ${meta.className}`}>
                             {meta.icon} {meta.label}
                           </Tag>
@@ -668,19 +647,19 @@ export default function PotentialPage() {
                       </div>
 
                       {/* Stock Main */}
-                      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: t.space[2] }}>
+                      <div className="potential-pick-head">
                         <div>
-                          <StockExternalLink code={pick.code} name={pick.name} style={{ display: "inline-flex", alignItems: "baseline", gap: 6 }}>
-                            <span style={{ fontSize: t.font.md, fontWeight: Number(t.weight.bold), color: c.textPrimary }}>
+                          <StockExternalLink code={pick.code} name={pick.name} className="potential-pick-link">
+                            <span className="potential-pick-name">
                               {pick.name}
                             </span>
-                            <span style={{ fontSize: t.font.xs, color: c.textMuted }}>
+                            <span className="u-text-muted u-text-xs">
                               {pick.code}
                             </span>
                           </StockExternalLink>
                         </div>
-                        <div style={{ textAlign: "right" }}>
-                          <span style={{ fontFamily: "var(--c-font-mono)", fontWeight: Number(t.weight.semibold), fontSize: t.font.md, marginRight: 6 }}>
+                        <div className="potential-text-right">
+                          <span className="potential-pick-price">
                             {formatValue(pick.price)}
                           </span>
                           <ChangeValue value={pick.change_pct} fontWeight={Number(t.weight.bold)} />
@@ -689,17 +668,7 @@ export default function PotentialPage() {
 
                       {/* 4-Dim Mini Scores */}
                       <div
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns: "repeat(4, 1fr)",
-                          gap: 4,
-                          background: c.cardBg,
-                          borderRadius: t.radius.sm,
-                          padding: "4px 8px",
-                          fontSize: t.font.xs,
-                          textAlign: "center",
-                          marginBottom: t.space[2],
-                        }}
+                        className="potential-pick-metrics"
                       >
                         <div>
                           <div className="u-text-muted">信号</div>
@@ -729,17 +698,7 @@ export default function PotentialPage() {
 
                       {/* Reason */}
                       <div
-                        style={{
-                          fontSize: t.font.xs,
-                          color: c.textSecondary,
-                          lineHeight: 1.4,
-                          display: "-webkit-box",
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: "vertical",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          minHeight: 34,
-                        }}
+                        className="potential-pick-summary"
                         title={pick.reason}
                       >
                         {pick.reason || "符合多维量化筛选模型"}
@@ -748,22 +707,14 @@ export default function PotentialPage() {
 
                     {/* Action Bar */}
                     <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        gap: 8,
-                        marginTop: t.space[2],
-                        paddingTop: t.space[2],
-                        borderTop: `1px dashed ${c.border}`,
-                      }}
+                      className="potential-pick-foot"
                     >
                       <Button
                         type="primary"
                         ghost
                         size="small"
                         icon={<RobotOutlined />}
-                        style={{ flex: 1 }}
+                        className="potential-flex-btn"
                         onClick={() => triggerStockAiDiagnosis(pick.code, pick.name, navigate)}
                       >
                         AI诊断
@@ -777,7 +728,7 @@ export default function PotentialPage() {
                       </Button>
                       <Button
                         size="small"
-                        icon={isFavorited ? <StarFilled style={{ color: "#faad14" }} /> : <StarOutlined />}
+                        icon={isFavorited ? <StarFilled className="potential-star" /> : <StarOutlined />}
                         onClick={() => handleToggleWatchlist(pick)}
                       >
                         {isFavorited ? "已选" : "自选"}
@@ -792,7 +743,7 @@ export default function PotentialPage() {
 
         {/* 策略风格分类筛选 */}
         {items.length > 0 ? (
-          <div style={{ marginBottom: t.space[3] }}>
+          <div className="potential-section-gap">
             <Segmented
               aria-label="策略意图分类"
               value={intentFilter}
@@ -828,7 +779,7 @@ export default function PotentialPage() {
             scroll={{ x: "max-content" }}
             expandable={{
               expandedRowRender: (record) => (
-                <div style={{ display: "grid", gap: t.space[2], padding: `${t.space[1]} 0` }}>
+                <div className="potential-list">
                   <Text className="u-text-secondary">{record.reason || "暂无入选说明"}</Text>
                   <div className="potential-tags-row">
                     <Tag style={{ ...semanticTagStyle("primary"), margin: 0 }}>信号分 {record.signal_score.toFixed(1)}</Tag>
@@ -870,7 +821,7 @@ export default function PotentialPage() {
       <Card
         size="small"
         title="历史表现复盘"
-        style={{ marginTop: t.space[4] }}
+        className="potential-history-card"
         extra={(
           <Segmented
             size="small"
@@ -886,8 +837,8 @@ export default function PotentialPage() {
           <Text type="danger">历史表现数据加载失败</Text>
         ) : performanceQuery.data ? (
           performanceQuery.data.evaluated_count > 0 ? (
-            <div style={{ display: "grid", gap: t.space[3] }}>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: t.space[2] }}>
+            <div className="potential-grid">
+              <div className="potential-outcome-grid">
                 <div className="potential-metric-tile">
                   <div className="u-text-secondary u-text-xs">胜率</div>
                   <div className="potential-text-primary u-text-bold u-font-mono">
@@ -902,10 +853,10 @@ export default function PotentialPage() {
                 </div>
                 <div className="potential-metric-tile">
                   <div className="u-text-secondary u-text-xs">涨跌分布</div>
-                  <div style={{ fontSize: t.font.xs, fontWeight: Number(t.weight.semibold), fontFamily: "var(--c-font-mono)", marginTop: 2 }}>
-                    <span style={{ color: c.up }}>{performanceQuery.data.positive_count ?? 0}涨</span>
-                    <span style={{ color: c.textMuted, margin: "0 2px" }}>/</span>
-                    <span style={{ color: c.down }}>{performanceQuery.data.negative_count ?? 0}跌</span>
+                  <div className="potential-outcome-value">
+                    <span className="u-text-up">{performanceQuery.data.positive_count ?? 0}涨</span>
+                    <span className="potential-outcome-sep">/</span>
+                    <span className="u-text-down">{performanceQuery.data.negative_count ?? 0}跌</span>
                   </div>
                 </div>
                 <div className="potential-metric-tile">
