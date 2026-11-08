@@ -35,6 +35,20 @@ logger = logging.getLogger(__name__)
 
 _SENTIMENT_DATA_DIR = Path(DATA_DIR) / "sentiment" / "leek_index"
 
+_metrics = {
+    "computes_total": 0,
+    "last_duration_ms": 0.0,
+    "last_success_timestamp": 0.0,
+    "last_median_score": 0.0,
+    "extreme_count": 0,
+    "safe_count": 0,
+}
+
+
+def leek_index_metrics_snapshot() -> dict[str, object]:
+    """返回韭菜指数运行指标快照供监控与 Prometheus 采集。"""
+    return dict(_metrics)
+
 
 class LeekIndexService:
     def __init__(self) -> None:
@@ -60,9 +74,20 @@ class LeekIndexService:
             return persisted
 
         # 3. 实时计算
+        t0 = datetime.now()
         overview = await self._compute_overview(today_str)
+        duration_ms = round((datetime.now() - t0).total_seconds() * 1000, 1)
+
         self._cached_overview = overview
         self._cache_time = now_ts
+
+        # 更新指标
+        _metrics["computes_total"] += 1
+        _metrics["last_duration_ms"] = duration_ms
+        _metrics["last_success_timestamp"] = now_ts
+        _metrics["last_median_score"] = overview.summary.median_score
+        _metrics["extreme_count"] = overview.summary.extreme_count
+        _metrics["safe_count"] = overview.summary.safe_count
 
         # 4. 自动持久化当日结果
         self._persist_result(overview)

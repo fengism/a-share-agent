@@ -75,11 +75,13 @@ async def operational_snapshots() -> OperationalSnapshot:
     application_metrics = metrics.snapshot()
     from app.financial_data.market.quotes.national_team import national_team_snapshot
     from app.infrastructure.providers.sina.provider import sina_snapshot_health_snapshot
+    from app.modules.sentiment.service import leek_index_metrics_snapshot
 
     application_metrics["market_snapshots"] = {
         "sina_full_market": sina_snapshot_health_snapshot(),
     }
     application_metrics["national_team"] = national_team_snapshot()
+    application_metrics["leek_index"] = leek_index_metrics_snapshot()
     persistence_metrics = dict(application_metrics.get("persistence", {}))
     persistence_metrics["databases"] = databases
     persistence_metrics["history_indexes"] = history_indexes

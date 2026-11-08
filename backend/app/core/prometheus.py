@@ -152,6 +152,14 @@ def render_prometheus_metrics(
         for scope, count in national_team.get("source_failures", {}).items():
             lines.append(_sample("a_share_national_team_source_failures_total", count, scope=scope))
 
+    leek_index = snapshot.get("leek_index", {})
+    if leek_index:
+        lines.append(_sample("a_share_leek_index_computes_total", leek_index.get("computes_total", 0)))
+        lines.append(_sample("a_share_leek_index_duration_milliseconds", leek_index.get("last_duration_ms", 0)))
+        lines.append(_sample("a_share_leek_index_median_score", leek_index.get("last_median_score", 0)))
+        lines.append(_sample("a_share_leek_index_extreme_count", leek_index.get("extreme_count", 0)))
+        lines.append(_sample("a_share_leek_index_safe_count", leek_index.get("safe_count", 0)))
+
     workflow = snapshot.get("workflow", {})
     for kind, events in workflow.get("events", {}).items():
         for event, count in events.items():
