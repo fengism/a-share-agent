@@ -38,6 +38,7 @@ import MarketWindBoard from "../../components/MarketWindBoard";
 import { marketDateStamp } from "../../utils/marketTime";
 import WatchlistPanel from "./WatchlistPanel";
 import NationalTeamSignalCard from "./NationalTeamSignalCard";
+import DashboardLeekCard from "./DashboardLeekCard";
 import "./styles/index.css";
 
 const { Text } = Typography;
@@ -557,10 +558,13 @@ export default function Dashboard() {
         />
       </div>
       <div className="dashboard-layout" data-mobile-view={mobileView}>
-        {/* 左栏：市场状态仪表（温度、涨跌家数、情绪）+ 国家队监控 */}
+        {/* 左栏：市场状态仪表（温度、涨跌家数、情绪）+ 国家队监控 + 散户韭菜指数 */}
         <section className="dashboard-rail-left" aria-label="首页市场状态与国家队">
           <section aria-label="国家队托底信号">
             <NationalTeamSignalCard />
+          </section>
+          <section aria-label="行业韭菜指数">
+            <DashboardLeekCard />
           </section>
           <section className="dashboard-market-board" aria-label="首页市场看板">
             <MarketOverviewBoard showRankings={false} onNavigate={(tab) => navigate(`/market?tab=${tab}`)} />

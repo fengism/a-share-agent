@@ -119,6 +119,39 @@ function mainlineSnapshot(): MarketMainline {
   };
 }
 
+vi.mock("../../api/queryHooks/sentiment", () => ({
+  useLeekIndexOverview: () => ({
+    data: {
+      trade_date: "2026-08-21",
+      updated_at: "2026-08-21 15:30:00",
+      summary: {
+        median_score: 48.5,
+        extreme_count: 1,
+        fever_count: 3,
+        safe_count: 2,
+        market_sentiment_label: "博弈均衡",
+      },
+      industries: [
+        {
+          industry_name: "电子",
+          leek_score: 82.5,
+          risk_level: "extreme",
+          sub_scores: { flow: 85, guba: 80, crowd: 75, trap: 80 },
+          change_pct: -1.2,
+          main_net: -200000000,
+          retail_net: 210000000,
+          crowded_stocks: [],
+          warning_signals: [],
+        },
+      ],
+    },
+    isLoading: false,
+    isFetching: false,
+    error: null,
+    refetch: vi.fn(),
+  }),
+}));
+
 vi.mock("../../components/MarketOverviewBoard", () => ({
   default: ({
     onNavigate,
