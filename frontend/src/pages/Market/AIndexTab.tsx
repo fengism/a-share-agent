@@ -272,6 +272,11 @@ export default function AIndexTab() {
         }
         centered={!isMobile}
         destroyOnHidden
+        afterOpenChange={(open) => {
+          if (open && typeof window !== "undefined") {
+            window.dispatchEvent(new Event("resize"));
+          }
+        }}
         styles={{
           body: {
             height: isMobile ? "calc(100dvh - 56px)" : fullscreenHeight,

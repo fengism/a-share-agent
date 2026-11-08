@@ -23,7 +23,8 @@ import { downloadCsv } from "../utils/csv";
 import LazyChart from "./LazyChart";
 import { DEFAULT_INTRADAY_OBSERVATION } from "../data/defaultIntradayObservation";
 
-const CHART_STYLE: React.CSSProperties = { height: "100%", width: "100%" };
+const CHART_STYLE_280: React.CSSProperties = { width: "100%", height: 280 };
+const CHART_STYLE_250: React.CSSProperties = { width: "100%", height: 250 };
 
 export interface NationalTeamIntradayMonitorProps {
   intraday?: NationalTeamIntradayObservation;
@@ -77,7 +78,16 @@ export default function NationalTeamIntradayMonitor({
 
     const times = minute.times;
     const bars = minute.bars;
-    const closes = minute.closes;
+    const rawCloses = minute.closes;
+    const preClose = minute.pre_close;
+
+    // 自适应校验：若 closes 点位与 pre_close 存在严重量纲割裂（例如 closes 在 11 附近而 pre_close 在 3700 附近），
+    // 将 closes 按基准比率重缩放到昨收指数基准，避免 yAxis 跨度被拉大到几千导致分时折线贴底被压成一条横线看不见
+    let closes = rawCloses;
+    if (preClose > 100 && rawCloses && rawCloses.length > 0 && rawCloses[0] > 0 && rawCloses[0] < 50) {
+      const base = rawCloses[0];
+      closes = rawCloses.map((c) => Number((preClose * (c / base)).toFixed(2)));
+    }
 
     return {
       animationDuration: 300,
@@ -736,7 +746,7 @@ export default function NationalTeamIntradayMonitor({
                   echarts={echarts}
                   data-testid="national-team-intraday-minute-chart"
                   option={minuteOption}
-                  style={CHART_STYLE}
+                  style={CHART_STYLE_280}
                   opts={{ renderer: "canvas" }}
                   notMerge
                 />
@@ -762,7 +772,7 @@ export default function NationalTeamIntradayMonitor({
                   echarts={echarts}
                   data-testid="national-team-intraday-cum-chart"
                   option={cumOption}
-                  style={CHART_STYLE}
+                  style={CHART_STYLE_280}
                   opts={{ renderer: "canvas" }}
                   notMerge
                 />
@@ -815,7 +825,7 @@ export default function NationalTeamIntradayMonitor({
                   echarts={echarts}
                   data-testid="national-team-intraday-typical-chart"
                   option={typicalOption}
-                  style={CHART_STYLE}
+                  style={CHART_STYLE_280}
                   opts={{ renderer: "canvas" }}
                   notMerge
                 />
@@ -919,7 +929,7 @@ export default function NationalTeamIntradayMonitor({
                 echarts={echarts}
                 data-testid="national-team-intraday-signal-chart"
                 option={volumeSignalOption}
-                style={CHART_STYLE}
+                style={CHART_STYLE_250}
                 opts={{ renderer: "canvas" }}
                 notMerge
               />

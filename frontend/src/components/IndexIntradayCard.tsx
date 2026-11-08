@@ -116,6 +116,11 @@ export default function IndexIntradayCard({
         width="min(1280px, 94vw)"
         style={{ top: 24 }}
         destroyOnHidden
+        afterOpenChange={(open) => {
+          if (open && typeof window !== "undefined") {
+            window.dispatchEvent(new Event("resize"));
+          }
+        }}
       >
         <div style={{ padding: "8px 0" }}>
           <IntradayChart

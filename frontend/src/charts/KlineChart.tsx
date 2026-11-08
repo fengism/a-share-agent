@@ -137,6 +137,8 @@ export default function KlineChart({
   const anchoredLogicalRangeRef = useRef<{ from: number; to: number; length: number; viewKey: string } | null>(null);
   const rowCountRef = useRef(0);
   const [isZoomed, setIsZoomed] = useState(false);
+  const isZoomedRef = useRef(isZoomed);
+  isZoomedRef.current = isZoomed;
   const [hoverInfo, setHoverInfo] = useState<HoverCandleInfo | null>(null);
   const [mainOverlay, setMainOverlay] = useState<"MA" | "BOLL" | "NONE">("MA");
   const [subIndicator, setSubIndicator] = useState<SubIndicatorType>(defaultSubIndicator);
@@ -749,6 +751,7 @@ export default function KlineChart({
     const wrapper = wrapperRef.current;
     const brush = brushRef.current;
     let hadZeroWidth = (chartElRef.current?.clientWidth ?? 0) <= 0;
+    let lastWidth = Math.floor(chartElRef.current?.clientWidth ?? 0);
     const resizeObserver = new ResizeObserver(
       createDebouncedResizeHandler((entry) => {
         const hudHeight = hudRef.current?.clientHeight ?? 32;
@@ -760,8 +763,15 @@ export default function KlineChart({
         updateLayoutMetrics();
 
         const currentViewKey = viewKeyRef.current;
-        if (entryWidth > 0 && rowsRef.current.length > 0 && (hadZeroWidth || shouldFitChartContent(fittedViewKeyRef.current, currentViewKey))) {
+        const widthChanged = Math.abs(entryWidth - lastWidth) > 1;
+        const isInitialOrViewKeyChanged = hadZeroWidth || shouldFitChartContent(fittedViewKeyRef.current, currentViewKey);
+        const shouldRefit = entryWidth > 0 && rowsRef.current.length > 0 && (
+          isInitialOrViewKeyChanged || (widthChanged && !isZoomedRef.current)
+        );
+
+        if (shouldRefit) {
           hadZeroWidth = false;
+          lastWidth = entryWidth;
           if (rowsRef.current.length > 80) {
             chart.timeScale().setVisibleLogicalRange({ from: rowsRef.current.length - 80, to: rowsRef.current.length + 2 });
           } else {
@@ -769,10 +779,45 @@ export default function KlineChart({
           }
           fittedViewKeyRef.current = currentViewKey;
           setIsZoomed(false);
+        } else if (entryWidth > 0) {
+          lastWidth = entryWidth;
         }
       })
     );
     resizeObserver.observe(chartElRef.current);
+
+    const handleWindowResize = () => {
+      const el = chartElRef.current;
+      if (!el || !chartRef.current) return;
+      const width = Math.floor(el.clientWidth);
+      const hudHeight = hudRef.current?.clientHeight ?? 32;
+      const elHeight = Math.floor(el.clientHeight);
+      const plotHeight = elHeight > 0 ? elHeight : Math.max(100, height - hudHeight);
+      if (width > 0) {
+        chart.applyOptions({ width, height: plotHeight });
+        applyVolumePaneLayout(chart, paneRatio);
+        updateLayoutMetrics();
+        const widthChanged = Math.abs(width - lastWidth) > 1;
+        const isInitialOrViewKeyChanged = hadZeroWidth || shouldFitChartContent(fittedViewKeyRef.current, viewKeyRef.current);
+        const shouldRefit = rowsRef.current.length > 0 && (
+          isInitialOrViewKeyChanged || (widthChanged && !isZoomedRef.current)
+        );
+        if (shouldRefit) {
+          hadZeroWidth = false;
+          lastWidth = width;
+          if (rowsRef.current.length > 80) {
+            chart.timeScale().setVisibleLogicalRange({ from: rowsRef.current.length - 80, to: rowsRef.current.length + 2 });
+          } else {
+            chart.timeScale().fitContent();
+          }
+          fittedViewKeyRef.current = viewKeyRef.current;
+          setIsZoomed(false);
+        } else {
+          lastWidth = width;
+        }
+      }
+    };
+    window.addEventListener("resize", handleWindowResize);
     let startX: number | null = null;
 
     const resetBrush = () => { brush.style.display = "none"; brush.style.left = "0px"; brush.style.width = "0px"; };
@@ -928,6 +973,7 @@ export default function KlineChart({
 
     return () => {
       resizeObserver.disconnect();
+      window.removeEventListener("resize", handleWindowResize);
       window.removeEventListener("keydown", handleKeyDownWindow);
       window.removeEventListener("keyup", handleKeyUpWindow);
       chart.unsubscribeCrosshairMove(handleCrosshairMove);

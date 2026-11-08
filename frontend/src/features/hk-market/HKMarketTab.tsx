@@ -866,6 +866,11 @@ export default function HKMarketTab({
         style={isMobile ? { top: 0, margin: 0, paddingBottom: 0, maxWidth: "100vw" } : undefined}
         centered={!isMobile}
         destroyOnHidden
+        afterOpenChange={(open) => {
+          if (open && typeof window !== "undefined") {
+            window.dispatchEvent(new Event("resize"));
+          }
+        }}
         styles={{
           body: {
             height: isMobile ? "calc(100dvh - 56px)" : fullscreenHeight,
@@ -900,6 +905,11 @@ export default function HKMarketTab({
           style={isMobile ? { top: 0, margin: 0, paddingBottom: 0, maxWidth: "100vw" } : undefined}
           centered={!isMobile}
           destroyOnHidden
+          afterOpenChange={(open) => {
+            if (open && typeof window !== "undefined") {
+              window.dispatchEvent(new Event("resize"));
+            }
+          }}
           styles={{
             body: {
               height: isMobile ? "calc(100dvh - 56px)" : fullscreenHeight,

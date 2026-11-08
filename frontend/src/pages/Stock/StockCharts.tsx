@@ -611,6 +611,11 @@ export default function StockCharts({ code, market = "cn", name }: StockChartsPr
           },
         }}
         destroyOnHidden
+        afterOpenChange={(open) => {
+          if (open && typeof window !== "undefined") {
+            window.dispatchEvent(new Event("resize"));
+          }
+        }}
       >
         {activeView === "kline" ? (
           <KlinePanel

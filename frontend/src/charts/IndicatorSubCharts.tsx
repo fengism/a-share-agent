@@ -226,6 +226,11 @@ export default function IndicatorSubCharts({
   const seriesRefs = useRef<IndicatorSeries[]>([]);
   const fittedViewKeyRef = useRef<string | null>(null);
   const initialHeightRef = useRef(height);
+  const datesRef = useRef(dates);
+  datesRef.current = dates;
+  const currentViewKey = `${code}:${activeIndicatorType}:${activePeriod}`;
+  const viewKeyRef = useRef(currentViewKey);
+  viewKeyRef.current = currentViewKey;
 
   useEffect(() => {
     if (!chartRef.current) return;
@@ -250,13 +255,48 @@ export default function IndicatorSubCharts({
     chartInstanceRef.current = chart;
     fittedViewKeyRef.current = null;
 
+    let lastWidth = Math.floor(chartRef.current.clientWidth ?? 0);
     const resizeObserver = new ResizeObserver(
       createDebouncedResizeHandler((entry) => {
         const width = Math.floor(entry.contentRect.width);
-        if (width > 0) chart.applyOptions({ width });
+        if (width <= 0) return;
+        chart.applyOptions({ width });
+        const widthChanged = Math.abs(width - lastWidth) > 1;
+        if (datesRef.current.length > 0 && (widthChanged || shouldFitChartContent(fittedViewKeyRef.current, viewKeyRef.current))) {
+          if (datesRef.current.length > 80) {
+            chart.timeScale().setVisibleLogicalRange({ from: datesRef.current.length - 80, to: datesRef.current.length + 2 });
+          } else {
+            chart.timeScale().fitContent();
+          }
+          lastWidth = width;
+          fittedViewKeyRef.current = viewKeyRef.current;
+        } else {
+          lastWidth = width;
+        }
       })
     );
     resizeObserver.observe(chartRef.current);
+
+    const handleWindowResize = () => {
+      const el = chartRef.current;
+      if (!el || !chartInstanceRef.current) return;
+      const width = Math.floor(el.clientWidth);
+      if (width <= 0) return;
+      chartInstanceRef.current.applyOptions({ width });
+      const widthChanged = Math.abs(width - lastWidth) > 1;
+      if (datesRef.current.length > 0 && (widthChanged || shouldFitChartContent(fittedViewKeyRef.current, viewKeyRef.current))) {
+        if (datesRef.current.length > 80) {
+          chartInstanceRef.current.timeScale().setVisibleLogicalRange({ from: datesRef.current.length - 80, to: datesRef.current.length + 2 });
+        } else {
+          chartInstanceRef.current.timeScale().fitContent();
+        }
+        lastWidth = width;
+        fittedViewKeyRef.current = viewKeyRef.current;
+      } else {
+        lastWidth = width;
+      }
+    };
+    window.addEventListener("resize", handleWindowResize);
 
     const handleCrosshairMove = (param: MouseEventParams<Time>) => {
       if (!param.time || typeof param.time !== "object" || !("year" in param.time)) {
@@ -296,6 +336,7 @@ export default function IndicatorSubCharts({
 
     return () => {
       resizeObserver.disconnect();
+      window.removeEventListener("resize", handleWindowResize);
       chart.unsubscribeCrosshairMove(handleCrosshairMove);
       chart.timeScale()?.unsubscribeVisibleLogicalRangeChange?.(handleVisibleRangeChange);
       chart.remove();

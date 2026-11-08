@@ -360,6 +360,16 @@ export default function IntradayChart({
     );
     resizeObserver.observe(container);
 
+    const handleWindowResize = () => {
+      if (!container || !chartRef.current) return;
+      const width = Math.floor(container.clientWidth);
+      if (width <= 0) return;
+      const hudHeight = hudRef.current?.clientHeight ?? 32;
+      chartRef.current.applyOptions({ width, height: Math.max(100, height - hudHeight) });
+      updateLayoutMetrics();
+    };
+    window.addEventListener("resize", handleWindowResize);
+
     const handleCrosshairMove = (param: MouseEventParams<Time>) => {
       if (!param.time || !param.seriesData) {
         if (selectedIndexRef.current === null) {
@@ -397,6 +407,7 @@ export default function IntradayChart({
 
     return () => {
       resizeObserver.disconnect();
+      window.removeEventListener("resize", handleWindowResize);
       chart.unsubscribeCrosshairMove(handleCrosshairMove);
       chart.remove();
       chartRef.current = null;
