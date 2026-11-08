@@ -1,0 +1,137 @@
+/* 概念页样式：移动端响应式适配（<= 767px）。 */
+
+/* ── 移动端适配 (< 768px) ── */
+@media (max-width: 767px) {
+  .concept-page {
+    gap: 10px;
+  }
+
+  .concept-page__desc {
+    font-size: var(--c-font-xs);
+  }
+
+  .concept-search-input {
+    max-width: 100%;
+  }
+
+  .concept-search-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .concept-search-meta {
+    justify-content: space-between;
+    font-size: var(--c-font-xs);
+  }
+
+  .concept-chips-scroll,
+  .concept-picker__chips {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+
+  .concept-picker__chips::-webkit-scrollbar {
+    display: none;
+  }
+
+  .concept-picker__chips > * {
+    flex-shrink: 0;
+  }
+
+  .concept-mobile-view-tabs {
+    display: flex;
+  }
+
+  .concept-mobile-view-tabs .ant-segmented {
+    width: 100%;
+  }
+
+  .concept-mobile-view-tabs .ant-segmented-group {
+    width: 100%;
+    display: flex;
+  }
+
+  .concept-mobile-view-tabs .ant-segmented-item {
+    flex: 1;
+    text-align: center;
+  }
+
+  .concept-kpi {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .concept-kpi__close {
+    font-size: 22px;
+  }
+
+  .concept-kpi__stats {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+    padding: 8px 10px;
+    border-radius: var(--c-radius-sm);
+    background: var(--c-bg-subtle);
+    border: 1px solid var(--c-border-subtle);
+  }
+
+  .concept-kpi__stat {
+    justify-content: space-between;
+  }
+
+  .concept-index-toolbar {
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .concept-index-toolbar .ant-segmented {
+    width: 100%;
+    display: flex;
+  }
+
+  .concept-index-toolbar .ant-segmented-group {
+    width: 100%;
+    display: flex;
+  }
+
+  .concept-index-toolbar .ant-segmented-item {
+    flex: 1;
+    text-align: center;
+    padding-inline: 4px;
+    font-size: var(--c-font-xs);
+  }
+
+  .concept-breadth__bar {
+    width: 72px;
+  }
+
+  .concept-constituent-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .concept-constituent-sort {
+    width: 100%;
+  }
+
+  .concept-constituent-sort .ant-segmented {
+    width: 100%;
+  }
+
+  .concept-constituent-sort .ant-segmented-group {
+    width: 100%;
+    display: flex;
+  }
+
+  .concept-constituent-sort .ant-segmented-item {
+    flex: 1;
+    text-align: center;
+  }
+}

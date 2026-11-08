@@ -1,0 +1,180 @@
+/* 个股资金流向面板样式 */
+
+.fund-flow-panel__tile {
+  padding: 14px 12px;
+  background: var(--c-hover-bg);
+  border: 1px solid var(--c-border);
+  border-radius: 10px;
+  text-align: center;
+}
+
+.fund-flow-panel__tile-label {
+  color: var(--c-text-secondary);
+  font-size: var(--c-font-sm);
+  margin-bottom: 4px;
+}
+
+.fund-flow-panel__tile-value {
+  font-size: var(--c-font-base);
+  font-weight: var(--c-weight-bold);
+  line-height: var(--c-leading-tight);
+}
+
+.fund-flow-panel__tile-value--up {
+  color: var(--c-up);
+}
+
+.fund-flow-panel__tile-value--down {
+  color: var(--c-down);
+}
+
+.fund-flow-panel__tile-value--muted {
+  color: var(--c-text-muted);
+}
+
+.fund-flow-panel__tile-value--primary {
+  color: var(--c-text-primary);
+}
+
+.fund-flow-panel__container {
+  display: grid;
+  gap: 16px;
+}
+
+.fund-flow-panel__meta-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.fund-flow-panel__summary-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.fund-flow-panel__diagnosis-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  background: var(--c-hover-bg);
+  border-radius: 8px;
+  border: 1px solid var(--c-border);
+}
+
+.fund-flow-panel__diagnosis-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.fund-flow-panel__diagnosis-title {
+  font-size: var(--c-font-sm);
+}
+
+.fund-flow-panel__diagnosis-tag {
+  border-color: var(--c-border);
+  background: var(--c-hover-bg);
+}
+
+.fund-flow-panel__diagnosis-tag--up {
+  color: var(--c-up);
+}
+
+.fund-flow-panel__diagnosis-tag--down {
+  color: var(--c-down);
+}
+
+.fund-flow-panel__diagnosis-tag--warning {
+  color: var(--c-warning);
+}
+
+.fund-flow-panel__diagnosis-tag--primary {
+  color: var(--c-primary);
+}
+
+.fund-flow-panel__diagnosis-stats {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: var(--c-font-xs);
+  font-family: var(--c-font-mono);
+}
+
+.fund-flow-panel__chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 6px;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+.fund-flow-panel__chart-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.fund-flow-panel__chart-title {
+  font-size: var(--c-font-md);
+  font-weight: var(--c-weight-semibold);
+  color: var(--c-text-primary);
+}
+
+.fund-flow-panel__chart-cumulative {
+  font-size: var(--c-font-xs);
+  color: var(--c-text-secondary);
+}
+
+.fund-flow-panel__chart-cumulative-val {
+  font-family: var(--c-font-mono);
+}
+
+.fund-flow-panel__chart-cumulative-val--up {
+  color: var(--c-up);
+}
+
+.fund-flow-panel__chart-cumulative-val--down {
+  color: var(--c-down);
+}
+
+.fund-flow-panel__table-date {
+  font-weight: var(--c-weight-medium);
+}
+
+.fund-flow-panel__table-tag {
+  font-weight: var(--c-weight-semibold);
+  border-color: var(--c-border);
+  background: var(--c-hover-bg);
+}
+
+.fund-flow-panel__table-tag--up {
+  color: var(--c-up);
+}
+
+.fund-flow-panel__table-tag--down {
+  color: var(--c-down);
+}
+
+.fund-flow-panel__text--up {
+  color: var(--c-up);
+}
+
+.fund-flow-panel__text--down {
+  color: var(--c-down);
+}
+
+.fund-flow-panel__text--muted {
+  color: var(--c-text-muted);
+}
+
+.fund-flow-panel__text--medium {
+  font-weight: var(--c-weight-medium);
+}

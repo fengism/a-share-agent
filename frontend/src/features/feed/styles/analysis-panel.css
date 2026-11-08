@@ -1,0 +1,140 @@
+/* 右侧分析面板：情感仪表、摘要段落、条目与来源
+   自 feed.css 第 423–560 行拆出。
+   由同目录 index.css 按固定顺序 @import，顺序不可调整：同特异性规则靠源序决胜负。 */
+.feed-analysis {
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius-md);
+  background: var(--c-nested-bg, rgba(128, 128, 128, 0.03));
+  padding: 16px 18px;
+}
+
+.feed-analysis-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--c-border);
+}
+
+.feed-analysis-header .feed-section-heading {
+  flex: 1;
+  min-height: auto;
+  padding: 0;
+  border-bottom: 0;
+}
+
+.feed-sentiment {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 2px 10px;
+  border-radius: var(--c-radius-pill);
+  font-size: var(--c-font-xs);
+  font-weight: var(--c-weight-bold);
+}
+
+.feed-sentiment-gauge {
+  margin: 10px 0 12px;
+}
+
+.feed-sentiment-gauge-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+  font-size: var(--c-font-xs);
+}
+
+.feed-sentiment-label {
+  color: var(--c-text-secondary);
+}
+
+.feed-sentiment-value {
+  font-weight: var(--c-weight-heavy);
+  font-family: var(--c-font-mono, monospace);
+}
+
+.feed-sentiment-meter {
+  height: 6px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--c-border);
+}
+
+.feed-sentiment-meter > span {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+
+.feed-analysis-lead {
+  margin: 10px 0 12px;
+  padding: 10px 14px;
+  background: var(--c-card-bg);
+  border-radius: var(--c-radius-sm);
+  border-left: 3px solid var(--c-primary);
+  color: var(--c-text-primary);
+  font-family: var(--c-font-sans);
+  font-size: var(--c-font-sm);
+  line-height: var(--c-leading-relaxed);
+}
+
+.feed-analysis-mobile-toggle {
+  display: none;
+}
+
+.feed-analysis-scroll {
+  max-height: calc(100vh - 250px);
+  overflow-y: auto;
+  padding-right: 3px;
+}
+
+.feed-analysis-section + .feed-analysis-section { margin-top: 14px; }
+
+.feed-analysis-section-title {
+  margin: 0 0 4px;
+  padding-bottom: 6px;
+  color: var(--c-text-primary);
+  border-bottom: 1px solid var(--c-border);
+  font-family: var(--c-font-sans);
+  font-size: var(--c-font-sm);
+  font-weight: var(--c-weight-heavy);
+}
+
+.feed-analysis-list { margin: 0; padding: 0; list-style: none; }
+
+.feed-analysis-item {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--c-border);
+}
+
+.feed-summary-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(128, 128, 128, 0.1);
+  color: var(--c-text-secondary);
+  font-size: 11px;
+  font-family: var(--c-font-mono, monospace);
+  font-weight: var(--c-weight-bold);
+}
+
+.feed-analysis-text {
+  color: var(--c-text-primary);
+  font-size: var(--c-font-sm);
+  line-height: var(--c-leading-relaxed);
+}
+
+.feed-analysis-sources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}

@@ -1,0 +1,56 @@
+/* 出站代理配置卡片：自 EastmoneyProxyConfigCard 内联样式迁出 */
+
+.proxy-scope-label {
+  font-weight: 500;
+}
+
+[data-theme] .proxy-scope-tag.ant-tag {
+  margin-left: 6px;
+  font-size: var(--c-font-xs);
+  line-height: 18px;
+  padding: 0 4px;
+  border-radius: 2px;
+}
+
+.proxy-scope-desc {
+  color: var(--c-text-muted);
+  font-size: var(--c-font-xs);
+}
+
+.proxy-title-icon {
+  margin-right: 8px;
+}
+
+.proxy-number-full {
+  width: 100%;
+}
+
+.proxy-hint {
+  margin-top: 6px;
+  font-size: var(--c-font-sm);
+  color: var(--c-text-muted);
+}
+
+[data-theme] .ant-divider.proxy-divider {
+  margin: 16px 0 12px;
+}
+
+[data-theme] .proxy-result-message.ant-typography {
+  margin-bottom: 0;
+  font-size: var(--c-font-xs);
+  word-break: break-all;
+}
+
+.proxy-row-tdx {
+  margin-top: 8px;
+}
+
+[data-theme] .proxy-footnote.ant-typography {
+  margin-top: var(--c-space-3);
+  margin-bottom: 0;
+  font-size: var(--c-font-xs);
+}
+
+[data-theme] .proxy-footnote--no-top.ant-typography {
+  margin-top: 0;
+}

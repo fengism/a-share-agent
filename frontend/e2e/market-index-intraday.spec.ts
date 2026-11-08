@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./base";
 
 const user = { id: 7, username: "researcher", is_admin: false, must_change_password: false };
 

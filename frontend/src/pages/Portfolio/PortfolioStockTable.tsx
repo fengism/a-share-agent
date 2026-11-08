@@ -8,11 +8,10 @@ import {
 } from "@ant-design/icons";
 import { Button, Empty, Input, Segmented, Space, Table, Tag, Tooltip } from "antd";
 import type { TableColumnsType } from "antd";
-import { memo, useMemo, useState } from "react";
+import React, { memo, useMemo, useState } from "react";
 import ChangeValue from "../../components/ChangeValue";
 import PreloadLink from "../../components/PreloadLink";
 import type { PortfolioStockSummary } from "../../types/portfolio";
-import { changeColor } from "../../utils/format";
 import {
   formatInteger,
   formatMoney,
@@ -22,6 +21,7 @@ import PortfolioTableCard from "./PortfolioTableCard";
 import { PORTFOLIO_TABLE_PAGINATION } from "./portfolioTableConfig";
 import { marketDateStamp } from "../../utils/marketTime";
 import type { PortfolioTableRenderers } from "./portfolioTableRenderers";
+import "./portfolio-stock-table.css";
 
 interface PortfolioStockTableProps {
   stocks: PortfolioStockSummary[];
@@ -40,7 +40,7 @@ function PortfolioStockTable({
 }: PortfolioStockTableProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"table" | "card">("table");
-  const { colors, isMobile, renderProfit, renderStock } = renderers;
+  const { isMobile, renderProfit, renderStock } = renderers;
 
   const displayStocks = useMemo(() => {
     if (!searchQuery.trim()) return stocks;
@@ -209,32 +209,23 @@ function PortfolioStockTable({
       align: "right",
       className: "financial-num",
       sorter: (a, b) => (a.allocation_pct ?? 0) - (b.allocation_pct ?? 0),
-      render: (value: number | null) =>
-        value == null ? "-" : (
+      render: (value: number | null) => {
+        if (value == null) return "-";
+        const fillStyle: React.CSSProperties = {
+          width: `${Math.min(100, Math.max(0, value))}%`,
+        };
+        return (
           <div>
             <div>{value.toFixed(2)}%</div>
-            <div
-              style={{
-                height: 3,
-                borderRadius: 2,
-                background: colors.nestedBg,
-                overflow: "hidden",
-                marginTop: 2,
-                display: "flex",
-                justifyContent: "flex-end",
-              }}
-            >
+            <div className="portfolio-stock-table__bar-track">
               <div
-                style={{
-                  width: `${Math.min(100, Math.max(0, value))}%`,
-                  height: "100%",
-                  background: "var(--c-primary)",
-                  borderRadius: 2,
-                }}
+                className="portfolio-stock-table__bar-fill"
+                style={fillStyle}
               />
             </div>
           </div>
-        ),
+        );
+      },
     },
     {
       title: (
@@ -252,7 +243,7 @@ function PortfolioStockTable({
             title={`约 ${formatInteger(record.max_additional_shares ?? 0)} 股 · 每手 ${record.lot_size ?? "-"} 股`}
           >
             <div>{formatMoney(record.max_additional_value)}</div>
-            <div style={{ fontSize: 11, color: colors.textMuted }}>
+            <div className="portfolio-stock-table__shares-sub">
               {formatInteger(record.max_additional_shares ?? 0)} 股
             </div>
           </Tooltip>
@@ -274,11 +265,11 @@ function PortfolioStockTable({
       align: "right",
       className: "financial-num",
       sorter: (a, b) => (a.profit_contribution_pct ?? 0) - (b.profit_contribution_pct ?? 0),
-      render: (value: number | null) => (
-        value == null
-          ? "-"
-          : <span style={{ color: changeColor(value, colors) }}>{value.toFixed(2)}%</span>
-      ),
+      render: (value: number | null) => {
+        if (value == null) return "-";
+        const cls = value > 0 ? "u-text-up" : value < 0 ? "u-text-down" : undefined;
+        return <span className={cls}>{value.toFixed(2)}%</span>;
+      },
     },
     {
       title: "已实现盈亏",
@@ -315,7 +306,7 @@ function PortfolioStockTable({
               <Button
                 type="link"
                 size="small"
-                style={{ padding: "0 2px" }}
+                className="portfolio-stock-table__action-btn"
               >
                 研报
               </Button>
@@ -326,7 +317,7 @@ function PortfolioStockTable({
                 size="small"
                 icon={<LineChartOutlined />}
                 onClick={() => onViewKline(record.stock_code)}
-                style={{ padding: "0 2px" }}
+                className="portfolio-stock-table__action-btn"
                 title="跳转查看买卖点复盘"
               >
                 复盘
@@ -341,7 +332,7 @@ function PortfolioStockTable({
                   aria-label={`卖出 ${record.stock_name}`}
                   disabled={sellable <= 0}
                   onClick={() => onSell(record)}
-                  style={{ padding: "0 2px" }}
+                  className="portfolio-stock-table__action-btn"
                 >
                   卖出
                 </Button>
@@ -351,7 +342,7 @@ function PortfolioStockTable({
         );
       },
     },
-  ], [colors, isMobile, onSell, onViewKline, renderProfit, renderStock]);
+  ], [isMobile, onSell, onViewKline, renderProfit, renderStock]);
 
   return (
     <PortfolioTableCard
@@ -373,11 +364,11 @@ function PortfolioStockTable({
             <Input
               size="small"
               placeholder="搜索股票"
-              prefix={<SearchOutlined style={{ color: colors.textMuted }} />}
+              prefix={<SearchOutlined className="portfolio-stock-table__search-icon" />}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               allowClear
-              style={{ width: 130 }}
+              className="portfolio-stock-table__search-input"
             />
             <Button size="small" icon={<DownloadOutlined />} onClick={handleExportCsv}>
               导出 CSV
@@ -397,69 +388,56 @@ function PortfolioStockTable({
               return (
                 <div
                   key={stock.stock_code}
-                  style={{
-                    background: colors.nestedBg,
-                    borderRadius: 8,
-                    border: `1px solid ${colors.border ?? "rgba(128,128,128,0.15)"}`,
-                    padding: "var(--c-pad-card, 16px 18px)",
-                    marginBottom: 10,
-                  }}
                   className="portfolio-stock-card-item"
                 >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+                  <div className="portfolio-stock-table__card-header">
                     <div>
                       {renderStock(stock.stock_name, stock.stock_code)}
                       {stock.currency && stock.currency !== "CNY" ? (
-                        <Tag style={{ marginLeft: 4 }}>{stock.currency}</Tag>
+                        <Tag className="portfolio-stock-table__currency-tag">{stock.currency}</Tag>
                       ) : null}
                     </div>
-                    <div style={{ textAlign: "right" }}>
-                      <ChangeValue value={stock.change_pct} style={{ fontSize: 14, fontWeight: 700 }} />
-                      <div style={{ fontSize: 11, color: colors.textMuted }}>当日涨跌</div>
+                    <div className="portfolio-stock-table__card-price">
+                      <div className="portfolio-stock-table__change-val">
+                        <ChangeValue value={stock.change_pct} />
+                      </div>
+                      <div className="portfolio-stock-table__sub-label">当日涨跌</div>
                     </div>
                   </div>
 
-                  <div style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(3, 1fr)",
-                    gap: 8,
-                    padding: "8px 0",
-                    borderTop: `1px dashed ${colors.border ?? "rgba(128,128,128,0.15)"}`,
-                    borderBottom: `1px dashed ${colors.border ?? "rgba(128,128,128,0.15)"}`,
-                    marginBottom: 8,
-                  }}>
+                  <div className="portfolio-stock-table__card-metrics">
                     <div>
-                      <div style={{ fontSize: 11, color: colors.textMuted }}>持仓市值(CNY)</div>
-                      <div style={{ fontWeight: 600, fontSize: 13 }}>{formatMoney(stock.market_value)}</div>
-                      <div style={{ fontSize: 11, color: colors.textMuted }}>成本 {formatMoney(stock.cost_value)}</div>
+                      <div className="portfolio-stock-table__sub-label">持仓市值(CNY)</div>
+                      <div className="portfolio-stock-table__metric-val">{formatMoney(stock.market_value)}</div>
+                      <div className="portfolio-stock-table__sub-label">成本 {formatMoney(stock.cost_value)}</div>
                     </div>
                     <div>
-                      <div style={{ fontSize: 11, color: colors.textMuted }}>现价 / 成本</div>
-                      <div style={{ fontWeight: 600, fontSize: 13 }}>{formatPrice(stock.current_price, stock.currency)}</div>
-                      <div style={{ fontSize: 11, color: colors.textMuted }}>成本 {formatPrice(stock.average_cost, stock.currency)}</div>
+                      <div className="portfolio-stock-table__sub-label">现价 / 成本</div>
+                      <div className="portfolio-stock-table__metric-val">{formatPrice(stock.current_price, stock.currency)}</div>
+                      <div className="portfolio-stock-table__sub-label">成本 {formatPrice(stock.average_cost, stock.currency)}</div>
                     </div>
-                    <div style={{ textAlign: "right" }}>
-                      <div style={{ fontSize: 11, color: colors.textMuted }}>浮动盈亏(CNY)</div>
+                    <div className="portfolio-stock-table__card-price">
+                      <div className="portfolio-stock-table__sub-label">浮动盈亏(CNY)</div>
                       {renderProfit(stock.profit_amount, stock.profit_pct)}
                     </div>
                   </div>
 
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, fontSize: 12 }}>
-                    <span style={{ color: colors.textMuted }}>
+                  <div className="portfolio-stock-table__card-footer">
+                    <span className="portfolio-stock-table__holdings-text">
                       持仓 <strong>{formatInteger(stock.total_shares)}</strong> 股
                       {stock.sellable_shares != null ? ` · 可卖 ${formatInteger(stock.sellable_shares)}` : ""}
                       {frozen > 0 ? ` · 冻结 ${formatInteger(frozen)}` : ""}
                     </span>
                     {stock.allocation_pct != null ? (
                       <div>
-                        <span style={{ fontWeight: 600, fontSize: 12 }}>
+                        <span className="portfolio-stock-table__allocation-text">
                           占比 {stock.allocation_pct.toFixed(2)}%
                         </span>
                       </div>
                     ) : null}
                   </div>
 
-                  <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+                  <div className="portfolio-stock-table__card-actions">
                     <PreloadLink
                       to={`/analysis?code=${stock.stock_code}`}
                       aria-label={`查看${stock.stock_name}研报`}

@@ -1,0 +1,109 @@
+/* distribution —— 自 market-overview.css 第 496–603 行拆出。
+   由同目录 index.css 按固定顺序 @import，顺序不可调整：同特异性规则靠源序决胜负。 */
+.market-board-distribution {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 7px;
+  padding: 12px var(--c-space-4) var(--c-space-4);
+  border-top: 1px solid var(--c-border);
+}
+
+.market-board-distribution__heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--c-space-3);
+  margin-bottom: 2px;
+}
+
+.market-board-distribution__heading > strong {
+  font-size: var(--c-font-sm);
+  font-weight: var(--c-weight-semibold);
+}
+
+.market-board-distribution__heading > span {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px;
+  color: var(--c-text-muted);
+  font-size: var(--c-font-xs);
+}
+
+.market-board-distribution__heading b {
+  color: var(--c-text-secondary);
+  font-weight: var(--c-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.market-board-distribution__heading i {
+  color: var(--c-border);
+  font-style: normal;
+}
+
+.market-board-distribution__header,
+.market-board-distribution__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 58px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.market-board-distribution__header {
+  color: var(--c-text-muted);
+  font-size: var(--c-font-xs);
+  line-height: var(--c-leading-tight);
+}
+
+.market-board-distribution__header span:first-child { text-align: right; }
+.market-board-distribution__header span:nth-child(2) { text-align: center; }
+
+.market-board-distribution__side {
+  display: grid;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.market-board-distribution__side--down { grid-template-columns: auto minmax(0, 1fr); }
+.market-board-distribution__side--up { grid-template-columns: minmax(0, 1fr) auto; }
+
+.market-board-distribution__side strong {
+  min-width: 28px;
+  color: var(--c-text-secondary);
+  font-size: var(--c-font-xs);
+  font-weight: var(--c-weight-medium);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.market-board-distribution__side--down strong { text-align: right; }
+
+.market-board-distribution__track {
+  display: flex;
+  height: 7px;
+  overflow: hidden;
+  border-radius: var(--c-radius-pill);
+  background: var(--c-nested-bg);
+}
+
+.market-board-distribution__side--down .market-board-distribution__track { justify-content: flex-end; }
+.market-board-distribution__side--down .market-board-distribution__track span { background: var(--c-down); }
+.market-board-distribution__side--up .market-board-distribution__track span { background: var(--c-up); }
+
+.market-board-distribution__track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  transition: width 180ms ease;
+}
+
+.market-board-distribution__label {
+  color: var(--c-text-secondary);
+  font-size: var(--c-font-xs);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.market-board .is-up { color: var(--c-up); }
+.market-board .is-down { color: var(--c-down); }

@@ -1,0 +1,15 @@
+/* national-team.css 的入口。
+   原文件 1873 行按关注点拆分；@import 顺序与原文件行序一致，不可重排。 */
+
+@import "./hero.css";
+@import "./kpi.css";
+@import "./sections.css";
+@import "./charts.css";
+@import "./methodology-and-responsive.css";
+@import "./portrait.css";
+@import "./heatmap.css";
+@import "./intraday.css";
+@import "./intraday-monitor.css";
+@import "./support-and-milestone.css";
+@import "./concentration.css";
+@import "./data-status-panel.css";

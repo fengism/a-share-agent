@@ -1,0 +1,79 @@
+/* 指标副图标题栏 / 图例。原先为 TSX 内联样式，逐条等价迁移；
+   颜色走主题变量，色块用 currentColor 继承所在图例项的颜色。 */
+
+.indicator-sub__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.indicator-sub__header-start {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.indicator-sub__legend {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-size: var(--c-font-xs);
+  color: var(--c-text-secondary);
+  flex-wrap: wrap;
+}
+
+.indicator-sub__time {
+  color: var(--c-text-muted);
+  font-family: var(--c-font-mono);
+  font-size: 11px;
+}
+
+.indicator-sub__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.indicator-sub__legend-item.is-primary {
+  color: var(--c-primary);
+}
+
+.indicator-sub__legend-item.is-accent {
+  color: var(--c-accent);
+}
+
+.indicator-sub__legend-item.is-warning {
+  color: var(--c-warning);
+}
+
+.indicator-sub__legend-item.is-up {
+  color: var(--c-up);
+}
+
+.indicator-sub__legend-item.is-down {
+  color: var(--c-down);
+}
+
+.indicator-sub__legend-item.is-dim {
+  opacity: 0.8;
+}
+
+.indicator-sub__swatch {
+  display: inline-block;
+  width: 8px;
+  height: 2px;
+  background: currentColor;
+}
+
+.indicator-sub__swatch--hist {
+  width: 6px;
+  height: 6px;
+}
+
+.indicator-sub__mono {
+  font-family: var(--c-font-mono);
+}

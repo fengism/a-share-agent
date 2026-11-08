@@ -13,8 +13,8 @@ from datetime import UTC, date, datetime, timedelta
 from app.configuration.paths import DATA_DIR
 from app.core.concurrency.rate_limiter import call_blocking, misc_semaphore
 from app.financial_data.market.public import get_index_kline
-from app.financial_data.stock.public import get_historical_bars
 from app.infrastructure.persistence.json_storage import atomic_write_json
+from app.modules.potential.market_data import fetch_daily_bars
 from app.modules.potential.persistence import repository
 from app.modules.potential.schemas import (
     PotentialDailyResult,
@@ -117,13 +117,7 @@ async def _evaluate_item(
     end = market_date + timedelta(days=days * 2 + 20)
     try:
         bars = await asyncio.wait_for(
-            get_historical_bars(
-                item.code,
-                start,
-                end,
-                period="daily",
-                adjust="qfq",
-            ),
+            fetch_daily_bars(item.code, start, end),
             timeout=_PERFORMANCE_TIMEOUT_SECONDS,
         )
     except Exception as error:
@@ -206,6 +200,14 @@ async def compute_potential_performance(date_text: str, days: int = 5) -> Potent
     evaluated.sort(key=lambda item: (-(item.excess_return_pct or -999), -(item.return_pct or -999)))
     returns = [item.return_pct for item in evaluated if item.return_pct is not None]
     excess_returns = [item.excess_return_pct for item in evaluated if item.excess_return_pct is not None]
+    positive_count = sum(1 for value in returns if value > 0)
+    negative_count = sum(1 for value in returns if value < 0)
+    pos_vals = [v for v in returns if v > 0]
+    neg_vals = [v for v in returns if v < 0]
+    avg_pos = sum(pos_vals) / len(pos_vals) if pos_vals else 0.0
+    avg_neg = sum(neg_vals) / len(neg_vals) if neg_vals else 0.0
+    profit_loss_ratio = round(avg_pos / abs(avg_neg), 2) if avg_pos > 0 and avg_neg < 0 else None
+
     message = None
     if not evaluated:
         message = f"暂无足够的前瞻数据（需要至少 {days} 个交易日）"
@@ -222,6 +224,9 @@ async def compute_potential_performance(date_text: str, days: int = 5) -> Potent
         median_return_pct=round(statistics.median(returns), 2) if returns else None,
         average_excess_pct=round(sum(excess_returns) / len(excess_returns), 2) if excess_returns else None,
         benchmark_return_pct=benchmark_return,
+        profit_loss_ratio=profit_loss_ratio,
+        positive_count=positive_count,
+        negative_count=negative_count,
         message=message,
         items=evaluated,
     )

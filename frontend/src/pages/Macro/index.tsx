@@ -18,7 +18,7 @@ import { useForceRefreshMacroAllData } from "../../api/queries";
 import ResponsiveSectionNav from "../../components/ResponsiveSectionNav";
 import { useStyles } from "../../styles/ui";
 import { useUrlSearchParam } from "../../hooks/useUrlSearchParam";
-import "./macro-page.css";
+import "./styles/index.css";
 
 const DomesticMacroOverview = lazy(() => import("./DomesticMacroOverview"));
 const PriceTab = lazy(() => import("./PriceTab"));

@@ -1,0 +1,119 @@
+/* 时间轴样式的实时快讯流（竖线、圆点、新鲜标记、分页）
+   自 feed.css 第 306–422 行拆出。
+   由同目录 index.css 按固定顺序 @import，顺序不可调整：同特异性规则靠源序决胜负。 */
+/* 时间轴样式的实时快讯流 */
+.feed-stream-list {
+  position: relative;
+  border-top: 1px solid var(--c-border);
+  border-bottom: 1px solid var(--c-border);
+  padding: 6px 0;
+}
+
+.feed-stream-list .feed-news-item {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 10px 12px 4px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  border-bottom: 1px dashed var(--c-border);
+  transition: background-color 0.15s ease;
+}
+
+.feed-stream-list .feed-news-item:hover {
+  background-color: var(--c-nested-bg, rgba(128, 128, 128, 0.03));
+}
+
+.feed-stream-indicator {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 12px;
+  flex-shrink: 0;
+  padding-top: 7px;
+}
+
+.feed-stream-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--c-border);
+  border: 2px solid var(--c-card-bg);
+  box-shadow: 0 0 0 1px var(--c-border);
+  z-index: 2;
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.feed-news-item.is-fresh .feed-stream-dot {
+  background: var(--c-warning, #faad14);
+  box-shadow: 0 0 0 2px rgba(250, 173, 20, 0.25);
+  transform: scale(1.2);
+}
+
+.feed-stream-line {
+  position: absolute;
+  top: 14px;
+  bottom: -14px;
+  width: 1px;
+  background: var(--c-border);
+  z-index: 1;
+}
+
+.feed-stream-list .feed-news-item:last-child .feed-stream-line {
+  display: none;
+}
+
+.feed-news-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.feed-stream-list .feed-news-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.feed-stream-list .feed-source-label { display: none; }
+.feed-stream-list .feed-meta-dot::before { display: none; }
+.feed-stream-list .feed-news-title {
+  font-family: inherit;
+  font-size: var(--c-font-base);
+  font-weight: var(--c-weight-bold);
+  line-height: var(--c-leading-normal);
+}
+
+.feed-news-item.is-fresh .feed-news-title {
+  color: var(--c-text-primary);
+}
+
+.feed-stream-list .feed-news-content {
+  margin-top: 4px;
+  font-size: var(--c-font-sm);
+  color: var(--c-text-secondary);
+  -webkit-line-clamp: 3;
+}
+
+.feed-fresh-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 5px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: var(--c-weight-heavy);
+  color: #fff;
+  background: var(--c-warning, #faad14);
+  line-height: 14px;
+}
+
+.feed-pagination {
+  display: flex;
+  justify-content: center;
+  padding: 16px 8px 2px;
+  border-top: 1px solid var(--c-border);
+}

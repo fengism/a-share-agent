@@ -1,0 +1,56 @@
+/* 信息页来源切换器（分段式 Tab）
+   自 feed.css 第 906–958 行拆出。
+   由同目录 index.css 按固定顺序 @import，顺序不可调整：同特异性规则靠源序决胜负。 */
+/* Primary source switcher for the unified information page. */
+.feed-source-tabs > .ant-tabs-nav {
+  margin: 0;
+  padding: 10px var(--c-space-6);
+  border-bottom: 1px solid var(--c-border);
+  background: var(--c-nested-bg);
+}
+
+.feed-source-tabs > .ant-tabs-nav::before { border-bottom: 0; }
+
+.feed-source-tabs > .ant-tabs-nav .ant-tabs-nav-list {
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius-md);
+  background: var(--c-elevated-bg);
+}
+
+.feed-source-tabs > .ant-tabs-nav .ant-tabs-tab {
+  margin: 0;
+  padding: 7px 14px;
+  border-radius: calc(var(--c-radius-md) - 2px);
+  font-size: var(--c-font-md);
+  font-weight: var(--c-weight-semibold);
+  transition: color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.feed-source-tabs > .ant-tabs-nav .ant-tabs-tab-active {
+  background: var(--c-card-bg);
+  box-shadow: var(--c-shadow-sm);
+}
+
+.feed-source-tabs > .ant-tabs-nav .ant-tabs-ink-bar { display: none; }
+
+.feed-source-tabs > .ant-tabs-nav .ant-tabs-extra-content {
+  margin-left: var(--c-space-4);
+}
+
+.feed-source-tabs > .ant-tabs-content-holder > .ant-tabs-content > .ant-tabs-tabpane { outline: none; }
+
+@media (max-width: 640px) {
+  .feed-source-tabs > .ant-tabs-nav {
+    align-items: stretch;
+    flex-wrap: wrap;
+    row-gap: 8px;
+    padding: 10px 12px;
+  }
+
+  .feed-source-tabs > .ant-tabs-nav .ant-tabs-nav-wrap { width: 100%; }
+  .feed-source-tabs > .ant-tabs-nav .ant-tabs-nav-list { width: 100%; }
+  .feed-source-tabs > .ant-tabs-nav .ant-tabs-tab { flex: 1; justify-content: center; font-size: var(--c-font-sm); }
+  .feed-source-tabs > .ant-tabs-nav .ant-tabs-extra-content { width: 100%; margin-left: 0; }
+}

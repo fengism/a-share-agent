@@ -1,0 +1,201 @@
+/* 筹码集中度卡
+   自 national-team.css 第 1674–1873 行拆出。
+   由同目录 index.css 按固定顺序 @import，顺序不可调整：同特异性规则靠源序决胜负。 */
+/* ── Concentration card ─────────────────────────────────────────────── */
+.national-team-concentration-card {
+  margin-bottom: 12px;
+  border: 1px solid var(--c-border);
+  border-radius: 8px;
+  background: var(--c-card-bg);
+}
+
+.national-team-concentration__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.national-team-concentration__title-icon {
+  color: var(--c-primary);
+}
+
+.national-team-concentration__title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.national-team-concentration__tag {
+  padding: 0 4px;
+  font-size: 10px;
+  line-height: 16px;
+}
+
+.national-team-concentration__subtitle {
+  font-size: 11px;
+}
+
+.national-team-concentration__panel {
+  height: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--c-bg-layout);
+}
+
+.national-team-concentration__panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.national-team-concentration__icon-up {
+  color: var(--c-up);
+}
+
+.national-team-concentration__icon-warning {
+  color: #faad14;
+}
+
+.national-team-concentration__panel-title {
+  font-size: 13px;
+}
+
+.national-team-concentration__panel-title-sub {
+  font-size: 11px;
+}
+
+.national-team-concentration__info-icon {
+  font-size: 12px;
+  color: var(--c-text-secondary);
+  cursor: pointer;
+}
+
+.national-team-concentration__cr-row {
+  margin-bottom: 12px;
+}
+
+.national-team-concentration__progress {
+  margin: 4px 0;
+}
+
+.national-team-concentration__hint {
+  font-size: 10px;
+}
+
+.national-team-concentration__top-list-wrap {
+  padding-top: 8px;
+  border-top: 1px dashed var(--c-border);
+}
+
+.national-team-concentration__top-label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 11px;
+}
+
+.national-team-concentration__top-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.national-team-concentration__top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 0;
+  font-size: 11px;
+}
+
+.national-team-concentration__rank-tag {
+  margin: 0;
+  padding: 0 4px;
+  font-size: 10px;
+  line-height: 14px;
+}
+
+.national-team-concentration__item-name {
+  font-weight: 600;
+}
+
+.national-team-concentration__item-code {
+  font-family: var(--c-font-mono);
+  color: var(--c-text-secondary);
+}
+
+.national-team-concentration__flow {
+  font-family: var(--c-font-mono);
+  font-weight: 700;
+}
+
+.national-team-concentration__flow.is-up {
+  color: var(--c-up);
+}
+
+.national-team-concentration__flow.is-down {
+  color: var(--c-down);
+}
+
+.national-team-concentration__streak-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 8px;
+}
+
+.national-team-concentration__streak-item {
+  padding: 6px 8px;
+  border: 1px solid var(--c-border);
+  border-radius: 6px;
+  background: var(--c-card-bg);
+}
+
+.national-team-concentration__streak-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.national-team-concentration__streak-name {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.national-team-concentration__streak-tag {
+  margin: 0;
+  padding: 0 4px;
+  font-size: 10px;
+  line-height: 14px;
+}
+
+.national-team-concentration__streak-text {
+  margin-bottom: 2px;
+  font-size: 11px;
+}
+
+.national-team-concentration__streak-text.is-up {
+  color: var(--c-up);
+}
+
+.national-team-concentration__streak-text.is-down {
+  color: var(--c-down);
+}
+
+.national-team-concentration__streak-text.is-neutral {
+  color: var(--c-text-secondary);
+}
+
+.national-team-concentration__streak-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--c-text-secondary);
+}
+
+.national-team-concentration__streak-value {
+  font-family: var(--c-font-mono);
+  font-weight: 600;
+}

@@ -2,7 +2,7 @@ import { memo, useMemo } from "react";
 import { Card } from "antd";
 import ReactEChartsCore from "echarts-for-react/lib/core";
 import echarts from "../../charts/echarts-setup";
-import { useColors, useStyles } from "../../theme/hooks";
+import { useColors } from "../../theme/hooks";
 import type { ChipCostRange, ChipDistribution } from "../../types/stock";
 import "./chip-distribution.css";
 
@@ -35,7 +35,6 @@ export default memo(function ChipDistributionPanel({
   embedded?: boolean;
 }) {
   const colors = useColors();
-  const { cardStyle } = useStyles();
   const histogram = useMemo(
     () => [...data.histogram].sort((left, right) => left.price - right.price),
     [data.histogram],
@@ -125,10 +124,9 @@ export default memo(function ChipDistributionPanel({
       data-pdf-capture
       data-pdf-group
       size="small"
-      className="analysis-chart-card chip-distribution pdf-avoid-break"
+      className="analysis-chart-card chip-distribution pdf-avoid-break u-card"
       title={<span className="chip-distribution__title">筹码分布（本地估算）</span>}
-      extra={<span className="analysis-chart-caption">截至 {data.as_of_date} · 前复权日 K</span>}
-      style={{ ...cardStyle, borderTop: `3px solid ${colors.primary}` }}
+      extra={<span className="analysis-chart-caption">截至 {data.as_of_date} · 前复权日 K</span>} style={{ borderTop: `3px solid ${colors.primary}` }}
       styles={{ body: { padding: "14px 16px 16px" } }}
     >
       {content}

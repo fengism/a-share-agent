@@ -12,6 +12,7 @@ import {
 import { Button, Dropdown, Input, Tooltip, type MenuProps } from "antd";
 import { useStockSearch } from "../../../api/queryHooks/stock";
 import { useColors, useTokens } from "../../../styles/ui";
+import "./chat-input.css";
 
 interface ChatInputProps {
   value: string;
@@ -136,21 +137,21 @@ export function ChatInput({
   const commandMenuItems: MenuProps["items"] = useMemo(() => {
     return SLASH_COMMANDS.map((cmd) => ({
       key: cmd.key,
-      icon: <span style={{ color: c.primary }}>{cmd.icon}</span>,
+      icon: <span className="chat-input__icon">{cmd.icon}</span>,
       label: (
-        <div style={{ display: "flex", flexDirection: "column", gap: 2, padding: "2px 0" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontWeight: 600, color: c.primary, fontFamily: "monospace" }}>
+        <div className="chat-input__cmd-row">
+          <div className="chat-input__cmd-head">
+            <span className="chat-input__cmd-name">
               {cmd.command}
             </span>
-            <span style={{ color: c.textPrimary, fontWeight: 500 }}>{cmd.label}</span>
+            <span className="chat-input__cmd-label">{cmd.label}</span>
           </div>
-          <span style={{ fontSize: 11, color: c.textMuted }}>{cmd.description}</span>
+          <span className="chat-input__cmd-desc">{cmd.description}</span>
         </div>
       ),
       onClick: () => handleSelectCommand(cmd),
     }));
-  }, [c.primary, c.textMuted, c.textPrimary, handleSelectCommand]);
+  }, [handleSelectCommand]);
 
   const handleTextChange = (newVal: string) => {
     onChange(newVal);
@@ -163,25 +164,16 @@ export function ChatInput({
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: t.space[2] }}>
+    <div className="chat-input__root">
       {!isStreaming && !value && (
-        <div style={{ display: "flex", gap: t.space[1], flexWrap: "wrap", alignItems: "center" }}>
-          <span style={{ fontSize: t.font.xs, color: c.textMuted }}>💡 快捷探索：</span>
+        <div className="chat-input__quick-row">
+          <span className="chat-input__hint">💡 快捷探索：</span>
           {suggestions.map((prompt) => (
             <button
               key={prompt}
               type="button"
               onClick={() => onChange(prompt)}
-              style={{
-                fontSize: t.font.xs,
-                color: c.textSecondary,
-                background: c.nestedBg,
-                border: `1px solid ${c.border}`,
-                borderRadius: t.radius.pill,
-                padding: "2px 8px",
-                cursor: "pointer",
-                transition: "all 0.15s ease",
-              }}
+              className="chat-input__quick-chip"
               onMouseEnter={(e) => {
                 e.currentTarget.style.borderColor = c.primary;
                 e.currentTarget.style.color = c.primary;
@@ -197,55 +189,21 @@ export function ChatInput({
         </div>
       )}
 
-      <div
-        style={{
-          display: "flex",
-          gap: t.space[2],
-          alignItems: "flex-end",
-          position: "relative",
-        }}
-      >
+      <div className="chat-input__row">
         {/* $ 股票联想菜单 */}
         {matchedStocks.length > 0 && (
-          <div
-            style={{
-              position: "absolute",
-              bottom: "calc(100% + 8px)",
-              left: 0,
-              zIndex: 1000,
-              background: c.elevatedBg,
-              border: `1px solid ${c.border}`,
-              borderRadius: t.radius.md,
-              boxShadow: t.shadow.md,
-              padding: "6px 8px",
-              minWidth: 260,
-              maxWidth: 320,
-            }}
-          >
-            <div style={{ fontSize: 11, color: c.textMuted, marginBottom: 4, display: "flex", alignItems: "center", gap: 4 }}>
-              <StockOutlined style={{ color: c.primary }} />
+          <div className="chat-input__dropdown">
+            <div className="chat-input__picker-head">
+              <StockOutlined className="chat-input__icon" />
               <span>选择股票插入 (输入 $ 触发)</span>
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <div className="chat-input__picker-list">
               {matchedStocks.map((stock) => (
                 <button
                   key={stock.code}
                   type="button"
                   onClick={() => handleSelectStock(stock)}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    padding: "4px 8px",
-                    background: "transparent",
-                    border: "none",
-                    borderRadius: t.radius.sm,
-                    cursor: "pointer",
-                    textAlign: "left",
-                    color: c.textPrimary,
-                    fontSize: 12,
-                    transition: "background 0.15s ease",
-                  }}
+                  className="chat-input__picker-item"
                   onMouseEnter={(e) => {
                     e.currentTarget.style.background = c.hoverBg;
                   }}
@@ -253,8 +211,8 @@ export function ChatInput({
                     e.currentTarget.style.background = "transparent";
                   }}
                 >
-                  <span style={{ fontWeight: 500 }}>{stock.name}</span>
-                  <span style={{ color: c.textMuted, fontFamily: "monospace", fontSize: 11 }}>
+                  <span className="chat-input__picker-name">{stock.name}</span>
+                  <span className="chat-input__picker-code">
                     {stock.code}
                   </span>
                 </button>
@@ -289,7 +247,7 @@ export function ChatInput({
           </Tooltip>
         </Dropdown>
 
-        <div style={{ flex: 1, position: "relative" }}>
+        <div className="chat-input__field">
           <Input.TextArea
             value={value}
             onChange={(event) => handleTextChange(event.target.value)}
@@ -297,11 +255,7 @@ export function ChatInput({
             placeholder="输入问题、'/' 唤起指令或 '$' 联想股票，如：$茅台、/kline 贵州茅台..."
             autoSize={{ minRows: 1, maxRows: 4 }}
             disabled={isStreaming}
-            style={{
-              width: "100%",
-              borderRadius: t.radius.lg,
-              background: c.hoverBg,
-            }}
+            className="chat-input__input"
           />
         </div>
 
@@ -309,7 +263,7 @@ export function ChatInput({
           <Button
             onClick={onStop}
             danger
-            style={{ borderRadius: t.radius.lg, minWidth: 80, height: 40 }}
+            className="chat-input__action"
           >
             停止
           </Button>
@@ -319,18 +273,18 @@ export function ChatInput({
             icon={<SendOutlined />}
             onClick={onSend}
             disabled={!value.trim()}
-            style={{ borderRadius: t.radius.lg, minWidth: 80, height: 40 }}
+            className="chat-input__action"
           >
             发送
           </Button>
         )}
       </div>
 
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 4px" }}>
-        <span style={{ fontSize: 11, color: c.textMuted }}>
+      <div className="chat-input__footer">
+        <span className="chat-input__hint">
           支持 <strong>/</strong> 呼出投研指令 · 支持 <strong>$</strong> 联想股票代码
         </span>
-        <span style={{ fontSize: 11, color: c.textMuted }}>
+        <span className="chat-input__hint">
           Enter 发送 / Shift + Enter 换行
         </span>
       </div>

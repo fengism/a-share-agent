@@ -1,0 +1,179 @@
+/* 移动端全局 Tabs/Table/Modal/统计/日历覆盖
+   自原 base.css 第 2304–2477 行拆出。
+   本目录内文件由 index.css 按固定顺序 @import，顺序不可调整：
+   同特异性规则靠源序决出胜负，重排会改变层叠结果。 */
+@media (max-width: 768px) {
+  .app-command-header__search { margin-left: 0; }
+
+  .u-page-title--compact > h3.ant-typography {
+    font-size: var(--c-font-2xl);
+    line-height: var(--c-leading-tight);
+  }
+
+  /* 移动端全局 Tabs 手势横滑支持，隐藏下拉箭头操作 */
+  .ant-tabs > .ant-tabs-nav .ant-tabs-nav-wrap,
+  .ant-tabs > div > .ant-tabs-nav .ant-tabs-nav-wrap {
+    overflow-x: auto;
+    touch-action: pan-x pan-y;
+    -webkit-overflow-scrolling: touch;
+  }
+  .ant-tabs > .ant-tabs-nav .ant-tabs-nav-operations,
+  .ant-tabs > div > .ant-tabs-nav .ant-tabs-nav-operations {
+    display: none;
+  }
+  .ant-tabs-tab {
+    flex-shrink: 0;
+  }
+
+  /* 移动端全局 Table 横向溢出兜底支持 */
+  .ant-table-wrapper .ant-table .ant-table-content {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* 移动端全局弹窗安全边距与宽度限制 */
+  .ant-modal {
+    max-width: calc(100vw - 24px) !important;
+    margin: 12px auto !important;
+  }
+
+  /* 移动端全局统计指标流式字号与紧凑排版 */
+  .ant-statistic-title {
+    font-size: 11px !important;
+    margin-bottom: 2px !important;
+  }
+  .ant-statistic-content-value {
+    font-size: clamp(16px, 4.2vw, 22px);
+  }
+  .ant-statistic-content-prefix,
+  .ant-statistic-content-suffix {
+    font-size: 12px;
+  }
+
+  /* 移动端全局表格字号与内边距紧凑化，提升屏效比 */
+  .ant-table {
+    font-size: 13px;
+  }
+  .ant-table-thead > tr > th {
+    font-size: 11.5px !important;
+    padding: 7px 8px !important;
+    white-space: nowrap;
+  }
+  .ant-table-tbody > tr > td {
+    font-size: 13px;
+    padding: 8px 8px !important;
+  }
+  .ant-table-wrapper .ant-table-pagination.ant-pagination {
+    margin: 12px 0;
+  }
+
+  /* 移动端标签微型字阶 */
+  .ant-tag {
+    font-size: 11px;
+    line-height: 18px;
+    padding: 0 5px;
+  }
+
+  /* 移动端卡片头部在有标题和操作项时自适应折行 */
+  .ant-card-head-wrapper {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .ant-card-head-title {
+    min-width: 0;
+  }
+
+  /* 移动端卡片与分段器紧凑排版，提升纵向信息利用率 */
+  .ant-card:not(.ant-card-small) > .ant-card-body {
+    padding: 14px 12px;
+  }
+  .ant-card-small > .ant-card-body {
+    padding: 10px 10px;
+  }
+  .ant-card:not(.ant-card-small) > .ant-card-head {
+    padding: 0 12px;
+    min-height: 42px;
+    font-size: 14px;
+  }
+  .ant-card-small > .ant-card-head {
+    padding: 0 10px;
+    min-height: 38px;
+    font-size: 13px;
+  }
+
+  .ant-segmented {
+    font-size: 12px;
+  }
+  .ant-segmented .ant-segmented-item-label {
+    padding: 0 8px;
+    min-height: 28px;
+    line-height: 28px;
+  }
+
+  .ant-input,
+  .ant-input-number,
+  .ant-select-selector {
+    font-size: 13px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .u-page-title--compact > h3.ant-typography {
+    font-size: var(--c-font-xl, 18px);
+  }
+  .ant-statistic-title {
+    font-size: 10.5px !important;
+  }
+  .ant-statistic-content-value {
+    font-size: clamp(15px, 4.4vw, 20px) !important;
+  }
+  .ant-table {
+    font-size: 12px;
+  }
+  .ant-table-thead > tr > th {
+    font-size: 11px !important;
+    padding: 6px 6px !important;
+  }
+  .ant-table-tbody > tr > td {
+    font-size: 12px;
+    padding: 7px 6px !important;
+  }
+
+  .ant-card:not(.ant-card-small) > .ant-card-body {
+    padding: 12px 10px;
+  }
+  .ant-card-small > .ant-card-body {
+    padding: 8px 8px;
+  }
+  .ant-card:not(.ant-card-small) > .ant-card-head {
+    padding: 0 10px;
+    min-height: 40px;
+  }
+  .ant-card-small > .ant-card-head {
+    padding: 0 8px;
+    min-height: 36px;
+  }
+
+  .ant-segmented .ant-segmented-item-label {
+    padding: 0 5px;
+    font-size: 11px;
+  }
+
+  /* 移动端交易日历单元格紧凑化 */
+  .trading-calendar__cell {
+    min-height: 42px !important;
+  }
+  .trading-calendar__cell-date {
+    font-size: 11.5px !important;
+  }
+  .trading-calendar__cell-pct {
+    font-size: 9.5px !important;
+  }
+}
+
+html,
+body,
+#root {
+  max-width: 100%;
+  overflow-x: clip;
+}

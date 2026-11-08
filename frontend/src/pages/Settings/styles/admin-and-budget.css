@@ -1,0 +1,58 @@
+/* 管理设置与研究预算卡片：自 AdminSettingsSections / ResearchBudgetCard 内联样式迁出 */
+
+[data-theme] .ant-input-number.settings-number-full {
+  width: 100%;
+}
+
+.settings-block-title {
+  font-weight: var(--c-weight-semibold);
+  color: var(--c-text-primary);
+  margin-bottom: 12px;
+}
+
+.settings-block-gap {
+  margin-bottom: 20px;
+}
+
+.settings-block-gap-lg {
+  margin-bottom: 24px;
+}
+
+.settings-title-icon {
+  margin-right: 8px;
+}
+
+.settings-hint {
+  color: var(--c-text-muted);
+}
+
+.settings-hint--sm {
+  font-size: var(--c-font-sm);
+}
+
+.settings-hint--top {
+  margin-top: -4px;
+  margin-bottom: 16px;
+}
+
+.settings-hint--tight {
+  margin-top: -4px;
+  margin-bottom: 12px;
+}
+
+.settings-hint--block {
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+
+.settings-col-flex {
+  display: flex;
+}
+
+.settings-warning-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--c-warning, #faad14);
+}

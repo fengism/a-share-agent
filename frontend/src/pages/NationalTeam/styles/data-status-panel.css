@@ -1,0 +1,98 @@
+/* 国家队数据状态面板：自 NationalTeamDataStatusPanel 内联样式迁出 */
+
+[data-theme] .nt-data-status-card {
+  border: 1px dashed var(--c-border);
+  border-radius: 8px;
+  background: var(--c-bg-subtle, rgba(128, 128, 128, 0.02));
+  margin-bottom: 10px;
+}
+
+.nt-status-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.nt-status-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+[data-theme] .nt-status-label {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+[data-theme] .nt-status-tag {
+  margin: 0;
+  padding: 0 4px;
+  font-size: 10px;
+  line-height: 16px;
+}
+
+[data-theme] .nt-status-tag--plain {
+  margin: 0;
+  font-size: 10px;
+}
+
+.nt-status-strong {
+  color: var(--c-text-primary);
+  font-family: var(--c-font-mono);
+}
+
+.nt-status-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+[data-theme] .ant-btn.nt-status-link {
+  padding: 0;
+  font-size: 12px;
+}
+
+[data-theme] .nt-status-icon {
+  font-size: 10px;
+}
+
+.nt-status-details {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--c-border);
+  font-size: 12px;
+}
+
+.nt-status-block {
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--c-bg-layout);
+}
+
+[data-theme] .nt-status-block-title {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 12px;
+}
+
+.nt-status-list {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--c-text-secondary);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.nt-status-text {
+  color: var(--c-text-secondary);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.nt-status-warning {
+  margin-top: 4px;
+  color: #faad14;
+}

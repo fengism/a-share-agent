@@ -33,12 +33,11 @@ import {
 import { queryKeys } from "../../api/queryKeys";
 import SectionDataState from "../../components/SectionDataState";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
-import { semanticTagStyle, useColors, useStyles } from "../../styles/ui";
+import { useStyles } from "../../styles/ui";
 import type { InviteItem } from "../../types/auth";
 
 export default function InviteManagerCard() {
-  const { cardStyle, sectionCardBodyStyle } = useStyles();
-  const colors = useColors();
+  const { sectionCardBodyStyle } = useStyles();
   const isNarrow = useMediaQuery("(max-width: 640px)");
   const queryClient = useQueryClient();
   const { data: invites = [], isLoading, error, refetch } = useInvites(true);
@@ -115,8 +114,8 @@ export default function InviteManagerCard() {
 
   const renderStatus = (invite: InviteItem) => {
     if (invite.used) return <Tag color="default">已使用</Tag>;
-    if (invite.expired) return <Tag style={semanticTagStyle("up")}>已过期</Tag>;
-    return <Tag style={semanticTagStyle("down")}>有效未使用</Tag>;
+    if (invite.expired) return <Tag className="invite-manager__tag--expired">已过期</Tag>;
+    return <Tag className="invite-manager__tag--valid">有效未使用</Tag>;
   };
 
   const columns: ColumnsType<InviteItem> = [
@@ -126,14 +125,7 @@ export default function InviteManagerCard() {
       key: "code",
       render: (code: string) => (
         <Space size={6}>
-          <code
-            style={{
-              fontFamily: "var(--c-font-mono)",
-              fontSize: "var(--c-font-md)",
-              color: colors.textPrimary,
-              fontWeight: 600,
-            }}
-          >
+          <code className="invite-manager__code">
             {code}
           </code>
           <Tooltip title="复制邀请码">
@@ -168,7 +160,7 @@ export default function InviteManagerCard() {
       render: (val: string | null, record) => {
         if (!val) return <Tag color="blue">永不过期</Tag>;
         return record.expired && !record.used ? (
-          <span style={{ color: colors.up }}>{val}</span>
+          <span className="invite-manager__expired-date">{val}</span>
         ) : (
           val
         );
@@ -179,9 +171,9 @@ export default function InviteManagerCard() {
       key: "usage",
       width: 160,
       render: (_, record) => {
-        if (!record.used) return <span style={{ color: colors.textMuted }}>—</span>;
+        if (!record.used) return <span className="invite-manager__text--muted">—</span>;
         return (
-          <div style={{ fontSize: "var(--c-font-xs)", color: colors.textMuted }}>
+          <div className="invite-manager__usage-info">
             <div>使用者 ID: {record.used_by ?? "未知"}</div>
             {record.used_at && <div>时间: {record.used_at}</div>}
           </div>
@@ -207,17 +199,17 @@ export default function InviteManagerCard() {
             </Button>
           </Popconfirm>
         ) : (
-          <span style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)" }}>不可撤销</span>
+          <span className="invite-manager__irrevocable">不可撤销</span>
         ),
     },
   ];
 
   const inviteControls = (
-    <Space wrap style={{ width: isNarrow ? "100%" : undefined }}>
+    <Space wrap className={isNarrow ? "invite-manager__controls-space--narrow" : "invite-manager__controls-space"}>
       <Select
         size="small"
         value={expiresInDays ?? 0}
-        style={{ width: isNarrow ? "100%" : 120, minWidth: 120 }}
+        className={isNarrow ? "invite-manager__select--expiry-narrow" : "invite-manager__select--expiry"}
         onChange={(value) => setExpiresInDays(value === 0 ? undefined : value)}
         options={[
           { value: 0, label: "永不过期" },
@@ -255,75 +247,47 @@ export default function InviteManagerCard() {
 
   return (
     <Card
-      title={<span><TeamOutlined style={{ marginRight: 8 }} />邀请码管理</span>}
+      title={<span><TeamOutlined className="invite-manager__title-icon" />邀请码管理</span>}
       extra={isNarrow ? undefined : inviteControls}
-      style={{ ...cardStyle, marginBottom: 16 }}
+      className="u-card invite-manager-card"
       styles={{ body: sectionCardBodyStyle }}
     >
-      <div style={{ fontSize: "var(--c-font-sm)", color: colors.textMuted, marginBottom: 12 }}>
+      <div className="invite-manager__intro">
         新用户注册需填写有效且未使用的邀请码；每个邀请码仅可使用一次。管理员可随时发放、撤销或按需一键清理过期邀请码。
       </div>
 
-      {isNarrow && <div style={{ marginBottom: 12 }}>{inviteControls}</div>}
+      {isNarrow && <div className="invite-manager__controls-wrap--narrow">{inviteControls}</div>}
 
       {/* Metrics Bar */}
-      <Row gutter={[12, 12]} style={{ marginBottom: 14 }}>
+      <Row gutter={[12, 12]} className="invite-manager__stats-row">
         <Col xs={12} sm={6}>
-          <div
-            style={{
-              padding: "var(--c-pad-inset, 7px 12px)",
-              background: colors.hoverBg,
-              borderRadius: 6,
-              border: `1px solid ${colors.border}`,
-            }}
-          >
-            <div style={{ fontSize: "var(--c-font-xs)", color: colors.textMuted }}>总邀请码</div>
-            <div style={{ fontSize: "var(--c-font-xl)", fontWeight: 700, color: colors.textPrimary }}>
+          <div className="invite-manager__stat-tile">
+            <div className="invite-manager__stat-label">总邀请码</div>
+            <div className="invite-manager__stat-val">
               {stats.total}
             </div>
           </div>
         </Col>
         <Col xs={12} sm={6}>
-          <div
-            style={{
-              padding: "var(--c-pad-inset, 7px 12px)",
-              background: colors.hoverBg,
-              borderRadius: 6,
-              border: `1px solid ${colors.border}`,
-            }}
-          >
-            <div style={{ fontSize: "var(--c-font-xs)", color: colors.textMuted }}>有效未使用</div>
-            <div style={{ fontSize: "var(--c-font-xl)", fontWeight: 700, color: colors.success }}>
+          <div className="invite-manager__stat-tile">
+            <div className="invite-manager__stat-label">有效未使用</div>
+            <div className="invite-manager__stat-val invite-manager__stat-val--unused">
               {stats.unused}
             </div>
           </div>
         </Col>
         <Col xs={12} sm={6}>
-          <div
-            style={{
-              padding: "var(--c-pad-inset, 7px 12px)",
-              background: colors.hoverBg,
-              borderRadius: 6,
-              border: `1px solid ${colors.border}`,
-            }}
-          >
-            <div style={{ fontSize: "var(--c-font-xs)", color: colors.textMuted }}>已使用</div>
-            <div style={{ fontSize: "var(--c-font-xl)", fontWeight: 700, color: colors.primary }}>
+          <div className="invite-manager__stat-tile">
+            <div className="invite-manager__stat-label">已使用</div>
+            <div className="invite-manager__stat-val invite-manager__stat-val--used">
               {stats.used}
             </div>
           </div>
         </Col>
         <Col xs={12} sm={6}>
-          <div
-            style={{
-              padding: "var(--c-pad-inset, 7px 12px)",
-              background: colors.hoverBg,
-              borderRadius: 6,
-              border: `1px solid ${colors.border}`,
-            }}
-          >
-            <div style={{ fontSize: "var(--c-font-xs)", color: colors.textMuted }}>已过期</div>
-            <div style={{ fontSize: "var(--c-font-xl)", fontWeight: 700, color: colors.textMuted }}>
+          <div className="invite-manager__stat-tile">
+            <div className="invite-manager__stat-label">已过期</div>
+            <div className="invite-manager__stat-val invite-manager__stat-val--expired">
               {stats.expired}
             </div>
           </div>
@@ -331,31 +295,22 @@ export default function InviteManagerCard() {
       </Row>
 
       {/* Toolbar */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          flexWrap: "wrap",
-          gap: 10,
-          marginBottom: 12,
-        }}
-      >
+      <div className="invite-manager__toolbar">
         <Space wrap>
           <Input
             placeholder="搜索邀请码..."
-            prefix={<SearchOutlined style={{ color: colors.textMuted }} />}
+            prefix={<SearchOutlined className="invite-manager__search-icon" />}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             allowClear
             size="small"
-            style={{ width: isNarrow ? "100%" : 180 }}
+            className={isNarrow ? "invite-manager__search-input--narrow" : "invite-manager__search-input"}
           />
           <Select
             size="small"
             value={statusFilter}
             onChange={(val) => setStatusFilter(val)}
-            style={{ width: 120 }}
+            className="invite-manager__select--status"
             options={[
               { value: "all", label: "全部状态" },
               { value: "unused", label: "有效未使用" },
@@ -401,4 +356,3 @@ export default function InviteManagerCard() {
     </Card>
   );
 }
-

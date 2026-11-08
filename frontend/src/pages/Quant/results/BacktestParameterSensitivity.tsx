@@ -30,7 +30,7 @@ import {
   type QuantParameterScanResult,
   type QuantStrategyConfig,
 } from "../../../api/queries";
-import { useColors, useStyles } from "../../../styles/ui";
+import { useColors } from "../../../styles/ui";
 import { formatPercent, formatRatio } from "./formatters";
 
 const { Text } = Typography;
@@ -82,7 +82,6 @@ export default function BacktestParameterSensitivity({
   onApplyOptimal,
 }: BacktestParameterSensitivityProps) {
   const colors = useColors();
-  const { cardStyle } = useStyles();
   const scanMutation = useScanQuantParameterSensitivity();
 
   const availableParams = useMemo(() => {
@@ -198,32 +197,31 @@ export default function BacktestParameterSensitivity({
     <Card
       title={(
         <Space size={8}>
-          <ExperimentOutlined style={{ color: colors.primary }} />
+          <ExperimentOutlined className="u-text-primary" />
           <span>策略参数敏感性与稳健度分析 (Parameter Robustness Scan)</span>
         </Space>
       )}
       size="small"
-      style={cardStyle}
-      className="quant-result-card"
+      className="quant-result-card u-card"
     >
-      <div style={{ marginBottom: 16 }}>
-        <p style={{ color: "var(--color-text-secondary, #8c8c8c)", fontSize: 13, margin: "0 0 12px" }}>
+      <div className="u-mb-16">
+        <p className="sensitivity-desc">
           基于当前回测的纯内存高速复算引擎，扫描策略参数空间网格。可识别策略是否处于「稳健高原」还是面临「参数过拟合悬崖」。
         </p>
 
         <Form layout="vertical" size="small">
           <Row gutter={[16, 12]}>
             <Col xs={24} md={10}>
-              <Form.Item label="主要参数 1" style={{ marginBottom: 8 }}>
+              <Form.Item label="主要参数 1" className="sensitivity-form-item">
                 <Space.Compact block>
                   <Select
-                    style={{ width: "40%" }}
+                    className="sensitivity-width-40"
                     value={param1Name}
                     onChange={handleParam1Change}
                     options={availableParams.map((p) => ({ value: p, label: p }))}
                   />
                   <Input
-                    style={{ width: "60%" }}
+                    className="sensitivity-width-60"
                     value={param1Input}
                     onChange={(e) => setParam1Input(e.target.value)}
                     placeholder="逗号分隔，如 5, 10, 15, 20"
@@ -244,18 +242,18 @@ export default function BacktestParameterSensitivity({
                     />
                   </Space>
                 )}
-                style={{ marginBottom: 8 }}
+                className="sensitivity-form-item"
               >
                 <Space.Compact block>
                   <Select
-                    style={{ width: "40%" }}
+                    className="sensitivity-width-40"
                     disabled={!enableParam2}
                     value={param2Name}
                     onChange={handleParam2Change}
                     options={availableParams.map((p) => ({ value: p, label: p }))}
                   />
                   <Input
-                    style={{ width: "60%" }}
+                    className="sensitivity-width-60"
                     disabled={!enableParam2}
                     value={param2Input}
                     onChange={(e) => setParam2Input(e.target.value)}
@@ -265,14 +263,14 @@ export default function BacktestParameterSensitivity({
               </Form.Item>
             </Col>
 
-            <Col xs={24} md={4} style={{ display: "flex", alignItems: "flex-end" }}>
+            <Col xs={24} md={4} className="sensitivity-col-end">
               <Button
                 type="primary"
                 icon={<CompassOutlined />}
                 loading={scanMutation.isPending}
                 disabled={!runId}
                 onClick={handleRunScan}
-                style={{ width: "100%", marginBottom: 8 }}
+                className="sensitivity-run-btn"
               >
                 开始网格扫描
               </Button>
@@ -282,7 +280,7 @@ export default function BacktestParameterSensitivity({
       </div>
 
       {scanMutation.isPending && (
-        <div style={{ padding: "32px 0", textAlign: "center" }}>
+        <div className="sensitivity-empty">
           <Spin tip="正在进行高速内存网格并行复算..." />
         </div>
       )}
@@ -290,7 +288,7 @@ export default function BacktestParameterSensitivity({
       {scanResult && (
         <div>
           <Alert
-            style={{ marginBottom: 16 }}
+            className="u-mb-16"
             type={scanResult.robustness_score >= 70 ? "success" : scanResult.robustness_score >= 45 ? "info" : "warning"}
             showIcon
             icon={<CheckCircleOutlined />}
@@ -298,7 +296,7 @@ export default function BacktestParameterSensitivity({
               <Space wrap size={16} align="center">
                 <span>
                   <strong>参数稳健度评分：</strong>
-                  <Tag color={scanResult.robustness_score >= 70 ? "success" : "warning"} style={{ fontSize: 13, fontWeight: "bold" }}>
+                  <Tag color={scanResult.robustness_score >= 70 ? "success" : "warning"} className="sensitivity-tag--strong">
                     {scanResult.robustness_score} 分 ({scanResult.robustness_score >= 70 ? "稳健高原" : scanResult.robustness_score >= 45 ? "中等稳健" : "较敏感"})
                   </Tag>
                 </span>
@@ -333,8 +331,8 @@ export default function BacktestParameterSensitivity({
           />
 
           {matrixData && (
-            <div style={{ overflowX: "auto" }}>
-              <div style={{ marginBottom: 8, fontSize: 12, color: "var(--color-text-secondary, #8c8c8c)" }}>
+            <div className="sensitivity-table-scroll">
+              <div className="sensitivity-table-caption">
                 表格单元格数值为 <strong>夏普比率 (Sharpe)</strong>，悬停查看收益率与回撤。绿色代表高风险报酬，红色代表弱势或亏损。
               </div>
 
@@ -414,7 +412,7 @@ export default function BacktestParameterSensitivity({
                         return (
                           <Tooltip title={`收益: ${formatPercent(pt.total_return)} | 回撤: ${formatPercent(pt.max_drawdown)} | 胜率: ${formatPercent(pt.win_rate)}`}>
                             <div style={{ padding: "4px 6px", borderRadius: 4, background: bg, border: isOptimal ? `2px solid ${colors.primary}` : "none" }}>
-                              <span style={{ fontWeight: isOptimal ? "bold" : "normal" }}>
+                              <span className={isOptimal ? "u-text-bold" : undefined}>
                                 {formatRatio(pt.sharpe_ratio)} {isOptimal ? "★" : ""}
                               </span>
                             </div>

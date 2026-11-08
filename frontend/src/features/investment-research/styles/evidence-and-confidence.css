@@ -1,0 +1,109 @@
+/* evidence-and-confidence —— 自 research-framework.css 第 90–197 行拆出。
+   由同目录 index.css 按固定顺序 @import，顺序不可调整：同特异性规则靠源序决胜负。 */
+.research-evidence-ruler {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.72fr) minmax(0, 1.28fr);
+  overflow: hidden;
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius-md);
+  background: var(--c-hover-bg);
+}
+
+.research-evidence-ruler__grade {
+  display: grid;
+  align-content: center;
+  gap: 8px;
+  min-height: 160px;
+  padding: 16px 20px;
+  border-right: 1px solid var(--c-border);
+  background: var(--c-nested-bg);
+}
+
+.research-eyebrow,
+.research-section__header > span,
+.research-action-column > span {
+  color: var(--c-text-muted);
+  font-size: var(--stock-research-label-size, 11px);
+  font-weight: var(--c-weight-bold);
+  line-height: var(--c-leading-normal);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.research-evidence-ruler__grade > strong {
+  font-size: var(--stock-research-title-size, 20px);
+  font-weight: var(--c-weight-bold);
+  line-height: var(--c-leading-tight);
+}
+
+.research-evidence-ruler__grade > strong[data-grade="A"] { color: var(--c-success); }
+.research-evidence-ruler__grade > strong[data-grade="B"] { color: var(--c-accent); }
+.research-evidence-ruler__grade > strong[data-grade="C"] { color: var(--c-warning); }
+.research-evidence-ruler__grade > p,
+.research-evidence-ruler__confidence > p {
+  margin: 0;
+  color: var(--c-text-secondary);
+  font-size: var(--stock-research-support-size, 12px);
+  line-height: var(--c-leading-relaxed, 1.55);
+}
+
+.research-grade-scale {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  padding-top: 4px;
+}
+
+.research-grade-scale span {
+  padding: 4px 6px;
+  border-top: 2px solid var(--c-border);
+  color: var(--c-text-muted);
+  font-size: var(--stock-research-label-size, 11px);
+  line-height: var(--c-leading-normal);
+  text-align: center;
+}
+
+.research-grade-scale span.is-active {
+  border-color: var(--c-primary);
+  color: var(--c-text-primary);
+  font-weight: var(--c-weight-bold);
+}
+
+.research-evidence-ruler__confidence {
+  display: grid;
+  align-content: center;
+  gap: 10px;
+  padding: 16px 20px;
+}
+
+.research-evidence-ruler__confidence h4,
+.research-section__header h4 {
+  margin: 0 !important;
+  color: var(--c-text-primary) !important;
+  font-size: var(--stock-research-section-size, 15px);
+  font-weight: var(--c-weight-semibold);
+  line-height: var(--c-leading-tight);
+}
+
+.research-confidence-meter {
+  display: grid;
+  gap: 3px;
+}
+.research-confidence-meter__label {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: var(--stock-research-support-size, 12px);
+}
+.research-confidence-meter__label span,
+.research-confidence-meter small {
+  color: var(--c-text-muted);
+  font-size: var(--stock-research-label-size, 11px);
+  line-height: var(--c-leading-normal);
+}
+
+.research-framework p,
+.research-framework li,
+.research-framework dd {
+  line-height: var(--stock-research-body-leading, 1.6);
+}

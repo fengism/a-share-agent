@@ -137,7 +137,7 @@ export default function PriceAnomalyTab() {
       dataIndex: "is_today",
       width: 86,
       render: (value: boolean) => value
-        ? <Tag color="error">{isCurrentDataDate ? "今日异动" : "数据日异动"}</Tag>
+        ? <Tag color="gold">{isCurrentDataDate ? "今日异动" : "数据日异动"}</Tag>
         : <Tag>窗口记录</Tag>,
     },
   ], [isCurrentDataDate, isMobile]);

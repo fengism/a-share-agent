@@ -1,0 +1,9 @@
+/* shell —— 自 research-framework.css 第 1–8 行拆出。
+   由同目录 index.css 按固定顺序 @import，顺序不可调整：同特异性规则靠源序决胜负。 */
+.research-framework {
+  display: grid;
+  min-width: 0;
+  max-width: 100%;
+  gap: 16px;
+  margin-top: 12px;
+}

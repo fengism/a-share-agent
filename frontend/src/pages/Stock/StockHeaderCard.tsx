@@ -12,7 +12,7 @@ import {
 } from "@ant-design/icons";
 import { Button, Card, Tag, Tooltip, Typography, message } from "antd";
 import { useNavigate } from "react-router-dom";
-import { useColors, useStyles } from "../../styles/ui";
+import { useColors } from "../../styles/ui";
 import type { StockBasicInfo } from "../../types/stock";
 import { formatNumberWithSeparators } from "../../utils/format";
 import { buildStockAnalysisUrl } from "../../utils/stockLinks";
@@ -60,7 +60,6 @@ export default function StockHeaderCard({
 }: StockHeaderCardProps) {
   const navigate = useNavigate();
   const colors = useColors();
-  const { cardStyle } = useStyles();
   const [snapshotModalOpen, setSnapshotModalOpen] = useState(false);
   const isHK = market === "hk";
   const shouldShowAnalysis = showAnalysisButton ?? !isHK;
@@ -82,7 +81,7 @@ export default function StockHeaderCard({
   };
 
   return (
-    <Card id="stock-header-card" className="stock-header-card" style={cardStyle} styles={{ body: { padding: 0 } }}>
+    <Card id="stock-header-card" className="stock-header-card u-card" styles={{ body: { padding: 0 } }}>
       <span className="stock-header-card__glow" aria-hidden="true" />
       <div className="stock-header-card__content">
         <div className="stock-header-card__identity">

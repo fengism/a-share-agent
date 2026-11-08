@@ -1,0 +1,236 @@
+/* 从内联样式迁出的结构辅助类、产业链节点与层级、证据与冲突、表格与图谱
+   自 industry-report.css 第 85–318 行拆出。
+   由同目录 index.css 按固定顺序 @import，顺序不可调整：同特异性规则靠源序决胜负。 */
+/* ── Structural helpers migrated from inline styles ─────────────────── */
+.industry-block-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.industry-block-head .industry-research-block__title {
+  margin: 0;
+}
+
+.industry-source-label {
+  font-size: var(--c-font-xs);
+}
+
+.industry-wrap-tag-list--spaced {
+  margin-top: 6px;
+}
+
+.industry-chain-node__heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.industry-chain-node__code-tag {
+  flex: none;
+  margin: 0;
+  cursor: pointer;
+}
+
+.industry-chain-node__tag-list--inline {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+/* Company chip inside a chain node — clickable, compact, wraps long names. */
+.industry-chain-node__company {
+  margin: 0;
+  border-radius: 4px;
+  font-size: var(--c-font-xs);
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+.industry-chain-tier__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.industry-chain-tier__count {
+  font-size: var(--c-font-xs);
+  opacity: 0.85;
+  font-weight: bold;
+}
+
+.industry-chain-tier__title {
+  margin-bottom: 12px;
+  font-size: var(--c-font-md);
+}
+
+.industry-insight-tags {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.industry-insight__evidence {
+  display: block;
+  color: var(--c-primary);
+  font-size: var(--c-font-xs);
+}
+
+.industry-evidence-intro {
+  display: block;
+  margin-bottom: 10px;
+  font-size: var(--c-font-sm);
+}
+
+.industry-evidence-list {
+  display: grid;
+  gap: 10px;
+}
+
+.industry-evidence-item__summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  cursor: pointer;
+}
+
+.industry-evidence-item__body {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.industry-evidence-item__args {
+  margin: 4px 0 0;
+  max-height: 140px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.industry-evidence-item__meta-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.industry-coverage-tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.industry-conflict-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.industry-conflict-item {
+  padding: 8px;
+  border: 1px solid var(--c-border);
+  border-radius: 6px;
+}
+
+.industry-conflict-item__values,
+.industry-conflict-item__reason {
+  display: block;
+}
+
+.industry-coverage-gap {
+  margin-bottom: 12px;
+}
+
+.industry-coverage-gap--none {
+  margin-bottom: 0;
+}
+
+.industry-coverage-list {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+.industry-chain-table__tag {
+  margin-bottom: 4px;
+}
+
+.industry-chain-table__code-link,
+.industry-chain-table__company {
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.industry-chain-table__text {
+  font-size: 12px;
+  color: var(--c-text-secondary);
+}
+
+.industry-link-btn {
+  display: inline-block;
+  margin-top: 2px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.industry-metric-value {
+  display: block;
+  color: var(--c-primary);
+  font-size: var(--c-font-lg);
+  font-weight: var(--c-weight-bold);
+}
+
+.industry-metric-period-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.industry-graph-wrap {
+  width: 100%;
+  overflow: hidden;
+}
+
+.industry-graph-wrap--compact {
+  min-height: 660px;
+}
+
+.industry-graph-wrap--narrow {
+  min-height: 540px;
+}
+
+.industry-graph-loading {
+  padding: 40px;
+  text-align: center;
+  color: var(--c-text-muted);
+}
+
+.industry-event-date {
+  color: var(--c-primary);
+  font-size: var(--c-font-sm);
+  font-weight: var(--c-weight-semibold);
+}
+
+.industry-risk-item {
+  color: var(--c-text-secondary);
+}
+
+.industry-report__chapter-nav {
+  position: sticky;
+  z-index: 4;
+  top: var(--c-space-2);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+  gap: 0;
+  margin-bottom: 16px;
+  border-block: 1px solid var(--c-border);
+  background: color-mix(in srgb, var(--c-card-bg) 94%, transparent);
+  backdrop-filter: blur(12px);
+}

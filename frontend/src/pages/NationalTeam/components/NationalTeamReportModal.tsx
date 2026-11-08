@@ -8,7 +8,7 @@ import {
 } from "@ant-design/icons";
 import { Button, Card, Col, Divider, Modal, Row, Space, Tag, Typography, message } from "antd";
 import type { NationalTeamResponse } from "../../../types/stock/market";
-import { useColors, useTokens } from "../../../styles/ui";
+import { useColors } from "../../../styles/ui";
 import { useCopyFeedback } from "../../../hooks/useCopyFeedback";
 
 const { Text, Title } = Typography;
@@ -25,7 +25,6 @@ export default function NationalTeamReportModal({
   data,
 }: NationalTeamReportModalProps) {
   const colors = useColors();
-  const tokens = useTokens();
   const reportRef = useRef<HTMLDivElement>(null);
   const [isExporting, setIsExporting] = useState(false);
   const { copied: imgCopied, markCopied: markImgCopied } = useCopyFeedback(2000);
@@ -37,7 +36,7 @@ export default function NationalTeamReportModal({
   const supportScore = data.support_score?.score ?? 50;
   const supportLevel =
     supportScore >= 70
-      ? { text: "高强度托底", color: colors.up, tag: "red" }
+      ? { text: "高强度托底", color: colors.primary, tag: "blue" }
       : supportScore >= 50
       ? { text: "温和护盘", color: colors.warning, tag: "orange" }
       : { text: "常规运行", color: colors.textSecondary, tag: "default" };
@@ -192,7 +191,7 @@ export default function NationalTeamReportModal({
     <Modal
       title={
         <Space size={8} align="center">
-          <FileImageOutlined style={{ color: colors.primary }} />
+          <FileImageOutlined className="u-text-primary" />
           <span>国家队宽基资金监测 · 日度简报长图</span>
           <Tag color="cyan">截至 {asOfDate}</Tag>
         </Space>
@@ -201,7 +200,7 @@ export default function NationalTeamReportModal({
       onCancel={onClose}
       width={720}
       footer={
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
+        <div className="u-flex-between">
           <Button
             icon={textCopied ? <CheckOutlined /> : <CopyOutlined />}
             onClick={handleCopyMarkdown}
@@ -231,120 +230,96 @@ export default function NationalTeamReportModal({
         </div>
       }
     >
-      <div style={{ maxHeight: "72vh", overflowY: "auto", padding: "4px 8px" }}>
+      <div className="national-team-report-modal__scroll">
         {/* 长图容器 */}
         <div
           ref={reportRef}
-          style={{
-            background: colors.cardBg,
-            border: `1px solid ${colors.border}`,
-            borderRadius: tokens.radius.lg,
-            padding: "24px 28px",
-            color: colors.textPrimary,
-            fontFamily: "system-ui, -apple-system, sans-serif",
-          }}
+          className="national-team-poster"
           data-testid="national-team-poster-content"
         >
           {/* 海报 Header */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
+          <div className="national-team-poster__header">
             <div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                <span style={{ fontSize: 22 }}>🏛️</span>
-                <Title level={4} style={{ margin: 0, fontWeight: 700 }}>
+              <div className="national-team-poster__title-row">
+                <span className="national-team-poster__icon">🏛️</span>
+                <Title level={4} className="national-team-poster__title">
                   国家队宽基资金流向与托底监测
                 </Title>
               </div>
-              <Text type="secondary" style={{ fontSize: 12 }}>
+              <Text type="secondary" className="national-team-poster__desc">
                 每日跟踪主力机构申购赎回意图 · 捕捉宏观政策托底底牌
               </Text>
             </div>
-            <div style={{ textAlign: "right" }}>
-              <Tag color="blue" style={{ fontSize: 12, margin: 0, fontWeight: 600 }}>
+            <div className="national-team-poster__meta">
+              <Tag color="blue" className="u-m-0 u-text-semibold">
                 {asOfDate}
               </Tag>
-              <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 4 }}>
+              <div className="national-team-poster__meta-sub">
                 A-Share Agent
               </div>
             </div>
           </div>
 
           {/* 托底状态核心横幅 */}
-          <div
-            style={{
-              background: "var(--c-bg-layout)",
-              border: `1px solid ${colors.border}`,
-              borderRadius: tokens.radius.md,
-              padding: "12px 18px",
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: 16,
-            }}
-          >
+          <div className="national-team-poster__support-banner">
             <div>
-              <Text type="secondary" style={{ fontSize: 12 }}>今日托底意向诊断</Text>
-              <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginTop: 4 }}>
-                <span style={{ fontSize: 20, fontWeight: 700, color: supportLevel.color }}>
+              <Text type="secondary" className="national-team-poster__support-title">今日托底意向诊断</Text>
+              <div className="national-team-poster__support-row">
+                <span className="national-team-poster__support-level" style={{ color: supportLevel.color }}>
                   {supportLevel.text}
                 </span>
-                <span style={{ fontSize: 13, color: colors.textSecondary }}>
-                  托底指数：<strong style={{ color: colors.textPrimary }}>{supportScore.toFixed(0)}</strong> / 100
+                <span className="national-team-poster__support-score">
+                  托底指数：<strong className="u-text-primary">{supportScore.toFixed(0)}</strong> / 100
                 </span>
               </div>
             </div>
             {data.support_score?.percentile_60d != null && (
-              <Tag color={supportLevel.tag} style={{ fontSize: 12, padding: "2px 8px" }}>
+              <Tag color={supportLevel.tag}>
                 近 60 日分位：{(data.support_score.percentile_60d * 100).toFixed(0)}%
               </Tag>
             )}
           </div>
 
           {/* 四大核心资金指标 */}
-          <Row gutter={[12, 12]} style={{ marginBottom: 18 }}>
+          <Row gutter={[12, 12]} className="national-team-poster__section">
             <Col span={6}>
-              <Card size="small" style={{ background: "var(--c-bg-layout)", textAlign: "center" }}>
-                <Text type="secondary" style={{ fontSize: 11 }}>样本成交总额</Text>
-                <div style={{ fontSize: 16, fontWeight: 700, marginTop: 4, fontFamily: "var(--c-font-mono)" }}>
-                  {totalAmount1d.toFixed(1)} <span style={{ fontSize: 11, fontWeight: 400 }}>亿元</span>
+              <Card size="small" className="national-team-poster__metric-card">
+                <Text type="secondary" className="national-team-poster__metric-title">样本成交总额</Text>
+                <div className="national-team-poster__metric-val">
+                  {totalAmount1d.toFixed(1)} <span className="national-team-poster__metric-unit">亿元</span>
                 </div>
               </Card>
             </Col>
             <Col span={6}>
-              <Card size="small" style={{ background: "var(--c-bg-layout)", textAlign: "center" }}>
-                <Text type="secondary" style={{ fontSize: 11 }}>1 日估算净申购</Text>
+              <Card size="small" className="national-team-poster__metric-card">
+                <Text type="secondary" className="national-team-poster__metric-title">1 日估算净申购</Text>
                 <div
+                  className="national-team-poster__metric-val"
                   style={{
-                    fontSize: 16,
-                    fontWeight: 700,
-                    marginTop: 4,
-                    fontFamily: "var(--c-font-mono)",
                     color: netFlow1d > 0 ? colors.up : netFlow1d < 0 ? colors.down : colors.textPrimary,
                   }}
                 >
-                  {netFlow1d > 0 ? "+" : ""}{netFlow1d.toFixed(1)} <span style={{ fontSize: 11, fontWeight: 400 }}>亿元</span>
+                  {netFlow1d > 0 ? "+" : ""}{netFlow1d.toFixed(1)} <span className="national-team-poster__metric-unit">亿元</span>
                 </div>
               </Card>
             </Col>
             <Col span={6}>
-              <Card size="small" style={{ background: "var(--c-bg-layout)", textAlign: "center" }}>
-                <Text type="secondary" style={{ fontSize: 11 }}>区间累计净申购</Text>
+              <Card size="small" className="national-team-poster__metric-card">
+                <Text type="secondary" className="national-team-poster__metric-title">区间累计净申购</Text>
                 <div
+                  className="national-team-poster__metric-val"
                   style={{
-                    fontSize: 16,
-                    fontWeight: 700,
-                    marginTop: 4,
-                    fontFamily: "var(--c-font-mono)",
                     color: cumulativeFlow > 0 ? colors.up : cumulativeFlow < 0 ? colors.down : colors.textPrimary,
                   }}
                 >
-                  {cumulativeFlow > 0 ? "+" : ""}{cumulativeFlow.toFixed(1)} <span style={{ fontSize: 11, fontWeight: 400 }}>亿元</span>
+                  {cumulativeFlow > 0 ? "+" : ""}{cumulativeFlow.toFixed(1)} <span className="national-team-poster__metric-unit">亿元</span>
                 </div>
               </Card>
             </Col>
             <Col span={6}>
-              <Card size="small" style={{ background: "var(--c-bg-layout)", textAlign: "center" }}>
-                <Text type="secondary" style={{ fontSize: 11 }}>{ytdFlow != null ? "年初至今 (YTD)" : "监测覆盖数"}</Text>
-                <div style={{ fontSize: 16, fontWeight: 700, marginTop: 4, fontFamily: "var(--c-font-mono)" }}>
+              <Card size="small" className="national-team-poster__metric-card">
+                <Text type="secondary" className="national-team-poster__metric-title">{ytdFlow != null ? "年初至今 (YTD)" : "监测覆盖数"}</Text>
+                <div className="national-team-poster__metric-val">
                   {ytdFlow != null ? `${ytdFlow > 0 ? "+" : ""}${ytdFlow.toFixed(1)} 亿` : `${data.covered_etf_count} 只`}
                 </div>
               </Card>
@@ -352,8 +327,8 @@ export default function NationalTeamReportModal({
           </Row>
 
           {/* 战术分类资金偏好 */}
-          <div style={{ marginBottom: 18 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+          <div className="national-team-poster__section">
+            <div className="national-team-poster__section-title">
               <span>🎯</span>
               <span>战术分类资金偏好</span>
             </div>
@@ -363,22 +338,11 @@ export default function NationalTeamReportModal({
                 const isPositive = val > 0;
                 return (
                   <Col span={12} key={catKey}>
-                    <div
-                      style={{
-                        padding: "8px 12px",
-                        background: "var(--c-bg-layout)",
-                        borderRadius: tokens.radius.md,
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                      }}
-                    >
-                      <Text style={{ fontSize: 12 }}>{label}</Text>
+                    <div className="national-team-poster__category-item">
+                      <Text className="u-text-xs">{label}</Text>
                       <span
+                        className="national-team-poster__category-val"
                         style={{
-                          fontWeight: 700,
-                          fontSize: 12,
-                          fontFamily: "var(--c-font-mono)",
                           color: isPositive ? colors.up : val < 0 ? colors.down : colors.textSecondary,
                         }}
                       >
@@ -392,23 +356,15 @@ export default function NationalTeamReportModal({
           </div>
 
           {/* 重点异动与旗舰标的 */}
-          <div style={{ marginBottom: 18 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
-              <ThunderboltOutlined style={{ color: colors.warning }} />
+          <div className="national-team-poster__section">
+            <div className="national-team-poster__section-title">
+              <ThunderboltOutlined className="u-text-warning" />
               <span>重点放量与净流入标的</span>
             </div>
-            <div
-              style={{
-                padding: "10px 14px",
-                background: "var(--c-bg-layout)",
-                borderRadius: tokens.radius.md,
-                fontSize: 12,
-                lineHeight: 1.6,
-              }}
-            >
+            <div className="national-team-poster__box">
               {abnormalEtfs.length > 0 ? (
-                <div style={{ marginBottom: 6 }}>
-                  <Tag color="orange" style={{ fontSize: 10, marginRight: 6 }}>放量异动</Tag>
+                <div className="national-team-poster__box-row">
+                  <Tag color="orange" className="national-team-poster__tag">放量异动</Tag>
                   <span>
                     {abnormalEtfs
                       .map((e) => `${e.name} (${e.code} · 成交 ${e.latest_amount_100m?.toFixed(1)} 亿 · 量比 ${e.volume_ratio}x)`)
@@ -416,13 +372,13 @@ export default function NationalTeamReportModal({
                   </span>
                 </div>
               ) : (
-                <div style={{ color: colors.textSecondary, marginBottom: 6 }}>
+                <div className="national-team-poster__box-row u-text-muted">
                   今日样本池内无突破 1.8x 的异常放量标的，成交处于平稳区间。
                 </div>
               )}
               {topFlowEtfs.length > 0 && (
                 <div>
-                  <Tag color="red" style={{ fontSize: 10, marginRight: 6 }}>净买入领跑</Tag>
+                  <Tag color="red" className="national-team-poster__tag">净买入领跑</Tag>
                   <span>
                     {topFlowEtfs
                       .map((e) => `${e.name} (+${e.latest_estimated_net_flow_100m?.toFixed(2)} 亿元)`)
@@ -435,46 +391,38 @@ export default function NationalTeamReportModal({
 
           {/* 盘中高频与百亿护盘信号（若存在 intraday 数据） */}
           {intraday && (
-            <div style={{ marginBottom: 18 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+            <div className="national-team-poster__section">
+              <div className="national-team-poster__section-title">
                 <span>⏱️</span>
                 <span>盘中高频与百亿放量护盘信号</span>
               </div>
-              <div
-                style={{
-                  padding: "10px 14px",
-                  background: "var(--c-bg-layout)",
-                  borderRadius: tokens.radius.md,
-                  fontSize: 12,
-                  lineHeight: 1.6,
-                }}
-              >
+              <div className="national-team-poster__box">
                 {intradayTop3.length > 0 && (
-                  <div style={{ marginBottom: 6 }}>
-                    <Tag color="blue" style={{ fontSize: 10, marginRight: 6 }}>盘中成交领跑</Tag>
+                  <div className="national-team-poster__box-row">
+                    <Tag color="blue" className="national-team-poster__tag">盘中成交领跑</Tag>
                     <span>
                       {intradayTop3.map((item, i) => (
-                        <span key={item.code} style={{ marginRight: 12 }}>
-                          <strong>No.{i + 1}</strong> {item.name} ({item.code}) · <strong style={{ color: colors.primary }}>{item.amount.toFixed(1)} 亿</strong> ({item.pct > 0 ? "+" : ""}{item.pct.toFixed(2)}%)
+                        <span key={item.code} className="national-team-poster__item-gap">
+                          <strong>No.{i + 1}</strong> {item.name} ({item.code}) · <strong className="u-text-primary">{item.amount.toFixed(1)} 亿</strong> ({item.pct > 0 ? "+" : ""}{item.pct.toFixed(2)}%)
                         </span>
                       ))}
                     </span>
                   </div>
                 )}
                 {intradayMultiple && (
-                  <div style={{ color: colors.textSecondary }}>
-                    <Tag color="volcano" style={{ fontSize: 10, marginRight: 6 }}>护盘倍数标定</Tag>
-                    历史百亿护盘日中枢 <strong>{intradaySupAvgAmt.toFixed(1)} 亿</strong> vs 近期常态 <strong>{intradayRecAvgAmt.toFixed(1)} 亿</strong> (放量达 <strong style={{ color: colors.warning }}>{intradayMultiple}x</strong>)
+                  <div className="u-text-secondary">
+                    <Tag color="gold" className="national-team-poster__tag">护盘倍数标定</Tag>
+                    历史百亿护盘日中枢 <strong>{intradaySupAvgAmt.toFixed(1)} 亿</strong> vs 近期常态 <strong>{intradayRecAvgAmt.toFixed(1)} 亿</strong> (放量达 <strong className="u-text-warning">{intradayMultiple}x</strong>)
                   </div>
                 )}
               </div>
             </div>
           )}
 
-          <Divider style={{ margin: "16px 0 12px 0" }} />
+          <Divider className="national-team-poster__divider" />
 
           {/* 底部规范说明 */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11, color: colors.textSecondary }}>
+          <div className="national-team-poster__footer">
             <div>
               数据口径：申赎估算额 = Δ份额 × 收盘价；二级市场成交额为交易所撮合实际值。
             </div>

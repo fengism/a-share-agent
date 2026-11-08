@@ -1,0 +1,269 @@
+/* 上海金交所历史走势（概览、选择器、图表）
+   自 macro-page.css 第 565–831 行拆出。
+   由同目录 index.css 按固定顺序 @import，顺序不可调整：同特异性规则靠源序决胜负。 */
+/* Shanghai Gold Exchange historical trend */
+.sge-gold {
+  display: grid;
+  gap: var(--c-space-4);
+}
+
+.sge-gold__toolbar {
+  display: flex;
+  padding: 20px 22px;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--c-space-5);
+  border: 1px solid color-mix(in srgb, #d4a017 28%, var(--c-border));
+  border-radius: var(--c-radius-lg);
+  background:
+    radial-gradient(circle at 88% 12%, color-mix(in srgb, #d4a017 16%, transparent), transparent 36%),
+    linear-gradient(135deg, var(--c-card-bg), color-mix(in srgb, #d4a017 6%, var(--c-card-bg)));
+  box-shadow: var(--c-shadow-xs);
+}
+
+.sge-gold__eyebrow {
+  margin-bottom: 4px;
+  color: #b77900;
+  font-size: var(--c-font-xs);
+  font-weight: var(--c-weight-bold);
+  letter-spacing: 0.11em;
+}
+
+.sge-gold__title {
+  margin: 0;
+  color: var(--c-text-primary);
+  font-size: var(--c-font-2xl);
+  line-height: var(--c-leading-tight);
+}
+
+.sge-gold__description {
+  margin: 7px 0 0;
+  color: var(--c-text-secondary);
+  font-size: var(--c-font-sm);
+}
+
+.sge-gold__selector {
+  display: grid;
+  min-width: 220px;
+  gap: 6px;
+  color: var(--c-text-secondary);
+  font-size: var(--c-font-sm);
+  font-weight: var(--c-weight-medium);
+}
+
+.sge-gold__selector select {
+  min-height: 38px;
+  padding: 0 34px 0 12px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius-md);
+  outline: none;
+  background: var(--c-card-bg);
+  color: var(--c-text-primary);
+  font: inherit;
+  font-weight: var(--c-weight-semibold);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.sge-gold__selector select:focus {
+  border-color: var(--c-primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--c-primary) 16%, transparent);
+}
+
+.sge-gold__stale-alert.ant-alert {
+  margin-bottom: var(--c-space-4);
+  border-radius: var(--c-radius-md);
+}
+
+.sge-gold-summary {
+  display: grid;
+  grid-template-columns: minmax(230px, 0.72fr) minmax(0, 1.65fr);
+  gap: var(--c-space-4);
+}
+
+.sge-gold-summary__primary.ant-card,
+.sge-gold-chart.ant-card {
+  overflow: hidden;
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius-lg);
+  background: var(--c-card-bg);
+  box-shadow: var(--c-shadow-xs);
+}
+
+.sge-gold-summary__primary.ant-card {
+  background:
+    linear-gradient(145deg, color-mix(in srgb, #d4a017 9%, var(--c-card-bg)), var(--c-card-bg) 68%);
+}
+
+.sge-gold-summary__primary .ant-card-body {
+  height: 100%;
+  padding: 20px;
+}
+
+.sge-gold-summary__name-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--c-space-3);
+}
+
+.sge-gold-summary__name-row > div {
+  display: grid;
+  gap: 2px;
+}
+
+.sge-gold-summary__name-row strong {
+  color: var(--c-text-primary);
+  font-size: var(--c-font-lg);
+}
+
+.sge-gold-summary__name-row span {
+  color: var(--c-text-muted);
+  font-size: var(--c-font-sm);
+}
+
+.sge-gold-summary__price {
+  margin-top: 24px;
+  color: var(--c-text-primary);
+  font-size: 34px;
+  font-weight: var(--c-weight-bold);
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+
+.sge-gold-summary__change {
+  display: flex;
+  margin-top: 11px;
+  gap: var(--c-space-3);
+  color: var(--c-text-secondary);
+  font-size: var(--c-font-md);
+  font-weight: var(--c-weight-semibold);
+}
+
+.sge-gold-summary__value--up {
+  color: var(--c-up);
+}
+
+.sge-gold-summary__value--down {
+  color: var(--c-down);
+}
+
+.sge-gold-summary__metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--c-space-3);
+}
+
+.sge-gold-summary__metric {
+  display: grid;
+  min-height: 92px;
+  padding: 16px;
+  align-content: center;
+  gap: 7px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius-md);
+  background: color-mix(in srgb, var(--c-nested-bg) 72%, transparent);
+}
+
+.sge-gold-summary__metric span {
+  color: var(--c-text-muted);
+  font-size: var(--c-font-sm);
+}
+
+.sge-gold-summary__metric strong {
+  overflow: hidden;
+  color: var(--c-text-primary);
+  font-size: var(--c-font-md);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sge-gold-chart.ant-card {
+  margin-top: var(--c-space-4);
+}
+
+.sge-gold-chart .ant-card-body {
+  padding: 20px 22px 14px;
+}
+
+.sge-gold-chart__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--c-space-4);
+}
+
+.sge-gold-chart__header h3 {
+  margin: 0;
+  color: var(--c-text-primary);
+  font-size: var(--c-font-lg);
+}
+
+.sge-gold-chart__header span {
+  color: var(--c-text-muted);
+  font-size: var(--c-font-sm);
+}
+
+.sge-gold-chart__canvas {
+  height: 430px !important;
+  margin-top: var(--c-space-3);
+}
+
+.sge-gold-chart__footer {
+  display: flex;
+  padding-top: 9px;
+  justify-content: space-between;
+  gap: var(--c-space-3);
+  border-top: 1px solid var(--c-border);
+  color: var(--c-text-muted);
+  font-size: var(--c-font-xs);
+}
+
+@media (max-width: 767px) {
+  .sge-gold__toolbar {
+    padding: 17px;
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .sge-gold__selector {
+    min-width: 0;
+  }
+
+  .sge-gold-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .sge-gold-chart .ant-card-body {
+    padding: 16px 12px 12px;
+  }
+
+  .sge-gold-chart__header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .sge-gold-chart__canvas {
+    height: 350px !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .sge-gold-summary__metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .sge-gold-chart__header .ant-radio-group {
+    display: flex;
+    width: 100%;
+  }
+
+  .sge-gold-chart__header .ant-radio-button-wrapper {
+    padding-inline: 9px;
+    flex: 1;
+    text-align: center;
+  }
+
+  .sge-gold-chart__footer {
+    flex-direction: column;
+  }
+}

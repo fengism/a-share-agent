@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./base";
 
 const user = {
   id: 7,
@@ -453,7 +453,22 @@ for (const width of [1920, 390]) {
     const weeklyRequestCount = () =>
       requests.filter((url) => url.includes("/kline?") && url.includes("period=weekly")).length;
     await expect.poll(weeklyRequestCount, { timeout: 10_000 }).toBeGreaterThan(0);
+    // 周 K 会按不同回溯窗口连发 1~2 次请求（例如 start_date 为 1 年前 / 2 年前），
+    // 两者先后取决于两个 effect 的竞态，实测在每次运行中都不一样。所以必须先等
+    // 「请求数不再增长」再取基线，否则会把第二次请求误判成无界增长。
+    await expect
+      .poll(
+        async () => {
+          const before = weeklyRequestCount();
+          await page.waitForTimeout(400);
+          return weeklyRequestCount() === before ? before : 0;
+        },
+        { timeout: 15_000, intervals: [400] },
+      )
+      .toBeGreaterThan(0);
     const settled = await weeklyRequestCount();
+    // 目的是防无界回溯循环（曾观测到同一周期被打 10 次），有限次不算失败。
+    expect(settled).toBeLessThanOrEqual(4);
     await page.waitForTimeout(1_500);
     expect(weeklyRequestCount()).toBe(settled);
     await expect(page.locator("#stock-charts canvas").first()).toBeAttached();

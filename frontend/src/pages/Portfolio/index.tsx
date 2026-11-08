@@ -5,7 +5,6 @@ import { usePortfolio } from "../../api/queries";
 import DataRefreshIndicator from "../../components/DataRefreshIndicator";
 import PageShell, { PageHeader } from "../../components/page/PageShell";
 import QueryErrorState from "../../components/QueryErrorState";
-import { useStyles } from "../../styles/ui";
 import PortfolioSummaryCards from "./PortfolioSummaryCards";
 import PortfolioTables from "./PortfolioTables";
 import PortfolioTradeKline from "./PortfolioTradeKline";
@@ -16,14 +15,14 @@ import PortfolioSettingsCard from "./PortfolioSettingsCard";
 import TransactionEntryCard, { type TransactionEntryCardHandle } from "./TransactionEntryCard";
 import type { PortfolioStockSummary, PortfolioTrimSuggestion } from "../../types/portfolio";
 import { errorMessage, formatTime } from "./portfolioFormatters";
-import "./portfolio.css";
+import "./portfolio-summary.css";
+import "./portfolio-hero.css";
 
 export default function PortfolioPage() {
   const transactionEntryRef = useRef<TransactionEntryCardHandle>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isTransactionDrawerOpen, setIsTransactionDrawerOpen] = useState(false);
   const [klineStockCode, setKlineStockCode] = useState<string | undefined>(undefined);
-  const { cardStyle } = useStyles();
 
   const {
     data,
@@ -104,7 +103,7 @@ export default function PortfolioPage() {
       />
 
       {isError && !data ? (
-        <Card style={{ ...cardStyle, marginBottom: 16 }}>
+        <Card className="u-card" style={{ marginBottom: 16 }}>
           <QueryErrorState error={error} onRetry={() => refetch()} title="持仓数据加载失败" />
         </Card>
       ) : null}
@@ -120,7 +119,7 @@ export default function PortfolioPage() {
       ) : null}
 
       {isLoading ? (
-        <Card style={{ ...cardStyle, marginBottom: 16 }}>
+        <Card className="u-card" style={{ marginBottom: 16 }}>
           <Skeleton active paragraph={{ rows: 3 }} />
         </Card>
       ) : data ? (

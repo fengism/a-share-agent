@@ -2,7 +2,7 @@ import { lazy, Suspense } from "react";
 import { Card, Skeleton } from "antd";
 import { Navigate, useSearchParams } from "react-router-dom";
 import { buildStockValuationUrl } from "../../features/investment-research/analysisHistoryUrl";
-import { useColors, useStyles } from "../../theme/hooks";
+import { useColors } from "../../theme/hooks";
 import type { AnalysisResult, FundamentalExportData } from "../../types/stock";
 import FundamentalPanel from "./FundamentalPanel";
 import { loadValuationPanel } from "./analysisPanelLoaders";
@@ -30,7 +30,6 @@ export default function AnalysisPanels({
 }) {
   const [searchParams] = useSearchParams();
   const colors = useColors();
-  const { cardStyle } = useStyles();
   const exportItems = [
     {
       key: "fundamental",
@@ -56,8 +55,7 @@ export default function AnalysisPanels({
   return (
     <Card
       size="small"
-      className="analysis-export-panels stock-research-report"
-      style={{ ...cardStyle, borderTop: `3px solid ${colors.primary}` }}
+      className="analysis-export-panels stock-research-report u-card" style={{ borderTop: `3px solid ${colors.primary}` }}
       styles={{ body: { padding: "10px 16px 14px", background: colors.nestedBg, borderRadius: 8 } }}
     >
       {exportItems.map((item) => (

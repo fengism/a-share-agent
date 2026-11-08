@@ -17,7 +17,7 @@ export default function AnalysisEntry() {
 
   const colors = useColors();
   const t = useTokens();
-  const { pageContainerStyle, cardStyle } = useStyles();
+  const { pageContainerStyle } = useStyles();
 
   if (codeParam) {
     return <Navigate to={buildStockAnalysisUrl(codeParam)} replace />;
@@ -47,7 +47,7 @@ export default function AnalysisEntry() {
             </Paragraph>
           </div>
           <Card
-            style={{ ...cardStyle, padding: `${t.space[2]} 0`, width: "100%", maxWidth: 560 }}
+            className="u-card" style={{ padding: `${t.space[2]} 0`, width: "100%", maxWidth: 560 }}
             styles={{ body: { padding: `${t.space[6]} ${t.space[6]} ${t.space[4]}`, display: "flex", justifyContent: "center" } }}
           >
             {/* 个股入口默认带用户去个股资料页（/stock/:code）；AI 分析（/analysis/:code）

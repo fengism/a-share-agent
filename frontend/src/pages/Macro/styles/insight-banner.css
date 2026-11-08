@@ -1,0 +1,66 @@
+/* 分类工具条、区段分隔线、洞察横幅
+   自 macro-page.css 第 501–564 行拆出。
+   由同目录 index.css 按固定顺序 @import，顺序不可调整：同特异性规则靠源序决胜负。 */
+/* Macro Insight Banner & Section Dividers */
+.macro-category-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--c-space-4);
+  flex-wrap: wrap;
+  gap: var(--c-space-3);
+}
+
+.macro-section-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: var(--c-space-5) 0 var(--c-space-3);
+  color: var(--c-text-secondary);
+  font-size: var(--c-font-sm);
+  font-weight: var(--c-weight-bold);
+}
+
+.macro-section-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--c-border);
+  opacity: 0.7;
+}
+
+.macro-insight-banner {
+  margin-bottom: var(--c-space-4);
+  padding: 14px 18px;
+  background:
+    radial-gradient(circle at 98% 10%, color-mix(in srgb, var(--c-primary) 10%, transparent), transparent 50%),
+    linear-gradient(135deg, color-mix(in srgb, var(--c-primary) 6%, var(--c-card-bg)), var(--c-card-bg));
+  border: 1px solid color-mix(in srgb, var(--c-primary) 25%, var(--c-border));
+  border-left: 4px solid var(--c-primary);
+  border-radius: var(--c-radius-md, 8px);
+  font-size: var(--c-font-sm);
+  line-height: var(--c-leading-relaxed);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.macro-insight-banner__title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: var(--c-font-base, 14px);
+  font-weight: var(--c-weight-bold);
+  color: var(--c-text-primary);
+}
+
+.macro-insight-banner__body {
+  color: var(--c-text-secondary);
+}
+
+.macro-insight-banner__body strong {
+  color: var(--c-text-primary);
+  font-family: var(--c-font-mono);
+  font-weight: 600;
+}

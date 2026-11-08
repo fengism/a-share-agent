@@ -1,0 +1,227 @@
+/* 个股速览快报长图卡片 (Stock Snapshot Modal) */
+.stock-snapshot__modal-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stock-snapshot__modal-icon {
+  color: var(--c-primary);
+}
+
+.stock-snapshot__scroll {
+  max-height: 68vh;
+  overflow-y: auto;
+  padding: 8px 4px;
+}
+
+.stock-snapshot__card {
+  background: var(--c-card-bg);
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius-lg, 12px);
+  padding: var(--c-pad-card, 16px 18px);
+  box-shadow: var(--c-shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.05));
+  color: var(--c-text-primary);
+  font-family: var(--c-font-sans);
+}
+
+.stock-snapshot__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--c-border);
+  padding-bottom: 14px;
+  margin-bottom: 18px;
+}
+
+.stock-snapshot__brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stock-snapshot__brand-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, var(--c-primary), var(--c-up));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 16px;
+}
+
+.stock-snapshot__brand-text {
+  font-weight: var(--c-weight-bold);
+  font-size: 15px;
+  letter-spacing: 0.5px;
+}
+
+.stock-snapshot__timestamp.ant-typography {
+  font-size: 12px;
+  color: var(--c-text-secondary);
+}
+
+.stock-snapshot__identity-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+
+.stock-snapshot__name-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.stock-snapshot__market-icon {
+  color: var(--c-primary);
+  font-size: 18px;
+}
+
+.stock-snapshot__title.ant-typography {
+  margin: 0;
+  font-weight: var(--c-weight-bold);
+}
+
+.stock-snapshot__code-tag.ant-tag {
+  font-family: var(--c-font-mono);
+  font-size: 14px;
+  margin: 0;
+}
+
+.stock-snapshot__english-name.ant-typography {
+  font-size: 12px;
+}
+
+.stock-snapshot__tags-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.stock-snapshot__price-col {
+  text-align: right;
+}
+
+.stock-snapshot__price {
+  font-size: 28px;
+  font-weight: var(--c-weight-bold);
+  font-family: var(--c-font-mono);
+  line-height: 1.1;
+}
+
+.stock-snapshot__change-row {
+  font-size: 13px;
+  margin-top: 4px;
+  font-family: var(--c-font-mono);
+}
+
+.stock-snapshot__tape-grid {
+  background: var(--c-hover-bg, var(--c-bg-layout));
+  border-radius: 8px;
+  padding: var(--c-pad-inset, 7px 12px);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+  gap: 8px;
+  font-size: 12px;
+  margin-bottom: 16px;
+}
+
+.stock-snapshot__tape-label {
+  color: var(--c-text-secondary);
+}
+
+.stock-snapshot__tape-val {
+  font-family: var(--c-font-mono);
+}
+
+.stock-snapshot__range-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--c-pad-inset, 7px 12px);
+  background: var(--c-hover-bg, var(--c-bg-layout));
+  border-radius: 8px;
+  font-size: 12px;
+  margin-bottom: 16px;
+}
+
+.stock-snapshot__range-middle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  max-width: 280px;
+  margin: 0 14px;
+}
+
+.stock-snapshot__range-val {
+  font-family: var(--c-font-mono);
+  font-size: 11px;
+  color: var(--c-text-secondary);
+}
+
+.stock-snapshot__range-track {
+  flex: 1;
+  height: 6px;
+  background: var(--c-border);
+  border-radius: 3px;
+  position: relative;
+  overflow: hidden;
+}
+
+.stock-snapshot__range-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: var(--c-primary);
+  border-radius: 3px;
+}
+
+.stock-snapshot__range-percent {
+  color: var(--c-primary);
+  font-weight: var(--c-weight-semibold);
+  font-size: 12px;
+}
+
+.stock-snapshot__metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.stock-snapshot__metric-card {
+  padding: var(--c-pad-inset, 7px 12px);
+  background: var(--c-hover-bg, var(--c-bg-layout));
+  border-radius: 6px;
+  text-align: center;
+}
+
+.stock-snapshot__metric-label {
+  font-size: 11px;
+  color: var(--c-text-secondary);
+}
+
+.stock-snapshot__metric-val {
+  font-size: 13px;
+  font-weight: 600;
+  margin-top: 2px;
+  font-family: var(--c-font-mono);
+}
+
+.stock-snapshot__footer {
+  border-top: 1px dashed var(--c-border);
+  padding-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--c-text-muted);
+}

@@ -27,7 +27,7 @@ npm run dev        # 启动开发服务器(默认 5173)
 ```bash
 npm run build      # tsc -b 类型检查 + vite 生产构建,产物在 dist/
 npm run preview    # 本地预览生产构建
-npm run lint       # ESLint 检查
+npm run lint       # ESLint + 页面边界 + 时区 + 样式卫生 + 色彩纪律门禁
 ```
 
 ## 目录结构
@@ -41,7 +41,7 @@ src/
                #   Screener/Chat/DailyReview/Analysis/IndustryChain/Settings
   store/       # Zustand store(分析、对话)
   theme/       # 主题定义与 hooks(4 套主题,支持切换,持久化)
-  styles/      # 全局基础样式、Markdown、导出样式
+  styles/      # 全局基础样式(styles/base/ 下按关注点分片)、Markdown、导出样式
   types/       # 领域类型定义
   utils/       # 格式化、日期、字段标签等工具
 ```

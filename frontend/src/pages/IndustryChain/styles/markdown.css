@@ -1,0 +1,152 @@
+/* 报告 Markdown 排版
+   自 industry-report.css 第 1350–1498 行拆出。
+   由同目录 index.css 按固定顺序 @import，顺序不可调整：同特异性规则靠源序决胜负。 */
+@media (max-width: 480px) {
+  .industry-report__title,
+  .industry-report__title.ant-typography {
+    font-size: 16px;
+  }
+
+  .industry-conclusion__header h2 {
+    font-size: 15px;
+  }
+
+  .industry-conclusion__metrics strong {
+    font-size: 14.5px;
+  }
+
+  .industry-chain-tier {
+    padding: 8px 10px;
+  }
+
+  .industry-report__actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.industry-markdown {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--c-text-secondary);
+  font-size: var(--c-font-base);
+  line-height: var(--c-leading-relaxed);
+  overflow-wrap: anywhere;
+}
+
+.industry-markdown :where(h1, h2, h3, p, li, blockquote, a) {
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.industry-markdown h1,
+.industry-markdown h2,
+.industry-markdown h3 {
+  color: var(--c-text-primary);
+  line-height: var(--c-leading-normal);
+}
+
+.industry-markdown h1 {
+  margin: 0 0 16px;
+  font-size: var(--c-font-2xl);
+}
+
+.industry-markdown h2 {
+  margin: 26px 0 12px;
+  padding-bottom: 7px;
+  border-bottom: 1px solid var(--c-border);
+  font-size: var(--c-font-xl);
+}
+
+.industry-markdown h3 {
+  margin: 20px 0 8px;
+  font-size: var(--c-font-lg);
+}
+
+.industry-markdown p,
+.industry-markdown ul,
+.industry-markdown ol,
+.industry-markdown blockquote {
+  margin: 8px 0 12px;
+}
+
+.industry-markdown ul,
+.industry-markdown ol {
+  padding-left: 22px;
+}
+
+.industry-markdown li {
+  margin: 5px 0;
+}
+
+.industry-markdown blockquote {
+  padding: 10px 14px;
+  border-left: 3px solid var(--c-primary);
+  border-radius: 0 8px 8px 0;
+  background: var(--c-elevated-bg);
+}
+
+.industry-markdown a {
+  color: var(--c-primary);
+}
+
+.industry-markdown hr {
+  margin: 16px 0;
+  border: 0;
+  border-top: 1px solid var(--c-border);
+}
+
+.industry-markdown-table-wrap {
+  width: 100%;
+  max-width: 100%;
+  margin: 12px 0 18px;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+
+.industry-markdown-table-wrap table {
+  width: max-content;
+  min-width: 100%;
+  max-width: none;
+  border-spacing: 0;
+  border-collapse: collapse;
+}
+
+.industry-markdown th,
+.industry-markdown td {
+  min-width: 120px;
+  max-width: 360px;
+  padding: 9px 12px;
+  border: 1px solid var(--c-border);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  text-align: left;
+  vertical-align: top;
+}
+
+.industry-markdown th {
+  color: var(--c-text-primary);
+  background: var(--c-elevated-bg);
+  font-weight: var(--c-weight-semibold);
+}
+
+.industry-markdown code {
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: var(--c-elevated-bg);
+  color: var(--c-text-primary);
+  font-family: var(--c-font-mono);
+  font-size: var(--c-font-sm);
+}
+
+.industry-markdown pre {
+  padding: 12px 16px;
+  overflow-x: auto;
+  border: 1px solid var(--c-border);
+  border-radius: 8px;
+  background: var(--c-elevated-bg);
+}

@@ -6,7 +6,7 @@ import zhCN from "antd/locale/zh_CN";
 import { useThemeStore, tokensToCssVars } from "./styles/ui";
 import { themes } from "./theme/themes";
 import { APP_FONT_FAMILY, APP_MONO_FONT_FAMILY } from "./theme/typography";
-import "./styles/base.css";
+import "./styles/base/index.css";
 import "./styles/markdown.css";
 import "./styles/analysis-export.css";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -67,6 +67,7 @@ function AntProvider({ children }: { children: React.ReactNode }) {
       "--boot-bg": cc.pageBg,
       "--boot-fg": cc.textPrimary,
       "--c-page-bg": cc.pageBg,
+      "--c-bg-layout": cc.pageBg,
       "--c-card-bg": cc.cardBg,
       "--c-elevated-bg": cc.elevatedBg,
       "--c-nested-bg": cc.nestedBg,
@@ -77,6 +78,8 @@ function AntProvider({ children }: { children: React.ReactNode }) {
       "--c-accent": cc.accent,
       "--c-up": cc.up,
       "--c-down": cc.down,
+      "--c-up-bg": cc.upBg,
+      "--c-down-bg": cc.downBg,
       "--c-text-primary": cc.textPrimary,
       "--c-text-secondary": cc.textSecondary,
       "--c-text-muted": cc.textMuted,
@@ -90,6 +93,17 @@ function AntProvider({ children }: { children: React.ReactNode }) {
       "--c-card-shadow": cc.cardShadow,
       "--c-hover-bg": cc.hoverBg,
       "--c-active-bg": cc.activeBg,
+      // 语义填充/边框：此前多处写了这些变量名但从未定义，只能停在硬编码 fallback 上。
+      // 统一接到主题色，保证亮/暗主题一致；透明度后缀沿用既有 `${color}14` 约定。
+      "--c-primary-bg": `${cc.primary}1a`,
+      "--c-primary-light": `${cc.primary}1a`,
+      "--c-warning-bg": `${cc.warning}1a`,
+      "--c-selected-bg": `${cc.primary}0d`,
+      "--c-danger": meta.antToken.colorError,
+      "--c-fill-quaternary": cc.hoverBg,
+      "--c-surface-subtle": cc.hoverBg,
+      "--c-border-light": cc.border,
+      "--c-logo-gradient": `linear-gradient(135deg, ${cc.primary}, ${cc.accent})`,
       "--c-primary-soft": `${cc.primary}14`,
       "--c-primary-2": `${cc.primary}26`,
       "--c-primary-3": `${cc.primary}4d`,
@@ -126,6 +140,10 @@ function AntProvider({ children }: { children: React.ReactNode }) {
           borderColor: meta.colors.border,
           rowHoverBg: meta.colors.hoverBg,
           headerSplitColor: "transparent",
+          // 与全局表头「同色带」保持一致：排序态/悬停态不再用 antd 的灰阶，
+          // 否则去掉 reset.css 表头 !important 后排序列表头会变成 #2E333D。
+          headerSortActiveBg: meta.colors.nestedBg,
+          headerSortHoverBg: meta.colors.nestedBg,
         },
         // Keep antd Card elevation aligned with the design-token shadow so
         // Cards, `.u-card` and inline cardStyle share one shadow scale.

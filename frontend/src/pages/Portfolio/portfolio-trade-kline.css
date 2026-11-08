@@ -1,0 +1,183 @@
+/* 投资组合个股实际买卖点 K 线样式 */
+
+.portfolio-trade-select--desktop {
+  min-width: 210px;
+}
+
+.portfolio-trade-select--mobile {
+  flex: 1 1 140px;
+  min-width: 130px;
+}
+
+.portfolio-trade-kline-card {
+  margin-bottom: var(--c-space-4);
+}
+
+.portfolio-trade-kline__mobile-head-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.portfolio-trade-kline__mobile-title {
+  font-weight: 600;
+  font-size: var(--c-font-base);
+}
+
+.portfolio-trade-kline__mobile-zoom-btn.ant-btn {
+  padding: 0 8px;
+  height: 24px;
+  font-size: var(--c-font-sm);
+}
+
+.portfolio-trade-kline__mobile-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.portfolio-trade-kline__loading-wrap {
+  min-height: 280px;
+  display: grid;
+  place-items: center;
+}
+
+.portfolio-trade-snapshot-ribbon {
+  background: var(--c-nested-bg);
+  border-radius: var(--c-radius-md, 8px);
+  padding: var(--c-pad-inset, 7px 12px);
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  border: 1px solid var(--c-border);
+}
+
+.portfolio-trade-ribbon__label {
+  font-size: 11px;
+  color: var(--c-text-muted);
+}
+
+.portfolio-trade-ribbon__val {
+  font-size: 13px;
+}
+
+.portfolio-trade-ribbon__val-semibold {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.portfolio-trade-ribbon__val-bold {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.portfolio-trade-ribbon__sub--warning {
+  font-size: 11px;
+  color: var(--c-warning);
+  margin-left: 4px;
+}
+
+.portfolio-trade-ribbon__change-pct {
+  margin-left: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.portfolio-trade-ribbon__link-btn.ant-btn {
+  padding: 0 4px;
+  font-size: 12px;
+}
+
+.portfolio-trade-kline__alert {
+  margin-top: 12px;
+}
+
+.portfolio-trade-kline__detail-section {
+  margin-top: 14px;
+}
+
+.portfolio-trade-kline__detail-title {
+  font-size: var(--c-font-sm);
+}
+
+.portfolio-trade-kline__tag-list {
+  margin-top: 8px;
+}
+
+.portfolio-trade-tx-tag.ant-tag {
+  margin-inline-end: 0;
+  padding: 4px 8px;
+  white-space: normal;
+  font-size: var(--c-font-sm);
+}
+
+.portfolio-trade-tx-tag--modal.ant-tag {
+  padding: 3px 8px;
+}
+
+.portfolio-trade-tx-tag--buy.ant-tag {
+  color: var(--c-up);
+  background: var(--c-up-bg, rgba(239, 68, 68, 0.1));
+  border-color: rgba(239, 68, 68, 0.25);
+}
+
+.portfolio-trade-tx-tag--sell.ant-tag {
+  color: var(--c-down);
+  background: var(--c-down-bg, rgba(34, 197, 94, 0.1));
+  border-color: rgba(34, 197, 94, 0.25);
+}
+
+.portfolio-trade-modal__title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.portfolio-trade-modal__title-text {
+  font-weight: 600;
+}
+
+.portfolio-trade-tag--buy.ant-tag {
+  color: var(--c-up);
+  background: var(--c-up-bg, rgba(239, 68, 68, 0.1));
+  border-color: rgba(239, 68, 68, 0.25);
+}
+
+.portfolio-trade-tag--sell.ant-tag {
+  color: var(--c-down);
+  background: var(--c-down-bg, rgba(34, 197, 94, 0.1));
+  border-color: rgba(34, 197, 94, 0.25);
+}
+
+.portfolio-trade-modal.ant-modal {
+  top: 20px;
+}
+
+.portfolio-trade-modal .ant-modal-body {
+  padding: 8px 4px 12px;
+}
+
+.portfolio-trade-modal__detail-wrap {
+  margin-top: 12px;
+  padding: 0 8px;
+}
+
+.portfolio-trade-modal__detail-title {
+  display: block;
+  margin-bottom: 6px;
+  font-size: var(--c-font-sm);
+}
+
+.portfolio-trade-modal__tags-scroll {
+  max-height: 180px;
+  overflow-y: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+}

@@ -2,7 +2,6 @@ import { useEffect, useState, type ReactNode } from "react";
 import { HistoryOutlined } from "@ant-design/icons";
 import { Button, Card, Col, Drawer, Row } from "antd";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
-import { useStyles } from "../../styles/ui";
 
 interface WorkflowWorkspaceProps {
   children: ReactNode;
@@ -19,7 +18,6 @@ export default function WorkflowWorkspace({
   historyButtonLabel = "查看历史",
   historyVersion,
 }: WorkflowWorkspaceProps) {
-  const { cardStyle } = useStyles();
   const isCompact = useMediaQuery("(max-width: 991px)");
   const [historyOpen, setHistoryOpen] = useState(false);
 
@@ -51,7 +49,7 @@ export default function WorkflowWorkspace({
             <div style={{ position: "sticky", top: 24 }}>
               <Card
                 title={historyTitle}
-                style={cardStyle}
+                className="u-card"
                 styles={{ body: { maxHeight: "calc(100vh - 180px)", overflowY: "auto" } }}
               >
                 {history}

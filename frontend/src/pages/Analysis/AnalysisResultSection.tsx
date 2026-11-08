@@ -2,7 +2,7 @@ import { lazy, Suspense } from "react";
 import { Card, Skeleton, Tabs } from "antd";
 import { Link } from "react-router-dom";
 import { buildStockProfileUrl } from "../../utils/stockLinks";
-import { useColors, useStyles } from "../../theme/hooks";
+import { useColors } from "../../theme/hooks";
 import type { AnalysisResult } from "../../types/stock";
 import { formatAnalysisDate } from "../../features/investment-research/analysisHistoryUrl";
 import AnalysisReportVersions from "../../features/investment-research/AnalysisReportVersions";
@@ -22,7 +22,6 @@ export default function AnalysisResultSection({
   onOpenValuation?: () => void;
 }) {
   const colors = useColors();
-  const { cardStyle } = useStyles();
   if (!result) return null;
 
   const content = (
@@ -55,8 +54,7 @@ export default function AnalysisResultSection({
   return (
     <section id="analysis-result" tabIndex={-1} className="analysis-workspace__result" aria-label="个股分析结果">
       <Card
-        className="analysis-result-card stock-research-report"
-        style={{ ...cardStyle, borderTop: `3px solid ${colors.primary}` }}
+        className="analysis-result-card stock-research-report u-card" style={{ borderTop: `3px solid ${colors.primary}` }}
         styles={{ body: { padding: "10px 16px 14px", background: colors.nestedBg, borderRadius: 8 } }}
       >
         {isExportingPdf ? (

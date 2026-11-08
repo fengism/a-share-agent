@@ -13546,6 +13546,8 @@ export interface components {
             market_regime?: "bull" | "bear" | "neutral";
             /** Median Change Pct */
             median_change_pct?: number | null;
+            /** Top Picks */
+            top_picks?: components["schemas"]["PotentialStockItem"][];
             /**
              * Universe Size
              * @default 0
@@ -13611,6 +13613,18 @@ export interface components {
             median_return_pct?: number | null;
             /** Message */
             message?: string | null;
+            /**
+             * Negative Count
+             * @default 0
+             */
+            negative_count?: number;
+            /**
+             * Positive Count
+             * @default 0
+             */
+            positive_count?: number;
+            /** Profit Loss Ratio */
+            profit_loss_ratio?: number | null;
             /** Win Rate */
             win_rate?: number | null;
         };
@@ -13645,6 +13659,16 @@ export interface components {
         PotentialStockItem: {
             /** Amount */
             amount?: number | null;
+            /**
+             * Category
+             * @default pioneer
+             */
+            category?: string;
+            /**
+             * Category Label
+             * @default 趋势先锋
+             */
+            category_label?: string;
             /** Change Pct */
             change_pct?: number | null;
             /** Code */

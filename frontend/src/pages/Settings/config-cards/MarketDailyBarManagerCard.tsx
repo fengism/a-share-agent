@@ -55,7 +55,7 @@ import type {
 import { summarizeRefreshResult } from "../marketDailyRefreshSummary";
 import { formatMarketDateTime } from "../../../utils/marketTime";
 import type { ConfigSectionProps } from "../sectionTypes";
-import "./market-daily-bar-manager.css";
+import "./market-daily-bar-manager/index.css";
 
 const segmentOptions: Array<{ label: string; value: MarketDailySegment }> = [
   { label: "A股个股", value: "cn_stock" },
@@ -645,7 +645,7 @@ export default function MarketDailyBarManagerCard({ form, onChange, onSave, isSa
                   <div className="market-daily-history__day-header">
                     <Space size={8} wrap>
                       <strong>{group.date}</strong>
-                      {hasFailed ? <Tag color="error">存在失败</Tag> : isRunning ? <Tag color="processing">同步中</Tag> : allSuccess ? <Tag color="success">全部完成</Tag> : null}
+                      {hasFailed ? <Tag color="warning">存在失败</Tag> : isRunning ? <Tag color="processing">同步中</Tag> : allSuccess ? <Tag color="blue">全部完成</Tag> : null}
                       {group.date === selectedDate ? <Tag color="blue">当前操作日期</Tag> : null}
                     </Space>
                     {group.date !== selectedDate ? (

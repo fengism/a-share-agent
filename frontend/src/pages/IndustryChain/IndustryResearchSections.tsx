@@ -4,7 +4,6 @@ import { useNavigate } from "react-router-dom";
 import { Col, Row, Segmented, Table, Tag, Typography } from "antd";
 import type { TableProps } from "antd";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
-import { useColors } from "../../styles/ui";
 import LazyIndustryChart from "./LazyIndustryChart";
 import type {
   IndustryChainCompetitionGroup,
@@ -46,8 +45,8 @@ function ResearchBlock({
 }) {
   return (
     <section className={`industry-research-block ${className}`.trim()}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
-        <h3 className="industry-research-block__title" style={{ margin: 0 }}>{title}</h3>
+      <div className="industry-block-head">
+        <h3 className="industry-research-block__title">{title}</h3>
         {extra && <div>{extra}</div>}
       </div>
       <div className="industry-research-block__body">{children}</div>
@@ -92,9 +91,9 @@ function nodeName(node: IndustryChainNode): string {
 function SourceLabel({ source, url }: { source?: string; url?: string }) {
   const safeUrl = safeExternalUrl(url);
   if (!source && !safeUrl) return null;
-  if (!safeUrl) return <Text className="industry-source-label" type="secondary" style={{ fontSize: "var(--c-font-xs)" }}>来源：{source}</Text>;
+  if (!safeUrl) return <Text className="industry-source-label" type="secondary">来源：{source}</Text>;
   return (
-    <a className="industry-source-label" href={safeUrl} target="_blank" rel="noreferrer" style={{ fontSize: "var(--c-font-xs)" }}>
+    <a className="industry-source-label" href={safeUrl} target="_blank" rel="noreferrer">
       来源：{source || "查看原文"}
     </a>
   );
@@ -103,8 +102,8 @@ function SourceLabel({ source, url }: { source?: string; url?: string }) {
 function EvidenceTags({ ids }: { ids?: string[] }) {
   if (!ids?.length) return null;
   return (
-    <div className="industry-wrap-tag-list" style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
-      <Tag className="industry-wrap-tag" style={{ margin: 0, fontSize: "var(--c-font-xs)" }}>关联 {new Set(ids).size} 项资料</Tag>
+    <div className="industry-wrap-tag-list industry-wrap-tag-list--spaced">
+      <Tag className="industry-wrap-tag u-text-xs">关联 {new Set(ids).size} 项资料</Tag>
     </div>
   );
 }
@@ -180,15 +179,14 @@ function ChainNodeCard({ node, framed = false }: { node: IndustryChainNode; fram
 
   return (
     <div className={`industry-chain-node${framed ? " is-framed" : ""}`}>
-      <div className="industry-chain-node__heading" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
-        <Text className="industry-chain-node__name" strong style={{ minWidth: 0, overflowWrap: "anywhere", fontSize: "var(--c-font-base)" }}>
+      <div className="industry-chain-node__heading">
+        <Text className="industry-chain-node__name" strong>
           {nodeName(node)}
         </Text>
         {node.code && (
           <Tag
-            className="industry-nowrap-tag"
+            className="industry-nowrap-tag industry-chain-node__code-tag"
             color={node.code.length === 5 ? "processing" : "cyan"}
-            style={{ margin: 0, flexShrink: 0, cursor: "pointer" }}
             onClick={() => navigate(buildStockProfileUrl(node.code!))}
           >
             {node.code} {node.code.length === 5 ? "港股 ↗" : "↗"}
@@ -196,31 +194,24 @@ function ChainNodeCard({ node, framed = false }: { node: IndustryChainNode; fram
         )}
       </div>
       {node.role && (
-        <div className="industry-chain-node__tag-list" style={{ marginTop: 4 }}>
-          <Tag className="industry-chain-node__tag" color="blue" style={{ fontSize: "var(--c-font-xs)" }}>
+        <div className="industry-chain-node__tag-list">
+          <Tag className="industry-chain-node__tag u-text-xs" color="blue">
             {node.role}
           </Tag>
         </div>
       )}
       {node.description && (
-        <Paragraph type="secondary" style={{ margin: "6px 0 0", fontSize: "var(--c-font-sm)", lineHeight: "var(--c-leading-normal)" }}>
+        <Paragraph type="secondary" className="u-note--spaced">
           {node.description}
         </Paragraph>
       )}
       {node.companies && node.companies.length > 0 && (
-        <div className="industry-chain-node__tag-list" style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+        <div className="industry-chain-node__tag-list industry-chain-node__tag-list--inline">
           {node.companies.map((company) => (
             <Tag
               key={company}
-              className="industry-chain-node__tag"
+              className="industry-chain-node__tag industry-chain-node__company"
               color="geekblue"
-              style={{
-                margin: 0,
-                cursor: "pointer",
-                borderRadius: 4,
-                fontSize: "var(--c-font-xs)",
-                transition: "all 0.2s",
-              }}
               onClick={() => handleCompanyClick(company, node.code)}
               title={`点击查看 ${company} 深度个股分析`}
             >
@@ -230,8 +221,8 @@ function ChainNodeCard({ node, framed = false }: { node: IndustryChainNode; fram
         </div>
       )}
       {(node.market_share || node.metric || node.gross_margin) && (
-        <div className="industry-chain-node__tag-list" style={{ marginTop: 6 }}>
-          <Tag className="industry-chain-node__tag industry-chain-node__metric" color="gold" style={{ fontSize: "var(--c-font-xs)" }}>
+        <div className="industry-chain-node__tag-list industry-wrap-tag-list--spaced">
+          <Tag className="industry-chain-node__tag industry-chain-node__metric u-text-xs" color="gold">
             {[node.market_share, node.metric, node.gross_margin ? `毛利: ${node.gross_margin}` : ""].filter(Boolean).join(" · ")}
           </Tag>
         </div>
@@ -255,42 +246,41 @@ function ChainTier({
 }) {
   return (
     <div className="industry-chain-tier" style={{ borderLeftColor: accent, background: `linear-gradient(180deg, ${accent}08, transparent 40%)` }}>
-      <div className="industry-chain-tier__heading" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-        <Text className="industry-chain-tier__label" style={{ color: accent, fontSize: "var(--c-font-xs)", fontWeight: "var(--c-weight-bold)", letterSpacing: "0.08em" }}>
+      <div className="industry-chain-tier__heading">
+        <Text className="industry-chain-tier__label u-text-xs u-text-bold" style={{ color: accent, letterSpacing: "0.08em" }}>
           {label}
         </Text>
-        <span className="industry-chain-tier__count" style={{ fontSize: "var(--c-font-xs)", color: accent, opacity: 0.85, fontWeight: "bold" }}>
+        <span className="industry-chain-tier__count" style={{ color: accent }}>
           {items.length} 个环节
         </span>
       </div>
-      <Text className="industry-chain-tier__title" strong style={{ display: "block", marginBottom: 12, overflowWrap: "anywhere", fontSize: "var(--c-font-md)" }}>
+      <Text className="industry-chain-tier__title u-block" strong>
         {title}
       </Text>
       <div className="industry-chain-tier__nodes">
         {items.length > 0
           ? items.map((item, index) => <ChainNodeCard key={`${nodeName(item)}-${index}`} node={item} />)
-          : <Text type="secondary" style={{ fontSize: "var(--c-font-sm)" }}>暂无结构化环节</Text>}
+          : <Text type="secondary" className="u-text-sm">暂无结构化环节</Text>}
       </div>
     </div>
   );
 }
 
 function InsightPanel({ title, items }: { title: string; items: IndustryChainInsight[] }) {
-  const colors = useColors();
   if (items.length === 0) return null;
   const renderInsight = (item: IndustryChainInsight, index: number) => (
     <div key={`${item.title}-${index}`} className="industry-research-list__item">
       <Text strong>{item.title}</Text>
-      <div style={{ display: "flex", gap: 4, marginTop: 4 }}>
-        <Tag style={{ margin: 0, fontSize: "var(--c-font-xs)" }}>
+      <div className="industry-insight-tags">
+        <Tag className="u-tag-flush u-text-xs">
           {item.claim_type === "fact" ? "事实" : item.claim_type === "opinion" ? "观点" : "推断"}
         </Tag>
-        <Tag style={{ margin: 0, fontSize: "var(--c-font-xs)" }}>
+        <Tag className="u-tag-flush u-text-xs">
           置信度 {item.confidence === "high" ? "高" : item.confidence === "low" ? "低" : "中"}
         </Tag>
       </div>
-      {item.detail && <Paragraph type="secondary" style={{ margin: "4px 0 0", fontSize: "var(--c-font-sm)" }}>{item.detail}</Paragraph>}
-      {item.evidence && <Text style={{ display: "block", color: colors.primary, fontSize: "var(--c-font-xs)" }}>观察：{item.evidence}</Text>}
+      {item.detail && <Paragraph type="secondary" className="u-note">{item.detail}</Paragraph>}
+      {item.evidence && <Text className="industry-insight__evidence">观察：{item.evidence}</Text>}
       <SourceLabel source={item.source} url={item.source_url} />
       <EvidenceTags ids={item.evidence_ids} />
     </div>
@@ -312,8 +302,8 @@ function CompetitionPanel({ groups }: { groups: IndustryChainCompetitionGroup[] 
         {groups.map((group, groupIndex) => (
           <Col xs={24} lg={groups.length > 1 ? 12 : 24} key={`${group.market}-${groupIndex}`}>
             <div className="industry-research-group">
-              <Text strong style={{ fontSize: "var(--c-font-base)" }}>{group.market}</Text>
-              {group.summary && <Paragraph type="secondary" style={{ margin: "4px 0 12px", fontSize: "var(--c-font-sm)" }}>{group.summary}</Paragraph>}
+              <Text strong className="u-text-base">{group.market}</Text>
+              {group.summary && <Paragraph type="secondary" className="u-note--below">{group.summary}</Paragraph>}
               <div className="industry-research-group__items">
                 {group.companies.map((company, companyIndex) => (
                   <ChainNodeCard key={`${nodeName(company)}-${companyIndex}`} node={company} />
@@ -340,7 +330,7 @@ function SourcesPanel({ sources }: { sources: IndustryChainSource[] }) {
               {safeUrl ? (
                 <a className="industry-source-list__title" href={safeUrl} target="_blank" rel="noreferrer">{source.title}</a>
               ) : <Text className="industry-source-list__title">{source.title}</Text>}
-              {label && <Text className="industry-source-list__meta" type="secondary" style={{ fontSize: "var(--c-font-xs)" }}>{label}</Text>}
+              {label && <Text className="industry-source-list__meta u-text-xs" type="secondary">{label}</Text>}
             </div>
           );
         })}
@@ -357,43 +347,43 @@ function EvidenceCatalogPanel({ evidence, stats }: { evidence: IndustryChainEvid
       summary={`${stats?.selected_count || evidence.length} 条合成证据`}
     >
       {stats && (stats.total_count || 0) > 0 && (
-        <Text type="secondary" style={{ display: "block", marginBottom: 10, fontSize: "var(--c-font-sm)" }}>
+        <Text type="secondary" className="industry-evidence-intro">
           共 {stats.total_count || 0} 次调用 · 去重后 {stats.unique_count || 0} 条 · 合成使用 {stats.selected_count || 0} 条
           {stats.failed_count ? ` · 失败 ${stats.failed_count} 条` : ""}
           {stats.prompt_characters ? ` · 上下文 ${stats.prompt_characters} 字符` : ""}
         </Text>
       )}
-      <div style={{ display: "grid", gap: 10 }}>
+      <div className="industry-evidence-list">
         {evidence.map((item, index) => (
           <details key={item.evidence_id} className="industry-evidence-item">
-            <summary className="industry-evidence-item__summary" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, cursor: "pointer" }}>
-              <Tag className="industry-wrap-tag" style={{ margin: 0 }}>资料 {index + 1}</Tag>
+            <summary className="industry-evidence-item__summary">
+              <Tag className="industry-wrap-tag u-tag-flush">资料 {index + 1}</Tag>
               <Text className="industry-evidence-item__tool" code>{item.tool_name}</Text>
               {item.provider && <Text className="industry-evidence-item__provider" type="secondary">{item.provider}</Text>}
               <Text className="industry-evidence-item__title" strong>{item.title || "工具调用证据"}</Text>
-              {item.status === "error" && <Tag className="industry-nowrap-tag" color="error" style={{ margin: 0 }}>调用失败</Tag>}
-              {item.truncated && <Tag className="industry-nowrap-tag" color="warning" style={{ margin: 0 }}>已截断</Tag>}
+              {item.status === "error" && <Tag className="industry-nowrap-tag u-tag-flush" color="warning">调用失败</Tag>}
+              {item.truncated && <Tag className="industry-nowrap-tag u-tag-flush" color="warning">已截断</Tag>}
             </summary>
-            <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
+            <div className="industry-evidence-item__body">
               {(item.published_at || item.fetched_at) && (
-                <Text type="secondary" style={{ fontSize: "var(--c-font-sm)" }}>
+                <Text type="secondary" className="u-text-sm">
                   {[item.published_at && `发布：${item.published_at}`, item.fetched_at && `抓取：${item.fetched_at}`].filter(Boolean).join(" · ")}
                 </Text>
               )}
               {item.source_urls?.length ? (
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                <div className="industry-evidence-item__meta-row">
                   {item.source_urls.map((url, index) => {
                     const safeUrl = safeExternalUrl(url);
                     return safeUrl ? <a key={safeUrl} href={safeUrl} target="_blank" rel="noreferrer">原文 {index + 1}</a> : null;
                   })}
                 </div>
               ) : null}
-              {item.content_preview && <Paragraph type="secondary" style={{ margin: 0, fontSize: "var(--c-font-sm)" }}>{item.content_preview}</Paragraph>}
+              {item.content_preview && <Paragraph type="secondary" className="u-m-0 u-text-sm">{item.content_preview}</Paragraph>}
               {item.error_message && <Text type="danger">{item.error_message}</Text>}
               {item.arguments && (
                 <div>
-                  <Text type="secondary" style={{ fontSize: "var(--c-font-sm)" }}>调用参数</Text>
-                  <pre style={{ margin: "4px 0 0", maxHeight: 140, overflow: "auto", whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{item.arguments}</pre>
+                  <Text type="secondary" className="u-text-sm">调用参数</Text>
+                  <pre className="industry-evidence-item__args">{item.arguments}</pre>
                 </div>
               )}
             </div>
@@ -430,14 +420,14 @@ function ResearchQualityPanel({
       summary={`${coverageCount} 项覆盖 · ${missingEvidence.length + conflicts.length} 项待核验`}
     >
       {coverage && (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: missingEvidence.length || conflicts.length ? 12 : 0 }}>
+        <div className="industry-coverage-tags">
           {Object.entries(coverage).map(([key, status]) => (
             (() => {
               const normalizedStatus: keyof typeof statusLabel = status === "complete" || status === "partial"
                 ? status
                 : "missing";
               return (
-                <Tag key={key} color={normalizedStatus === "complete" ? "success" : normalizedStatus === "partial" ? "warning" : "error"} style={{ margin: 0 }}>
+                <Tag key={key} color={normalizedStatus === "complete" ? "success" : normalizedStatus === "partial" ? "warning" : "error"} className="u-tag-flush">
                   {labels[key] || key}：{statusLabel[normalizedStatus]}
                 </Tag>
               );
@@ -446,20 +436,20 @@ function ResearchQualityPanel({
         </div>
       )}
       {missingEvidence.length > 0 && (
-        <div style={{ marginBottom: conflicts.length ? 12 : 0 }}>
+        <div className={conflicts.length ? "industry-coverage-gap" : "industry-coverage-gap--none"}>
           <Text strong>缺失证据</Text>
-          <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>{missingEvidence.map((item) => <li key={item}>{item}</li>)}</ul>
+          <ul className="industry-coverage-list">{missingEvidence.map((item) => <li key={item}>{item}</li>)}</ul>
         </div>
       )}
       {conflicts.length > 0 && (
         <div>
           <Text strong>数据冲突</Text>
-          <div style={{ display: "grid", gap: 8, marginTop: 6 }}>
+          <div className="industry-conflict-list">
             {conflicts.map((conflict, index) => (
-              <div key={`${conflict.topic}-${index}`} style={{ padding: 8, border: "1px solid var(--c-border)", borderRadius: 6 }}>
+              <div key={`${conflict.topic}-${index}`} className="industry-conflict-item">
                 <Text>{conflict.topic}</Text>
-                {conflict.values?.length ? <Text type="secondary" style={{ display: "block" }}>{conflict.values.join(" / ")}</Text> : null}
-                {conflict.reason && <Text type="secondary" style={{ display: "block" }}>{conflict.reason}</Text>}
+                {conflict.values?.length ? <Text type="secondary" className="industry-conflict-item__values">{conflict.values.join(" / ")}</Text> : null}
+                {conflict.reason && <Text type="secondary" className="industry-conflict-item__reason">{conflict.reason}</Text>}
                 <EvidenceTags ids={conflict.evidence_ids} />
               </div>
             ))}
@@ -471,7 +461,6 @@ function ResearchQualityPanel({
 }
 
 export default function IndustryResearchSections({ result }: { result: IndustryChainResult }) {
-  const colors = useColors();
   const navigate = useSafeNavigate();
   const isNarrow = useMediaQuery("(max-width: 768px)");
   const [chainViewMode, setChainViewMode] = useState<"flow" | "graph" | "table">("flow");
@@ -509,9 +498,8 @@ export default function IndustryResearchSections({ result }: { result: IndustryC
           <Text strong>{nodeName(node)}</Text>
           {node.code && (
             <Tag
-              className="industry-nowrap-tag"
+              className="industry-nowrap-tag industry-chain-table__code-link"
               color="cyan"
-              style={{ display: "inline-block", marginTop: 2, cursor: "pointer", fontSize: 11 }}
               onClick={() => navigate(buildStockProfileUrl(node.code!))}
             >
               {node.code} ↗
@@ -525,8 +513,8 @@ export default function IndustryResearchSections({ result }: { result: IndustryC
       key: "role",
       render: (_: unknown, node: IndustryChainNode) => (
         <div className="industry-chain-table__text">
-          {node.role && <Tag className="industry-chain-table__tag" color="blue" style={{ marginBottom: 4 }}>{node.role}</Tag>}
-          {node.description && <div className="industry-chain-table__text" style={{ fontSize: 12, color: colors.textSecondary }}>{node.description}</div>}
+          {node.role && <Tag className="industry-chain-table__tag u-tag-flush" color="blue">{node.role}</Tag>}
+          {node.description && <div className="industry-chain-table__text">{node.description}</div>}
         </div>
       ),
     },
@@ -549,14 +537,13 @@ export default function IndustryResearchSections({ result }: { result: IndustryC
       title: "核心代表公司 (点击可穿透至个股资料)",
       key: "companies",
       render: (_: unknown, node: IndustryChainNode) => (
-        <div className="industry-wrap-tag-list" style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+        <div className="industry-wrap-tag-list">
           {node.companies && node.companies.length > 0 ? (
             node.companies.map((company) => (
               <Tag
                 key={company}
-                className="industry-chain-table__tag"
+                className="industry-chain-table__tag industry-chain-table__company"
                 color="geekblue"
-                style={{ cursor: "pointer", fontSize: 12 }}
                 onClick={() => {
                   const match = company.match(/(?:\D|^)(\d{5,6})(?:\D|$)/);
                   const code = match ? match[1] : node.code;
@@ -594,12 +581,12 @@ export default function IndustryResearchSections({ result }: { result: IndustryC
               {marketMetrics.map((metric, index) => (
                 <div key={`${metric.label}-${index}`} className="industry-research-list__item">
                   <Text strong>{metric.label}</Text>
-                  <Text style={{ display: "block", color: colors.primary, fontSize: "var(--c-font-lg)", fontWeight: "var(--c-weight-bold)" }}>
+                  <Text className="industry-metric-value">
                     {metric.value}
                     {metric.growth ? ` · ${metric.growth}` : ""}
                   </Text>
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: 8, marginTop: 4 }}>
-                    <Text type="secondary" style={{ fontSize: "var(--c-font-xs)" }}>{metric.period || "最新统计"}</Text>
+                  <div className="industry-metric-period-row">
+                    <Text type="secondary" className="u-text-xs">{metric.period || "最新统计"}</Text>
                     <SourceLabel source={metric.source} url={metric.source_url} />
                   </div>
                   <IndustryClaimStatus claim={metric} />
@@ -646,15 +633,15 @@ export default function IndustryResearchSections({ result }: { result: IndustryC
               <div aria-hidden className="industry-chain-flow__arrow">→</div>
               <ChainTier label="MIDSTREAM · 制造集成" title={result.name ? `中游 · ${result.name}核心系统` : "中游 · 制造与集成"} items={result.midstream} accent="#722ed1" />
               <div aria-hidden className="industry-chain-flow__arrow">→</div>
-              <ChainTier label="DOWNSTREAM · 应用落地" title="下游 · 终端场景/大模型应用" items={result.downstream} accent="#52c41a" />
+              <ChainTier label="DOWNSTREAM · 应用落地" title="下游 · 终端场景/大模型应用" items={result.downstream} accent="#13c2c2" />
             </div>
           )}
           {chainViewMode === "graph" && (
-            <div style={{ minHeight: isNarrow ? 540 : 660, width: "100%", overflow: "hidden" }}>
+            <div className={`industry-graph-wrap ${isNarrow ? "industry-graph-wrap--narrow" : "industry-graph-wrap--compact"}`}>
               {result.charts[0]?.option ? (
                 <LazyIndustryChart option={result.charts[0].option} height={isNarrow ? "540px" : "660px"} />
               ) : (
-                <div style={{ textAlign: "center", padding: 40, color: colors.textMuted }}>关系图生成中...</div>
+                <div className="industry-graph-loading">关系图生成中...</div>
               )}
             </div>
           )}
@@ -685,10 +672,10 @@ export default function IndustryResearchSections({ result }: { result: IndustryC
           <div className="industry-event-list">
             {keyEvents.map((event, index) => (
               <div key={`${event.date}-${event.title}-${index}`} className="industry-event-list__item">
-                <Text style={{ color: colors.primary, fontSize: "var(--c-font-sm)", fontWeight: "var(--c-weight-semibold)" }}>{event.date || "时间待确认"}</Text>
+                <Text className="industry-event-date">{event.date || "时间待确认"}</Text>
                 <div>
                   <Text strong>{event.title}</Text>
-                  {event.impact && <Paragraph type="secondary" style={{ margin: "4px 0 0", fontSize: "var(--c-font-sm)" }}>{event.impact}</Paragraph>}
+                  {event.impact && <Paragraph type="secondary" className="u-note">{event.impact}</Paragraph>}
                   <SourceLabel source={event.source} url={event.source_url} />
                   <EvidenceTags ids={event.evidence_ids} />
                 </div>
@@ -715,14 +702,14 @@ export default function IndustryResearchSections({ result }: { result: IndustryC
           {result.drivers.length > 0 && (
             <Col xs={24} lg={12}>
               <ResearchBlock title="行业驱动" className="is-fill">
-                <ul style={{ margin: 0, paddingLeft: 18 }}>{result.drivers.map((driver) => <li key={driver} style={{ marginBottom: 8 }}>{driver}</li>)}</ul>
+                <ul className="u-list">{result.drivers.map((driver) => <li key={driver} className="u-list__item">{driver}</li>)}</ul>
               </ResearchBlock>
             </Col>
           )}
           {result.risks.length > 0 && (
             <Col xs={24} lg={12}>
               <ResearchBlock title="风险提示" className="is-fill">
-                <ul style={{ margin: 0, paddingLeft: 18 }}>{result.risks.map((risk) => <li key={risk} style={{ marginBottom: 8, color: colors.textSecondary }}>{risk}</li>)}</ul>
+                <ul className="u-list">{result.risks.map((risk) => <li key={risk} className="u-list__item industry-risk-item">{risk}</li>)}</ul>
               </ResearchBlock>
             </Col>
           )}

@@ -1,0 +1,110 @@
+/* table —— 自 watchlist.css 第 284–392 行拆出。
+   由同目录 index.css 按固定顺序 @import，顺序不可调整：同特异性规则靠源序决胜负。 */
+.watchlist-page__table-wrap {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.watchlist-page__table {
+  font-family: var(--c-font-sans);
+  font-size: var(--c-font-md);
+  font-variant-numeric: tabular-nums;
+}
+
+.watchlist-page__table .ant-table {
+  background: transparent;
+  font-size: var(--c-font-md);
+}
+
+.watchlist-page__table .ant-table-container {
+  border-radius: 0;
+}
+
+.watchlist-page__table .ant-table-thead > tr > th {
+  padding-block: 11px;
+  color: var(--c-text-secondary);
+  background: var(--c-nested-bg);
+  font-size: var(--c-font-sm);
+  font-weight: var(--c-weight-semibold);
+  white-space: nowrap;
+}
+
+.watchlist-page__table .ant-table-tbody > tr > td {
+  padding-block: 11px;
+  color: var(--c-text-primary);
+  vertical-align: middle;
+  transition: background-color .16s ease;
+}
+
+.watchlist-page__table .watchlist-page__row > td:first-child {
+  box-shadow: inset 3px 0 transparent;
+}
+
+.watchlist-page__table .watchlist-page__row.is-up > td:first-child {
+  box-shadow: inset 3px 0 var(--c-up);
+}
+
+.watchlist-page__table .watchlist-page__row.is-down > td:first-child {
+  box-shadow: inset 3px 0 var(--c-down);
+}
+
+.watchlist-page__table .watchlist-page__row.is-flat > td:first-child {
+  box-shadow: inset 3px 0 var(--c-text-muted);
+}
+
+.watchlist-page__table .watchlist-page__row.is-up:hover > td {
+  background: var(--c-hover-bg);
+}
+
+.watchlist-page__table .watchlist-page__row.is-down:hover > td {
+  background: var(--c-hover-bg);
+}
+
+.watchlist-page__stock {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.watchlist-page__stock strong {
+  overflow: hidden;
+  color: var(--c-text-primary);
+  font-size: var(--c-font-base);
+  font-weight: var(--c-weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.watchlist-page__stock span {
+  color: var(--c-text-muted);
+  font-size: var(--c-font-xs);
+}
+
+.watchlist-page__stock:hover strong {
+  color: var(--c-primary);
+}
+
+.watchlist-page__price {
+  color: var(--c-text-primary);
+  font-size: var(--c-font-md);
+  font-weight: var(--c-weight-semibold);
+}
+
+.watchlist-page__price.is-up {
+  color: var(--c-up);
+}
+
+.watchlist-page__price.is-down {
+  color: var(--c-down);
+}
+
+.watchlist-page__price.is-flat {
+  color: var(--c-text-secondary);
+}
+
+.watchlist-page__price.is-unavailable {
+  color: var(--c-text-muted);
+  font-weight: var(--c-weight-normal);
+}

@@ -20,7 +20,8 @@ import {
   message,
 } from "antd";
 import { useEffect, useState } from "react";
-import { useColors, useStyles } from "../../../styles/ui";
+import { useStyles } from "../../../styles/ui";
+import "../styles/llm-config.css";
 import { useFetchLlmModels } from "../../../api/queryHooks/settings";
 import type { LlmApiMode, ProviderDefault } from "../../../types/settings";
 import { PROVIDER_MODEL_PAIRS, PROVIDER_RECOMMENDED_SUB_MODELS } from "../llmModelPairs";
@@ -94,7 +95,6 @@ export default function LlmConfigCard({
     : usesAdminLlm
       ? "留空即沿用管理员端点与 Key（可单独修改模型和温度）；若自定义需同时设置 Base URL 与 API Key。"
       : "自定义端点模式（Base URL 与 API Key 必须成对配置）。点击「改用管理员配置」可随时恢复。";
-  const colors = useColors();
   const selectedDefaults = form.llm_provider ? providerDefaults[form.llm_provider] : undefined;
   const [fetchedModels, setFetchedModels] = useState<string[] | null>(null);
   const serializedExtraBody = formatExtraBody(form.llm_extra_body);
@@ -165,7 +165,7 @@ export default function LlmConfigCard({
   return (
     <SettingsCard
       title="大模型配置"
-      icon={<RobotOutlined style={{ marginRight: 8 }} />}
+      icon={<RobotOutlined className="llm-config-icon--mr-8" />}
       saveLabel="保存大模型配置"
       onSave={onSave}
       isSaving={isSaving}
@@ -173,45 +173,27 @@ export default function LlmConfigCard({
       onReset={onReset}
     >
       <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          flexWrap: "wrap",
-          gap: 12,
-          marginBottom: 20,
-          padding: "var(--c-pad-inset, 7px 12px)",
-          borderRadius: 8,
-          border: `1px solid ${
-            isAdmin
-              ? "rgba(114, 46, 209, 0.25)"
-              : usesAdminLlm
-                ? "rgba(22, 119, 255, 0.25)"
-                : inheritsEndpoint
-                  ? "rgba(250, 173, 20, 0.3)"
-                  : "rgba(250, 140, 22, 0.3)"
-          }`,
-          backgroundColor: isAdmin
-            ? "rgba(114, 46, 209, 0.04)"
+        className={`llm-config-banner ${
+          isAdmin
+            ? "is-admin"
             : usesAdminLlm
-              ? "rgba(22, 119, 255, 0.04)"
+              ? "is-admin-llm"
               : inheritsEndpoint
-                ? "rgba(250, 173, 20, 0.05)"
-                : "rgba(250, 140, 22, 0.05)",
-          fontSize: "var(--c-font-sm)",
-        }}
+                ? "is-inherits-endpoint"
+                : "is-custom"
+        }`}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", flex: 1, minWidth: 260 }}>
-          <Tag color={isAdmin ? "purple" : usesAdminLlm ? "blue" : "gold"} style={{ margin: 0, fontWeight: 500 }}>
+        <div className="llm-config-banner__left">
+          <Tag color={isAdmin ? "purple" : usesAdminLlm ? "blue" : "gold"} className="llm-config-banner__tag">
             {sourceLabel}
           </Tag>
-          <span style={{ color: colors.textSecondary }}>{sourceHint}</span>
+          <span className="u-text-secondary">{sourceHint}</span>
         </div>
         {!isAdmin && !usesAdminLlm && onUseAdminConfig && (
           <Button
             size="small"
             onClick={onUseAdminConfig}
-            style={{ flexShrink: 0 }}
+            className="llm-config-banner__btn"
           >
             改用管理员配置
           </Button>
@@ -224,10 +206,10 @@ export default function LlmConfigCard({
             value={form.llm_provider}
             onChange={onProviderChange}
             options={providerOptions}
-            style={{ width: "100%" }}
+            className="u-w-full"
           />
           {selectedDefaults?.description && (
-            <div style={{ marginTop: 4, fontSize: "var(--c-font-xs)", color: "var(--c-text-muted)" }}>
+            <div className="u-field-hint">
               {selectedDefaults.description}
             </div>
           )}
@@ -247,7 +229,7 @@ export default function LlmConfigCard({
                   : "请输入该端点对应的 API Key"
             }
           />
-          <div style={{ marginTop: 4, fontSize: "var(--c-font-xs)", color: "var(--c-text-muted)" }}>
+          <div className="u-field-hint">
             {selectedDefaults?.api_key_required === false
               ? "本地服务无需 Key，可直接留空。"
               : inheritsEndpoint
@@ -257,9 +239,9 @@ export default function LlmConfigCard({
         </Col>
         <Col span={24} sm={12}>
           <div style={fieldLabelStyle}>Model</div>
-          <div style={{ display: "flex", gap: 8 }}>
+          <div className="llm-config-model-row">
             <AutoComplete
-              style={{ flex: 1, minWidth: 0 }}
+              className="llm-config-model-input"
               value={form.llm_model || ""}
               onChange={(value) => onChange({ llm_model: value })}
               options={(fetchedModels ?? recommendedModels).map((m) => ({ value: m }))}
@@ -278,16 +260,11 @@ export default function LlmConfigCard({
             </Button>
           </div>
           {form.llm_provider && PROVIDER_MODEL_PAIRS[form.llm_provider] ? (
-            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginTop: "6px", alignItems: "center" }}>
-              <span style={{ fontSize: "var(--c-font-xs)", color: "var(--c-text-muted)" }}>推荐搭配:</span>
+            <div className="llm-config-presets-row">
+              <span className="llm-config-presets-label">推荐搭配:</span>
               <Tag
                 color="blue"
-                style={{
-                  cursor: "pointer",
-                  fontSize: "var(--c-font-xs)",
-                  marginInlineEnd: 0,
-                  borderRadius: "4px",
-                }}
+                className="llm-config-preset-tag"
                 onClick={() => {
                   const pair = PROVIDER_MODEL_PAIRS[form.llm_provider!];
                   onChange({ llm_model: pair.main, llm_sub_model: pair.sub });
@@ -300,20 +277,12 @@ export default function LlmConfigCard({
             </div>
           ) : null}
           {form.llm_provider && PROVIDER_RECOMMENDED_MODELS[form.llm_provider] ? (
-            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginTop: "6px" }}>
-              <span style={{ fontSize: "var(--c-font-xs)", color: "var(--c-text-muted)", alignSelf: "center" }}>常用模型:</span>
+            <div className="llm-config-presets-row">
+              <span className="llm-config-presets-label">常用模型:</span>
               {PROVIDER_RECOMMENDED_MODELS[form.llm_provider].map((m) => (
                 <Tag
                   key={m}
-                  style={{
-                    cursor: "pointer",
-                    fontSize: "var(--c-font-xs)",
-                    marginInlineEnd: 0,
-                    borderRadius: "4px",
-                    background: form.llm_model === m ? "var(--c-primary-soft)" : undefined,
-                    borderColor: form.llm_model === m ? "var(--c-primary)" : undefined,
-                    color: form.llm_model === m ? "var(--c-primary)" : undefined,
-                  }}
+                  className={`llm-config-preset-tag ${form.llm_model === m ? "is-active" : ""}`}
                   onClick={() => onChange({ llm_model: m })}
                 >
                   {m}
@@ -322,18 +291,18 @@ export default function LlmConfigCard({
             </div>
           ) : null}
           {fetchedModels && fetchedModels.length > 0 ? (
-            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginTop: "6px", alignItems: "center" }}>
-              <span style={{ fontSize: "var(--c-font-xs)", color: "var(--c-text-muted)" }}>在线模型:</span>
-              <Tag color="success" style={{ fontSize: "var(--c-font-xs)", marginInlineEnd: 0 }}>
+            <div className="llm-config-presets-row">
+              <span className="llm-config-presets-label">在线模型:</span>
+              <Tag color="blue" className="llm-config-preset-tag">
                 已获取 {fetchedModels.length} 个
               </Tag>
             </div>
           ) : null}
         </Col>
         <Col span={24} sm={12}>
-          <div style={{ ...fieldLabelStyle, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div className="u-field-label--row">
             <span>Temperature: {form.llm_temperature ?? 0.1}</span>
-            <span style={{ fontSize: "var(--c-font-xs)", color: "var(--c-text-muted)", fontWeight: "normal" }}>
+            <span className="llm-config-presets-label">
               {(form.llm_temperature ?? 0.1) <= 0.2 ? "严谨精确" : (form.llm_temperature ?? 0.1) <= 0.5 ? "均衡通用" : "丰富发散"}
             </span>
           </div>
@@ -354,12 +323,12 @@ export default function LlmConfigCard({
                 step={0.05}
                 value={form.llm_temperature ?? 0.1}
                 onChange={(value) => onChange({ llm_temperature: value ?? 0.1 })}
-                style={{ width: "100%" }}
+                className="u-w-full"
                 size="small"
               />
             </Col>
           </Row>
-          <div style={{ display: "flex", gap: 6, marginTop: 4, flexWrap: "wrap" }}>
+          <div className="llm-config-presets-row">
             {[
               { label: "严谨 0.0", value: 0.0 },
               { label: "推荐 0.1", value: 0.1 },
@@ -368,15 +337,7 @@ export default function LlmConfigCard({
             ].map((preset) => (
               <Tag
                 key={preset.value}
-                style={{
-                  cursor: "pointer",
-                  fontSize: "var(--c-font-xs)",
-                  marginInlineEnd: 0,
-                  borderRadius: 4,
-                  background: (form.llm_temperature ?? 0.1) === preset.value ? "var(--c-primary-soft)" : undefined,
-                  borderColor: (form.llm_temperature ?? 0.1) === preset.value ? "var(--c-primary)" : undefined,
-                  color: (form.llm_temperature ?? 0.1) === preset.value ? "var(--c-primary)" : undefined,
-                }}
+                className={`llm-config-preset-tag ${(form.llm_temperature ?? 0.1) === preset.value ? "is-active" : ""}`}
                 onClick={() => onChange({ llm_temperature: preset.value })}
               >
                 {preset.label}
@@ -393,9 +354,9 @@ export default function LlmConfigCard({
                 key: "endpoint",
                 label: (
                   <span>
-                    <ApiOutlined style={{ marginRight: 6 }} />
+                    <ApiOutlined className="llm-config-icon--mr-6" />
                     端点与模型（Base URL / API 模式 / 子模型 / 上下文长度）
-                    <span style={{ marginLeft: 8, color: "var(--c-text-muted)", fontSize: "var(--c-font-xs)" }}>
+                    <span className="llm-config-subtext--ml-8 llm-config-presets-label">
                       留空即沿用管理员配置
                     </span>
                   </span>
@@ -410,18 +371,10 @@ export default function LlmConfigCard({
             placeholder={selectedDefaults?.base_url || "https://api.openai.com/v1"}
           />
           {selectedDefaults?.base_url ? (
-            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginTop: "6px", alignItems: "center" }}>
-              <span style={{ fontSize: "var(--c-font-xs)", color: "var(--c-text-muted)" }}>预设地址:</span>
+            <div className="llm-config-presets-row">
+              <span className="llm-config-presets-label">预设地址:</span>
               <Tag
-                style={{
-                  cursor: "pointer",
-                  fontSize: "var(--c-font-xs)",
-                  marginInlineEnd: 0,
-                  borderRadius: "4px",
-                  background: form.llm_base_url === selectedDefaults.base_url ? "var(--c-primary-soft)" : undefined,
-                  borderColor: form.llm_base_url === selectedDefaults.base_url ? "var(--c-primary)" : undefined,
-                  color: form.llm_base_url === selectedDefaults.base_url ? "var(--c-primary)" : undefined,
-                }}
+                className={`llm-config-preset-tag ${form.llm_base_url === selectedDefaults.base_url ? "is-active" : ""}`}
                 onClick={() => onChange({ llm_base_url: selectedDefaults.base_url })}
                 title="点击填充官方默认 Base URL"
               >
@@ -436,7 +389,7 @@ export default function LlmConfigCard({
             value={form.llm_api_mode || "auto"}
             onChange={(value) => onChange({ llm_api_mode: value })}
             options={API_MODE_OPTIONS}
-            style={{ width: "100%" }}
+            className="u-w-full"
           />
         </Col>
         <Col span={24} sm={12}>
@@ -448,13 +401,13 @@ export default function LlmConfigCard({
           />
         </Col>
         <Col span={24}>
-          <div style={{ ...fieldLabelStyle, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div className="u-field-label--row">
             <span>子模型（简单任务，可选）</span>
             {form.llm_sub_model && (
               <Button
                 type="link"
                 size="small"
-                style={{ padding: 0, height: "auto", fontSize: "var(--c-font-xs)" }}
+                className="llm-config-inline-link"
                 onClick={() => onChange({ llm_sub_model: "" })}
               >
                 清空（跟随主模型）
@@ -463,7 +416,7 @@ export default function LlmConfigCard({
           </div>
           <AutoComplete
             aria-label="子模型"
-            style={{ width: "100%" }}
+            className="u-w-full"
             value={form.llm_sub_model || ""}
             onChange={(value) => onChange({ llm_sub_model: value })}
             options={(fetchedModels ?? recommendedModels).map((m) => ({ value: m }))}
@@ -474,22 +427,14 @@ export default function LlmConfigCard({
             allowClear
           />
           {form.llm_provider && PROVIDER_RECOMMENDED_SUB_MODELS[form.llm_provider]?.length ? (
-            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginTop: "6px" }}>
-              <span style={{ fontSize: "var(--c-font-xs)", color: "var(--c-text-muted)", alignSelf: "center" }}>
+            <div className="llm-config-presets-row">
+              <span className="llm-config-presets-label">
                 常用子模型:
               </span>
               {PROVIDER_RECOMMENDED_SUB_MODELS[form.llm_provider].map((m) => (
                 <Tag
                   key={m}
-                  style={{
-                    cursor: "pointer",
-                    fontSize: "var(--c-font-xs)",
-                    marginInlineEnd: 0,
-                    borderRadius: "4px",
-                    background: form.llm_sub_model === m ? "var(--c-primary-soft)" : undefined,
-                    borderColor: form.llm_sub_model === m ? "var(--c-primary)" : undefined,
-                    color: form.llm_sub_model === m ? "var(--c-primary)" : undefined,
-                  }}
+                  className={`llm-config-preset-tag ${form.llm_sub_model === m ? "is-active" : ""}`}
                   onClick={() => onChange({ llm_sub_model: m })}
                 >
                   {m}
@@ -501,9 +446,9 @@ export default function LlmConfigCard({
             <Alert
               type="warning"
               showIcon
-              style={{ marginTop: 8 }}
+              className="llm-config-submodel-alert"
               title={
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+                <div className="llm-config-submodel-alert__content">
                   <span>
                     当前子模型 <code>{form.llm_sub_model}</code> 不在已获取的服务端模型列表中，简单任务可能因找不到模型而失败。
                   </span>
@@ -514,18 +459,18 @@ export default function LlmConfigCard({
               }
             />
           ) : null}
-          <div style={{ marginTop: 4, fontSize: "var(--c-font-xs)", color: "var(--c-text-muted)" }}>
+          <div className="u-field-hint">
             高频简单任务（如资讯逐条解读）改用更轻量的子模型，可显著降低超时概率；与主模型共用 Provider / Base URL / API Key。留空则直接复用主模型。
           </div>
         </Col>
         <Col span={24}>
-          <div style={{ ...fieldLabelStyle, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div className="u-field-label--row">
             <span>降级备用模型（429/限流/超额兜底，可选）</span>
             {form.llm_fallback_model && (
               <Button
                 type="link"
                 size="small"
-                style={{ padding: 0, height: "auto", fontSize: "var(--c-font-xs)" }}
+                className="llm-config-inline-link"
                 onClick={() => onChange({ llm_fallback_model: "" })}
               >
                 清空（不降级）
@@ -534,7 +479,7 @@ export default function LlmConfigCard({
           </div>
           <AutoComplete
             aria-label="降级备用模型"
-            style={{ width: "100%" }}
+            className="u-w-full"
             value={form.llm_fallback_model || ""}
             onChange={(value) => onChange({ llm_fallback_model: value })}
             options={(fetchedModels ?? recommendedModels).map((m) => ({ value: m }))}
@@ -544,7 +489,7 @@ export default function LlmConfigCard({
             placeholder="主模型 429 quota exceeded 或不可用时自动切换的备用模型；留空则不降级"
             allowClear
           />
-          <div style={{ marginTop: 4, fontSize: "var(--c-font-xs)", color: "var(--c-text-muted)" }}>
+          <div className="u-field-hint">
             当主模型发生 429 额度超限（Quota Exceeded）、限流或多次重试仍不可用时，系统自动无缝切换到此模型继续执行，避免对话或分析失败中断。与主模型共用 Provider / Base URL / API Key。
           </div>
         </Col>
@@ -556,7 +501,7 @@ export default function LlmConfigCard({
             onChange={(event) => onChange({ llm_simple_tasks: event.target.value })}
             placeholder="留空=全部"
           />
-          <div style={{ marginTop: 4, fontSize: "var(--c-font-xs)", color: "var(--c-text-muted)" }}>
+          <div className="u-field-hint">
             可选：chat_routing（对话意图分类）、macro_item（宏观逐条解读）、news_analysis（资讯归类）、twitter_analysis（推文分析）；逗号分隔。
           </div>
         </Col>
@@ -568,12 +513,12 @@ export default function LlmConfigCard({
             step={1000}
             value={form.llm_context_length_tokens ?? 0}
             onChange={(value) => onChange({ llm_context_length_tokens: value ?? 0 })}
-            style={{ width: "100%" }}
+            className="u-w-full"
             placeholder="0 = 未设置"
           />
         </Col>
         <Col span={24}>
-          <div style={{ fontSize: "var(--c-font-sm)", color: colors.textMuted }}>
+          <div className="llm-config-subtext-block">
             填写模型实际上下文窗口（如 32768 / 131072）。设置后对话历史会按该窗口自动裁剪，避免“超出模型上下文长度”报错；0 表示未设置，沿用默认历史上限。
           </div>
         </Col>
@@ -591,9 +536,9 @@ export default function LlmConfigCard({
                 key: "advanced",
                 label: (
                   <span>
-                    <SettingOutlined style={{ marginRight: 6 }} />
+                    <SettingOutlined className="llm-config-icon--mr-6" />
                     高级：超时 / 重试 / 输出预算 / 兼容字段
-                    <span style={{ marginLeft: 8, color: "var(--c-text-muted)", fontSize: "var(--c-font-xs)" }}>
+                    <span className="llm-config-subtext--ml-8 llm-config-presets-label">
                       留空或默认值即可，仅排障时调整
                     </span>
                   </span>
@@ -608,7 +553,7 @@ export default function LlmConfigCard({
                         max={3600}
                         value={form.llm_timeout_seconds ?? undefined}
                         onChange={(value) => onChange({ llm_timeout_seconds: value ?? undefined })}
-                        style={{ width: "100%" }}
+                        className="u-w-full"
                       />
                     </Col>
                     <Col span={24} sm={12}>
@@ -619,7 +564,7 @@ export default function LlmConfigCard({
                         max={3}
                         value={form.llm_max_attempts ?? undefined}
                         onChange={(value) => onChange({ llm_max_attempts: value ?? undefined })}
-                        style={{ width: "100%" }}
+                        className="u-w-full"
                       />
                     </Col>
                     <Col span={24} sm={12}>
@@ -630,7 +575,7 @@ export default function LlmConfigCard({
                         step={60}
                         value={form.llm_generation_timeout_seconds ?? undefined}
                         onChange={(value) => onChange({ llm_generation_timeout_seconds: value ?? undefined })}
-                        style={{ width: "100%" }}
+                        className="u-w-full"
                       />
                     </Col>
                     <Col span={24} sm={12}>
@@ -641,7 +586,7 @@ export default function LlmConfigCard({
                         step={512}
                         value={form.llm_generation_max_completion_tokens ?? undefined}
                         onChange={(value) => onChange({ llm_generation_max_completion_tokens: value ?? undefined })}
-                        style={{ width: "100%" }}
+                        className="u-w-full"
                       />
                     </Col>
                     <Col span={24} sm={12}>
@@ -652,7 +597,7 @@ export default function LlmConfigCard({
                         step={512}
                         value={form.llm_model_max_completion_tokens ?? undefined}
                         onChange={(value) => onChange({ llm_model_max_completion_tokens: value ?? null })}
-                        style={{ width: "100%" }}
+                        className="u-w-full"
                         placeholder="未设置"
                       />
                     </Col>
@@ -663,7 +608,7 @@ export default function LlmConfigCard({
                         checked={form.llm_json_mode_enabled ?? true}
                         onChange={(checked) => onChange({ llm_json_mode_enabled: checked })}
                       />
-                      <span style={{ marginLeft: 8, fontSize: "var(--c-font-xs)", color: "var(--c-text-muted)" }}>
+                      <span className="llm-config-subtext--ml-8 llm-config-presets-label">
                         网关不支持 response_format 时关闭
                       </span>
                     </Col>
@@ -674,7 +619,7 @@ export default function LlmConfigCard({
                         checked={form.llm_stream_include_usage ?? true}
                         onChange={(checked) => onChange({ llm_stream_include_usage: checked })}
                       />
-                      <span style={{ marginLeft: 8, fontSize: "var(--c-font-xs)", color: "var(--c-text-muted)" }}>
+                      <span className="llm-config-subtext--ml-8 llm-config-presets-label">
                         stream_options 被网关拒绝时关闭
                       </span>
                     </Col>
@@ -689,12 +634,12 @@ export default function LlmConfigCard({
                         spellCheck={false}
                         placeholder={'例：{"chat_template_kwargs": {"enable_thinking": true}}'}
                       />
-                      <div style={{ marginTop: 4, fontSize: "var(--c-font-xs)", color: extraBodyError ? colors.down : "var(--c-text-muted)" }}>
+                      <div className={`u-field-hint ${extraBodyError ? "llm-config-error-text" : ""}`}>
                         {extraBodyError
                           ? extraBodyError
                           : "用于打开 Qwen enable_thinking、GLM thinking 等兼容网关私有开关；model/messages/预算/协议参数不允许在此覆盖。"}
                       </div>
-                      <div style={{ marginTop: 4, fontSize: "var(--c-font-xs)", color: "var(--c-text-muted)" }}>
+                      <div className="u-field-hint">
                         网关能力覆盖（Azure 部署名、自定义中转端点）属部署级配置，见 .env.example 的 LLM_COMPATIBILITY_OVERRIDES。
                       </div>
                     </Col>

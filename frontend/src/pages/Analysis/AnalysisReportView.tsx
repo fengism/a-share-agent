@@ -31,7 +31,7 @@ import "./investment-research.css";
 const { Paragraph, Text, Title } = Typography;
 
 export default function AnalysisReportView({ page }: { page: AnalysisReportPageState }) {
-  const { pageContainerStyle, cardStyle } = useStyles();
+  const { pageContainerStyle } = useStyles();
   const t = useTokens();
   const {
     code,
@@ -158,7 +158,7 @@ export default function AnalysisReportView({ page }: { page: AnalysisReportPageS
             ) : null}
 
             {(pageLoading || (historyDate && historyLoading)) ? (
-              <Card style={cardStyle}>
+              <Card className="u-card">
                 <div aria-label="投资研究报告加载中" style={{ minHeight: 420, padding: t.space[4] }}>
                   <Skeleton active paragraph={{ rows: 12 }} />
                 </div>
@@ -207,7 +207,7 @@ export default function AnalysisReportView({ page }: { page: AnalysisReportPageS
                 ) : null}
               </div>
             ) : !isPageError && !isHistoryError ? (
-              <Card style={cardStyle}>
+              <Card className="u-card">
                 <div className="investment-research-no-report">
                   <Empty
                     image={Empty.PRESENTED_IMAGE_SIMPLE}

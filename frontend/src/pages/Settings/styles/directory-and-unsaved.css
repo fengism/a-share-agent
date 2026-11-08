@@ -1,0 +1,192 @@
+/* 设置页统一样式：目录条、分组锚点与未保存变更汇总面板。 */
+
+/* 设置页统一样式：目录条、卡片分组与移动端触控规范 */
+
+.settings-directory {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 2px 0 12px;
+  margin-bottom: 4px;
+  scrollbar-width: thin;
+  scroll-snap-type: x proximity;
+}
+
+.settings-directory::-webkit-scrollbar {
+  height: 4px;
+}
+
+.settings-directory::-webkit-scrollbar-thumb {
+  background: var(--c-border, rgba(148, 163, 184, 0.4));
+  border-radius: 2px;
+}
+
+.settings-directory__chip {
+  flex: 0 0 auto;
+  min-height: 32px;
+  padding: 5px 12px;
+  border: 1px solid var(--c-border);
+  border-radius: 999px;
+  background: var(--c-card-bg);
+  color: var(--c-text-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--c-font-xs, 12px);
+  line-height: 1.4;
+  white-space: nowrap;
+  scroll-snap-align: start;
+  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+.settings-directory__chip:hover {
+  color: var(--c-text-primary);
+  border-color: var(--c-primary);
+  background: var(--c-muted-soft);
+}
+
+.settings-directory__chip[aria-current="true"] {
+  color: var(--c-primary);
+  border-color: var(--c-primary);
+  background: var(--c-primary-soft);
+  font-weight: var(--c-weight-bold);
+}
+
+.settings-directory__chip:focus-visible {
+  outline: 2px solid var(--c-focus-ring);
+  outline-offset: 2px;
+}
+
+/* 卡片分组：锚点 + 组标题，滚动定位时留出吸顶头部空间 */
+.settings-group {
+  scroll-margin-top: 96px;
+}
+
+.settings-group + .settings-group {
+  margin-top: 24px;
+}
+
+.settings-group__title {
+  margin: 0 0 4px;
+  color: var(--c-text-secondary);
+  font-size: var(--c-font-sm, 13px);
+  font-weight: var(--c-weight-bold);
+  letter-spacing: 0.02em;
+}
+
+.settings-group__hint {
+  margin: 0 0 12px;
+  color: var(--c-text-muted);
+  font-size: var(--c-font-xs, 12px);
+  line-height: 1.6;
+}
+
+@media (max-width: 767px) {
+  .settings-directory {
+    gap: 6px;
+    padding-bottom: 10px;
+  }
+
+  .settings-directory__chip {
+    min-height: 36px;
+    padding: 7px 14px;
+  }
+
+  .settings-group + .settings-group {
+    margin-top: 20px;
+  }
+}
+
+/* 顶部未保存变更操作区 */
+.settings-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+.settings-dirty-trigger {
+  border-color: var(--c-warning, #faad14);
+  color: var(--c-warning, #faad14);
+}
+
+/* 未保存变更汇总面板 */
+.settings-dirty-panel {
+  width: 320px;
+  max-width: 78vw;
+}
+
+.settings-dirty-panel__hint {
+  margin: 0 0 10px;
+  color: var(--c-text-muted);
+  font-size: var(--c-font-xs, 12px);
+  line-height: 1.6;
+}
+
+.settings-dirty-panel__list {
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.settings-dirty-panel__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  min-height: 34px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--c-text-primary);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.settings-dirty-panel__item:hover {
+  background: var(--c-muted-soft);
+}
+
+.settings-dirty-panel__item:focus-visible {
+  outline: 2px solid var(--c-focus-ring);
+  outline-offset: 1px;
+}
+
+.settings-dirty-panel__item-label {
+  font-size: var(--c-font-sm, 13px);
+}
+
+.settings-dirty-panel__item-section {
+  color: var(--c-text-muted);
+  font-size: var(--c-font-xs, 12px);
+  white-space: nowrap;
+}
+
+.settings-dirty-panel__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 767px) {
+  .settings-header-actions {
+    width: 100%;
+  }
+
+  .settings-dirty-panel {
+    width: min(84vw, 320px);
+  }
+
+  .settings-dirty-panel__item {
+    min-height: 44px;
+  }
+
+  .settings-dirty-panel__actions .ant-btn {
+    min-height: 40px;
+  }
+}

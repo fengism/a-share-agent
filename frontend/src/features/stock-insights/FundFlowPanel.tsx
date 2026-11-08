@@ -6,20 +6,19 @@ import { useStockFundFlowPages } from "../../api/queries";
 import ResponsiveMetricGrid from "../../components/ResponsiveMetricGrid";
 import SectionDataState from "../../components/SectionDataState";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
-import { useColors, useStyles, semanticTagStyle } from "../../theme/hooks";
+import { useColors } from "../../theme/hooks";
 import { APP_FONT_SIZE } from "../../theme/typography";
 import type { StockFundFlowItem } from "../../types/stock";
 import { formatAmount } from "../../utils/format";
+import "./fund-flow-panel.css";
 
 const { Text } = Typography;
 
-interface NetColors { up: string; down: string; muted: string }
-
-function formatNet(value: number | null, colors: NetColors): { text: string; color: string } {
-  if (value === null) return { text: "-", color: colors.muted };
-  if (value > 0) return { text: `+${formatAmount(value)}`, color: colors.up };
-  if (value < 0) return { text: formatAmount(value), color: colors.down };
-  return { text: formatAmount(value), color: colors.muted };
+function formatNet(value: number | null): { text: string; modifier: "up" | "down" | "muted" } {
+  if (value === null) return { text: "-", modifier: "muted" };
+  if (value > 0) return { text: `+${formatAmount(value)}`, modifier: "up" };
+  if (value < 0) return { text: formatAmount(value), modifier: "down" };
+  return { text: formatAmount(value), modifier: "muted" };
 }
 
 function fundFlowDateIdentity(value: string) {
@@ -30,12 +29,12 @@ function fundFlowDateIdentity(value: string) {
   return separated ? `${separated[1]}-${separated[2]}-${separated[3]}` : text;
 }
 
-function FlowTile({ label, value, colors }: { label: string; value: number | null; colors: { textSecondary: string; hoverBg: string; border: string } & NetColors }) {
-  const fmt = formatNet(value, colors);
+function FlowTile({ label, value }: { label: string; value: number | null }) {
+  const fmt = formatNet(value);
   return (
-    <div style={{ padding: "14px 12px", background: colors.hoverBg, border: `1px solid ${colors.border}`, borderRadius: 10, textAlign: "center" }}>
-      <div style={{ color: colors.textSecondary, fontSize: "var(--c-font-sm)", marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: "var(--c-font-base)", fontWeight: "var(--c-weight-bold)", color: fmt.color, lineHeight: "var(--c-leading-tight)" }}>{fmt.text}</div>
+    <div className="fund-flow-panel__tile">
+      <div className="fund-flow-panel__tile-label">{label}</div>
+      <div className={`fund-flow-panel__tile-value fund-flow-panel__tile-value--${fmt.modifier}`}>{fmt.text}</div>
     </div>
   );
 }
@@ -43,15 +42,10 @@ function FlowTile({ label, value, colors }: { label: string; value: number | nul
 export default function FundFlowPanel({ code, isExportingPdf = false }: { code: string; isExportingPdf?: boolean }) {
   const c = useColors();
   const isNarrow = useMediaQuery("(max-width: 768px)");
-  const { cardStyle } = useStyles();
   const query = useStockFundFlowPages(code);
   const { isLoading, error, refetch } = query;
   const data = useMemo(() => query.data?.pages.flatMap((page) => page.items), [query.data]);
   const total = query.data?.pages[0]?.total ?? 0;
-  const net = useMemo<NetColors>(
-    () => ({ up: c.up, down: c.down, muted: c.textMuted }),
-    [c.down, c.textMuted, c.up],
-  );
 
   const recentData = useMemo(() => {
     const uniqueByDate = new Map<string, StockFundFlowItem>();
@@ -96,12 +90,12 @@ export default function FundFlowPanel({ code, isExportingPdf = false }: { code: 
     };
   }, [chartData, c.textSecondary, c.up, c.down]);
 
-  const tileColors = { textSecondary: c.textSecondary, hoverBg: c.hoverBg, border: c.border, up: c.up, down: c.down, muted: c.textMuted };
+  const chartContainerStyle = useMemo(() => ({ height: 220 }), []);
 
   const columns = useMemo(() => {
     if (isNarrow) {
       return [
-        { title: "日期", dataIndex: "date", key: "date", width: 110, render: (value: string) => <Text style={{ fontWeight: "var(--c-weight-medium)" }}>{value}</Text> },
+        { title: "日期", dataIndex: "date", key: "date", width: 110, render: (value: string) => <Text className="fund-flow-panel__table-date">{value}</Text> },
         {
           title: "主力净流入",
           dataIndex: "main_net",
@@ -109,69 +103,69 @@ export default function FundFlowPanel({ code, isExportingPdf = false }: { code: 
           width: 140,
           align: "right" as const,
           render: (value: number | null) => value === null ? (
-            <Tag>{formatNet(value, net).text}</Tag>
+            <Tag>{formatNet(value).text}</Tag>
           ) : (
-            <Tag style={{ ...semanticTagStyle(value >= 0 ? "up" : "down"), fontWeight: "var(--c-weight-semibold)" }}>{formatNet(value, net).text}</Tag>
+            <Tag className={`fund-flow-panel__table-tag fund-flow-panel__table-tag--${value >= 0 ? "up" : "down"}`}>{formatNet(value).text}</Tag>
           ),
         },
         {
           title: "超大单", dataIndex: "super_net", key: "super_net", width: 110, align: "right" as const,
-          render: (value: number | null) => <span style={{ color: formatNet(value, net).color, fontWeight: "var(--c-weight-medium)" }}>{formatNet(value, net).text}</span>,
+          render: (value: number | null) => <span className={`fund-flow-panel__text--medium fund-flow-panel__text--${formatNet(value).modifier}`}>{formatNet(value).text}</span>,
         },
         {
           title: "大单", dataIndex: "large_net", key: "large_net", width: 100, align: "right" as const,
-          render: (value: number | null) => <span style={{ color: formatNet(value, net).color }}>{formatNet(value, net).text}</span>,
+          render: (value: number | null) => <span className={`fund-flow-panel__text--${formatNet(value).modifier}`}>{formatNet(value).text}</span>,
         },
         {
           title: "中单", dataIndex: "mid_net", key: "mid_net", width: 100, align: "right" as const,
-          render: (value: number | null) => <span style={{ color: value === null ? net.muted : value >= 0 ? c.down : c.up }}>{formatNet(value, net).text}</span>,
+          render: (value: number | null) => <span className={`fund-flow-panel__text--${value === null ? "muted" : value >= 0 ? "down" : "up"}`}>{formatNet(value).text}</span>,
         },
         {
           title: "小单", dataIndex: "small_net", key: "small_net", width: 100, align: "right" as const,
-          render: (value: number | null) => <span style={{ color: value === null ? net.muted : value >= 0 ? c.down : c.up }}>{formatNet(value, net).text}</span>,
+          render: (value: number | null) => <span className={`fund-flow-panel__text--${value === null ? "muted" : value >= 0 ? "down" : "up"}`}>{formatNet(value).text}</span>,
         },
       ];
     }
 
     return [
-      { title: "日期", dataIndex: "date", key: "date", width: 100, render: (value: string) => <Text style={{ fontWeight: "var(--c-weight-medium)" }}>{value}</Text> },
+      { title: "日期", dataIndex: "date", key: "date", width: 100, render: (value: string) => <Text className="fund-flow-panel__table-date">{value}</Text> },
       {
         title: "主力净流入", dataIndex: "main_net", key: "main_net", width: 130, align: "right" as const,
         render: (value: number | null) => value === null ? (
-          <Tag>{formatNet(value, net).text}</Tag>
+          <Tag>{formatNet(value).text}</Tag>
         ) : (
-          <Tag style={{ ...semanticTagStyle(value >= 0 ? "up" : "down"), fontWeight: "var(--c-weight-semibold)" }}>{formatNet(value, net).text}</Tag>
+          <Tag className={`fund-flow-panel__table-tag fund-flow-panel__table-tag--${value >= 0 ? "up" : "down"}`}>{formatNet(value).text}</Tag>
         ),
       },
       {
         title: "超大单", dataIndex: "super_net", key: "super_net", width: 110, align: "right" as const,
-        render: (value: number | null) => <span style={{ color: formatNet(value, net).color, fontWeight: "var(--c-weight-medium)" }}>{formatNet(value, net).text}</span>,
+        render: (value: number | null) => <span className={`fund-flow-panel__text--medium fund-flow-panel__text--${formatNet(value).modifier}`}>{formatNet(value).text}</span>,
       },
       {
         title: "大单", dataIndex: "large_net", key: "large_net", width: 100, align: "right" as const,
-        render: (value: number | null) => <span style={{ color: formatNet(value, net).color }}>{formatNet(value, net).text}</span>,
+        render: (value: number | null) => <span className={`fund-flow-panel__text--${formatNet(value).modifier}`}>{formatNet(value).text}</span>,
       },
       {
         title: "中单", dataIndex: "mid_net", key: "mid_net", width: 100, align: "right" as const,
-        render: (value: number | null) => <span style={{ color: value === null ? net.muted : value >= 0 ? c.down : c.up }}>{formatNet(value, net).text}</span>,
+        render: (value: number | null) => <span className={`fund-flow-panel__text--${value === null ? "muted" : value >= 0 ? "down" : "up"}`}>{formatNet(value).text}</span>,
       },
       {
         title: "小单", dataIndex: "small_net", key: "small_net", width: 100, align: "right" as const,
-        render: (value: number | null) => <span style={{ color: value === null ? net.muted : value >= 0 ? c.down : c.up }}>{formatNet(value, net).text}</span>,
+        render: (value: number | null) => <span className={`fund-flow-panel__text--${value === null ? "muted" : value >= 0 ? "down" : "up"}`}>{formatNet(value).text}</span>,
       },
     ];
-  }, [c.down, c.up, isNarrow, net]);
+  }, [isNarrow]);
 
   const renderExpandedRow = useCallback((record: StockFundFlowItem) => (
     <ResponsiveMetricGrid
       items={[
-        { key: "super", label: "超大单", value: formatNet(record.super_net, net).text },
-        { key: "large", label: "大单", value: formatNet(record.large_net, net).text },
-        { key: "mid", label: "中单", value: formatNet(record.mid_net, net).text },
-        { key: "small", label: "小单", value: formatNet(record.small_net, net).text },
+        { key: "super", label: "超大单", value: formatNet(record.super_net).text },
+        { key: "large", label: "大单", value: formatNet(record.large_net).text },
+        { key: "mid", label: "中单", value: formatNet(record.mid_net).text },
+        { key: "small", label: "小单", value: formatNet(record.small_net).text },
       ]}
     />
-  ), [net]);
+  ), []);
 
   return (
     <SectionDataState
@@ -184,7 +178,7 @@ export default function FundFlowPanel({ code, isExportingPdf = false }: { code: 
       skeletonRows={5}
       minHeight={260}
     >
-      <div style={{ display: "grid", gap: 16 }}>
+      <div className="fund-flow-panel__container">
       {isStale ? (
         <Alert
           type="warning"
@@ -200,7 +194,7 @@ export default function FundFlowPanel({ code, isExportingPdf = false }: { code: 
           description="按分笔成交金额分档计算，非交易所官方资金流，与百度、东方财富口径可能不同；主力、大单等仅为金额分档，不代表交易者身份。"
         />
       ) : null}
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+      <div className="fund-flow-panel__meta-row">
         <Text type="secondary">已加载 {recentData.length} / {total} 个交易日 · 每批最多 20 日</Text>
         {query.hasNextPage && !isExportingPdf ? (
           <Button aria-label={query.isFetchNextPageError ? "重试加载更多" : "加载更多"} loading={query.isFetchingNextPage} onClick={() => { void query.fetchNextPage(); }}>
@@ -219,17 +213,17 @@ export default function FundFlowPanel({ code, isExportingPdf = false }: { code: 
       ) : null}
       {/* Summary cards for latest day */}
       {latest && (
-        <div style={{ display: "grid", gap: 10 }}>
+        <div className="fund-flow-panel__summary-grid">
           <Row gutter={[10, 10]}>
-            <Col xs={12} sm={8}><FlowTile label="主力净流入" value={latest.main_net} colors={tileColors} /></Col>
-            <Col xs={12} sm={8}><FlowTile label="超大单净流入" value={latest.super_net} colors={tileColors} /></Col>
-            <Col xs={12} sm={8}><FlowTile label="大单净流入" value={latest.large_net} colors={tileColors} /></Col>
-            <Col xs={12} sm={8}><FlowTile label="中单净流入" value={latest.mid_net} colors={tileColors} /></Col>
-            <Col xs={12} sm={8}><FlowTile label="小单净流入" value={latest.small_net} colors={tileColors} /></Col>
+            <Col xs={12} sm={8}><FlowTile label="主力净流入" value={latest.main_net} /></Col>
+            <Col xs={12} sm={8}><FlowTile label="超大单净流入" value={latest.super_net} /></Col>
+            <Col xs={12} sm={8}><FlowTile label="大单净流入" value={latest.large_net} /></Col>
+            <Col xs={12} sm={8}><FlowTile label="中单净流入" value={latest.mid_net} /></Col>
+            <Col xs={12} sm={8}><FlowTile label="小单净流入" value={latest.small_net} /></Col>
             <Col xs={12} sm={8}>
-              <div style={{ padding: "14px 12px", background: c.hoverBg, border: `1px solid ${c.border}`, borderRadius: 10, textAlign: "center" }}>
-                <div style={{ color: c.textSecondary, fontSize: "var(--c-font-sm)", marginBottom: 4 }}>统计日期</div>
-                <div style={{ fontSize: "var(--c-font-base)", fontWeight: "var(--c-weight-bold)", color: c.textPrimary }}>{latest.date}</div>
+              <div className="fund-flow-panel__tile">
+                <div className="fund-flow-panel__tile-label">统计日期</div>
+                <div className="fund-flow-panel__tile-value fund-flow-panel__tile-value--primary">{latest.date}</div>
               </div>
             </Col>
           </Row>
@@ -256,26 +250,14 @@ export default function FundFlowPanel({ code, isExportingPdf = false }: { code: 
             }
 
             return (
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 12,
-                  flexWrap: "wrap",
-                  padding: "10px 14px",
-                  background: c.hoverBg,
-                  borderRadius: 8,
-                  border: `1px solid ${c.border}`,
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                  <Text strong style={{ fontSize: "var(--c-font-sm)" }}>博弈诊断：</Text>
-                  <Tag style={semanticTagStyle(stanceTagColor)}>{stanceLabel}</Tag>
+              <div className="fund-flow-panel__diagnosis-card">
+                <div className="fund-flow-panel__diagnosis-left">
+                  <Text strong className="fund-flow-panel__diagnosis-title">博弈诊断：</Text>
+                  <Tag className={`fund-flow-panel__diagnosis-tag fund-flow-panel__diagnosis-tag--${stanceTagColor}`}>{stanceLabel}</Tag>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 16, fontSize: "var(--c-font-xs)", fontFamily: "var(--c-font-mono)" }}>
-                  <span>主力合计: <strong style={{ color: mainVal >= 0 ? c.up : c.down }}>{mainVal > 0 ? `+${formatAmount(mainVal)}` : formatAmount(mainVal)}</strong></span>
-                  <span>散户合计: <strong style={{ color: retailVal >= 0 ? c.up : c.down }}>{retailVal > 0 ? `+${formatAmount(retailVal)}` : formatAmount(retailVal)}</strong></span>
+                <div className="fund-flow-panel__diagnosis-stats">
+                  <span>主力合计: <strong className={mainVal >= 0 ? "fund-flow-panel__text--up" : "fund-flow-panel__text--down"}>{mainVal > 0 ? `+${formatAmount(mainVal)}` : formatAmount(mainVal)}</strong></span>
+                  <span>散户合计: <strong className={retailVal >= 0 ? "fund-flow-panel__text--up" : "fund-flow-panel__text--down"}>{retailVal > 0 ? `+${formatAmount(retailVal)}` : formatAmount(retailVal)}</strong></span>
                 </div>
               </div>
             );
@@ -285,15 +267,15 @@ export default function FundFlowPanel({ code, isExportingPdf = false }: { code: 
 
       {/* Bar chart */}
       {chartOption && (
-        <Card size="small" style={cardStyle} styles={{ body: { padding: 8 } }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 6, paddingLeft: 4, paddingRight: 4 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <Text style={{ fontSize: "var(--c-font-md)", fontWeight: "var(--c-weight-semibold)", color: c.textPrimary }}>
+        <Card size="small" className="u-card" styles={{ body: { padding: 8 } }}>
+          <div className="fund-flow-panel__chart-header">
+            <div className="fund-flow-panel__chart-title-wrap">
+              <Text className="fund-flow-panel__chart-title">
                 主力净流入走势（近 {chartData.length} 日）
               </Text>
               {chartData.length > 0 && (
-                <span style={{ fontSize: "var(--c-font-xs)", color: "var(--c-text-secondary)" }}>
-                  累计: <strong style={{ color: cumulativeMainNet >= 0 ? c.up : c.down, fontFamily: "var(--c-font-mono)" }}>
+                <span className="fund-flow-panel__chart-cumulative">
+                  累计: <strong className={`fund-flow-panel__chart-cumulative-val ${cumulativeMainNet >= 0 ? "fund-flow-panel__chart-cumulative-val--up" : "fund-flow-panel__chart-cumulative-val--down"}`}>
                     {cumulativeMainNet > 0 ? `+${formatAmount(cumulativeMainNet)}` : formatAmount(cumulativeMainNet)}
                   </strong>
                 </span>
@@ -313,12 +295,12 @@ export default function FundFlowPanel({ code, isExportingPdf = false }: { code: 
               />
             )}
           </div>
-          <ReactEChartsCore echarts={echarts} option={chartOption} style={{ height: 220 }} notMerge />
+          <ReactEChartsCore echarts={echarts} option={chartOption} style={chartContainerStyle} notMerge />
         </Card>
       )}
 
       {/* Data table */}
-      <Card size="small" style={cardStyle} styles={{ body: { padding: 0 } }}>
+      <Card size="small" className="u-card" styles={{ body: { padding: 0 } }}>
         <Table
           dataSource={recentData}
           columns={columns}

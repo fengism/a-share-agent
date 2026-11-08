@@ -11,12 +11,13 @@ import {
 import { useMarketEmotion } from "../../api/queries";
 import RefreshBadge from "../../components/RefreshBadge";
 import SectionDataState from "../../components/SectionDataState";
+import SectionHeader from "../../components/SectionHeader";
 import SectionToolbar from "../../components/SectionToolbar";
 import { useColors, semanticTagStyle } from "../../styles/ui";
 import type { ThemeColors } from "../../styles/ui";
 import type { MarketEmotionDistribution } from "../../types/stock";
 import { formatMarketDateTime } from "../../utils/marketTime";
-import "./market-emotion.css";
+import "./market-emotion/index.css";
 
 type EmotionTone = "cold" | "neutral" | "hot";
 type MetricTone = "positive" | "warning" | "neutral";
@@ -93,14 +94,13 @@ function SectionHeading({
   extra?: ReactNode;
 }) {
   return (
-    <div className="emotion-section-heading">
-      <span className="emotion-section-heading__icon">{icon}</span>
-      <span>
-        <span className="emotion-section-heading__title">{title}</span>
-        <span className="emotion-section-heading__description">{description}</span>
-      </span>
-      {extra ? <span className="emotion-section-heading__extra">{extra}</span> : null}
-    </div>
+    <SectionHeader
+      icon={icon}
+      title={title}
+      subtitle={description}
+      extra={extra}
+      className="emotion-section-heading"
+    />
   );
 }
 

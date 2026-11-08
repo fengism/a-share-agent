@@ -86,7 +86,7 @@ export default function AnalysisHeaderCard({
   onPush,
 }: AnalysisHeaderCardProps) {
   const colors = useColors();
-  const { cardStyle, gradientHeaderStyle } = useStyles();
+  const { gradientHeaderStyle } = useStyles();
   const [pushModalOpen, setPushModalOpen] = useState(false);
   const info = pageData?.stock_info;
   const valuation = pageData?.valuation;
@@ -125,8 +125,7 @@ export default function AnalysisHeaderCard({
 
   return (
     <div
-      className="analysis-header-card"
-      style={{ ...cardStyle, ...gradientHeaderStyle }}
+      className="analysis-header-card u-card" style={{ ...gradientHeaderStyle }}
     >
       <div className="analysis-header-card__top">
         <div className="analysis-header-card__identity">

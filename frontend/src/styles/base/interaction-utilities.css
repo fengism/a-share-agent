@@ -1,0 +1,88 @@
+/* hover 行、来源标签、刷新指示器
+   自原 base.css 第 1812–1896 行拆出。
+   本目录内文件由 index.css 按固定顺序 @import，顺序不可调整：
+   同特异性规则靠源序决出胜负，重排会改变层叠结果。 */
+/* Remaining hover states migrated from JS to CSS
+   (Feed / Chat / IndustryChain / Analysis Entry). */
+.hover-row {
+  background: var(--c-nested-bg);
+  border: 1px solid var(--c-border);
+  transition: border-color 0.15s, background 0.15s;
+}
+.hover-row:hover {
+  border-color: var(--c-primary);
+  background: var(--c-primary-soft);
+}
+
+.hover-mutedrow {
+  background: transparent;
+  transition: background 0.15s;
+}
+.hover-mutedrow:hover {
+  background: var(--c-muted-soft);
+}
+
+/* base background is set inline (conditional); only override on hover */
+.feed-row:hover {
+  background: var(--c-elevated-bg) !important;
+}
+
+.feed-srctag {
+  background: var(--c-primary-soft);
+  border: 1px solid var(--c-primary-2);
+  transition: background 0.15s, border-color 0.15s;
+}
+.feed-srctag:hover {
+  background: var(--c-primary-2);
+  border-color: var(--c-primary-3);
+}
+
+.data-refresh-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--c-text-muted);
+  font-size: var(--c-font-sm);
+  white-space: nowrap;
+}
+
+.refresh-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  border-radius: var(--c-radius-pill);
+  border: 1px solid var(--c-border);
+  color: var(--c-text-secondary);
+  font-size: var(--c-font-sm);
+  line-height: var(--c-leading-tight);
+  white-space: nowrap;
+  background: transparent;
+}
+
+.refresh-badge__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--c-primary);
+  box-shadow: none;
+  animation: refresh-badge-pulse 2.4s ease-out infinite;
+}
+
+@keyframes refresh-badge-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(8, 127, 152, 0.5);
+  }
+  70% {
+    box-shadow: 0 0 0 6px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .refresh-badge__dot {
+    animation: none;
+  }
+}

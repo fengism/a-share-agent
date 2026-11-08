@@ -44,28 +44,10 @@ const WatchlistCardItem: React.FC<WatchlistCardItemProps> = ({
   return (
     <div
       className={`watchlist-mobile-card ${isSelected ? "is-selected" : ""}`}
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: 8,
-        padding: "var(--c-pad-card, 16px 18px)",
-        background: "var(--c-card-bg)",
-        border: isSelected
-          ? "1px solid var(--c-primary)"
-          : "1px solid var(--c-border)",
-        borderRadius: 8,
-        transition: "border-color 0.2s, box-shadow 0.2s",
-      }}
     >
       {/* 上半部分：左侧代码名称，右侧价格与涨跌幅 */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <div className="watchlist-mobile-card__top">
+        <div className="watchlist-mobile-card__identity">
           <Checkbox
             checked={isSelected}
             onChange={() => onToggleSelect(item.id)}
@@ -73,72 +55,47 @@ const WatchlistCardItem: React.FC<WatchlistCardItemProps> = ({
           />
           <PreloadLink
             to={buildWatchlistStockUrl(item.stock_code, item.market)}
-            style={{ display: "flex", flexDirection: "column" }}
+            className="watchlist-mobile-card__link"
           >
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <strong style={{ fontSize: 16, color: "var(--c-text-primary)" }}>
+            <div className="watchlist-mobile-card__name-row">
+              <strong className="watchlist-mobile-card__name">
                 {item.stock_name}
               </strong>
-              {item.market === "hk" && <Tag color="blue" style={{ margin: 0, fontSize: 10 }}>港股</Tag>}
-              {isLimitUp && <Tag color="red" style={{ margin: 0, fontSize: 10 }}>涨停</Tag>}
-              {isLimitDown && <Tag color="green" style={{ margin: 0, fontSize: 10 }}>跌停</Tag>}
-              {isHighTurnover && <Tag color="orange" style={{ margin: 0, fontSize: 10 }}>高换手</Tag>}
+              {item.market === "hk" && <Tag color="blue" className="watchlist-mobile-card__tag">港股</Tag>}
+              {isLimitUp && <Tag color="red" className="watchlist-mobile-card__tag">涨停</Tag>}
+              {isLimitDown && <Tag color="green" className="watchlist-mobile-card__tag">跌停</Tag>}
+              {isHighTurnover && <Tag color="orange" className="watchlist-mobile-card__tag">高换手</Tag>}
             </div>
-            <span
-              style={{
-                fontSize: 12,
-                fontFamily: "var(--c-font-mono)",
-                color: "var(--c-text-muted)",
-              }}
-            >
+            <span className="watchlist-mobile-card__code">
               {item.stock_code}
             </span>
           </PreloadLink>
         </div>
 
         {/* 右侧价格 & 涨跌幅 */}
-        <div style={{ textAlign: "right" }}>
+        <div className="watchlist-mobile-card__quote">
           <div
-            className={flashClass}
+            className={[
+              flashClass,
+              "watchlist-mobile-card__price",
+              (item.change_pct ?? 0) > 0 ? "is-up" : (item.change_pct ?? 0) < 0 ? "is-down" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
             data-testid="watchlist-card-price"
-            style={{
-              fontSize: 16,
-              fontWeight: 700,
-              fontFamily: "var(--c-font-mono)",
-              padding: "0 4px",
-              borderRadius: 4,
-              transition: "background-color 0.3s ease",
-              color:
-                (item.change_pct ?? 0) > 0
-                  ? "var(--c-up)"
-                  : (item.change_pct ?? 0) < 0
-                  ? "var(--c-down)"
-                  : "var(--c-text-primary)",
-            }}
           >
             {item.current_price != null ? item.current_price.toFixed(2) : "-"}
           </div>
-          <div style={{ fontSize: 13, fontWeight: 600 }}>
+          <div className="watchlist-mobile-card__change">
             <ChangeValue value={item.change_pct} />
           </div>
         </div>
       </div>
 
       {/* 中间指标栏：日内振幅、成交额、换手率 */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr 1fr",
-          alignItems: "center",
-          gap: 8,
-          padding: "6px 8px",
-          background: "color-mix(in srgb, var(--c-page-bg) 60%, transparent)",
-          borderRadius: 6,
-          fontSize: 11,
-        }}
-      >
+      <div className="watchlist-mobile-card__metrics">
         <div>
-          <span style={{ color: "var(--c-text-muted)" }}>日内区间：</span>
+          <span className="u-text-muted">日内区间：</span>
           <PriceRangeBar
             low={item.low_price}
             high={item.high_price}
@@ -146,14 +103,14 @@ const WatchlistCardItem: React.FC<WatchlistCardItemProps> = ({
           />
         </div>
         <div>
-          <span style={{ color: "var(--c-text-muted)" }}>换手：</span>
-          <span style={{ fontFamily: "var(--c-font-mono)" }}>
+          <span className="u-text-muted">换手：</span>
+          <span className="watchlist-mobile-card__mono">
             {item.turnover_pct != null ? `${item.turnover_pct.toFixed(2)}%` : "-"}
           </span>
         </div>
         <div>
-          <span style={{ color: "var(--c-text-muted)" }}>成交额：</span>
-          <span style={{ fontFamily: "var(--c-font-mono)" }}>
+          <span className="u-text-muted">成交额：</span>
+          <span className="watchlist-mobile-card__mono">
             {item.amount != null
               ? item.amount >= 100_000_000
                 ? `${(item.amount / 100_000_000).toFixed(1)}亿`
@@ -164,31 +121,14 @@ const WatchlistCardItem: React.FC<WatchlistCardItemProps> = ({
       </div>
 
       {/* 底部概念与操作栏 */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          flexWrap: "wrap",
-          gap: 6,
-          paddingTop: 2,
-        }}
-      >
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+      <div className="watchlist-mobile-card__footer">
+        <div className="watchlist-mobile-card__concepts">
           {(item.concepts || []).slice(0, 2).map((c) => (
             <button
               key={c.code || c.name}
               type="button"
               onClick={() => onSelectConcept(c.name)}
-              style={{
-                background: "var(--c-nested-bg)",
-                border: "1px solid var(--c-border)",
-                borderRadius: 3,
-                fontSize: 10,
-                padding: "1px 5px",
-                color: "var(--c-text-secondary)",
-                cursor: "pointer",
-              }}
+              className="watchlist-mobile-card__concept"
             >
               {c.name}
             </button>
@@ -211,7 +151,7 @@ const WatchlistCardItem: React.FC<WatchlistCardItemProps> = ({
             <Button
               type="text"
               size="small"
-              icon={<RobotOutlined style={{ color: "var(--c-primary)" }} />}
+              icon={<RobotOutlined className="watchlist-mobile-card__icon-primary" />}
               aria-label={`AI体检${item.stock_name}`}
               onClick={() => triggerStockAiDiagnosis(item.stock_code, item.stock_name, navigate)}
             />
@@ -270,15 +210,7 @@ export const WatchlistCardList: React.FC<WatchlistCardListProps> = ({
   onQuickPreview,
 }) => {
   return (
-    <div
-      className="watchlist-mobile-cards"
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: 10,
-        margin: "8px 0",
-      }}
-    >
+    <div className="watchlist-mobile-cards">
       {items.map((item) => (
         <WatchlistCardItem
           key={item.id}

@@ -28,6 +28,7 @@ import StrategyResultInsightBar from "./StrategyResultInsightBar";
 import { useScreenerBatchController } from "./useScreenerBatchController";
 import { useScreenerFilterController } from "./useScreenerFilterController";
 import { useScreenerPercentiles } from "./useScreenerPercentiles";
+import "./screener-page.css";
 
 interface PresetStrategy {
   label: string;
@@ -360,7 +361,7 @@ export default function Screener() {
     }
   };
 
-  const { cardStyle, sectionCardBodyStyle } = useStyles();
+  const { sectionCardBodyStyle } = useStyles();
   const isNarrow = useMediaQuery("(max-width: 768px)");
   const strategyControlsDisabled = runStrategy.isPending || isFetching;
   const displayedResult = showMatchedOnly && strategyResult
@@ -433,23 +434,11 @@ export default function Screener() {
       />
       <Card
         size="small"
-        title={<span style={{ fontWeight: "var(--c-weight-semibold)" }}>筛选条件</span>}
-        style={{ ...cardStyle, marginBottom: 16 }}
+        title={<span className="screener-page__card-title">筛选条件</span>}
+        className="u-card screener-page__card"
         styles={{ body: sectionCardBodyStyle }}
       >
-        <div
-          style={{
-            marginBottom: 14,
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            overflowX: "auto",
-            whiteSpace: "nowrap",
-            paddingBottom: 4,
-            WebkitOverflowScrolling: "touch",
-            scrollbarWidth: "none",
-          }}
-        >
+        <div className="screener-page__horizontal-scroll">
           {PRESET_STRATEGIES.map((preset) => {
             const active = isPresetActive(preset.filters, filters.filters);
             return (
@@ -458,7 +447,7 @@ export default function Screener() {
                 size="small"
                 shape="round"
                 type={active ? "primary" : "default"}
-                style={{ fontSize: "var(--c-font-md)", fontWeight: "var(--c-weight-medium)", flexShrink: 0 }}
+                className="screener-page__preset-btn"
                 onClick={() => filters.applyPreset(preset.filters)}
                 title={preset.description}
               >
@@ -467,25 +456,14 @@ export default function Screener() {
             );
           })}
         </div>
-        <div style={{ marginBottom: 14 }}>
-          <div style={{ marginBottom: 8, fontSize: "var(--c-font-md)", fontWeight: "var(--c-weight-semibold)" }}>历史信号选股（应用于候选范围）</div>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              overflowX: "auto",
-              whiteSpace: "nowrap",
-              paddingBottom: 4,
-              WebkitOverflowScrolling: "touch",
-              scrollbarWidth: "none",
-            }}
-          >
+        <div className="screener-page__strategy-section">
+          <div className="screener-page__strategy-title">历史信号选股（应用于候选范围）</div>
+          <div className="screener-page__horizontal-scroll">
             {(strategies.data ?? []).map((strategy) => (
               <Button
                 key={strategy.key}
                 size="small"
-                style={{ flexShrink: 0 }}
+                className="screener-page__strategy-btn"
                 type={selectedStrategyKey === strategy.key ? "primary" : "default"}
                 disabled={strategyControlsDisabled}
                 title={`${strategy.description} · ${strategy.scenario}`}
@@ -504,15 +482,15 @@ export default function Screener() {
             const selected = (strategies.data ?? []).find((strategy) => strategy.key === selectedStrategyKey);
             if (!selected) return null;
             return (
-              <div style={{ marginTop: 12, padding: 12, border: "1px solid var(--c-border)", borderRadius: 8 }}>
-                <div style={{ marginBottom: 10, fontWeight: "var(--c-weight-semibold)" }}>{selected.name}参数</div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "end" }}>
+              <div className="screener-page__strategy-box">
+                <div className="screener-page__strategy-box-title">{selected.name}参数</div>
+                <div className="screener-page__strategy-params">
                   {selected.parameter_definitions.map((parameter) => (
-                    <label key={parameter.key} style={{ display: "grid", gap: 4, fontSize: "var(--c-font-sm)", width: isNarrow ? "calc(50% - 6px)" : undefined }}>
+                    <label key={parameter.key} className="screener-page__param-label">
                       <span>{parameter.label}</span>
                       <InputNumber
                         aria-label={parameter.label}
-                        style={{ width: "100%" }}
+                        className="screener-page__param-input"
                         value={Number(strategyParameters[parameter.key] ?? parameter.default)}
                         min={parameter.minimum ?? undefined}
                         max={parameter.maximum ?? undefined}
@@ -522,16 +500,16 @@ export default function Screener() {
                       />
                     </label>
                   ))}
-                  <label style={{ display: "grid", gap: 4, fontSize: "var(--c-font-sm)", width: isNarrow ? "100%" : undefined }}>
+                  <label className="screener-page__param-label screener-page__param-label--full">
                     <span>
                       最大信号年龄（交易日K线）{" "}
                       <Tooltip title="从最近一次入场信号到最新交易日的 K 线根数；清空后不限制">
-                        <InfoCircleOutlined aria-label="最大信号年龄说明" style={{ color: "var(--c-text-muted)" }} />
+                        <InfoCircleOutlined aria-label="最大信号年龄说明" className="screener-page__info-icon" />
                       </Tooltip>
                     </span>
                     <InputNumber
                       aria-label="最大信号年龄"
-                      style={{ width: "100%" }}
+                      className="screener-page__param-input"
                       value={maxSignalAgeBars}
                       min={0}
                       max={250}
@@ -542,9 +520,9 @@ export default function Screener() {
                       onChange={setMaxSignalAgeBars}
                     />
                   </label>
-                  <Radio.Group disabled={strategyControlsDisabled} value={scanLimit} onChange={(event) => setScanLimit(event.target.value)} style={{ width: isNarrow ? "100%" : undefined }}>
-                    <Radio.Button value={50} style={{ width: isNarrow ? "50%" : undefined, textAlign: "center" }}>当前页 {screenerResult?.items.length ?? 0}</Radio.Button>
-                    <Radio.Button value={200} style={{ width: isNarrow ? "50%" : undefined, textAlign: "center" }}>前 200 候选</Radio.Button>
+                  <Radio.Group disabled={strategyControlsDisabled} value={scanLimit} onChange={(event) => setScanLimit(event.target.value)} className="screener-page__radio-group">
+                    <Radio.Button value={50} className="screener-page__radio-btn">当前页 {screenerResult?.items.length ?? 0}</Radio.Button>
+                    <Radio.Button value={200} className="screener-page__radio-btn">前 200 候选</Radio.Button>
                   </Radio.Group>
                   <Button
                     type="primary"
@@ -567,7 +545,7 @@ export default function Screener() {
         />
         {isNarrow ? (
           <>
-            <div style={{ marginTop: 12 }}>
+            <div className="screener-page__mobile-filter-btn">
               <Button
                 block
                 icon={<FilterOutlined />}
@@ -629,7 +607,7 @@ export default function Screener() {
             type="warning"
             showIcon
             action={<Button size="small" onClick={() => refetchIndustries()}>重试</Button>}
-            style={{ marginTop: 12, borderRadius: 8 }}
+            className="screener-page__alert--inline"
           />
         )}
       </Card>
@@ -642,7 +620,7 @@ export default function Screener() {
           action={<Button danger size="small" onClick={() => cancelStrategy?.()}>取消扫描</Button>}
           type="info"
           showIcon
-          style={{ marginBottom: 16, borderRadius: 8 }}
+          className="screener-page__alert--section"
         />
       ) : null}
       {strategyResult ? (
@@ -664,7 +642,7 @@ export default function Screener() {
             showIcon
             closable
             onClose={() => { setStrategyResult(undefined); setShowMatchedOnly(false); setExcludedDetailsOpen(false); }}
-            style={{ marginBottom: 16, borderRadius: 8 }}
+            className="screener-page__alert--section"
           />
           <StrategyResultInsightBar
             strategyName={strategyResult.name}
@@ -688,11 +666,11 @@ export default function Screener() {
         onCancel={() => setExcludedDetailsOpen(false)}
         width={560}
       >
-        <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+        <ul className="screener-page__excluded-list">
           {Object.entries(strategyResult?.excluded ?? {}).map(([code, reason]) => {
             const stockName = screenerResult?.items.find((item) => item.code === code)?.name;
             return (
-              <li key={code} style={{ padding: "8px 0" }}>
+              <li key={code} className="screener-page__excluded-item">
                 <Space align="start">
                   <Typography.Text code>{stockName ? `${code} ${stockName}` : code}</Typography.Text>
                   <Typography.Text>{reason}</Typography.Text>
@@ -707,13 +685,14 @@ export default function Screener() {
           title="正在计算估值百分位，请稍候..."
           type="info"
           showIcon
-          style={{ marginBottom: 16, borderRadius: 8 }}
+          className="screener-page__alert--section"
         />
       )}
       <Card
         size="small"
+        className="u-card screener-page__card"
         title={(
-          <span style={{ fontWeight: "var(--c-weight-semibold)" }}>
+          <span className="screener-page__card-title">
             {showMatchedOnly && strategyResult
               ? `策略命中 (${strategyResult.matchedItems.length} 只)`
               : `筛选结果${screenerResult ? ` (${screenerResult.total} 只)` : ""}`}
@@ -791,7 +770,6 @@ export default function Screener() {
             <DataRefreshIndicator active={isFetching && !!screenerResult} />
           </Space>
         )}
-        style={cardStyle}
         styles={{ body: { padding: "12px 18px" } }}
       >
         <SectionDataState
@@ -857,7 +835,7 @@ export default function Screener() {
           )}
         </SectionDataState>
       </Card>
-      <div style={{ height: 72 }} aria-hidden />
+      <div className="screener-page__bottom-spacer" aria-hidden />
     </PageShell>
   );
 }

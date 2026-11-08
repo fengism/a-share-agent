@@ -1,0 +1,211 @@
+/* ── 仓位管理（Portfolio）移动端响应式样式 ── */
+
+/* 资产汇总卡片与统计指标 */
+.portfolio-block-mb {
+  margin-bottom: 16px;
+}
+
+.portfolio-summary-card {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.portfolio-summary-card--position.ant-card {
+  border-left: 3px solid #722ed1;
+}
+
+.portfolio-summary-card--market.ant-card {
+  border-left: 3px solid var(--c-primary);
+}
+
+.portfolio-summary-card--cost.ant-card {
+  border-left: 3px solid #1890ff;
+}
+
+.portfolio-summary-side-grid {
+  height: 100%;
+}
+
+.portfolio-summary-stat .ant-statistic-title {
+  margin-bottom: 4px;
+  font-size: var(--c-font-xs, 12px);
+  color: var(--c-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.portfolio-summary-stat .ant-statistic-title .anticon {
+  margin-right: 4px;
+}
+
+.portfolio-summary-stat .ant-statistic-content,
+.portfolio-summary-stat.ant-statistic .ant-statistic-content {
+  font-family: var(--c-font-mono);
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: -0.01em;
+}
+
+.portfolio-hero-stat.ant-statistic .ant-statistic-content {
+  font-weight: 800;
+  font-size: calc(var(--c-font-lg, 18px) * 1.5);
+  letter-spacing: -0.02em;
+}
+
+.portfolio-hero-pnl-strip .portfolio-summary-stat.ant-statistic .ant-statistic-content {
+  font-size: 15px;
+}
+
+.portfolio-summary-subtext,
+.portfolio-summary-subtext.ant-typography {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 4px;
+  color: var(--c-text-muted);
+  font-size: var(--c-font-sm);
+}
+
+.portfolio-hero-pnl-strip .portfolio-summary-subtext,
+.portfolio-hero-pnl-strip .portfolio-summary-subtext.ant-typography {
+  font-size: var(--c-font-xs);
+}
+
+.portfolio-risk-subtext,
+.portfolio-risk-subtext.ant-typography {
+  color: var(--c-text-muted);
+  font-size: var(--c-font-sm);
+}
+
+/* 实际买卖点卡片头部与列表 */
+.portfolio-trade-kline__mobile-head {
+  padding-bottom: 4px;
+}
+
+.portfolio-trade-kline__tag-list {
+  max-height: 260px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+/* 移动端媒体查询（≤ 768px） */
+@media (max-width: 768px) {
+  .portfolio-summary-card.ant-card > .ant-card-body {
+    padding: 10px 10px;
+  }
+
+  .portfolio-summary-stat .ant-statistic-title {
+    font-size: 11px;
+    margin-bottom: 2px;
+  }
+
+  .portfolio-summary-stat .ant-statistic-content,
+  .portfolio-summary-stat.ant-statistic .ant-statistic-content {
+    font-size: 16px;
+  }
+
+  .portfolio-summary-stat.ant-statistic .ant-statistic-content .ant-statistic-content-prefix {
+    font-size: 13px;
+    margin-inline-end: 2px;
+  }
+
+  .portfolio-summary-stat .ant-statistic-content-suffix {
+    font-size: 12px;
+  }
+
+  .portfolio-summary-subtext,
+  .portfolio-summary-subtext.ant-typography,
+  .portfolio-hero-pnl-strip .portfolio-summary-subtext,
+  .portfolio-hero-pnl-strip .portfolio-summary-subtext.ant-typography {
+    font-size: 10.5px;
+    margin-top: 2px;
+  }
+
+  /* 仓位风险与资产曲线统计指标移动端收缩 */
+  .portfolio-risk-stat .ant-statistic-title,
+  .portfolio-equity-stat .ant-statistic-title {
+    font-size: 11px !important;
+    margin-bottom: 2px;
+  }
+
+  .portfolio-risk-stat.ant-statistic .ant-statistic-content,
+  .portfolio-equity-stat.ant-statistic .ant-statistic-content {
+    font-size: 16px;
+  }
+
+  .portfolio-risk-stat .ant-statistic-content-prefix,
+  .portfolio-risk-stat .ant-statistic-content-suffix,
+  .portfolio-equity-stat .ant-statistic-content-prefix,
+  .portfolio-equity-stat .ant-statistic-content-suffix {
+    font-size: 12px;
+  }
+
+  .portfolio-risk-subtext,
+  .portfolio-risk-subtext.ant-typography {
+    font-size: 10.5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+  }
+}
+
+/* 超窄屏手机端媒体查询（≤ 480px） */
+@media (max-width: 480px) {
+  .portfolio-summary-card.ant-card > .ant-card-body {
+    padding: 8px 8px;
+  }
+
+  .portfolio-summary-stat .ant-statistic-title {
+    font-size: 10.5px;
+  }
+
+  .portfolio-summary-stat .ant-statistic-content {
+    font-size: 14.5px !important;
+  }
+
+  .portfolio-summary-stat.ant-statistic .ant-statistic-content .ant-statistic-content-prefix {
+    font-size: 11.5px;
+  }
+
+  .portfolio-summary-stat .ant-statistic-content-suffix {
+    font-size: 11px;
+  }
+
+  .portfolio-summary-subtext,
+  .portfolio-summary-subtext.ant-typography,
+  .portfolio-hero-pnl-strip .portfolio-summary-subtext,
+  .portfolio-hero-pnl-strip .portfolio-summary-subtext.ant-typography {
+    font-size: 10px;
+  }
+
+  .portfolio-risk-stat.ant-statistic .ant-statistic-content,
+  .portfolio-equity-stat.ant-statistic .ant-statistic-content {
+    font-size: 14.5px;
+  }
+}
+
+@media (max-width: 576px) {
+  .portfolio-settings-submit-item.ant-form-item .ant-form-item-label {
+    display: none;
+  }
+}
+
+/* 标签徽标与多表聚合 Tab 样式 */
+.portfolio-tab-badge {
+  font-size: 11px;
+  color: var(--c-text-muted, #8c8c8c);
+  font-weight: 500;
+  margin-left: 2px;
+}
+
+.portfolio-tables-card .ant-tabs > .ant-tabs-nav {
+  margin-bottom: 8px;
+}
+
+.portfolio-bare-table-container {
+  padding-top: 4px;
+}

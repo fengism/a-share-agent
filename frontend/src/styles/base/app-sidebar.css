@@ -1,0 +1,211 @@
+/* 侧栏工具区、移动端抽屉导航、折叠态导航
+   自原 base.css 第 563–770 行拆出。
+   本目录内文件由 index.css 按固定顺序 @import，顺序不可调整：
+   同特异性规则靠源序决出胜负，重排会改变层叠结果。 */
+/* 运维工具区：紧接最后一组，靠分隔线区隔，不占分组标题的视觉权重 */
+.app-sidebar-nav__utility {
+  margin-top: 8px;
+  padding-top: 2px;
+}
+
+.app-sidebar-nav__utility .app-sidebar-nav__divider {
+  margin-bottom: 4px;
+}
+
+.app-sidebar-nav__group-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px 3px;
+  color: var(--c-text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  user-select: none;
+  opacity: 0.8;
+}
+
+.app-sidebar-nav__group-icon {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  opacity: 0.85;
+}
+
+[data-theme="stellar-blue"] .app-sidebar-nav__group-title span,
+[data-theme="light"] .app-sidebar-nav__group-title span {
+  color: var(--c-text-muted);
+}
+
+.app-sidebar-nav__item {
+  position: relative;
+  display: flex;
+  width: 100%;
+  min-height: 33px;
+  padding: 0 10px;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid transparent;
+  border-radius: var(--c-radius-sm);
+  color: var(--c-text-secondary);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--c-font-sm, 13px);
+  text-align: left;
+  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+[data-theme="stellar-blue"] .app-sidebar-nav__item:hover {
+  color: var(--c-text-primary);
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.app-sidebar-nav__item:focus-visible {
+  outline: 2px solid var(--c-focus-ring);
+  outline-offset: -2px;
+}
+
+[data-theme="stellar-blue"] .app-sidebar-nav__item[aria-current="page"] {
+  color: #ffffff;
+  background: rgba(14, 165, 233, 0.12);
+  font-weight: 500;
+  border: 1px solid rgba(14, 165, 233, 0.28);
+  box-shadow: none;
+}
+
+[data-theme="stellar-blue"] .app-sidebar-nav__item[aria-current="page"]::before {
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  left: 0;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--c-accent, var(--c-primary));
+  box-shadow: none;
+  content: "";
+}
+
+[data-theme="stellar-blue"] .app-sidebar-nav__item[aria-current="page"] .app-sidebar-nav__icon {
+  color: var(--c-accent, var(--c-primary));
+  filter: none;
+}
+
+[data-theme="light"] .app-sidebar-nav__item {
+  color: var(--c-text-secondary);
+}
+
+[data-theme="light"] .app-sidebar-nav__item:hover {
+  color: var(--c-text-primary);
+  background: var(--c-hover-bg);
+  border-color: var(--c-border);
+  box-shadow: none;
+}
+
+[data-theme="light"] .app-sidebar-nav__item[aria-current="page"] {
+  color: var(--c-primary);
+  background: rgba(2, 132, 199, 0.08);
+  font-weight: 500;
+  border: 1px solid rgba(2, 132, 199, 0.22);
+  box-shadow: none;
+}
+
+[data-theme="light"] .app-sidebar-nav__item[aria-current="page"]::before {
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  left: 0;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--c-primary);
+  box-shadow: none;
+  content: "";
+}
+
+[data-theme="light"] .app-sidebar-nav__item[aria-current="page"] .app-sidebar-nav__icon {
+  color: var(--c-primary);
+}
+
+.app-sidebar-nav__icon {
+  display: grid;
+  width: 20px;
+  flex: 0 0 20px;
+  place-items: center;
+  font-size: var(--c-font-lg);
+}
+
+.app-sidebar-nav__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── 移动端抽屉专属导航优化 ── */
+.app-sidebar-nav--mobile {
+  padding: 8px 12px 18px;
+}
+
+.app-sidebar-nav--mobile .app-sidebar-nav__group + .app-sidebar-nav__group {
+  margin-top: 12px;
+  padding-top: 8px;
+}
+
+.app-sidebar-nav--mobile .app-sidebar-nav__group-title {
+  padding: 5px 12px 4px;
+  font-size: 11.5px;
+}
+
+.app-sidebar-nav--mobile .app-sidebar-nav__item {
+  min-height: 42px;
+  padding: 0 14px;
+  border-radius: 8px;
+  font-size: 14px;
+  gap: 12px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.app-sidebar-nav--mobile .app-sidebar-nav__icon {
+  font-size: 17px;
+  width: 22px;
+  flex: 0 0 22px;
+}
+
+.app-sidebar-nav--mobile .app-sidebar-nav__item[aria-current="page"]::before {
+  top: 8px;
+  bottom: 8px;
+  width: 3.5px;
+}
+
+/* ── 折叠态专属导航优化 ── */
+.app-sidebar-nav--collapsed {
+  padding-inline: 8px;
+}
+
+.app-sidebar-nav__divider {
+  height: 1px;
+  margin: 6px 6px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="light"] .app-sidebar-nav__divider {
+  background: var(--c-border);
+}
+
+.app-sidebar-nav--collapsed .app-sidebar-nav__item {
+  padding: 0;
+  justify-content: center;
+  min-height: 36px;
+  margin: 2px 0;
+}
+
+.app-sidebar-nav--collapsed .app-sidebar-nav__item[aria-current="page"]::before {
+  display: none;
+}
+
+.app-sidebar-nav--collapsed .app-sidebar-nav__item:hover {
+  transform: none;
+}

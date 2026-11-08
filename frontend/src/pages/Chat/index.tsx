@@ -14,7 +14,7 @@ import { ChatSkillSelector } from "./components/ChatSkillSelector";
 import { useChatCapabilitySelection } from "./useChatCapabilitySelection";
 import { useChatController } from "./useChatController";
 import { useChatResultActionController } from "./useChatResultActionController";
-import "./chat.css";
+import "./styles/index.css";
 
 export default function ChatPage() {
   const [searchParams] = useSearchParams();

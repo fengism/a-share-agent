@@ -28,6 +28,17 @@ vi.mock("../../api/queries", () => ({
       limit_down_count: 6,
       median_change_pct: 1.2,
       hot_themes: ["低空经济", "军工"],
+      top_picks: [
+        {
+          code: "600487", name: "亨通光电", price: 12.34, change_pct: 3.21, market_cap: 300.5,
+          turnover_pct: 4.2, amount: 102.6, industry: "通信设备",
+          strategies: ["底部放量", "多头趋势"], signal_types: ["reversal", "trend"], signal_date: "2026-08-19",
+          signal_age_days: 2, score: 4.6, signal_score: 3.2, quality_score: 0.8, fundamental_score: 0.5,
+          theme_score: 0.6, themes: ["低空经济"], sector_strength: 1.5, risk_flags: ["RSI超买"],
+          reason: "命中底部放量、多头趋势；通信设备；题材：低空经济",
+          category: "reversal", category_label: "超跌反转",
+        },
+      ],
       items: [
         {
           code: "600487", name: "亨通光电", price: 12.34, change_pct: 3.21, market_cap: 300.5,
@@ -36,6 +47,7 @@ vi.mock("../../api/queries", () => ({
           signal_age_days: 2, score: 4.6, signal_score: 3.2, quality_score: 0.8, fundamental_score: 0.5,
           theme_score: 0.6, themes: ["低空经济"], sector_strength: 1.5, risk_flags: ["RSI超买"],
           reason: "命中底部放量、多头趋势；通信设备；题材：低空经济",
+          category: "reversal", category_label: "超跌反转",
         },
         {
           code: "601899", name: "紫金矿业", price: 20.1, change_pct: -0.5, market_cap: 5000,
@@ -43,6 +55,7 @@ vi.mock("../../api/queries", () => ({
           strategies: ["多头趋势"], signal_types: ["trend"], signal_date: "2026-08-21",
           signal_age_days: 1, score: 2.0, signal_score: 2.0, quality_score: 0.0, fundamental_score: 0.0,
           theme_score: 0.0, themes: [], sector_strength: -0.5, risk_flags: [], reason: "命中多头趋势；有色金属",
+          category: "anchor", category_label: "机构中军",
         },
       ],
     },
@@ -62,6 +75,9 @@ vi.mock("../../api/queries", () => ({
       median_return_pct: 2.0,
       average_excess_pct: 1.5,
       benchmark_return_pct: 1.7,
+      profit_loss_ratio: 2.35,
+      positive_count: 1,
+      negative_count: 1,
       message: null,
       items: [
         {
@@ -81,10 +97,16 @@ vi.mock("../../api/queries", () => ({
     error: null,
     refetch: vi.fn(),
   }),
+  useWatchlist: () => ({
+    data: { items: [{ stock_code: "600487", stock_name: "亨通光电" }] },
+    isLoading: false,
+  }),
+  useAddWatchlistItem: () => ({ mutate: vi.fn(), isPending: false }),
+  useDeleteWatchlistItem: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 describe("PotentialPage", () => {
-  it("renders the mining summary and ranked stocks with strategy tags", () => {
+  it("renders the mining summary, top picks, and ranked stocks with strategy tags", () => {
     render(
       <MemoryRouter>
         <PotentialPage />
@@ -99,10 +121,21 @@ describe("PotentialPage", () => {
     expect(screen.getAllByText("亨通光电").length).toBeGreaterThan(0);
     expect(screen.getByText("底部放量")).toBeInTheDocument();
     expect(screen.getAllByText("通信设备").length).toBeGreaterThan(0);
-    expect(screen.getByText("4.6")).toBeInTheDocument();
+    expect(screen.getAllByText("4.6").length).toBeGreaterThan(0);
+
+    // 今日精选金股与风格定位
+    expect(screen.getByText("今日精选金股")).toBeInTheDocument();
+    expect(screen.getAllByText(/超跌反转/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/机构中军/).length).toBeGreaterThan(0);
+
+    // 历史表现与回测指标
     expect(screen.getByText("历史表现复盘")).toBeInTheDocument();
     expect(screen.getByText("胜率")).toBeInTheDocument();
     expect(screen.getByText("50%")).toBeInTheDocument();
+    expect(screen.getByText("盈亏比")).toBeInTheDocument();
+    expect(screen.getByText("2.35")).toBeInTheDocument();
+    expect(screen.getByText("涨跌分布")).toBeInTheDocument();
+
     const link = screen.getAllByRole("link", { name: /亨通光电/ })[0];
     expect(link).toHaveAttribute("href", "/stock/600487");
   });
@@ -130,5 +163,6 @@ describe("PotentialPage", () => {
     expect(screen.getAllByText("底部企稳").length).toBeGreaterThan(0);
     expect(screen.getByText(/全部候选/)).toBeInTheDocument();
     expect(screen.getByText(/顺势突破/)).toBeInTheDocument();
+    expect(screen.getAllByText(/机构中军/).length).toBeGreaterThan(0);
   });
 });

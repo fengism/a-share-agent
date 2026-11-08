@@ -1,0 +1,82 @@
+/* toolbar-and-anchor —— 自 research-framework.css 第 9–89 行拆出。
+   由同目录 index.css 按固定顺序 @import，顺序不可调整：同特异性规则靠源序决胜负。 */
+.research-reading-toolbar {
+  position: sticky;
+  z-index: 4;
+  top: 0;
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius-md);
+  background: var(--c-card-bg);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.research-reading-toolbar nav {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+}
+
+.research-reading-toolbar a {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--c-radius-sm);
+  color: var(--c-text-secondary);
+  font-size: var(--stock-research-support-size, 12px);
+  font-weight: var(--c-weight-medium);
+  line-height: var(--c-leading-normal);
+  transition: all 0.15s ease;
+  text-decoration: none;
+}
+
+.research-reading-toolbar a:hover,
+.research-reading-toolbar a:focus-visible {
+  color: var(--c-primary);
+  background: var(--c-primary-soft, rgba(8, 127, 152, 0.1));
+  border-color: var(--c-primary);
+}
+
+.research-anchor {
+  scroll-margin-top: 90px;
+}
+
+.research-section__compact-summary {
+  padding: 10px 14px;
+  border: 1px solid var(--c-border);
+  border-left: 3px solid var(--c-primary);
+  border-radius: var(--c-radius-sm);
+  background: var(--c-hover-bg);
+  color: var(--c-text-primary);
+  font-size: var(--stock-research-body-size, 14px);
+  line-height: var(--c-leading-relaxed, 1.6);
+}
+
+.research-valuation-compact-summary {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.research-valuation-compact-summary strong {
+  min-width: 0;
+  font-size: var(--c-font-base, 14px);
+  overflow-wrap: anywhere;
+}
+.research-valuation-compact-summary .ant-btn { flex: none; }
+
+.research-framework.is-compact .research-section__content[aria-hidden="true"] {
+  display: none;
+}

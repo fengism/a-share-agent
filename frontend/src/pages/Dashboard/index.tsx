@@ -26,7 +26,7 @@ import RefreshBadge from "../../components/RefreshBadge";
 import SectionDataState from "../../components/SectionDataState";
 import StockExternalLink from "../../components/StockExternalLink";
 import { useAStockTradingSession } from "../../hooks/useAStockTradingSession";
-import { useColors, useTokens, semanticTagStyle } from "../../styles/ui";
+import { semanticTagStyle } from "../../styles/ui";
 import type {
   MarketMainlineChance,
   MarketMainlineStyle,
@@ -38,7 +38,7 @@ import MarketWindBoard from "../../components/MarketWindBoard";
 import { marketDateStamp } from "../../utils/marketTime";
 import WatchlistPanel from "./WatchlistPanel";
 import NationalTeamSignalCard from "./NationalTeamSignalCard";
-import "./dashboard.css";
+import "./styles/index.css";
 
 const { Text } = Typography;
 
@@ -111,49 +111,40 @@ function collectStyleStockRows(style: MarketMainlineStyle): MainlineStyleStockRo
 }
 
 function MainlineChanceCard({ chance }: { chance: MarketMainlineChance }) {
-  const t = useTokens();
   return (
     <Card
-      className="dashboard-mainline-card"
+      className="dashboard-mainline-card dashboard-mainline-card--chance"
       size="small"
       title={chance.title}
       extra={
-        <span style={{ display: "inline-flex", gap: t.space[1] }}>
+        <span className="dashboard-mainline__tags">
           {chance.continued_days != null && chance.continued_days > 0 ? (
             <Tag className="financial-num" style={{ marginInlineEnd: 0 }}>持续 {chance.continued_days} 天</Tag>
           ) : null}
           {chance.hot != null && chance.hot > 0 ? (
-            <Tag className="financial-num" color="volcano" style={{ marginInlineEnd: 0 }}>热度 {chance.hot}</Tag>
+            <Tag className="financial-num" color="orange" style={{ marginInlineEnd: 0 }}>热度 {chance.hot}</Tag>
           ) : null}
         </span>
       }
-      style={{
-        borderRadius: t.radius.md,
-        boxShadow: t.shadow.xs,
-        height: "100%",
-        display: "flex",
-        flexDirection: "column",
-      }}
-      styles={{ body: { flex: 1, minHeight: 0 } }}
     >
       {chance.description ? (
-        <Text type="secondary" style={{ fontSize: t.font.sm }}>{chance.description}</Text>
+        <Text type="secondary" className="dashboard-text-sm">{chance.description}</Text>
       ) : null}
-      <div style={{ marginTop: chance.description ? t.space[2] : 0, display: "grid", gap: t.space[2] }}>
+      <div className={chance.description ? "dashboard-mainline__plates dashboard-mainline__plates--spaced" : "dashboard-mainline__plates"}>
         {chance.plates.map((plate) => (
           <div
             key={`${plate.code}-${plate.name}`}
             className="dashboard-mainline-plate"
           >
-            <div style={{ display: "flex", alignItems: "baseline", gap: t.space[2], flexWrap: "wrap" }}>
+            <div className="dashboard-mainline__plate-head">
               <Text strong>{plate.name}</Text>
               <ChangeValue value={plate.change_pct} />
               {plate.rise_count != null && plate.rise_count > 0 ? (
-                <Text type="secondary" className="financial-num" style={{ fontSize: t.font.xs }}>{plate.rise_count} 家上涨</Text>
+                <Text type="secondary" className="financial-num dashboard-text-xs">{plate.rise_count} 家上涨</Text>
               ) : null}
             </div>
             {plate.reason ? (
-              <Text type="secondary" style={{ fontSize: t.font.xs }} ellipsis>{plate.reason}</Text>
+              <Text type="secondary" className="dashboard-text-xs" ellipsis>{plate.reason}</Text>
             ) : null}
           </div>
         ))}
@@ -163,9 +154,6 @@ function MainlineChanceCard({ chance }: { chance: MarketMainlineChance }) {
 }
 
 function MainlineFaucetTableCard({ rows }: { rows: MainlineFaucetRow[] }) {
-  const c = useColors();
-  const t = useTokens();
-
   const handleExportCsv = () => {
     const headers = ["股票代码", "股票名称", "所属主线", "涨跌幅(%)", "上涨逻辑"];
     const lines = rows.map((r) => [
@@ -190,9 +178,9 @@ function MainlineFaucetTableCard({ rows }: { rows: MainlineFaucetRow[] }) {
       key: "stock",
       width: 150,
       render: (_value, row) => (
-        <span style={{ display: "inline-flex", alignItems: "baseline", gap: t.space[2] }}>
+        <span className="dashboard-stock-cell">
           <StockExternalLink code={row.code} name={row.name}><strong>{row.name}</strong></StockExternalLink>
-          <span className="financial-num" style={{ color: c.textSecondary, fontSize: t.font.xs }}>{row.code}</span>
+          <span className="financial-num dashboard-stock-cell__code">{row.code}</span>
         </span>
       ),
     },
@@ -218,26 +206,26 @@ function MainlineFaucetTableCard({ rows }: { rows: MainlineFaucetRow[] }) {
       key: "actions",
       width: 135,
       render: (_value, row) => (
-        <span style={{ display: "inline-flex", gap: 4 }}>
+        <span className="dashboard-quick-actions">
           <PreloadLink to={`/chat?prompt=${encodeURIComponent(`分析 ${row.name}(${row.code}) 的主线逻辑、资金流向与近期估值`)}`}>
-            <Button size="small" type="link" style={{ padding: "0 2px", fontSize: 12 }}>
+            <Button size="small" type="link" className="dashboard-link-btn">
               问AI
             </Button>
           </PreloadLink>
           <PreloadLink to={`/analysis?code=${row.code}`}>
-            <Button size="small" type="link" style={{ padding: "0 2px", fontSize: 12 }}>
+            <Button size="small" type="link" className="dashboard-link-btn">
               研报
             </Button>
           </PreloadLink>
           <PreloadLink to={`/quant?codes=${row.code}`}>
-            <Button size="small" type="link" style={{ padding: "0 2px", fontSize: 12 }}>
+            <Button size="small" type="link" className="dashboard-link-btn">
               回测
             </Button>
           </PreloadLink>
         </span>
       ),
     },
-  ], [c.textSecondary, t.font.xs, t.space]);
+  ], []);
 
   return (
     <Card
@@ -251,7 +239,6 @@ function MainlineFaucetTableCard({ rows }: { rows: MainlineFaucetRow[] }) {
           </Button>
         ) : null
       }
-      style={{ borderRadius: t.radius.md, boxShadow: t.shadow.xs }}
     >
       <div className="dashboard-faucet-desktop-table">
         <Table<MainlineFaucetRow>
@@ -276,7 +263,7 @@ function MainlineFaucetTableCard({ rows }: { rows: MainlineFaucetRow[] }) {
               <ChangeValue value={row.change_pct} />
             </div>
             <div className="dashboard-faucet-card-item__meta">
-              <Tag color="blue" style={{ marginInlineEnd: 0, fontSize: 11 }}>{row.origin}</Tag>
+              <Tag color="blue" className="dashboard-origin-tag">{row.origin}</Tag>
             </div>
             {row.reason ? (
               <div className="dashboard-faucet-card-item__reason">
@@ -285,12 +272,12 @@ function MainlineFaucetTableCard({ rows }: { rows: MainlineFaucetRow[] }) {
             ) : null}
             <div className="dashboard-faucet-card-item__actions">
               <PreloadLink to={`/analysis?code=${row.code}`}>
-                <Button size="small" type="link" style={{ padding: "0 4px", fontSize: 12 }}>
+                <Button size="small" type="link" className="dashboard-link-btn dashboard-link-btn--wide">
                   研报
                 </Button>
               </PreloadLink>
               <PreloadLink to={`/quant?codes=${row.code}`}>
-                <Button size="small" type="link" style={{ padding: "0 4px", fontSize: 12 }}>
+                <Button size="small" type="link" className="dashboard-link-btn dashboard-link-btn--wide">
                   回测
                 </Button>
               </PreloadLink>
@@ -303,8 +290,6 @@ function MainlineFaucetTableCard({ rows }: { rows: MainlineFaucetRow[] }) {
 }
 
 function MainlineStyleTableCard({ style }: { style: MarketMainlineStyle }) {
-  const c = useColors();
-  const t = useTokens();
   const stockRows = useMemo(() => collectStyleStockRows(style), [style]);
 
   const indexColumns: ColumnsType<MarketMainlineStyleIndex> = useMemo(() => [
@@ -330,9 +315,9 @@ function MainlineStyleTableCard({ style }: { style: MarketMainlineStyle }) {
       key: "stock",
       width: 150,
       render: (_value, row) => (
-        <span style={{ display: "inline-flex", alignItems: "baseline", gap: t.space[2] }}>
+        <span className="dashboard-stock-cell">
           <StockExternalLink code={row.code} name={row.name}><strong>{row.name}</strong></StockExternalLink>
-          <span className="financial-num" style={{ color: c.textSecondary, fontSize: t.font.xs }}>{row.code}</span>
+          <span className="financial-num dashboard-stock-cell__code">{row.code}</span>
         </span>
       ),
     },
@@ -352,33 +337,31 @@ function MainlineStyleTableCard({ style }: { style: MarketMainlineStyle }) {
       width: 65,
       render: (_value, row) => (
         <PreloadLink to={`/analysis?code=${row.code}`}>
-          <Button size="small" type="link" style={{ padding: "0 2px", fontSize: 12 }}>
+          <Button size="small" type="link" className="dashboard-link-btn">
             研报
           </Button>
         </PreloadLink>
       ),
     },
-  ], [c.textSecondary, t.font.xs, t.space]);
+  ], []);
 
   return (
     <Card
-      className="dashboard-mainline-card"
+      className="dashboard-mainline-card dashboard-mainline-card--stacked"
       size="small"
       title="风格判断"
-      style={{ borderRadius: t.radius.md, boxShadow: t.shadow.xs }}
-      styles={{ body: { display: "grid", gap: t.space[3] } }}
     >
       {style.title || style.interpret ? (
-        <div style={{ display: "grid", gap: 2 }}>
-          {style.title ? <Text strong style={{ fontSize: t.font.sm }}>{style.title}</Text> : null}
+        <div className="dashboard-style-block">
+          {style.title ? <Text strong className="dashboard-text-sm">{style.title}</Text> : null}
           {style.interpret ? (
-            <Text type="secondary" style={{ fontSize: t.font.sm }}>{style.interpret}</Text>
+            <Text type="secondary" className="dashboard-text-sm">{style.interpret}</Text>
           ) : null}
         </div>
       ) : null}
       {style.indexes.length > 0 ? (
-        <div style={{ display: "grid", gap: t.space[2], minWidth: 0 }}>
-          <Text strong style={{ fontSize: t.font.sm }}>指数表现</Text>
+        <div className="dashboard-style-grid">
+          <Text strong className="dashboard-text-sm">指数表现</Text>
           <Table<MarketMainlineStyleIndex>
             size="small"
             rowKey="code"
@@ -390,8 +373,8 @@ function MainlineStyleTableCard({ style }: { style: MarketMainlineStyle }) {
         </div>
       ) : null}
       {stockRows.length > 0 ? (
-        <div style={{ display: "grid", gap: t.space[2], minWidth: 0 }}>
-          <Text strong style={{ fontSize: t.font.sm }}>代表个股</Text>
+        <div className="dashboard-style-grid">
+          <Text strong className="dashboard-text-sm">代表个股</Text>
           <Table<MainlineStyleStockRow>
             size="small"
             rowKey="key"
@@ -407,7 +390,6 @@ function MainlineStyleTableCard({ style }: { style: MarketMainlineStyle }) {
 }
 
 function DashboardMainlineSection() {
-  const t = useTokens();
   const query = useMarketMainline();
   const isTradingSession = useAStockTradingSession();
   const chances = useMemo(() => query.data?.items ?? [], [query.data?.items]);
@@ -417,7 +399,7 @@ function DashboardMainlineSection() {
 
   return (
     <section aria-label="今日主线">
-      <header className="dashboard-section-heading" style={{ marginBottom: 16 }}>
+      <header className="dashboard-section-heading">
         <span className="dashboard-section-heading__icon"><AimOutlined /></span>
         <span className="dashboard-section-heading__text">
           <strong>今日主线</strong>
@@ -447,7 +429,7 @@ function DashboardMainlineSection() {
         skeletonRows={4}
         minHeight={160}
       >
-        <div style={{ display: "grid", gap: t.space[3] }}>
+        <div className="dashboard-mainline-section-body">
           {chances.length > 0 ? (
             <div className="dashboard-mainline-grid">
               {chances.map((chance) => (
@@ -475,15 +457,15 @@ export default function Dashboard() {
     <PageShell width="full" className="dashboard-page">
       <header className="dashboard-hero">
         <div className="dashboard-hero__copy">
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <div className="dashboard-hero__meta">
             <span className="dashboard-hero__eyebrow">今日市场</span>
-            <span style={{ fontSize: "var(--c-font-xs)", color: "var(--c-text-muted)" }}>·</span>
+            <span className="dashboard-hero__meta-sep">·</span>
             <span className="dashboard-hero__terminal-badge">
               <span className="dashboard-hero__pulse-dot" />
               A股实时态势
             </span>
-            <span style={{ fontSize: "var(--c-font-xs)", color: "var(--c-text-muted)" }}>·</span>
-            <span style={{ fontSize: "var(--c-font-xs)", color: "var(--c-text-secondary)", fontFamily: "var(--c-font-mono)" }}>{dateStr}</span>
+            <span className="dashboard-hero__meta-sep">·</span>
+            <span className="dashboard-hero__date">{dateStr}</span>
           </div>
           <h1 className="dashboard-hero__title">市场总览</h1>
         </div>
@@ -502,7 +484,7 @@ export default function Dashboard() {
             size="small"
             shape="round"
             className="dashboard-hero__shortcut-btn"
-            icon={<RobotOutlined style={{ color: "var(--c-primary)" }} />}
+            icon={<RobotOutlined className="dashboard-hero__shortcut-icon" />}
             onClick={() => navigate("/analysis")}
           >
             个股研报
@@ -511,7 +493,7 @@ export default function Dashboard() {
             size="small"
             shape="round"
             className="dashboard-hero__shortcut-btn"
-            icon={<ThunderboltOutlined style={{ color: "var(--c-warning, #faad14)" }} />}
+            icon={<ThunderboltOutlined className="dashboard-hero__shortcut-icon dashboard-hero__shortcut-icon--warning" />}
             onClick={() => navigate("/screener")}
           >
             智能选股
@@ -520,7 +502,7 @@ export default function Dashboard() {
             size="small"
             shape="round"
             className="dashboard-hero__shortcut-btn"
-            icon={<LineChartOutlined style={{ color: "var(--c-primary)" }} />}
+            icon={<LineChartOutlined className="dashboard-hero__shortcut-icon" />}
             onClick={() => navigate("/quant")}
           >
             量化回测
@@ -530,7 +512,7 @@ export default function Dashboard() {
             shape="round"
             className="dashboard-hero__shortcut-btn"
             aria-label="产业链图谱"
-            icon={<ApartmentOutlined style={{ color: "var(--c-primary)" }} />}
+            icon={<ApartmentOutlined className="dashboard-hero__shortcut-icon" />}
             onClick={() => navigate("/industry-chain")}
           >
             产业链图谱
@@ -540,7 +522,7 @@ export default function Dashboard() {
             shape="round"
             className="dashboard-hero__shortcut-btn"
             aria-label="国家队监测"
-            icon={<AuditOutlined style={{ color: "var(--c-primary)" }} />}
+            icon={<AuditOutlined className="dashboard-hero__shortcut-icon" />}
             onClick={() => navigate("/national-team")}
           >
             国家队监测
@@ -550,7 +532,7 @@ export default function Dashboard() {
             shape="round"
             className="dashboard-hero__shortcut-btn"
             aria-label="每日复盘"
-            icon={<CalendarOutlined style={{ color: "var(--c-primary)" }} />}
+            icon={<CalendarOutlined className="dashboard-hero__shortcut-icon" />}
             onClick={() => navigate("/daily-review")}
           >
             每日复盘
@@ -575,18 +557,25 @@ export default function Dashboard() {
         />
       </div>
       <div className="dashboard-layout" data-mobile-view={mobileView}>
-        <section className="dashboard-main" aria-label="首页中间内容">
+        {/* 左栏：市场状态仪表（温度、涨跌家数、情绪）+ 国家队监控 */}
+        <section className="dashboard-rail-left" aria-label="首页市场状态与国家队">
           <section aria-label="国家队托底信号">
             <NationalTeamSignalCard />
           </section>
           <section className="dashboard-market-board" aria-label="首页市场看板">
             <MarketOverviewBoard showRankings={false} onNavigate={(tab) => navigate(`/market?tab=${tab}`)} />
           </section>
+        </section>
+
+        {/* 中栏：可操作信息（市场风向 + 今日主线 + 龙头股） */}
+        <section className="dashboard-main" aria-label="首页中间内容">
           <section aria-label="市场风向">
             <MarketWindBoard embedded />
           </section>
           <DashboardMainlineSection />
         </section>
+
+        {/* 右栏：个人关注（热榜 + 自选异动） */}
         <aside className="dashboard-sidebar" aria-label="首页热榜与自选栏">
           <section aria-label="热榜"><HotRankBoard embedded /></section>
           <WatchlistPanel />

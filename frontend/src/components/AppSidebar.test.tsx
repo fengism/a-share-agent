@@ -87,7 +87,7 @@ describe("AppSidebar", () => {
     expect(preloadAppRoute).toHaveBeenCalledWith("/market");
   });
 
-  it("places home, watchlist, market, and news entries in the market information group", async () => {
+  it("orders sidebar entries by the four investment workspaces", async () => {
     render(
       <AppSidebar
         activeKey="/"
@@ -108,7 +108,32 @@ describe("AppSidebar", () => {
       .getAllByRole("button")
       .map((item) => item.textContent);
 
-    expect(menuItems.slice(0, 6)).toEqual(["首页", "自选", "市场", "概念", "国家队", "资讯"]);
+    // 4 个工作区：盯盘中心 → 市场洞察 → 深度投研 → 策略与复盘，尾部为运维工具区。
+    // 顺序即信息架构，改动这里应是有意为之，而不是顺手调序。
+    expect(menuItems).toEqual([
+      // 盯盘中心
+      "首页",
+      "自选",
+      "市场",
+      "概念",
+      // 市场洞察
+      "国家队",
+      "宏观",
+      "产业链",
+      "资讯",
+      // 深度投研
+      "对话",
+      "个股",
+      "选股",
+      "潜力股",
+      // 策略与复盘
+      "仓位",
+      "量化",
+      "复盘",
+      "交易日历",
+      // 运维工具区（无分组标题）
+      "主数据管理",
+    ]);
     expect(menuItems).not.toContain("港股市场");
   });
 

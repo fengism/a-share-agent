@@ -27,6 +27,8 @@ class PotentialStockItem(BaseModel):
     sector_strength: float | None = None  # 行业当日中位涨幅（%）
     risk_flags: list[str] = Field(default_factory=list)  # 风险提示
     reason: str = ""  # 一句话入选理由
+    category: str = "pioneer"  # 风格定位: pioneer(趋势先锋) / anchor(机构中军) / reversal(超跌反转) / quality(价值优选)
+    category_label: str = "趋势先锋"
 
 
 class PotentialDailyResult(BaseModel):
@@ -45,6 +47,7 @@ class PotentialDailyResult(BaseModel):
     limit_down_count: int = 0
     median_change_pct: float | None = None  # 全市场中位涨幅
     hot_themes: list[str] = Field(default_factory=list)  # 当日热门题材
+    top_picks: list[PotentialStockItem] = Field(default_factory=list)  # 核心精选金股（涵盖先锋、中军、反转等风格）
     items: list[PotentialStockItem] = Field(default_factory=list)
 
 
@@ -83,6 +86,9 @@ class PotentialPerformanceSummary(BaseModel):
     median_return_pct: float | None = None
     average_excess_pct: float | None = None
     benchmark_return_pct: float | None = None
+    profit_loss_ratio: float | None = None  # 盈亏比 (平均正收益 / abs(平均负收益))
+    positive_count: int = 0
+    negative_count: int = 0
     message: str | None = None
     items: list[PotentialPerformanceItem] = Field(default_factory=list)
 

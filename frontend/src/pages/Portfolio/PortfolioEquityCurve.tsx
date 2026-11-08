@@ -5,7 +5,7 @@ import { ReloadOutlined } from "@ant-design/icons";
 import { usePortfolioEquityCurve } from "../../api/queries";
 import echarts from "../../charts/echarts-setup";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
-import { useColors, useStyles } from "../../styles/ui";
+import { useColors } from "../../styles/ui";
 import { changeColor } from "../../utils/format";
 import { buildPortfolioEquityOption } from "./portfolioEquityChartOptions";
 
@@ -14,7 +14,6 @@ const { Text } = Typography;
 export default function PortfolioEquityCurve() {
   const query = usePortfolioEquityCurve();
   const colors = useColors();
-  const { cardStyle } = useStyles();
   const narrow = useMediaQuery("(max-width: 768px)");
   const option = useMemo(
     () => query.data ? buildPortfolioEquityOption(query.data, colors, narrow) : {},
@@ -42,7 +41,7 @@ export default function PortfolioEquityCurve() {
           </Button>
         </Space>
       )}
-      style={{ ...cardStyle, marginBottom: 16 }}
+      className="u-card" style={{ marginBottom: 16 }}
     >
       {query.isLoading ? <Skeleton active paragraph={{ rows: 5 }} /> : null}
       {query.error ? (

@@ -1,13 +1,15 @@
+import type { CSSProperties } from "react";
 import { useMemo, useState } from "react";
 import { Button, Card, Tag, Typography } from "antd";
 import { CalendarOutlined, LeftOutlined, RightOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { useMarketIndexKline, useMarketIndices, useTradingCalendar } from "../../api/queries";
+import PageShell, { PageHeader } from "../../components/page/PageShell";
 import SectionDataState from "../../components/SectionDataState";
 import { hexToRgba } from "../../charts/utils";
-import { useColors, useStyles, useTokens } from "../../styles/ui";
+import "./trading-calendar.css";
 
-const { Text, Title, Paragraph } = Typography;
+const { Text } = Typography;
 
 const WEEKDAYS = ["一", "二", "三", "四", "五", "六", "日"];
 const BENCHMARK_SYMBOL = "000001"; // 上证指数
@@ -24,6 +26,15 @@ function formatPct(value: number) {
 
 interface DayHeat {
   changePct: number;
+}
+
+function getHeatStyle(heat: DayHeat | undefined, isTrading: boolean): CSSProperties | undefined {
+  if (!isTrading || !heat) return undefined;
+  const isUp = heat.changePct >= 0;
+  const alpha = heatAlpha(heat.changePct);
+  return {
+    backgroundColor: hexToRgba(isUp ? "#f5222d" : "#52c41a", alpha),
+  };
 }
 
 interface MonthGridProps {
@@ -47,9 +58,6 @@ function MonthGrid({
   onNextMonth,
   yearTotalCount,
 }: MonthGridProps) {
-  const c = useColors();
-  const t = useTokens();
-
   const cells = useMemo(() => {
     const first = dayjs(`${year}-${String(month + 1).padStart(2, "0")}-01`);
     const leading = (first.day() + 6) % 7; // 周一为一周起点
@@ -79,105 +87,91 @@ function MonthGrid({
 
   return (
     <div>
-      <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: t.space[2], marginBottom: t.space[3] }}>
-        <div style={{ display: "flex", alignItems: "center", gap: t.space[2], flexWrap: "wrap" }}>
+      <div className="trading-calendar__header">
+        <div className="trading-calendar__month-ctrl">
           <Button type="text" size="small" icon={<LeftOutlined />} aria-label="上一月" onClick={onPrevMonth} />
-          <Text strong style={{ fontSize: t.font.lg, minWidth: 96, textAlign: "center" }}>
+          <Text strong className="trading-calendar__month-title">
             {year} 年 {month + 1} 月
           </Text>
           <Button type="text" size="small" icon={<RightOutlined />} aria-label="下一月" onClick={onNextMonth} />
           <Tag>{monthTradingCount} 个交易日</Tag>
           {monthStats.up + monthStats.down > 0 ? (
             <>
-              <Tag style={{ color: c.up, borderColor: hexToRgba(c.up, 0.4), background: hexToRgba(c.up, 0.08) }}>
+              <Tag className="trading-calendar__stat-tag--up">
                 涨 {monthStats.up}
               </Tag>
-              <Tag style={{ color: c.down, borderColor: hexToRgba(c.down, 0.4), background: hexToRgba(c.down, 0.08) }}>
+              <Tag className="trading-calendar__stat-tag--down">
                 跌 {monthStats.down}
               </Tag>
             </>
           ) : null}
           {yearTotalCount != null ? (
-            <Text type="secondary" style={{ fontSize: t.font.sm }}>全年 {yearTotalCount} 个</Text>
+            <Text type="secondary" className="trading-calendar__year-total">全年 {yearTotalCount} 个</Text>
           ) : null}
         </div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: t.space[2], fontSize: t.font.xs, color: c.textSecondary, alignItems: "center" }}>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-            <i style={{ display: "inline-block", width: 14, height: 14, borderRadius: 4, background: hexToRgba(c.up, 0.45) }} />
-            <i style={{ display: "inline-block", width: 14, height: 14, borderRadius: 4, background: hexToRgba(c.up, 0.12) }} />
+        <div className="trading-calendar__legend">
+          <span className="trading-calendar__legend-item">
+            <i className="trading-calendar__legend-chip trading-calendar__legend-chip--up-deep" />
+            <i className="trading-calendar__legend-chip trading-calendar__legend-chip--up-light" />
             涨幅越深越红
           </span>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-            <i style={{ display: "inline-block", width: 14, height: 14, borderRadius: 4, background: hexToRgba(c.down, 0.12) }} />
-            <i style={{ display: "inline-block", width: 14, height: 14, borderRadius: 4, background: hexToRgba(c.down, 0.45) }} />
+          <span className="trading-calendar__legend-item">
+            <i className="trading-calendar__legend-chip trading-calendar__legend-chip--down-light" />
+            <i className="trading-calendar__legend-chip trading-calendar__legend-chip--down-deep" />
             跌幅越深越绿
           </span>
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: t.space[1], marginBottom: t.space[1] }}>
+      <div className="trading-calendar__weekdays">
         {WEEKDAYS.map((label, index) => (
           <div
             key={label}
-            style={{
-              textAlign: "center",
-              fontSize: t.font.xs,
-              fontWeight: Number(t.weight.semibold),
-              color: index >= 5 ? c.textMuted : c.textSecondary,
-              padding: `${t.space[1]} 0`,
-            }}
+            className={`trading-calendar__weekday ${index >= 5 ? "trading-calendar__weekday--weekend" : ""}`}
           >
             {label}
           </div>
         ))}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: t.space[1] }}>
+      <div className="trading-calendar__grid">
         {cells.map((iso, index) => {
           if (iso === null) return <div key={`blank-${index}`} />;
           const isTrading = tradeDateSet.has(iso);
           const isToday = iso === today;
           const heat = heatMap.get(iso);
 
-          let background = "transparent";
+          let cellCls = "trading-calendar__cell";
+          if (isToday) cellCls += " trading-calendar__cell--today";
+          if (!isTrading) cellCls += " trading-calendar__cell--closed";
+
           let content = (
-            <span style={{ fontSize: t.font.md, color: c.textMuted, textDecoration: "line-through", textDecorationColor: c.textMuted }}>
+            <span className="trading-calendar__cell-closed-date">
               {dayjs(iso).date()}
             </span>
           );
           if (isTrading && heat) {
-            const color = heat.changePct >= 0 ? c.up : c.down;
-            background = hexToRgba(color, heatAlpha(heat.changePct));
+            const isUp = heat.changePct >= 0;
             content = (
-              <span style={{ display: "flex", flexDirection: "column", alignItems: "center", lineHeight: "var(--c-leading-tight)" }}>
-                <span className="trading-calendar__cell-date" style={{ fontSize: t.font.md, color: c.textPrimary }}>{dayjs(iso).date()}</span>
-                <span className="trading-calendar__cell-pct financial-num" style={{ fontSize: t.font.xs, fontWeight: Number(t.weight.semibold), color: heat.changePct >= 0 ? c.up : c.down }}>
+              <span className="trading-calendar__cell-content">
+                <span className="trading-calendar__cell-date">{dayjs(iso).date()}</span>
+                <span className={`trading-calendar__cell-pct financial-num ${isUp ? "trading-calendar__cell-pct--up" : "trading-calendar__cell-pct--down"}`}>
                   {formatPct(heat.changePct)}
                 </span>
               </span>
             );
           } else if (isTrading) {
-            background = c.hoverBg;
+            cellCls += " trading-calendar__cell--trading-empty";
             content = (
-              <span className="trading-calendar__cell-date" style={{ fontSize: t.font.md, color: c.textPrimary }}>{dayjs(iso).date()}</span>
+              <span className="trading-calendar__cell-date">{dayjs(iso).date()}</span>
             );
           }
 
           return (
             <div
               key={iso}
-              className="trading-calendar__cell"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                minHeight: 52,
-                borderRadius: t.radius.md,
-                background,
-                border: `1.5px solid ${isToday ? c.primary : "transparent"}`,
-                boxShadow: isToday ? `0 0 0 2px ${hexToRgba(c.primary, 0.25)}` : "none",
-                opacity: isTrading ? 1 : 0.5,
-              }}
+              className={cellCls}
+              style={getHeatStyle(heat, isTrading)}
               title={heat ? `${iso} ${BENCHMARK_NAME} ${formatPct(heat.changePct)}` : iso}
             >
               {content}
@@ -190,9 +184,6 @@ function MonthGrid({
 }
 
 export default function TradingCalendar() {
-  const t = useTokens();
-  const c = useColors();
-  const { pageContainerStyle, pageHeaderStyle, pageTitleStyle, pageDescriptionStyle } = useStyles();
   const initial = dayjs();
   const [cursor, setCursor] = useState(() => ({ year: initial.year(), month: initial.month() }));
   const query = useTradingCalendar(cursor.year);
@@ -247,13 +238,11 @@ export default function TradingCalendar() {
   };
 
   return (
-    <div style={pageContainerStyle}>
-      <div style={pageHeaderStyle}>
-        <div className="u-page-title u-page-title--compact">
-          <Title level={3} style={pageTitleStyle}>交易日历</Title>
-        </div>
-        <Paragraph style={pageDescriptionStyle}>查看 A 股交易日安排与上证指数每日涨跌热力。</Paragraph>
-      </div>
+    <PageShell>
+      <PageHeader
+        title="交易日历"
+        description="查看 A 股交易日安排与上证指数每日涨跌热力。"
+      />
 
       <SectionDataState
         isLoading={query.isLoading}
@@ -265,18 +254,19 @@ export default function TradingCalendar() {
         minHeight={480}
       >
         <Card
+          className="u-card"
           title={(
-            <span style={{ display: "inline-flex", alignItems: "center", gap: t.space[2] }}>
-              <CalendarOutlined style={{ color: c.primary }} />
+            <span className="trading-calendar__card-title">
+              <CalendarOutlined className="trading-calendar__title-icon" />
               <span>A 股交易日历</span>
-              <Text type="secondary" style={{ fontSize: t.font.sm, fontWeight: "var(--c-weight-normal)" }}>
+              <Text type="secondary" className="trading-calendar__title-sub">
                 · {BENCHMARK_NAME}涨跌热力
               </Text>
             </span>
           )}
           extra={
             query.data ? (
-              <span style={{ display: "inline-flex", gap: t.space[2], alignItems: "center", flexWrap: "wrap" }}>
+              <span className="trading-calendar__extra-tags">
                 <Tag color={query.data.today_is_trading_day ? "red" : "default"}>
                   今天{query.data.today_is_trading_day ? "交易日" : "休市"}
                 </Tag>
@@ -301,12 +291,12 @@ export default function TradingCalendar() {
             onNextMonth={() => moveMonth(1)}
             yearTotalCount={query.data?.count ?? null}
           />
-          <Text type="secondary" style={{ fontSize: t.font.xs, display: "block", marginTop: t.space[3] }}>
+          <Text type="secondary" className="trading-calendar__footer-note">
             交易日按{BENCHMARK_NAME}当日涨跌着色（较前收盘，hover 查看精确数值）；删除线为休市日；
             近一年之外的历史月份仅显示交易日无热力。数据源：新浪交易日历 + 指数日K。
           </Text>
         </Card>
       </SectionDataState>
-    </div>
+    </PageShell>
   );
 }

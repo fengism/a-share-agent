@@ -29,6 +29,7 @@ import { buildKlineTradeMarkers, type KlineTradeMarker } from "./klineMarkers";
 import { calculateMA, calculateMAVOL, calculateBOLL, MA_CONFIGS, MAVOL_CONFIGS } from "./movingAverages";
 import { calculateMACD, calculateKDJ, calculateRSI } from "./technicalIndicators";
 import { VOLUME_PANE_INDEX, PRICE_PANE_RATIO, applyVolumePaneLayout, getChartPaneThemeConfig } from "./chartPaneLayout";
+import "./kline-chart.css";
 
 /** 可视区左缘距离第一根 K 线多少根以内触发扩充历史。 */
 const LEFT_EDGE_TRIGGER_INDEX = 8;
@@ -136,6 +137,8 @@ export default function KlineChart({
   const anchoredLogicalRangeRef = useRef<{ from: number; to: number; length: number; viewKey: string } | null>(null);
   const rowCountRef = useRef(0);
   const [isZoomed, setIsZoomed] = useState(false);
+  const isZoomedRef = useRef(isZoomed);
+  isZoomedRef.current = isZoomed;
   const [hoverInfo, setHoverInfo] = useState<HoverCandleInfo | null>(null);
   const [mainOverlay, setMainOverlay] = useState<"MA" | "BOLL" | "NONE">("MA");
   const [subIndicator, setSubIndicator] = useState<SubIndicatorType>(defaultSubIndicator);
@@ -748,6 +751,7 @@ export default function KlineChart({
     const wrapper = wrapperRef.current;
     const brush = brushRef.current;
     let hadZeroWidth = (chartElRef.current?.clientWidth ?? 0) <= 0;
+    let lastWidth = Math.floor(chartElRef.current?.clientWidth ?? 0);
     const resizeObserver = new ResizeObserver(
       createDebouncedResizeHandler((entry) => {
         const hudHeight = hudRef.current?.clientHeight ?? 32;
@@ -759,8 +763,15 @@ export default function KlineChart({
         updateLayoutMetrics();
 
         const currentViewKey = viewKeyRef.current;
-        if (entryWidth > 0 && rowsRef.current.length > 0 && (hadZeroWidth || shouldFitChartContent(fittedViewKeyRef.current, currentViewKey))) {
+        const widthChanged = Math.abs(entryWidth - lastWidth) > 1;
+        const isInitialOrViewKeyChanged = hadZeroWidth || shouldFitChartContent(fittedViewKeyRef.current, currentViewKey);
+        const shouldRefit = entryWidth > 0 && rowsRef.current.length > 0 && (
+          isInitialOrViewKeyChanged || (widthChanged && !isZoomedRef.current)
+        );
+
+        if (shouldRefit) {
           hadZeroWidth = false;
+          lastWidth = entryWidth;
           if (rowsRef.current.length > 80) {
             chart.timeScale().setVisibleLogicalRange({ from: rowsRef.current.length - 80, to: rowsRef.current.length + 2 });
           } else {
@@ -768,10 +779,45 @@ export default function KlineChart({
           }
           fittedViewKeyRef.current = currentViewKey;
           setIsZoomed(false);
+        } else if (entryWidth > 0) {
+          lastWidth = entryWidth;
         }
       })
     );
     resizeObserver.observe(chartElRef.current);
+
+    const handleWindowResize = () => {
+      const el = chartElRef.current;
+      if (!el || !chartRef.current) return;
+      const width = Math.floor(el.clientWidth);
+      const hudHeight = hudRef.current?.clientHeight ?? 32;
+      const elHeight = Math.floor(el.clientHeight);
+      const plotHeight = elHeight > 0 ? elHeight : Math.max(100, height - hudHeight);
+      if (width > 0) {
+        chart.applyOptions({ width, height: plotHeight });
+        applyVolumePaneLayout(chart, paneRatio);
+        updateLayoutMetrics();
+        const widthChanged = Math.abs(width - lastWidth) > 1;
+        const isInitialOrViewKeyChanged = hadZeroWidth || shouldFitChartContent(fittedViewKeyRef.current, viewKeyRef.current);
+        const shouldRefit = rowsRef.current.length > 0 && (
+          isInitialOrViewKeyChanged || (widthChanged && !isZoomedRef.current)
+        );
+        if (shouldRefit) {
+          hadZeroWidth = false;
+          lastWidth = width;
+          if (rowsRef.current.length > 80) {
+            chart.timeScale().setVisibleLogicalRange({ from: rowsRef.current.length - 80, to: rowsRef.current.length + 2 });
+          } else {
+            chart.timeScale().fitContent();
+          }
+          fittedViewKeyRef.current = viewKeyRef.current;
+          setIsZoomed(false);
+        } else {
+          lastWidth = width;
+        }
+      }
+    };
+    window.addEventListener("resize", handleWindowResize);
     let startX: number | null = null;
 
     const resetBrush = () => { brush.style.display = "none"; brush.style.left = "0px"; brush.style.width = "0px"; };
@@ -927,6 +973,7 @@ export default function KlineChart({
 
     return () => {
       resizeObserver.disconnect();
+      window.removeEventListener("resize", handleWindowResize);
       window.removeEventListener("keydown", handleKeyDownWindow);
       window.removeEventListener("keyup", handleKeyUpWindow);
       chart.unsubscribeCrosshairMove(handleCrosshairMove);
@@ -1356,48 +1403,16 @@ export default function KlineChart({
       }
     >
       {/* Allow wrapped quotes to grow without overlapping the toolbar or plot. */}
-      <div ref={hudRef} className="kline-chart__hud" style={{
-        minHeight: 32,
-        padding: "4px 10px",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        flexWrap: "wrap",
-        rowGap: 4,
-        columnGap: 8,
-        flexShrink: 0,
-        fontSize: "11px",
-        color: c.textSecondary,
-        backgroundColor: c.nestedBg,
-        borderBottom: `1px solid ${c.border}`,
-        fontFamily: "var(--c-font-mono)",
-        userSelect: "none",
-      }}>
+      <div ref={hudRef} className="kline-chart__hud kline-chart__hud-shell">
         {activeCandle ? (
-          <div style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "4px 10px",
-            flexWrap: "wrap",
-            flex: "1 1 auto",
-            minWidth: 0,
-            lineHeight: 1.4,
-          }}>
-            <span style={{
-              color: c.textPrimary,
-              fontWeight: 700,
-              minWidth: 80,
-              flexShrink: 0,
-              paddingRight: 6,
-              borderRight: `1px solid ${c.border}`,
-              marginRight: 2,
-            }}>
+          <div className="kline-chart__hud-stats">
+            <span className="kline-chart__hud-time">
               {activeCandle.dateStr}
             </span>
-            <span style={{ whiteSpace: "nowrap" }}>开: <strong style={{ color: activeCandle.close >= activeCandle.open ? c.up : c.down }}>{activeCandle.open.toFixed(2)}</strong></span>
-            <span style={{ whiteSpace: "nowrap" }}>高: <strong style={{ color: c.up }}>{activeCandle.high.toFixed(2)}</strong></span>
-            <span style={{ whiteSpace: "nowrap" }}>低: <strong style={{ color: c.down }}>{activeCandle.low.toFixed(2)}</strong></span>
-            <span style={{ whiteSpace: "nowrap" }}>收: <strong style={{ color: activeCandle.close >= activeCandle.open ? c.up : c.down }}>{activeCandle.close.toFixed(2)}</strong></span>
+            <span className="u-nowrap">开: <strong style={{ color: activeCandle.close >= activeCandle.open ? c.up : c.down }}>{activeCandle.open.toFixed(2)}</strong></span>
+            <span className="u-nowrap">高: <strong className="u-text-up">{activeCandle.high.toFixed(2)}</strong></span>
+            <span className="u-nowrap">低: <strong className="u-text-down">{activeCandle.low.toFixed(2)}</strong></span>
+            <span className="u-nowrap">收: <strong style={{ color: activeCandle.close >= activeCandle.open ? c.up : c.down }}>{activeCandle.close.toFixed(2)}</strong></span>
             {activeCandle.changePct != null && (
               <span style={{ whiteSpace: "nowrap", color: activeCandle.changePct >= 0 ? c.up : c.down }}>
                 ({activeCandle.changePct >= 0 ? `+${activeCandle.changePct.toFixed(2)}%` : `${activeCandle.changePct.toFixed(2)}%`})
@@ -1405,48 +1420,48 @@ export default function KlineChart({
             )}
             {activeCandle.volume != null && (
               <span
-                style={{ whiteSpace: "nowrap" }}
+                className="u-nowrap"
                 title={formatVolumeTooltip(activeCandle.volume)}
               >
-                量: <strong style={{ color: c.textPrimary }}>{formatVolume(activeCandle.volume)}</strong>
+                量: <strong className="u-text-primary">{formatVolume(activeCandle.volume)}</strong>
               </span>
             )}
             {activeCandle.amount != null && (
               <span
-                style={{ whiteSpace: "nowrap" }}
+                className="u-nowrap"
                 title={`成交额: ${activeCandle.amount.toLocaleString("zh-CN", { maximumFractionDigits: 2 })} 元`}
               >
-                额: <strong style={{ color: c.textPrimary }}>{formatAmount(activeCandle.amount)}</strong>
+                额: <strong className="u-text-primary">{formatAmount(activeCandle.amount)}</strong>
               </span>
             )}
             {activeCandle.turnoverPct != null && (
-              <span style={{ whiteSpace: "nowrap" }}>换: <strong style={{ color: c.textPrimary }}>{activeCandle.turnoverPct.toFixed(2)}%</strong></span>
+              <span className="u-nowrap">换: <strong className="u-text-primary">{activeCandle.turnoverPct.toFixed(2)}%</strong></span>
             )}
             {activeCandle.amplitude != null && (
-              <span style={{ whiteSpace: "nowrap" }}>振: <strong style={{ color: c.textPrimary }}>{activeCandle.amplitude.toFixed(2)}%</strong></span>
+              <span className="u-nowrap">振: <strong className="u-text-primary">{activeCandle.amplitude.toFixed(2)}%</strong></span>
             )}
             {mainOverlay === "MA" ? (
               <>
-                <span style={{ whiteSpace: "nowrap", color: "#f0b90b" }}>MA5: {activeCandle.ma5 != null ? activeCandle.ma5.toFixed(2) : "-"}</span>
-                <span style={{ whiteSpace: "nowrap", color: "#1890ff" }}>MA10: {activeCandle.ma10 != null ? activeCandle.ma10.toFixed(2) : "-"}</span>
-                <span style={{ whiteSpace: "nowrap", color: "#9254de" }}>MA20: {activeCandle.ma20 != null ? activeCandle.ma20.toFixed(2) : "-"}</span>
-                <span style={{ whiteSpace: "nowrap", color: "#13c2c2" }}>MA30: {activeCandle.ma30 != null ? activeCandle.ma30.toFixed(2) : "-"}</span>
-                <span style={{ whiteSpace: "nowrap", color: "#ff7a45" }}>MA60: {activeCandle.ma60 != null ? activeCandle.ma60.toFixed(2) : "-"}</span>
+                <span className="kline-chart__legend-text is-ma">MA5: {activeCandle.ma5 != null ? activeCandle.ma5.toFixed(2) : "-"}</span>
+                <span className="kline-chart__legend-text is-blue">MA10: {activeCandle.ma10 != null ? activeCandle.ma10.toFixed(2) : "-"}</span>
+                <span className="kline-chart__legend-text is-purple">MA20: {activeCandle.ma20 != null ? activeCandle.ma20.toFixed(2) : "-"}</span>
+                <span className="kline-chart__legend-text is-teal">MA30: {activeCandle.ma30 != null ? activeCandle.ma30.toFixed(2) : "-"}</span>
+                <span className="kline-chart__legend-text is-orange">MA60: {activeCandle.ma60 != null ? activeCandle.ma60.toFixed(2) : "-"}</span>
               </>
             ) : mainOverlay === "BOLL" ? (
               <>
-                <span style={{ whiteSpace: "nowrap", color: "#f0b90b" }}>MID: {activeCandle.bollMid != null ? activeCandle.bollMid.toFixed(2) : "-"}</span>
-                <span style={{ whiteSpace: "nowrap", color: "#ff7a45" }}>UP: {activeCandle.bollUp != null ? activeCandle.bollUp.toFixed(2) : "-"}</span>
-                <span style={{ whiteSpace: "nowrap", color: "#9254de" }}>DN: {activeCandle.bollDn != null ? activeCandle.bollDn.toFixed(2) : "-"}</span>
+                <span className="kline-chart__legend-text is-ma">MID: {activeCandle.bollMid != null ? activeCandle.bollMid.toFixed(2) : "-"}</span>
+                <span className="kline-chart__legend-text is-orange">UP: {activeCandle.bollUp != null ? activeCandle.bollUp.toFixed(2) : "-"}</span>
+                <span className="kline-chart__legend-text is-purple">DN: {activeCandle.bollDn != null ? activeCandle.bollDn.toFixed(2) : "-"}</span>
               </>
             ) : null}
             {showChipPeak && chipDistribution?.peak_price != null && (
               <>
-                <span style={{ whiteSpace: "nowrap", color: "#faad14" }}>
+                <span className="kline-chart__legend-text is-amber">
                   筹码峰: {chipDistribution.peak_price.toFixed(2)}
                 </span>
                 {chipDistribution.profit_ratio != null && (
-                  <span style={{ whiteSpace: "nowrap", color: c.textMuted }}>
+                  <span className="u-nowrap u-text-muted">
                     获利盘: <strong style={{ color: chipDistribution.profit_ratio >= 0.5 ? c.up : c.down }}>{(chipDistribution.profit_ratio * 100).toFixed(1)}%</strong>
                   </span>
                 )}
@@ -1458,76 +1473,36 @@ export default function KlineChart({
         )}
 
         {/* Range & Overlay controls */}
-        <div className="kline-chart__hud-controls" style={{ display: "flex", alignItems: "center", gap: 4, flex: "0 0 auto", marginLeft: "auto", flexWrap: "wrap" }}>
+        <div className="kline-chart__hud-controls kline-chart__toolbar-end">
           <button
             type="button"
-            className="kline-chart__hud-btn"
+            className="kline-chart__hud-btn kline-chart__chip"
             onClick={() => handleRangeSelect("1M")}
             title="查看近1月 (约22根K线)"
-            style={{
-              padding: "1px 6px",
-              fontSize: "11px",
-              borderRadius: 4,
-              border: `1px solid ${c.border}`,
-              background: "transparent",
-              color: c.textSecondary,
-              cursor: "pointer",
-              whiteSpace: "nowrap",
-            }}
           >
             1月
           </button>
           <button
             type="button"
-            className="kline-chart__hud-btn"
+            className="kline-chart__hud-btn kline-chart__chip"
             onClick={() => handleRangeSelect("3M")}
             title="查看近3月 (约66根K线)"
-            style={{
-              padding: "1px 6px",
-              fontSize: "11px",
-              borderRadius: 4,
-              border: `1px solid ${c.border}`,
-              background: "transparent",
-              color: c.textSecondary,
-              cursor: "pointer",
-              whiteSpace: "nowrap",
-            }}
           >
             3月
           </button>
           <button
             type="button"
-            className="kline-chart__hud-btn"
+            className="kline-chart__hud-btn kline-chart__chip"
             onClick={() => handleRangeSelect("1Y")}
             title="查看近1年 (约250根K线)"
-            style={{
-              padding: "1px 6px",
-              fontSize: "11px",
-              borderRadius: 4,
-              border: `1px solid ${c.border}`,
-              background: "transparent",
-              color: c.textSecondary,
-              cursor: "pointer",
-              whiteSpace: "nowrap",
-            }}
           >
             1年
           </button>
           <button
             type="button"
-            className="kline-chart__hud-btn"
+            className="kline-chart__hud-btn kline-chart__chip"
             onClick={() => handleRangeSelect("ALL")}
             title="查看全部K线"
-            style={{
-              padding: "1px 6px",
-              fontSize: "11px",
-              borderRadius: 4,
-              border: `1px solid ${c.border}`,
-              background: "transparent",
-              color: c.textSecondary,
-              cursor: "pointer",
-              whiteSpace: "nowrap",
-            }}
           >
             全部
           </button>
@@ -1618,7 +1593,7 @@ export default function KlineChart({
               gap: 3,
             }}
           >
-            <span style={{ fontSize: "12px", lineHeight: 1 }}>{isLandscape ? "✕" : "⛶"}</span>
+            <span className="kline-chart__icon">{isLandscape ? "✕" : "⛶"}</span>
             {isLandscape ? "退出横屏" : "放大横屏"}
           </button>
 
@@ -1662,8 +1637,8 @@ export default function KlineChart({
         ) : null}
       </div>
 
-      <div className="kline-chart__plot" style={{ position: "relative", flex: 1, width: "100%", minHeight: 0, backgroundColor: c.cardBg }}>
-        <div ref={chartElRef} style={{ width: "100%", height: "100%", backgroundColor: c.cardBg }} />
+      <div className="kline-chart__plot kline-chart__plot">
+        <div ref={chartElRef} className="kline-chart__canvas" />
         <div ref={brushRef} className="kline-chart__brush" style={{
           position: "absolute", top: 0, bottom: 0, display: "none", pointerEvents: "none",
           background: hexToRgba(c.primary, 0.12), border: `1px solid ${hexToRgba(c.primary, 0.35)}`,
@@ -1693,11 +1668,10 @@ export default function KlineChart({
           onMouseDown={handleSeparatorMouseDown}
           title="上下拖拽可调整K线图与副图高度比例"
         >
-          <div className="kline-chart__subindicator-info" style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "nowrap", overflow: "hidden", minWidth: 0 }}>
+          <div className="kline-chart__subindicator-info kline-chart__volume-row">
             {/* 同花顺风格副图指标切换器 */}
             <div
-              className="kline-chart__subindicator-tabs"
-              style={{ display: "flex", alignItems: "center", gap: 3, flexShrink: 0 }}
+              className="kline-chart__subindicator-tabs kline-chart__legend-group"
               onMouseDown={(e) => e.stopPropagation()}
               onTouchStart={(e) => e.stopPropagation()}
             >
@@ -1732,62 +1706,49 @@ export default function KlineChart({
 
             {activeCandle && (
               <div
-                className="kline-chart__subindicator-stats"
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  flexWrap: "nowrap",
-                  overflowX: "auto",
-                  scrollbarWidth: "none",
-                }}
+                className="kline-chart__subindicator-stats kline-chart__tabs-row"
               >
                 {subIndicator === "VOL" && (
                   <>
                     <span
-                      className="kline-chart__vol-stat"
+                      className="kline-chart__vol-stat kline-chart__hint"
                       title={formatVolumeTooltip(activeCandle.volume)}
-                      style={{ fontSize: "11px", color: c.textMuted, whiteSpace: "nowrap" }}
                     >
-                      VOL: <strong style={{ color: c.textPrimary, fontFamily: APP_FONT_FAMILY }}>{formatVolume(activeCandle.volume ?? activeCandle.amount)}</strong>
+                      VOL: <strong className="u-text-primary u-font-sans">{formatVolume(activeCandle.volume ?? activeCandle.amount)}</strong>
                     </span>
                     {renderVolumeRatioBadge(activeCandle.volume, activeCandle.vol5, { up: c.up, down: c.down, muted: c.textMuted, secondary: c.textSecondary })}
                     {activeCandle.amount != null && (
                       <span
-                        className="kline-chart__vol-stat"
+                        className="kline-chart__vol-stat kline-chart__hint"
                         title={`成交额: ${activeCandle.amount.toLocaleString("zh-CN", { maximumFractionDigits: 2 })} 元`}
-                        style={{ fontSize: "11px", color: c.textMuted, whiteSpace: "nowrap" }}
                       >
-                        额: <strong style={{ color: c.textPrimary, fontFamily: APP_FONT_FAMILY }}>{formatAmount(activeCandle.amount)}</strong>
+                        额: <strong className="u-text-primary u-font-sans">{formatAmount(activeCandle.amount)}</strong>
                       </span>
                     )}
                     {activeCandle.turnoverPct != null && (
                       <span
-                        className="kline-chart__vol-stat"
+                        className="kline-chart__vol-stat kline-chart__hint"
                         title={`换手率: ${activeCandle.turnoverPct.toFixed(2)}%`}
-                        style={{ fontSize: "11px", color: c.textMuted, whiteSpace: "nowrap" }}
                       >
-                        换手: <strong style={{ color: c.textPrimary, fontFamily: APP_FONT_FAMILY }}>{activeCandle.turnoverPct.toFixed(2)}%</strong>
+                        换手: <strong className="u-text-primary u-font-sans">{activeCandle.turnoverPct.toFixed(2)}%</strong>
                       </span>
                     )}
                     {activeCandle.vol5 != null && (
                       <span
-                        className="kline-chart__vol-stat"
+                        className="kline-chart__vol-stat kline-chart__legend is-ma"
                         title={`5日均量: ${formatVolume(activeCandle.vol5)}`}
-                        style={{ fontSize: "11px", color: "#f0b90b", whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: 3 }}
                       >
-                        <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", backgroundColor: "#f0b90b" }} />
-                        MA5: <strong style={{ fontFamily: APP_FONT_FAMILY }}>{formatVolume(activeCandle.vol5)}</strong>
+                        <span className="kline-chart__dot is-ma" />
+                        MA5: <strong className="u-font-sans">{formatVolume(activeCandle.vol5)}</strong>
                       </span>
                     )}
                     {activeCandle.vol10 != null && (
                       <span
-                        className="kline-chart__vol-stat"
+                        className="kline-chart__vol-stat kline-chart__legend is-cyan"
                         title={`10日均量: ${formatVolume(activeCandle.vol10)}`}
-                        style={{ fontSize: "11px", color: "#00d4d4", whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: 3 }}
                       >
-                        <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", backgroundColor: "#00d4d4" }} />
-                        MA10: <strong style={{ fontFamily: APP_FONT_FAMILY }}>{formatVolume(activeCandle.vol10)}</strong>
+                        <span className="kline-chart__dot is-cyan" />
+                        MA10: <strong className="u-font-sans">{formatVolume(activeCandle.vol10)}</strong>
                       </span>
                     )}
                   </>
@@ -1795,97 +1756,92 @@ export default function KlineChart({
                 {subIndicator === "AMO" && (
                   <>
                     <span
-                      className="kline-chart__vol-stat"
+                      className="kline-chart__vol-stat kline-chart__hint"
                       title={activeCandle.amount != null ? `成交额: ${activeCandle.amount.toLocaleString("zh-CN", { maximumFractionDigits: 2 })} 元` : "成交额"}
-                      style={{ fontSize: "11px", color: c.textMuted, whiteSpace: "nowrap" }}
                     >
-                      AMO: <strong style={{ color: c.textPrimary, fontFamily: APP_FONT_FAMILY }}>{formatAmount(activeCandle.amount ?? activeCandle.volume)}</strong>
+                      AMO: <strong className="u-text-primary u-font-sans">{formatAmount(activeCandle.amount ?? activeCandle.volume)}</strong>
                     </span>
                     {renderVolumeRatioBadge(activeCandle.amount, activeCandle.amo5, { up: c.up, down: c.down, muted: c.textMuted, secondary: c.textSecondary })}
                     {activeCandle.volume != null && (
                       <span
-                        className="kline-chart__vol-stat"
+                        className="kline-chart__vol-stat kline-chart__hint"
                         title={formatVolumeTooltip(activeCandle.volume)}
-                        style={{ fontSize: "11px", color: c.textMuted, whiteSpace: "nowrap" }}
                       >
-                        量: <strong style={{ color: c.textPrimary, fontFamily: APP_FONT_FAMILY }}>{formatVolume(activeCandle.volume)}</strong>
+                        量: <strong className="u-text-primary u-font-sans">{formatVolume(activeCandle.volume)}</strong>
                       </span>
                     )}
                     {activeCandle.turnoverPct != null && (
                       <span
-                        className="kline-chart__vol-stat"
+                        className="kline-chart__vol-stat kline-chart__hint"
                         title={`换手率: ${activeCandle.turnoverPct.toFixed(2)}%`}
-                        style={{ fontSize: "11px", color: c.textMuted, whiteSpace: "nowrap" }}
                       >
-                        换手: <strong style={{ color: c.textPrimary, fontFamily: APP_FONT_FAMILY }}>{activeCandle.turnoverPct.toFixed(2)}%</strong>
+                        换手: <strong className="u-text-primary u-font-sans">{activeCandle.turnoverPct.toFixed(2)}%</strong>
                       </span>
                     )}
                     {activeCandle.amo5 != null && (
                       <span
-                        className="kline-chart__vol-stat"
+                        className="kline-chart__vol-stat kline-chart__legend is-ma"
                         title={`5日均额: ${formatAmount(activeCandle.amo5)}`}
-                        style={{ fontSize: "11px", color: "#f0b90b", whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: 3 }}
                       >
-                        <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", backgroundColor: "#f0b90b" }} />
-                        MA5: <strong style={{ fontFamily: APP_FONT_FAMILY }}>{formatAmount(activeCandle.amo5)}</strong>
+                        <span className="kline-chart__dot is-ma" />
+                        MA5: <strong className="u-font-sans">{formatAmount(activeCandle.amo5)}</strong>
                       </span>
                     )}
                     {activeCandle.amo10 != null && (
                       <span
-                        className="kline-chart__vol-stat"
+                        className="kline-chart__vol-stat kline-chart__legend is-cyan"
                         title={`10日均额: ${formatAmount(activeCandle.amo10)}`}
-                        style={{ fontSize: "11px", color: "#00d4d4", whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: 3 }}
                       >
-                        <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", backgroundColor: "#00d4d4" }} />
-                        MA10: <strong style={{ fontFamily: APP_FONT_FAMILY }}>{formatAmount(activeCandle.amo10)}</strong>
+                        <span className="kline-chart__dot is-cyan" />
+                        MA10: <strong className="u-font-sans">{formatAmount(activeCandle.amo10)}</strong>
                       </span>
                     )}
                   </>
                 )}
                 {subIndicator === "MACD" && (
                   <>
-                    <span className="kline-chart__vol-stat" style={{ fontSize: "11px", color: "#f0b90b", whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: 3 }}>
-                      <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", backgroundColor: "#f0b90b" }} />
-                      DIF: <strong style={{ fontFamily: APP_FONT_FAMILY }}>{activeCandle.dif != null ? activeCandle.dif.toFixed(2) : "-"}</strong>
+                    <span className="kline-chart__vol-stat kline-chart__legend is-ma">
+                      <span className="kline-chart__dot is-ma" />
+                      DIF: <strong className="u-font-sans">{activeCandle.dif != null ? activeCandle.dif.toFixed(2) : "-"}</strong>
                     </span>
-                    <span className="kline-chart__vol-stat" style={{ fontSize: "11px", color: "#e879f9", whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: 3 }}>
-                      <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", backgroundColor: "#e879f9" }} />
-                      DEA: <strong style={{ fontFamily: APP_FONT_FAMILY }}>{activeCandle.dea != null ? activeCandle.dea.toFixed(2) : "-"}</strong>
+                    <span className="kline-chart__vol-stat kline-chart__legend is-fuchsia">
+                      <span className="kline-chart__dot is-fuchsia" />
+                      DEA: <strong className="u-font-sans">{activeCandle.dea != null ? activeCandle.dea.toFixed(2) : "-"}</strong>
                     </span>
                     <span className="kline-chart__vol-stat" style={{ fontSize: "11px", color: (activeCandle.macd ?? 0) >= 0 ? c.up : c.down, whiteSpace: "nowrap" }}>
-                      MACD: <strong style={{ fontFamily: APP_FONT_FAMILY }}>{activeCandle.macd != null ? activeCandle.macd.toFixed(2) : "-"}</strong>
+                      MACD: <strong className="u-font-sans">{activeCandle.macd != null ? activeCandle.macd.toFixed(2) : "-"}</strong>
                     </span>
                   </>
                 )}
                 {subIndicator === "KDJ" && (
                   <>
-                    <span className="kline-chart__vol-stat" style={{ fontSize: "11px", color: "#f0b90b", whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: 3 }}>
-                      <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", backgroundColor: "#f0b90b" }} />
-                      K: <strong style={{ fontFamily: APP_FONT_FAMILY }}>{activeCandle.k != null ? activeCandle.k.toFixed(2) : "-"}</strong>
+                    <span className="kline-chart__vol-stat kline-chart__legend is-ma">
+                      <span className="kline-chart__dot is-ma" />
+                      K: <strong className="u-font-sans">{activeCandle.k != null ? activeCandle.k.toFixed(2) : "-"}</strong>
                     </span>
-                    <span className="kline-chart__vol-stat" style={{ fontSize: "11px", color: "#38bdf8", whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: 3 }}>
-                      <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", backgroundColor: "#38bdf8" }} />
-                      D: <strong style={{ fontFamily: APP_FONT_FAMILY }}>{activeCandle.d != null ? activeCandle.d.toFixed(2) : "-"}</strong>
+                    <span className="kline-chart__vol-stat kline-chart__legend is-sky">
+                      <span className="kline-chart__dot is-sky" />
+                      D: <strong className="u-font-sans">{activeCandle.d != null ? activeCandle.d.toFixed(2) : "-"}</strong>
                     </span>
-                    <span className="kline-chart__vol-stat" style={{ fontSize: "11px", color: "#d946ef", whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: 3 }}>
-                      <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", backgroundColor: "#d946ef" }} />
-                      J: <strong style={{ fontFamily: APP_FONT_FAMILY }}>{activeCandle.j != null ? activeCandle.j.toFixed(2) : "-"}</strong>
+                    <span className="kline-chart__vol-stat kline-chart__legend is-magenta">
+                      <span className="kline-chart__dot is-magenta" />
+                      J: <strong className="u-font-sans">{activeCandle.j != null ? activeCandle.j.toFixed(2) : "-"}</strong>
                     </span>
                   </>
                 )}
                 {subIndicator === "RSI" && (
                   <>
-                    <span className="kline-chart__vol-stat" style={{ fontSize: "11px", color: "#f0b90b", whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: 3 }}>
-                      <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", backgroundColor: "#f0b90b" }} />
-                      RSI6: <strong style={{ fontFamily: APP_FONT_FAMILY }}>{activeCandle.rsi6 != null ? activeCandle.rsi6.toFixed(2) : "-"}</strong>
+                    <span className="kline-chart__vol-stat kline-chart__legend is-ma">
+                      <span className="kline-chart__dot is-ma" />
+                      RSI6: <strong className="u-font-sans">{activeCandle.rsi6 != null ? activeCandle.rsi6.toFixed(2) : "-"}</strong>
                     </span>
-                    <span className="kline-chart__vol-stat" style={{ fontSize: "11px", color: "#38bdf8", whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: 3 }}>
-                      <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", backgroundColor: "#38bdf8" }} />
-                      RSI12: <strong style={{ fontFamily: APP_FONT_FAMILY }}>{activeCandle.rsi12 != null ? activeCandle.rsi12.toFixed(2) : "-"}</strong>
+                    <span className="kline-chart__vol-stat kline-chart__legend is-sky">
+                      <span className="kline-chart__dot is-sky" />
+                      RSI12: <strong className="u-font-sans">{activeCandle.rsi12 != null ? activeCandle.rsi12.toFixed(2) : "-"}</strong>
                     </span>
-                    <span className="kline-chart__vol-stat" style={{ fontSize: "11px", color: "#c084fc", whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: 3 }}>
-                      <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", backgroundColor: "#c084fc" }} />
-                      RSI24: <strong style={{ fontFamily: APP_FONT_FAMILY }}>{activeCandle.rsi24 != null ? activeCandle.rsi24.toFixed(2) : "-"}</strong>
+                    <span className="kline-chart__vol-stat kline-chart__legend is-violet">
+                      <span className="kline-chart__dot is-violet" />
+                      RSI24: <strong className="u-font-sans">{activeCandle.rsi24 != null ? activeCandle.rsi24.toFixed(2) : "-"}</strong>
                     </span>
                   </>
                 )}
@@ -1893,15 +1849,9 @@ export default function KlineChart({
             )}
           </div>
 
-          <div className="kline-chart__separator-drag" style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-            <div style={{
-              width: 22,
-              height: 3,
-              borderRadius: 2,
-              backgroundColor: c.border,
-              opacity: 0.8,
-            }} />
-            <span className="kline-chart__separator-unit" style={{ fontSize: "10px", color: c.textMuted, opacity: 0.75 }}>
+          <div className="kline-chart__separator-drag kline-chart__drag-row">
+            <div className="kline-chart__drag-handle" />
+            <span className="kline-chart__separator-unit kline-chart__unit">
               {subIndicator === "VOL" ? "单位: 股/元" : subIndicator === "AMO" ? "单位: 元" : subIndicator === "MACD" ? "参数: 12,26,9" : subIndicator === "KDJ" ? "参数: 9,3,3" : "参数: 6,12,24"}
             </span>
           </div>
@@ -1930,17 +1880,17 @@ export default function KlineChart({
               overflow: "hidden",
             }}
           >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 }}>
-              <span style={{ fontSize: "9px", fontWeight: 700, color: c.textSecondary, letterSpacing: "0.02em" }}>
+            <div className="kline-chart__chip-head">
+              <span className="kline-chart__chip-title">
                 CYQ 筹码
               </span>
-              <span style={{ fontSize: "9px", fontWeight: 700, color: "#faad14" }}>
+              <span className="kline-chart__chip-title is-amber">
                 峰:{chipDistribution.peak_price.toFixed(2)}
               </span>
             </div>
 
             {/* 柱状分布图 */}
-            <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", justifyContent: "space-between", gap: 1, overflow: "hidden" }}>
+            <div className="kline-chart__chip-body">
               {sortedHistogramSlice.map((item, idx) => {
                 const currentPrice = activeCandle?.close ?? chipDistribution.peak_price;
                 const isProfit = item.price <= currentPrice;
@@ -1949,7 +1899,7 @@ export default function KlineChart({
                 const widthPct = Math.min(100, Math.max(4, Math.round((item.ratio / maxChipRatio) * 100)));
 
                 return (
-                  <div key={idx} style={{ display: "flex", alignItems: "center", height: 4, gap: 3 }}>
+                  <div key={idx} className="kline-chart__chip-bar-row">
                     <div
                       style={{
                         height: "100%",
@@ -1965,16 +1915,16 @@ export default function KlineChart({
 
             {/* 统计指标 */}
             <div style={{ marginTop: 3, paddingTop: 2, borderTop: `1px dashed ${hexToRgba(c.border, 0.6)}`, display: "flex", flexDirection: "column", gap: 1 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "9px" }}>
-                <span style={{ color: c.textMuted }}>获利比例</span>
+              <div className="kline-chart__scale-row">
+                <span className="u-text-muted">获利比例</span>
                 <span style={{ color: (chipDistribution.profit_ratio ?? 0) >= 0.5 ? c.up : c.down, fontWeight: 600 }}>
                   {chipDistribution.profit_ratio != null ? `${(chipDistribution.profit_ratio * 100).toFixed(1)}%` : "-"}
                 </span>
               </div>
               {chipDistribution.concentration_90 != null && (
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "9px" }}>
-                  <span style={{ color: c.textMuted }}>90%集中度</span>
-                  <span style={{ color: c.textSecondary, fontWeight: 500 }}>
+                <div className="kline-chart__scale-row">
+                  <span className="u-text-muted">90%集中度</span>
+                  <span className="kline-chart__chip-label">
                     {(chipDistribution.concentration_90 * 100).toFixed(1)}%
                   </span>
                 </div>
@@ -1984,7 +1934,7 @@ export default function KlineChart({
         )}
 
         {isZoomed && (
-          <div className="pdf-hide" style={{ position: "absolute", right: 12, top: 10, zIndex: 5 }}>
+          <div className="pdf-hide kline-chart__chip-overlay">
             <button type="button" onClick={() => { chartRef.current?.timeScale().fitContent(); setIsZoomed(false); }}
               style={{
                 padding: "6px 12px", fontSize: "var(--c-font-sm)", fontWeight: "var(--c-weight-semibold)", color: c.primary,

@@ -47,12 +47,12 @@ export function SettingsCard({
   onReset,
   dangerZone,
 }: SettingsCardProps) {
-  const { cardStyle, sectionCardBodyStyle } = useStyles();
+  const { sectionCardBodyStyle } = useStyles();
   const colors = useColors();
 
   return (
     <Card
-      className="settings-card"
+      className="settings-card u-card"
       data-dirty={isDirty ? "true" : undefined}
       title={
         <span className="settings-card__head">
@@ -64,12 +64,7 @@ export function SettingsCard({
             </span>
           )}
         </span>
-      }
-      style={{
-        ...cardStyle,
-        marginBottom: 16,
-        ...(stretch ? { display: "flex", flexDirection: "column", flex: 1, minWidth: 0 } : {}),
-      }}
+      } style={{ marginBottom: 16, ...(stretch ? { display: "flex", flexDirection: "column", flex: 1, minWidth: 0 } : {}) }}
       styles={{
         body: {
           ...sectionCardBodyStyle,

@@ -754,6 +754,42 @@ describe("KlineChart", () => {
     expect(queryByText("CYQ 筹码")).toBeNull();
     expect(mocks.candleSeries.removePriceLine).toHaveBeenCalled();
   });
+
+  it("adapts visible logical range when container width expands or window resizes", () => {
+    const bars = Array.from({ length: 100 }, (_, i) => ({
+      date: `2026-08-${String((i % 28) + 1).padStart(2, "0")}`,
+      open: 10,
+      close: 11,
+      high: 12,
+      low: 9,
+      volume: 1000,
+      amount: 10000,
+      amplitude: null,
+      turnover_pct: null,
+      change_pct: null,
+    }));
+    const { container } = render(<KlineChart height={500} data={bars} viewKey="test-resize" />);
+    const canvas = container.querySelector(".kline-chart__canvas") as HTMLDivElement;
+    expect(canvas).toBeInTheDocument();
+
+    mocks.timeScale.setVisibleLogicalRange.mockClear();
+
+    // Simulate modal expanding width or window resize
+    Object.defineProperty(canvas, "clientWidth", { value: 1200, configurable: true });
+    Object.defineProperty(canvas, "clientHeight", { value: 460, configurable: true });
+
+    act(() => {
+      window.dispatchEvent(new Event("resize"));
+    });
+
+    expect(mocks.chart.applyOptions).toHaveBeenCalledWith(
+      expect.objectContaining({ width: 1200 }),
+    );
+    expect(mocks.timeScale.setVisibleLogicalRange).toHaveBeenCalledWith({
+      from: 20, // 100 - 80
+      to: 102, // 100 + 2
+    });
+  });
 });
 
 function queryByTextReg(getByText: (text: RegExp) => HTMLElement, reg: RegExp) {

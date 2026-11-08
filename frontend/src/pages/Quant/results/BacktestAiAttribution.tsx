@@ -11,7 +11,6 @@ import {
 import { Button, Card, Col, message, Progress, Row, Space, Tag, Typography } from "antd";
 import type { QuantBacktestResult, QuantStrategyConfig } from "../../../api/queries";
 import { useAddWatchlistItem } from "../../../api/queries";
-import { useColors, useStyles } from "../../../styles/ui";
 import { formatNumber, formatPercent } from "./formatters";
 import { quantStrategyIdentity } from "../quantRun";
 
@@ -23,8 +22,6 @@ interface BacktestAiAttributionProps {
 }
 
 export default function BacktestAiAttribution({ result, strategy }: BacktestAiAttributionProps) {
-  const colors = useColors();
-  const { cardStyle } = useStyles();
   const addWatchlistItem = useAddWatchlistItem();
   const [addingWatchlist, setAddingWatchlist] = useState(false);
   const [addedAll, setAddedAll] = useState(false);
@@ -140,8 +137,8 @@ export default function BacktestAiAttribution({ result, strategy }: BacktestAiAt
   return (
     <Card
       title={(
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-          <BulbOutlined style={{ color: "var(--c-primary)", fontSize: 16 }} />
+        <span className="quant-ai-title">
+          <BulbOutlined className="quant-ai-title-icon" />
           <span>AI 策略战术归因与多因子体检 (Tactical Attribution)</span>
           <Tag color={diagnosis.archetypeColor}>{diagnosis.archetype}</Tag>
         </span>
@@ -173,59 +170,42 @@ export default function BacktestAiAttribution({ result, strategy }: BacktestAiAt
         </Space>
       )}
       size="small"
-      style={{ ...cardStyle, marginBottom: 16 }}
-      className="quant-result-card"
+      className="quant-result-card u-card quant-ai-card"
     >
       <Row gutter={[16, 16]}>
         {/* Score & Core Evaluation */}
         <Col xs={24} md={8}>
-          <div
-            style={{
-              padding: "16px",
-              height: "100%",
-              borderRadius: "var(--c-radius-sm)",
-              background: "color-mix(in srgb, var(--c-primary) 5%, var(--c-nested-bg))",
-              border: "1px solid color-mix(in srgb, var(--c-primary) 18%, var(--c-border))",
-              display: "flex",
-              flexDirection: "column",
-              justifyContent: "space-between",
-            }}
-          >
+          <div className="quant-ai-score-box">
             <div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontSize: 13, color: "var(--c-text-muted)" }}>策略成色综合评级</span>
+              <div className="quant-ai-score-header">
+                <span className="quant-ai-score-label">策略成色综合评级</span>
                 <span
-                  style={{
-                    fontSize: 24,
-                    fontWeight: 800,
-                    fontFamily: "var(--c-font-mono)",
-                    color: diagnosis.score >= 70 ? colors.up : colors.textPrimary,
-                  }}
+                  className={`quant-ai-score-val ${diagnosis.score >= 70 ? "quant-ai-score-val--high" : ""}`}
                 >
                   {diagnosis.score}
-                  <span style={{ fontSize: 13, fontWeight: 500, color: "var(--c-text-muted)" }}>/100</span>
+                  <span className="quant-ai-score-total">/100</span>
                 </span>
               </div>
               <Progress
                 percent={diagnosis.score}
                 showInfo={false}
-                strokeColor={{ "0%": "var(--c-primary)", "100%": colors.up }}
+                strokeColor={{ "0%": "var(--c-primary)", "100%": "var(--c-up)" }}
                 size="small"
-                style={{ marginTop: 6, marginBottom: 12 }}
+                className="quant-ai-progress"
               />
-              <div style={{ fontSize: 13, lineHeight: 1.6, color: "var(--c-text-primary)" }}>
+              <div className="quant-ai-eval-text">
                 {diagnosis.isExcessPositive ? (
-                  <p style={{ margin: 0 }}>
+                  <p className="quant-ai-p-reset">
                     🎯 <strong>显著跑赢基准：</strong>
-                    区间累计产生 <span style={{ color: colors.up }}>+{metrics.excess_return?.toFixed(1)}%</span> 超额回报。
+                    区间累计产生 <span className="u-text-up">+{metrics.excess_return?.toFixed(1)}%</span> 超额回报。
                   </p>
                 ) : (
-                  <p style={{ margin: 0, color: "var(--c-text-muted)" }}>
+                  <p className="quant-ai-p-muted">
                     ⚖️ <strong>超额偏弱：</strong>
                     当前策略在回测区间与基准收益接近，可能受到市场风格或持仓摩擦影响。
                   </p>
                 )}
-                <p style={{ margin: "6px 0 0", fontSize: 12, color: "var(--c-text-muted)" }}>
+                <p className="quant-ai-p-sub">
                   夏普比率 <strong>{metrics.sharpe_ratio ?? "-"}</strong> ｜ 最大回撤{" "}
                   <strong>{formatPercent(metrics.max_drawdown)}</strong> ｜ 盈亏比{" "}
                   <strong>{formatNumber(metrics.profit_loss_ratio)}:1</strong>
@@ -233,8 +213,8 @@ export default function BacktestAiAttribution({ result, strategy }: BacktestAiAt
               </div>
             </div>
 
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 12 }}>
-              {diagnosis.isHighAlpha && <Tag color="green">超额阿尔法强劲</Tag>}
+            <div className="quant-ai-badges-row">
+              {diagnosis.isHighAlpha && <Tag color="gold">超额阿尔法强劲</Tag>}
               {diagnosis.isLowDrawdown && <Tag color="blue">回撤控制扎实</Tag>}
               {diagnosis.isGoodPayoff && <Tag color="purple">盈亏比优势显著</Tag>}
               {diagnosis.isHighWinRate && <Tag color="cyan">高胜率支撑</Tag>}
@@ -244,22 +224,15 @@ export default function BacktestAiAttribution({ result, strategy }: BacktestAiAt
 
         {/* Multi-Factor Insights (Capital Flow, Turnover, Financials) */}
         <Col xs={24} md={16}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div className="quant-ai-factors-col">
             {/* Factor 1: Turnover & Volume Dynamics */}
-            <div
-              style={{
-                padding: "var(--c-pad-inset, 7px 12px)",
-                borderRadius: "var(--c-radius-sm)",
-                background: "var(--c-nested-bg)",
-                border: "1px solid var(--c-border)",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                <ThunderboltOutlined style={{ color: "#fa8c16" }} />
-                <strong style={{ fontSize: 13 }}>换手率与量价活跃度归因</strong>
-                <Tag color="orange" style={{ margin: 0, fontSize: 11 }}>流动性特征</Tag>
+            <div className="quant-ai-factor-card">
+              <div className="quant-ai-factor-header">
+                <ThunderboltOutlined className="quant-ai-thunder-icon" />
+                <strong className="quant-ai-factor-title">换手率与量价活跃度归因</strong>
+                <Tag color="orange" className="quant-ai-tag">流动性特征</Tag>
               </div>
-              <Paragraph style={{ margin: 0, fontSize: 12, color: "var(--c-text-muted)", lineHeight: 1.6 }}>
+              <Paragraph className="quant-ai-paragraph">
                 回测年化换手率约 <strong>{formatPercent(metrics.turnover_rate)}</strong>。
                 {metrics.turnover_rate > 200
                   ? " 该策略交易节奏较为进取。在个股量价放量初期（换手率突破 3%~5%）进场往往胜率更高；但在个股缩量阴跌期需严格执行止损，防止流动性滑点损失。"
@@ -268,39 +241,25 @@ export default function BacktestAiAttribution({ result, strategy }: BacktestAiAt
             </div>
 
             {/* Factor 2: Capital Flow & Momentum */}
-            <div
-              style={{
-                padding: "var(--c-pad-inset, 7px 12px)",
-                borderRadius: "var(--c-radius-sm)",
-                background: "var(--c-nested-bg)",
-                border: "1px solid var(--c-border)",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                <DashboardOutlined style={{ color: "var(--c-primary)" }} />
-                <strong style={{ fontSize: 13 }}>资金流向与主力博弈协同建议</strong>
-                <Tag color="geekblue" style={{ margin: 0, fontSize: 11 }}>资金面赋能</Tag>
+            <div className="quant-ai-factor-card">
+              <div className="quant-ai-factor-header">
+                <DashboardOutlined className="quant-ai-primary-icon" />
+                <strong className="quant-ai-factor-title">资金流向与主力博弈协同建议</strong>
+                <Tag color="geekblue" className="quant-ai-tag">资金面赋能</Tag>
               </div>
-              <Paragraph style={{ margin: 0, fontSize: 12, color: "var(--c-text-muted)", lineHeight: 1.6 }}>
+              <Paragraph className="quant-ai-paragraph">
                 实盘量化进阶建议：将<strong>「主力资金连续净流入」</strong>或<strong>「超大单成交占比 &gt; 10%」</strong>作为策略买点的正向过滤条件，能有效规避散户追高被套诱多陷阱，提升假突破过滤效率。
               </Paragraph>
             </div>
 
             {/* Factor 3: Fundamentals & Valuation Gate */}
-            <div
-              style={{
-                padding: "var(--c-pad-inset, 7px 12px)",
-                borderRadius: "var(--c-radius-sm)",
-                background: "var(--c-nested-bg)",
-                border: "1px solid var(--c-border)",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                <SafetyCertificateOutlined style={{ color: "#52c41a" }} />
-                <strong style={{ fontSize: 13 }}>财报基本面与选股池质量底座</strong>
-                <Tag color="green" style={{ margin: 0, fontSize: 11 }}>安全边际</Tag>
+            <div className="quant-ai-factor-card">
+              <div className="quant-ai-factor-header">
+                <SafetyCertificateOutlined className="quant-ai-primary-icon" />
+                <strong className="quant-ai-factor-title">财报基本面与选股池质量底座</strong>
+                <Tag color="cyan" className="quant-ai-tag">安全边际</Tag>
               </div>
-              <Paragraph style={{ margin: 0, fontSize: 12, color: "var(--c-text-muted)", lineHeight: 1.6 }}>
+              <Paragraph className="quant-ai-paragraph">
                 结合智能选股（Screener）构建底池时，建议前置叠加<strong>「ROE ≥ 10% + 扣非净利润连续增长 + 估值处历史 50% 分位以内」</strong>。优质基本面可提供坚实下行安全垫，避免纯技术择时买入业绩暴雷个股。
               </Paragraph>
             </div>

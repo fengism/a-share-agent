@@ -59,32 +59,26 @@ export default function OutboundProxyConfigCard({
         value: opt.value,
         label: (
           <span>
-            <span style={{ fontWeight: 500 }}>{opt.label}</span>
+            <span className="proxy-scope-label">{opt.label}</span>
             <Tag
               color={opt.tagColor}
-              style={{
-                marginLeft: 6,
-                fontSize: "var(--c-font-xs)",
-                lineHeight: "18px",
-                padding: "0 4px",
-                borderRadius: 2,
-              }}
+              className="proxy-scope-tag"
             >
               {opt.tag}
             </Tag>
-            <span style={{ color: colors.textMuted, fontSize: "var(--c-font-xs)" }}>
+            <span className="proxy-scope-desc">
               （{opt.desc}）
             </span>
           </span>
         ),
       })),
-    [colors.textMuted],
+    [],
   );
 
   return (
     <SettingsCard
       title="出站代理（公共）"
-      icon={<GlobalOutlined style={{ marginRight: 8 }} />}
+      icon={<GlobalOutlined className="proxy-title-icon" />}
       saveLabel="保存出站代理配置"
       onSave={onSave}
       isSaving={isSaving}
@@ -95,7 +89,7 @@ export default function OutboundProxyConfigCard({
       <Alert
         type="info"
         showIcon
-        style={{ marginBottom: 16 }}
+        className="u-mb-16"
         title="数据源出站代理路由"
         description="国内财经站点常对境外或机房出口 IP 实行严格风控（如返回 403 或重置连接）。您可灵活勾选下方需要走代理的数据源；未勾选的接口将保持直连以获得最优速度。"
       />
@@ -146,13 +140,13 @@ export default function OutboundProxyConfigCard({
             min={5}
             max={120}
             step={5}
-            style={{ width: "100%" }}
+            className="proxy-number-full"
             value={form.outbound_proxy_timeout_seconds ?? 20}
             onChange={(value) =>
               onChange({ outbound_proxy_timeout_seconds: (value ?? 20) as number })
             }
           />
-          <div style={{ marginTop: 6, fontSize: "var(--c-font-sm)", color: colors.textMuted }}>
+          <div className="proxy-hint">
             走代理时覆盖接口默认超时，代理链路通常更慢。
           </div>
         </Col>
@@ -163,13 +157,13 @@ export default function OutboundProxyConfigCard({
             min={0}
             max={6}
             step={1}
-            style={{ width: "100%" }}
+            className="proxy-number-full"
             value={form.outbound_proxy_retries ?? 2}
             onChange={(value) =>
               onChange({ outbound_proxy_retries: (value ?? 0) as number })
             }
           />
-          <div style={{ marginTop: 6, fontSize: "var(--c-font-sm)", color: colors.textMuted }}>
+          <div className="proxy-hint">
             代理不稳定时按指数退避重试，仅对代理请求生效。
           </div>
         </Col>
@@ -188,17 +182,17 @@ export default function OutboundProxyConfigCard({
             <Alert
               type="warning"
               showIcon
-              style={{ marginTop: 8 }}
+              className="u-mt-8"
               title="当前未选中任何数据源，所有出网请求将保持直连；如需代理请至少勾选一项（海外服务器推荐勾选东财与 AkShare）。"
             />
           )}
-          <div style={{ marginTop: 6, fontSize: "var(--c-font-sm)", color: colors.textMuted }}>
+          <div className="proxy-hint">
             仅选中的数据源出网请求会通过代理转发；未勾选的接口保持直连以获得最优速度与稳定性。
           </div>
         </Col>
       </Row>
 
-      <Divider style={{ margin: "16px 0 12px" }} />
+      <Divider className="proxy-divider" />
       <Row gutter={[12, 12]} align="middle">
         <Col xs={24} sm={14}>
           <Button icon={<WifiOutlined />} loading={isTesting} onClick={onTest} disabled={!proxyEnabled}>
@@ -223,7 +217,7 @@ export default function OutboundProxyConfigCard({
           {testResult && (
             <Typography.Paragraph
               type="secondary"
-              style={{ marginBottom: 0, fontSize: "var(--c-font-xs)", wordBreak: "break-all" }}
+              className="proxy-result-message"
             >
               {testResult.message}
             </Typography.Paragraph>
@@ -233,7 +227,7 @@ export default function OutboundProxyConfigCard({
 
       {/* TDX 行情走原始 TCP，HTTP 探测测不到，需要单独做隧道 + 协议往返验证 */}
       {proxyEnabled && tdxScopeEnabled && (
-        <Row gutter={[12, 12]} align="middle" style={{ marginTop: 8 }}>
+        <Row gutter={[12, 12]} align="middle" className="proxy-row-tdx">
           <Col xs={24} sm={14}>
             <Button icon={<WifiOutlined />} loading={isTestingTdx} onClick={onTestTdx}>
               测试 TDX 连通性
@@ -249,7 +243,7 @@ export default function OutboundProxyConfigCard({
             {tdxTestResult && (
               <Typography.Paragraph
                 type="secondary"
-                style={{ marginBottom: 0, fontSize: "var(--c-font-xs)", wordBreak: "break-all" }}
+                className="proxy-result-message"
               >
                 {tdxTestResult.message}
               </Typography.Paragraph>
@@ -258,12 +252,12 @@ export default function OutboundProxyConfigCard({
         </Row>
       )}
 
-      <Typography.Paragraph type="secondary" style={{ marginTop: 12, marginBottom: 0, fontSize: "var(--c-font-xs)" }}>
+      <Typography.Paragraph type="secondary" className="proxy-footnote">
         连通性测试针对当前已保存的配置，请先保存再测试。SOCKS5 代理需要后端安装 PySocks 或
         socksio 依赖，否则请求会直接报错。
       </Typography.Paragraph>
       {proxyEnabled && tdxScopeEnabled && (
-        <Typography.Paragraph type="secondary" style={{ marginBottom: 0, fontSize: "var(--c-font-xs)" }}>
+        <Typography.Paragraph type="secondary" className="proxy-footnote proxy-footnote--no-top">
           TDX 连通性测试会先建立代理隧道，再向行情节点发一次 round2 协议请求；
           “代理隧道不可用”说明代理配置有问题，“目标行情节点不可用”说明代理正常但该节点行情接口异常。
         </Typography.Paragraph>

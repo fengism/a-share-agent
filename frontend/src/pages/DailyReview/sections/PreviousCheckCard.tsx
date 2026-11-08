@@ -81,15 +81,15 @@ export default function PreviousCheckCard({ check, accuracy }: PreviousCheckCard
                       ) : (
                         <span style={{ color: (item.change_pct ?? 0) >= 0 ? c.up : c.down }}>
                           {formatSignedPct(item.change_pct)}
-                          {item.limit_up ? <Tag color="volcano" style={{ marginLeft: 6 }}>涨停</Tag> : null}
+                          {item.limit_up ? <Tag color="red" style={{ marginLeft: 6 }}>涨停</Tag> : null}
                         </span>
                       )}
                     </td>
                     <td>
                       {verdict === "hit" ? (
-                        <Tag color="success" icon={<CheckCircleFilled />}>命中</Tag>
+                        <Tag color="blue" icon={<CheckCircleFilled />}>命中</Tag>
                       ) : verdict === "miss" ? (
-                        <Tag color="error" icon={<CloseCircleFilled />}>未命中</Tag>
+                        <Tag icon={<CloseCircleFilled />}>未命中</Tag>
                       ) : (
                         <Tag icon={<MinusCircleOutlined />}>无数据</Tag>
                       )}

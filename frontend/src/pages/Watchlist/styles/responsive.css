@@ -1,0 +1,191 @@
+/* responsive —— 自 watchlist.css 第 550–738 行拆出。
+   由同目录 index.css 按固定顺序 @import，顺序不可调整：同特异性规则靠源序决胜负。 */
+@media (max-width: 900px) {
+  .watchlist-page__header {
+    flex-direction: column;
+  }
+
+  .watchlist-page__status {
+    justify-content: flex-start;
+  }
+
+  .watchlist-page__metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .watchlist-page__toolbar {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .watchlist-page__view-control {
+    grid-column: 1 / -1;
+  }
+
+  .watchlist-page__view-control .ant-segmented {
+    width: auto;
+  }
+
+  .watchlist-page__filter-bar {
+    grid-template-columns: minmax(0, 1fr) 240px;
+  }
+}
+
+@media (max-width: 640px) {
+  .watchlist-page__header {
+    gap: var(--c-space-3);
+    margin-bottom: var(--c-space-3);
+    padding-bottom: var(--c-space-3);
+  }
+
+  .watchlist-page__status {
+    width: 100%;
+    gap: 6px;
+  }
+
+  .watchlist-page__status > span {
+    font-size: 11px;
+    padding: 3px 7px;
+  }
+
+  .watchlist-page__status > span:nth-of-type(2) {
+    display: none;
+  }
+
+  .watchlist-page__status .ant-btn {
+    height: 28px;
+    padding: 0 8px;
+    font-size: 12px;
+  }
+
+  .watchlist-page__metrics {
+    gap: var(--c-space-2);
+  }
+
+  .watchlist-page__metric {
+    padding: 10px 12px 8px;
+  }
+
+  .watchlist-page__metric > span {
+    font-size: 12px;
+  }
+
+  .watchlist-page__metric > strong {
+    font-size: 18px;
+  }
+
+  .watchlist-page__metric > small {
+    font-size: 11px;
+  }
+
+  .watchlist-page__toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .watchlist-page__toolbar-card > .ant-card-body {
+    padding: 12px;
+  }
+
+  .watchlist-page__field-label {
+    font-size: 12px;
+  }
+
+  .watchlist-page__view-control .ant-segmented {
+    width: 100%;
+  }
+
+  .watchlist-page__filter-bar {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .watchlist-page__market-filter .ant-segmented {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    touch-action: pan-x pan-y;
+  }
+
+  .watchlist-page__market-filter .ant-segmented::-webkit-scrollbar {
+    display: none;
+  }
+
+  .watchlist-page__market-filter .ant-segmented-group {
+    min-width: max-content;
+  }
+
+  .watchlist-page__market-option {
+    font-size: 12px;
+    gap: 4px;
+  }
+
+  .watchlist-page__market-count {
+    min-width: 16px;
+    height: 16px;
+    line-height: 16px;
+    font-size: 10px;
+    padding-inline: 4px;
+  }
+
+  .watchlist-page__content-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    min-height: 52px;
+    padding: 8px 12px;
+  }
+
+  .watchlist-page__content-actions {
+    width: 100%;
+    justify-content: flex-start;
+    gap: 6px;
+  }
+
+  .watchlist-page__content-actions > .ant-select {
+    min-width: 130px;
+    flex: 1;
+  }
+
+  .watchlist-page__table .ant-table-thead > tr > th,
+  .watchlist-page__table .ant-table-tbody > tr > td {
+    padding: 8px 6px;
+    font-size: 12px;
+  }
+
+  .watchlist-page__stock strong {
+    font-size: 13px;
+  }
+
+  .watchlist-page__stock span {
+    font-size: 11px;
+  }
+
+  .watchlist-page__price {
+    font-size: 13px;
+  }
+
+  .watchlist-page__group-header {
+    padding: 10px 12px;
+    font-size: 14px;
+  }
+
+  .watchlist-page__group-name {
+    font-size: 14px;
+  }
+
+  .watchlist-page__group-breadth {
+    gap: 5px;
+    margin-left: 0;
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 430px) {
+  .watchlist-page__metric > small {
+    white-space: normal;
+  }
+
+  .watchlist-page__content-title > span,
+  .watchlist-page__group-breadth {
+    display: none;
+  }
+}

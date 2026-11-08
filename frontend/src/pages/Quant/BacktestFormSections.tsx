@@ -316,22 +316,22 @@ export function UniverseFields({ source }: { source: QuantFormValues["source"] }
       return {
         value: item.code,
         label: (
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <div className="quant-option-row">
+            <span className="quant-option-main">
               {isHk ? (
-                <Tag color="blue" style={{ fontSize: 10, lineHeight: "16px", padding: "0 4px", margin: 0 }}>
+                <Tag color="blue" className="quant-market-tag">
                   港股
                 </Tag>
               ) : (
-                <Tag color="cyan" style={{ fontSize: 10, lineHeight: "16px", padding: "0 4px", margin: 0 }}>
+                <Tag color="cyan" className="quant-market-tag">
                   A股
                 </Tag>
               )}
-              <strong style={{ fontFamily: "monospace" }}>{item.code}</strong>
+              <strong className="quant-option-code">{item.code}</strong>
               <span>{item.name}</span>
             </span>
             {typeof item.price === "number" && (
-              <span style={{ color: "var(--c-text-muted)", fontSize: "var(--c-font-xs)" }}>
+              <span className="quant-option-price">
                 {isHk ? "HK$" : "¥"}{item.price.toFixed(2)}
               </span>
             )}
@@ -378,13 +378,13 @@ export function UniverseFields({ source }: { source: QuantFormValues["source"] }
               onSelect={handleSelectOption}
               onChange={handleInputChange}
               filterOption={false}
-              style={{ width: "100%" }}
+              className="quant-codes-autocomplete"
             >
               <Input
                 aria-label="股票代码"
                 disabled={source === "portfolio"}
                 placeholder="600519, 000001"
-                prefix={<SearchOutlined style={{ color: "var(--c-text-muted)" }} />}
+                prefix={<SearchOutlined className="quant-search-icon" />}
                 allowClear
                 onBlur={handleBlurOrNormalize}
                 onPressEnter={handleBlurOrNormalize}
@@ -392,10 +392,10 @@ export function UniverseFields({ source }: { source: QuantFormValues["source"] }
             </AutoComplete>
           </Form.Item>
           {source === "custom" ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "-10px", marginBottom: "14px" }}>
+            <div className="quant-codes-helper">
               {parsedCodes.length > 0 && parsedCodes[0] && (
-                <div className="quant-selected-stocks" style={{ display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center" }}>
-                  <span style={{ fontSize: "var(--c-font-xs)", color: "var(--c-text-muted)" }}>
+                <div className="quant-selected-stocks">
+                  <span className="quant-selected-label">
                     已选股票 ({parsedCodes.length}/30):
                   </span>
                   {parsedCodes.map((code) => {
@@ -409,40 +409,34 @@ export function UniverseFields({ source }: { source: QuantFormValues["source"] }
                           handleRemoveCode(code);
                         }}
                         color="blue"
-                        style={{
-                          fontSize: "var(--c-font-xs)",
-                          marginInlineEnd: 0,
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 4,
-                        }}
+                        className="quant-selected-tag"
                       >
                         <strong>{code}</strong>
-                        {name ? <span style={{ opacity: 0.85 }}>{name}</span> : null}
+                        {name ? <span className="quant-option-name">{name}</span> : null}
                       </Tag>
                     );
                   })}
                 </div>
               )}
-              <div className="quant-quick-stocks" style={{ display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center" }}>
-                <span style={{ fontSize: "var(--c-font-xs)", color: "var(--c-text-muted)" }}>快速导入:</span>
+              <div className="quant-quick-stocks">
+                <span className="quant-quick-label">快速导入:</span>
                 <Button
                   size="small"
                   type="dashed"
                   icon={<StarOutlined />}
                   onClick={handleImportWatchlist}
-                  style={{ fontSize: "var(--c-font-xs)", height: "24px", lineHeight: "22px", padding: "0 8px" }}
+                  className="quant-quick-import"
                 >
                   导入自选股 ({watchlistItems.length})
                 </Button>
               </div>
-              <div className="quant-quick-stocks" style={{ display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center" }}>
-                <span style={{ fontSize: "var(--c-font-xs)", color: "var(--c-text-muted)" }}>精选主题池:</span>
+              <div className="quant-quick-stocks">
+                <span className="quant-quick-label">精选主题池:</span>
                 {THEMATIC_UNIVERSE_PRESETS.map((preset) => (
                   <Tooltip key={preset.name} title={preset.desc}>
                     <Tag
                       color={preset.color}
-                      style={{ cursor: "pointer", fontSize: "var(--c-font-xs)", marginInlineEnd: 0 }}
+                      className="quant-preset-tag"
                       onClick={() => handleThematicPreset(preset.codes)}
                     >
                       {preset.name}
@@ -450,19 +444,19 @@ export function UniverseFields({ source }: { source: QuantFormValues["source"] }
                   </Tooltip>
                 ))}
               </div>
-              <div className="quant-quick-stocks" style={{ display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center" }}>
-                <span style={{ fontSize: "var(--c-font-xs)", color: "var(--c-text-muted)" }}>快捷加单股:</span>
+              <div className="quant-quick-stocks">
+                <span className="quant-quick-label">快捷加单股:</span>
                 {QUICK_STOCK_PRESETS.map((preset) => (
                   <Tag
                     key={preset.code}
-                    style={{ cursor: "pointer", fontSize: "var(--c-font-xs)", marginInlineEnd: 0 }}
+                    className="quant-preset-tag"
                     onClick={() => handleQuickCode(preset.code)}
                   >
                     {preset.label}
                   </Tag>
                 ))}
                 <Tag
-                  style={{ cursor: "pointer", fontSize: "var(--c-font-xs)", marginInlineEnd: 0, opacity: 0.7 }}
+                  className="quant-preset-tag quant-preset-tag--dim"
                   onClick={() => form.setFieldValue("codes", "")}
                 >
                   清空
@@ -539,7 +533,7 @@ export function StrategyFields({
                   max={parameter.maximum ?? undefined}
                   step={parameter.step ?? (parameter.type === "integer" ? 1 : undefined)}
                   precision={parameter.type === "integer" ? 0 : undefined}
-                  style={{ width: "100%" }}
+                  className="quant-number-full"
                 />
               ) : (
                 <Input maxLength={120} />

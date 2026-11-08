@@ -8,7 +8,6 @@ import {
 import { Card, Col, Empty, Row, Space, Table, Tag, Typography } from "antd";
 import type { QuantBacktestResult } from "../../../api/queries";
 import PreloadLink from "../../../components/PreloadLink";
-import { useColors, useStyles } from "../../../styles/ui";
 import { getStockName } from "../quantForm";
 
 const { Text } = Typography;
@@ -41,9 +40,6 @@ export default function ConstituentPerformanceMatrix({
   marketSnapshots = [],
   onSelectCode,
 }: ConstituentPerformanceMatrixProps) {
-  const colors = useColors();
-  const { cardStyle } = useStyles();
-
   // Aggregate stats per stock code
   const { stockStats, topGainer, topWinRate, mostActive } = useMemo(() => {
     // Map snapshot turnover by code + date
@@ -151,41 +147,30 @@ export default function ConstituentPerformanceMatrix({
   return (
     <Card
       title={(
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-          <PieChartOutlined style={{ color: "var(--c-primary)", fontSize: 16 }} />
+        <span className="quant-cpm-title">
+          <PieChartOutlined className="quant-cpm-title-icon" />
           <span>多标的盈亏贡献与胜负分析 (Constituent Stock Performance)</span>
           <Tag color="blue">{codes.length} 只标的</Tag>
         </span>
       )}
       size="small"
-      style={{ ...cardStyle, marginBottom: 16 }}
-      className="quant-result-card"
+      className="quant-result-card u-card quant-cpm-card"
     >
       {/* Top Highlights */}
       {(topGainer || topWinRate || mostActive) && (
-        <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
+        <Row gutter={[12, 12]} className="quant-cpm-highlights-row">
           {topGainer && (
             <Col xs={24} sm={8}>
-              <div
-                style={{
-                  padding: "var(--c-pad-inset, 7px 12px)",
-                  borderRadius: "var(--c-radius-sm)",
-                  background: "color-mix(in srgb, var(--c-up) 8%, var(--c-nested-bg))",
-                  border: "1px solid color-mix(in srgb, var(--c-up) 22%, var(--c-border))",
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--c-text-muted)" }}>
-                  <TrophyOutlined style={{ color: colors.up }} />
+              <div className="quant-cpm-highlight-card quant-cpm-highlight-card--up">
+                <div className="quant-cpm-highlight-header">
+                  <TrophyOutlined className="u-text-up" />
                   <span>最佳盈利贡献标的 (Alpha King)</span>
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 4 }}>
-                  <strong style={{ fontSize: 14 }}>
+                <div className="quant-cpm-highlight-body">
+                  <strong className="quant-cpm-stock-name">
                     {topGainer.name} ({topGainer.code})
                   </strong>
-                  <span
-                    className="financial-num"
-                    style={{ fontSize: 15, fontWeight: 700, color: colors.up }}
-                  >
+                  <span className="financial-num quant-cpm-pnl--up">
                     +{topGainer.realizedPnl.toFixed(2)}元
                   </span>
                 </div>
@@ -195,23 +180,16 @@ export default function ConstituentPerformanceMatrix({
 
           {topWinRate && (
             <Col xs={24} sm={8}>
-              <div
-                style={{
-                  padding: "var(--c-pad-inset, 7px 12px)",
-                  borderRadius: "var(--c-radius-sm)",
-                  background: "color-mix(in srgb, var(--c-primary) 8%, var(--c-nested-bg))",
-                  border: "1px solid color-mix(in srgb, var(--c-primary) 22%, var(--c-border))",
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--c-text-muted)" }}>
-                  <CrownOutlined style={{ color: "var(--c-primary)" }} />
+              <div className="quant-cpm-highlight-card quant-cpm-highlight-card--primary">
+                <div className="quant-cpm-highlight-header">
+                  <CrownOutlined className="quant-cpm-icon--primary" />
                   <span>最高胜率标的</span>
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 4 }}>
-                  <strong style={{ fontSize: 14 }}>
+                <div className="quant-cpm-highlight-body">
+                  <strong className="quant-cpm-stock-name">
                     {topWinRate.name} ({topWinRate.code})
                   </strong>
-                  <Tag color="cyan" style={{ margin: 0, fontWeight: 600 }}>
+                  <Tag color="cyan" className="quant-cpm-winrate-tag">
                     胜率 {topWinRate.winRate?.toFixed(1)}%
                   </Tag>
                 </div>
@@ -221,23 +199,16 @@ export default function ConstituentPerformanceMatrix({
 
           {mostActive && (
             <Col xs={24} sm={8}>
-              <div
-                style={{
-                  padding: "var(--c-pad-inset, 7px 12px)",
-                  borderRadius: "var(--c-radius-sm)",
-                  background: "var(--c-nested-bg)",
-                  border: "1px solid var(--c-border)",
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--c-text-muted)" }}>
-                  <ThunderboltOutlined style={{ color: "#fa8c16" }} />
+              <div className="quant-cpm-highlight-card">
+                <div className="quant-cpm-highlight-header">
+                  <ThunderboltOutlined className="quant-cpm-icon--warning" />
                   <span>调仓最活跃标的</span>
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 4 }}>
-                  <strong style={{ fontSize: 14 }}>
+                <div className="quant-cpm-highlight-body">
+                  <strong className="quant-cpm-stock-name">
                     {mostActive.name} ({mostActive.code})
                   </strong>
-                  <span style={{ fontSize: 13, fontWeight: 600 }}>{mostActive.tradeCount} 笔成交</span>
+                  <span className="quant-cpm-trades-count">{mostActive.tradeCount} 笔成交</span>
                 </div>
               </div>
             </Col>
@@ -263,12 +234,11 @@ export default function ConstituentPerformanceMatrix({
                 <PreloadLink
                   to={`/analysis?code=${record.code}`}
                   aria-label={`查看${record.code}研报`}
-                  className="financial-num"
-                  style={{ fontWeight: 600 }}
+                  className="financial-num quant-cpm-code-link"
                 >
                   {record.code}
                 </PreloadLink>
-                <span style={{ color: "var(--c-text-muted)", fontSize: 12 }}>
+                <span className="quant-cpm-stock-subname">
                   {record.name}
                 </span>
               </Space>
@@ -281,16 +251,12 @@ export default function ConstituentPerformanceMatrix({
             width: 140,
             sorter: (a, b) => a.realizedPnl - b.realizedPnl,
             render: (value: number, record) => {
-              if (record.closedCount === 0) return <span style={{ color: "var(--c-text-muted)" }}>-</span>;
+              if (record.closedCount === 0) return <span className="u-text-muted">-</span>;
               const isProfit = value > 0;
               const isLoss = value < 0;
               return (
                 <Text
-                  className="financial-num"
-                  style={{
-                    fontWeight: 700,
-                    color: isProfit ? colors.up : isLoss ? colors.down : colors.textPrimary,
-                  }}
+                  className={`financial-num quant-cpm-cell-pnl ${isProfit ? "u-text-up" : isLoss ? "u-text-down" : ""}`}
                 >
                   {isProfit ? `+${value.toFixed(2)}` : value.toFixed(2)}
                 </Text>
@@ -304,10 +270,10 @@ export default function ConstituentPerformanceMatrix({
             width: 110,
             sorter: (a, b) => (a.winRate ?? -1) - (b.winRate ?? -1),
             render: (value: number | null, record) => {
-              if (value == null) return <span style={{ color: "var(--c-text-muted)" }}>-</span>;
+              if (value == null) return <span className="u-text-muted">-</span>;
               const color = value >= 60 ? "success" : value >= 45 ? "blue" : "default";
               return (
-                <Tag color={color} style={{ margin: 0, fontVariantNumeric: "tabular-nums" }}>
+                <Tag color={color} className="quant-cpm-table-tag">
                   {value.toFixed(1)}% ({record.winCount}/{record.closedCount})
                 </Tag>
               );
@@ -320,9 +286,9 @@ export default function ConstituentPerformanceMatrix({
             width: 120,
             sorter: (a, b) => a.tradeCount - b.tradeCount,
             render: (_, record) => (
-              <span className="financial-num" style={{ fontSize: 12 }}>
+              <span className="financial-num quant-cpm-num-sm">
                 {record.tradeCount} 笔
-                <small style={{ color: "var(--c-text-muted)", marginLeft: 4 }}>
+                <small className="quant-cpm-trades-sub">
                   (买{record.buyCount}/卖{record.sellCount})
                 </small>
               </span>
@@ -336,10 +302,10 @@ export default function ConstituentPerformanceMatrix({
             sorter: (a, b) => (a.avgTurnover ?? -1) - (b.avgTurnover ?? -1),
             render: (value: number | null) => (
               value != null ? (
-                <span className="financial-num" style={{ fontSize: 12 }}>
+                <span className="financial-num quant-cpm-num-sm">
                   {value.toFixed(2)}%
                 </span>
-              ) : <span style={{ color: "var(--c-text-muted)" }}>-</span>
+              ) : <span className="u-text-muted">-</span>
             ),
           },
           {
@@ -348,7 +314,7 @@ export default function ConstituentPerformanceMatrix({
             align: "right",
             width: 110,
             render: (value: number) => (
-              <span className="financial-num" style={{ fontSize: 12, color: "var(--c-text-muted)" }}>
+              <span className="financial-num quant-cpm-fee-num">
                 ¥{value.toFixed(2)}
               </span>
             ),
@@ -368,7 +334,7 @@ export default function ConstituentPerformanceMatrix({
                     document.getElementById("quant-result-trades-chart")?.scrollIntoView({ behavior: "smooth" });
                   }
                 }}
-                style={{ fontSize: 12 }}
+                className="quant-cpm-action-link"
               >
                 看点位
               </a>

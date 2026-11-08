@@ -1,0 +1,240 @@
+/* 概念页样式：概念对比、涨跌分布、领涨/关联侧栏、成分股表与未收录空态。 */
+
+/* ── 概念对比 ── */
+.concept-compare__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.concept-compare__legend {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.concept-compare__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--c-font-xs);
+}
+
+/* ── 成分股筛选行 ── */
+.concept-constituent-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+/* ── 涨跌分布条 ── */
+.concept-breadth {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.concept-breadth__bar {
+  display: flex;
+  width: 96px;
+  height: 6px;
+  border-radius: var(--c-radius-pill);
+  overflow: hidden;
+  background: var(--c-muted-soft);
+  flex-shrink: 0;
+}
+
+.concept-breadth__bar > span {
+  display: block;
+  min-width: 0;
+}
+
+.concept-breadth__labels {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--c-font-xs);
+  white-space: nowrap;
+}
+
+/* ── 右侧栏：领涨/领跌 + 关联概念 ── */
+.concept-side__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--c-font-sm);
+}
+
+.concept-leaders__col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.concept-leaders__col-label {
+  font-size: var(--c-font-xs);
+}
+
+.concept-leader-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  font-size: var(--c-font-sm);
+}
+
+.concept-leader-row__name {
+  color: var(--c-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.concept-leader-row__name:hover {
+  color: var(--c-primary);
+}
+
+.concept-related {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.concept-related__tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+}
+
+.concept-related__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.concept-related__overlap {
+  font-size: 11px;
+  color: var(--c-text-muted);
+}
+
+/* ── 成分股表 ── */
+.concept-constituent-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.concept-constituent-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.concept-quote-progress {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+/* 涨跌幅单元格：数字右侧贴齐，背景条从右往左按波动幅度着色 */
+.concept-change-cell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  padding: 1px 6px;
+  border-radius: var(--c-radius-sm);
+  min-width: 88px;
+}
+
+.concept-change-cell__badge {
+  flex-shrink: 0;
+}
+
+.concept-row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* 行内「其他概念」标签：窄屏不展示，避免挤占行情列 */
+.concept-other-tags {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.concept-other-tags__tag {
+  max-width: 78px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  line-height: 18px;
+  padding-inline: 6px;
+}
+
+/* 脚注与口径说明 */
+.concept-index-note {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--c-text-muted);
+}
+
+.concept-caliper p {
+  margin: 0 0 6px;
+  font-size: var(--c-font-xs);
+  line-height: 1.7;
+  color: var(--c-text-secondary);
+}
+
+.concept-caliper p:last-child {
+  margin-bottom: 0;
+}
+
+.concept-mobile-view-tabs {
+  display: none;
+  width: 100%;
+  margin-bottom: 2px;
+}
+
+/* ── 未收录概念兑底 ── */
+.concept-missing {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: var(--c-space-7) var(--c-space-4);
+  text-align: center;
+}
+
+.concept-missing__title {
+  margin: 0;
+  font-size: var(--c-font-md);
+  font-weight: var(--c-weight-semibold);
+  color: var(--c-text-primary);
+}
+
+.concept-missing__desc {
+  margin: 0 0 var(--c-space-3);
+  font-size: var(--c-font-sm);
+}
+
+.concept-missing__actions {
+  display: flex;
+  gap: 8px;
+}

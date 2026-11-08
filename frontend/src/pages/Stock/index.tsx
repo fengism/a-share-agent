@@ -24,7 +24,7 @@ import StockStickyBar from "./StockStickyBar";
 import StockDetailTabs from "./StockDetailTabs";
 import StockMetrics from "./StockMetrics";
 import { useDocumentTitle } from "../../hooks/useDocumentTitle";
-import "./stock-page.css";
+import "./styles/index.css";
 
 export default function StockPage() {
   const { code = "" } = useParams<{ code: string }>();

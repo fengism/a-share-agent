@@ -1,0 +1,7 @@
+/* chat.css 的拆分入口。
+   @import 顺序即层叠顺序，不可重排。 */
+
+@import "./messages-and-steps.css";
+@import "./tools-and-actions.css";
+@import "./config-and-layout.css";
+@import "./empty-state.css";

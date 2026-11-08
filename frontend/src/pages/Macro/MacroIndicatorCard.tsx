@@ -194,7 +194,7 @@ export default function MacroIndicatorCard({
               </Tooltip>
             ) : null}
             {metadata?.is_fallback ? <Tag className="macro-indicator-card__tag" color="warning">fallback</Tag> : null}
-            {metadata?.is_stale ? <Tag className="macro-indicator-card__tag" color="error">数据滞后</Tag> : null}
+            {metadata?.is_stale ? <Tag className="macro-indicator-card__tag" color="warning">数据滞后</Tag> : null}
             {!metadata?.is_stale && metadata?.stale_fields?.length ? <Tag className="macro-indicator-card__tag" color="warning">部分字段滞后</Tag> : null}
             {dateValue ? (
               <Text className="macro-indicator-card__date">

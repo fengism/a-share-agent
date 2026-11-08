@@ -4,7 +4,6 @@ import KeyFinancialMetricsSection from "../../features/investment-research/KeyFi
 import RevenueBreakdownSection from "../../features/investment-research/RevenueBreakdownSection";
 import FundFlowPanel from "../../features/stock-insights/FundFlowPanel";
 import { useUrlSearchParam } from "../../hooks/useUrlSearchParam";
-import { useStyles } from "../../styles/ui";
 import HKIndustryComparisonSection from "./HKIndustryComparisonSection";
 import StockFinancialMetrics from "./StockFinancialMetrics";
 import StockInformationTabs from "./StockInformationTabs";
@@ -14,7 +13,6 @@ import StockValuationTab from "./StockValuationTab";
 const DETAIL_TABS = ["financial", "valuation", "fund-flow", "information"] as const;
 
 export default function StockDetailTabs({ code, market = "cn" }: { code: string; market?: "cn" | "hk" }) {
-  const { cardStyle } = useStyles();
   const [activeKey, setActiveKey] = useUrlSearchParam("tab", "financial", { allowedValues: DETAIL_TABS });
 
   if (market === "hk") {
@@ -33,7 +31,7 @@ export default function StockDetailTabs({ code, market = "cn" }: { code: string;
                   <RevenueBreakdownSection code={code} />
                   <Card
                     data-testid="hk-financial-data"
-                    className="stock-section-card stock-financial-card"
+                    className="stock-section-card stock-financial-card u-card"
                     title={(
                       <StockSectionTitle
                         icon={<BarChartOutlined />}
@@ -41,7 +39,6 @@ export default function StockDetailTabs({ code, market = "cn" }: { code: string;
                         description="同花顺 F10 · 最近四个报告期 · 金额按公司原始披露币种"
                       />
                     )}
-                    style={cardStyle}
                   >
                     <KeyFinancialMetricsSection code={code} showHeader={false} />
                   </Card>
@@ -78,9 +75,8 @@ export default function StockDetailTabs({ code, market = "cn" }: { code: string;
             label: "资金流向",
             children: activeKey === "fund-flow" ? (
               <Card
-                className="stock-section-card stock-fund-flow-card"
+                className="stock-section-card stock-fund-flow-card u-card"
                 title={<StockSectionTitle icon={<LineChartOutlined />} title="资金流向" description="主力与各类订单净流入 · 近60日走势" />}
-                style={cardStyle}
               >
                 <FundFlowPanel code={code} />
               </Card>

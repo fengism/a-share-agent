@@ -4,7 +4,7 @@ import { Button } from "antd";
 import type { ChatDisplayMessage } from "../../../types/chat";
 import type { ChatResultActionHandler } from "../chatResultActions";
 import { useMediaQuery } from "../../../hooks/useMediaQuery";
-import { useColors, useStyles, useTokens } from "../../../theme/hooks";
+import { useColors, useTokens } from "../../../theme/hooks";
 import {
   getNextVisibleCount,
   getVisibleMessageStart,
@@ -37,7 +37,6 @@ export const ChatMessageList = React.memo(function ChatMessageList({
 }: ChatMessageListProps) {
   const c = useColors();
   const t = useTokens();
-  const { cardStyle } = useStyles();
   const isNarrow = useMediaQuery("(max-width: 768px)");
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_MESSAGES);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -62,16 +61,7 @@ export const ChatMessageList = React.memo(function ChatMessageList({
 
   return (
     <div
-      style={{
-        ...cardStyle,
-        padding: 0,
-        marginBottom: t.space[3],
-        height: isNarrow ? "calc(100dvh - 220px)" : "calc(100vh - 260px)",
-        minHeight: isNarrow ? 320 : 400,
-        display: "flex",
-        flexDirection: "column",
-        overflow: "hidden",
-      }}
+      className="u-card" style={{ padding: 0, marginBottom: t.space[3], height: isNarrow ? "calc(100dvh - 220px)" : "calc(100vh - 260px)", minHeight: isNarrow ? 320 : 400, display: "flex", flexDirection: "column", overflow: "hidden" }}
     >
       <div
         ref={scrollContainerRef}

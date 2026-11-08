@@ -1,0 +1,60 @@
+/* 整页响应式断点覆盖
+   自 feed.css 第 848–905 行拆出。
+   由同目录 index.css 按固定顺序 @import，顺序不可调整：同特异性规则靠源序决胜负。 */
+@media (max-width: 900px) {
+  .feed-masthead::before,
+  .feed-masthead::after { display: none; }
+
+  .feed-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 14px 12px;
+  }
+
+  .feed-rail {
+    order: -1;
+    width: 100%;
+    padding: 0;
+    border-top: none;
+    border-left: none;
+  }
+
+  .feed-rail > * { position: static; }
+
+  .feed-analysis-mobile-toggle {
+    display: block;
+    margin: 8px 0 4px;
+    text-align: center;
+  }
+
+  .feed-analysis-scroll {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease-out;
+  }
+
+  .feed-analysis-scroll.is-expanded {
+    max-height: 2500px;
+    overflow: visible;
+  }
+}
+
+@media (max-width: 640px) {
+  .feed-paper { margin-inline: -4px; border-radius: var(--c-radius-sm, 6px); }
+  .feed-masthead { padding: 14px 14px 10px; }
+  .feed-masthead h1 { font-size: var(--c-font-xl); }
+  .feed-masthead-kicker { letter-spacing: 0.12em; font-size: 10px; }
+  .feed-masthead-meta { font-size: 11px; }
+
+  .feed-search { width: 100%; }
+  .feed-layout { padding: 12px 8px 18px; }
+  .twitter-feed-refresh { align-items: flex-end; flex-direction: column; gap: 6px; }
+  .feed-tabs .ant-tabs-tab { font-size: var(--c-font-sm); }
+  .feed-news-grid { grid-template-columns: 1fr; gap: 10px; }
+  .feed-news-item { padding: 12px; }
+  .feed-news-item.is-featured { grid-column: auto; padding: 14px; }
+  .feed-news-item.is-featured .feed-news-title { font-size: var(--c-font-xl); }
+  .feed-section-heading { font-size: var(--c-font-lg); }
+  .feed-stream-list .feed-news-item { padding: 10px 4px 10px 0; gap: 8px; }
+}

@@ -6,7 +6,6 @@ import type {
   PortfolioStockSummary,
   PortfolioTransaction,
 } from "../../types/portfolio";
-import { useStyles } from "../../styles/ui";
 import PortfolioClosedPositionTable from "./PortfolioClosedPositionTable";
 import PortfolioLotTable from "./PortfolioLotTable";
 import PortfolioStockTable from "./PortfolioStockTable";
@@ -30,7 +29,6 @@ function PortfolioTables({
   onSell,
   onViewKline,
 }: PortfolioTablesProps) {
-  const { cardStyle } = useStyles();
   const renderers = usePortfolioTableRenderers();
 
   const initialKey = useMemo(() => {
@@ -108,10 +106,9 @@ function PortfolioTables({
 
   return (
     <Card
-      size="small"
-      style={{ ...cardStyle, marginBottom: 16 }}
+      size="small" style={{ marginBottom: 16 }}
       styles={{ body: { padding: "8px 12px 12px" } }}
-      className="portfolio-tables-card"
+      className="portfolio-tables-card u-card"
     >
       <Tabs
         activeKey={activeKey}

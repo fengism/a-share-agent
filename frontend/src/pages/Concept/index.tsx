@@ -32,7 +32,7 @@ import {
   useFavoriteConcepts,
   useRecentConcepts,
 } from "./conceptSelection";
-import "./concept-page.css";
+import "./styles/index.css";
 
 /** 指数卡片视图切换：单概念 K 线 / 多概念对比 */
 const INDEX_VIEW_OPTIONS = [
@@ -60,7 +60,7 @@ function HotChips({
   return (
     <div className="concept-picker__chips">
       <span className="concept-picker__label">
-        <FireOutlined style={{ color: c.warning }} /> 热门
+        <FireOutlined className="concept-icon-warning" /> 热门
       </span>
       {hot.slice(0, 10).map((item, index) => {
         const active = item.name === activeConcept;
@@ -140,12 +140,11 @@ function FavoriteChips({
   activeConcept: string;
   onSelect: (name: string) => void;
 }) {
-  const c = useColors();
   if (!favorites.length) return null;
   return (
     <div className="concept-picker__chips">
       <span className="concept-picker__label">
-        <StarFilled style={{ color: c.warning }} /> 关注
+        <StarFilled className="concept-icon-warning" /> 关注
       </span>
       {favorites.map((name) => (
         <button
@@ -154,7 +153,7 @@ function FavoriteChips({
           className={`concept-chip${name === activeConcept ? " concept-chip--active" : ""}`}
           onClick={() => onSelect(name)}
         >
-          <StarFilled style={{ color: c.warning, fontSize: 11 }} />
+          <StarFilled className="concept-icon-warning--sm" />
           <span className="concept-chip__name">{name}</span>
         </button>
       ))}
@@ -198,7 +197,7 @@ function MainlineChips({
   return (
     <div className="concept-picker__chips">
       <span className="concept-picker__label">
-        <RiseOutlined style={{ color: c.up }} /> 今日主线
+        <RiseOutlined className="u-text-up" /> 今日主线
       </span>
       {plates.map((plate) => {
         const active = plate.name === activeConcept || plate.rawName === activeConcept;
@@ -397,22 +396,22 @@ export default function Concept() {
       <main className="concept-page" style={pageContainerStyle}>
         <header>
           <div className="u-page-title u-page-title--compact">
-            <Title level={3} style={{ margin: 0, color: c.textPrimary }}>
+            <Title level={3} className="concept-page__heading">
               <ApartmentOutlined /> 概念
             </Title>
           </div>
         </header>
         <Card size="small">
           <div className="concept-missing">
-            <p className="concept-missing__title" style={{ color: c.textPrimary }}>
+            <p className="concept-missing__title">
               「{concept}」暂未收录或已更名
             </p>
-            <p className="concept-missing__desc" style={{ color: c.textMuted }}>
+            <p className="concept-missing__desc">
               概念名单来自本地维护的同花顺映射，热门概念榜中的名称一般都可直接打开。
             </p>
             {suggestedConcepts.length > 0 && (
-              <div style={{ marginTop: 12, marginBottom: 12, display: "flex", alignItems: "center", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
-                <span style={{ fontSize: 13, color: c.textMuted }}>为您推荐相关概念：</span>
+              <div className="concept-suggest-row">
+                <span className="concept-muted-13">为您推荐相关概念：</span>
                 {suggestedConcepts.map((item) => (
                   <Button
                     key={item.name}
@@ -442,11 +441,11 @@ export default function Concept() {
     <main className="concept-page" style={pageContainerStyle}>
       <header>
         <div className="u-page-title u-page-title--compact">
-          <Title level={3} style={{ margin: 0, color: c.textPrimary }}>
+          <Title level={3} className="concept-page__heading">
             <ApartmentOutlined /> 概念
           </Title>
         </div>
-        <p className="concept-page__desc" style={{ color: c.textMuted }}>
+        <p className="concept-page__desc">
           把一个概念当作一个组合：看板块整体走势、谁在领涨，以及与哪些概念联动。
         </p>
       </header>
@@ -465,9 +464,9 @@ export default function Concept() {
             options={filtered.slice(0, 30).map((item) => ({
               value: item.name,
               label: (
-                <span style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                <span className="concept-autocomplete-option">
                   <span>{item.name}</span>
-                  <span style={{ display: "inline-flex", gap: 10, alignItems: "baseline" }}>
+                  <span className="concept-autocomplete-option-metrics">
                     {item.change_pct != null ? (
                       <span
                         className="financial-num"
@@ -480,7 +479,7 @@ export default function Concept() {
                         {item.change_pct.toFixed(2)}%
                       </span>
                     ) : null}
-                    <span style={{ color: c.textMuted, fontSize: 12 }}>{item.stock_count} 只</span>
+                    <span className="u-text-muted u-text-sm">{item.stock_count} 只</span>
                   </span>
                 </span>
               ),
@@ -500,9 +499,9 @@ export default function Concept() {
                   aria-label={`${hasFavorite(concept) ? "取消收藏" : "收藏"}-${concept}`}
                   icon={
                     hasFavorite(concept) ? (
-                      <StarFilled style={{ color: c.warning }} />
+                      <StarFilled className="concept-icon-warning" />
                     ) : (
-                      <StarOutlined style={{ color: c.textMuted }} />
+                      <StarOutlined className="concept-icon-muted" />
                     )
                   }
                   onClick={() => toggleFavorite(concept)}
@@ -510,11 +509,11 @@ export default function Concept() {
               </Tooltip>
             ) : null}
             {concept ? (
-              <Tag style={{ marginInlineEnd: 0 }} color="blue">
+              <Tag className="concept-tag--flat" color="blue">
                 {concept} · {total || concepts.find((i) => i.name === concept)?.stock_count || 0} 只
               </Tag>
             ) : null}
-            <span style={{ fontSize: 12, color: c.textMuted }}>
+            <span className="u-text-muted u-text-sm">
               共 {concepts.length} 个概念{keyword.trim() ? ` · 匹配 ${filtered.length}` : ""}
             </span>
             <Tooltip title="涨幅为概念成分股最近交易日等权平均（与合成指数同口径）">
@@ -552,7 +551,7 @@ export default function Concept() {
         <Row gutter={[12, 12]} align="stretch">
           <Col xs={24} xl={16}>
             {indexView === "single" ? (
-              <Card size="small" style={{ height: "100%" }} styles={{ body: { padding: isNarrow ? 10 : 12 } }}>
+              <Card size="small" className="concept-card-full-height" styles={{ body: { padding: isNarrow ? 10 : 12 } }}>
                 <ConceptIndexPanel
                   concept={concept}
                   points={indexQuery.data?.items}
@@ -575,9 +574,9 @@ export default function Concept() {
                 />
               </Card>
             ) : (
-              <Card size="small" style={{ height: "100%" }} styles={{ body: { padding: isNarrow ? 10 : 12 } }}>
+              <Card size="small" className="concept-card-full-height" styles={{ body: { padding: isNarrow ? 10 : 12 } }}>
                 <div className="concept-index-toolbar">
-                  <span className="concept-kpi__name" style={{ color: c.textPrimary }}>{concept} 对比</span>
+                  <span className="concept-kpi__name">{concept} 对比</span>
                   <div className="concept-index-toolbar__controls">
                     <Segmented
                       size="small"

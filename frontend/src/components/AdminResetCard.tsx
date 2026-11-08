@@ -9,7 +9,7 @@ const { Text } = Typography;
 
 /** Admin-only: generate a one-time password-reset link for a user (no email). */
 export default function AdminResetCard() {
-  const { cardStyle, sectionCardBodyStyle } = useStyles();
+  const { sectionCardBodyStyle } = useStyles();
   const c = useColors();
   const isNarrow = useMediaQuery("(max-width: 640px)");
   const [form] = Form.useForm();
@@ -45,7 +45,7 @@ export default function AdminResetCard() {
   return (
     <Card
       title={<span><KeyOutlined style={{ marginRight: 8 }} />用户密码重置</span>}
-      style={{ ...cardStyle, marginBottom: 16 }}
+      className="u-card" style={{ marginBottom: 16 }}
       styles={{ body: sectionCardBodyStyle }}
     >
       <div style={{ fontSize: "var(--c-font-sm)", color: c.textMuted, marginBottom: 12 }}>

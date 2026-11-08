@@ -1,0 +1,221 @@
+/* 宽基日度资金流向热力矩阵样式 */
+
+.national-team-heatmap__date-btn.ant-btn {
+  padding: 0;
+  height: auto;
+  font-family: var(--c-font-mono);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.national-team-heatmap__help-span {
+  cursor: help;
+}
+
+.national-team-heatmap__info-icon {
+  font-size: 10px;
+  color: var(--c-text-secondary);
+}
+
+.national-team-heatmap__total-val {
+  text-align: right;
+  font-weight: 700;
+  font-family: var(--c-font-mono);
+  cursor: pointer;
+}
+
+.national-team-heatmap__header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.national-team-heatmap__title-icon {
+  color: var(--c-primary);
+}
+
+.national-team-heatmap__title-text {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.national-team-heatmap__unit-tag.ant-tag {
+  font-size: 11px;
+}
+
+.national-team-heatmap__header-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.national-team-heatmap__legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--c-text-secondary);
+}
+
+.national-team-heatmap__legend-box {
+  width: 14px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.national-team-heatmap__legend-box--out {
+  background: rgba(82, 196, 26, 0.45);
+}
+
+.national-team-heatmap__legend-box--in {
+  background: rgba(245, 34, 45, 0.45);
+}
+
+.national-team-heatmap__footer {
+  padding: 8px 14px;
+  border-top: 1px solid var(--c-border);
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--c-text-secondary);
+}
+
+.national-team-heatmap__modal-icon {
+  font-size: 16px;
+}
+
+.national-team-heatmap__modal-tag.ant-tag {
+  font-size: 11px;
+  margin: 0;
+}
+
+.national-team-heatmap__modal-body {
+  padding: 8px 0;
+}
+
+.national-team-heatmap__stat-row {
+  margin-bottom: 16px;
+}
+
+.national-team-heatmap__stat-card {
+  background: var(--c-bg-layout);
+  border-radius: 6px;
+}
+
+.national-team-heatmap__category-section {
+  margin-bottom: 16px;
+}
+
+.national-team-heatmap__section-title.ant-typography {
+  font-size: 13px;
+  margin-bottom: 8px;
+  display: block;
+}
+
+.national-team-heatmap__cat-card {
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--c-border);
+  background: var(--c-card-bg);
+}
+
+.national-team-heatmap__cat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.national-team-heatmap__cat-tag.ant-tag {
+  margin: 0;
+  font-size: 10px;
+  padding: 0 4px;
+}
+
+.national-team-heatmap__cat-val {
+  font-family: var(--c-font-mono);
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.national-team-heatmap__index-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.national-team-heatmap__index-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 10px;
+  border-radius: 4px;
+  background: transparent;
+  font-size: 12px;
+}
+
+.national-team-heatmap__index-row--alt {
+  background: var(--c-bg-layout);
+}
+
+.national-team-heatmap__index-idx {
+  font-family: var(--c-font-mono);
+  color: var(--c-text-secondary);
+  width: 16px;
+}
+
+.national-team-heatmap__index-name {
+  font-weight: 600;
+}
+
+.national-team-heatmap__index-val {
+  font-family: var(--c-font-mono);
+  font-weight: 700;
+}
+
+.national-team-heatmap__index-val--up {
+  color: var(--c-up);
+}
+
+.national-team-heatmap__index-val--down {
+  color: var(--c-down);
+}
+
+.national-team-heatmap__index-val--neutral {
+  color: var(--c-text-secondary);
+}
+
+.national-team-heatmap__cat-val--up {
+  color: var(--c-up);
+}
+
+.national-team-heatmap__cat-val--down {
+  color: var(--c-down);
+}
+
+.national-team-heatmap__cat-val--neutral {
+  color: var(--c-text-primary);
+}
+
+.national-team-heatmap__stat .ant-statistic-content-value {
+  font-family: var(--c-font-mono);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.national-team-heatmap__stat--up .ant-statistic-content-value,
+.national-team-heatmap__stat--up .ant-statistic-content-prefix {
+  color: var(--c-up);
+}
+
+.national-team-heatmap__stat--down .ant-statistic-content-value,
+.national-team-heatmap__stat--down .ant-statistic-content-prefix {
+  color: var(--c-down);
+}
+
+.national-team-heatmap__stat--primary .ant-statistic-content-value {
+  color: var(--c-primary);
+}

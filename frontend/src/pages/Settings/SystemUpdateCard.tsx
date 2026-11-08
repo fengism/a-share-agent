@@ -26,7 +26,7 @@ function formatVersion(version: string): string {
 }
 
 export default function SystemUpdateCard() {
-  const { cardStyle, sectionCardBodyStyle } = useStyles();
+  const { sectionCardBodyStyle } = useStyles();
   const c = useColors();
   const user = useAuthStore((s) => s.user);
   const isAdmin = Boolean(user?.is_admin);
@@ -101,7 +101,7 @@ export default function SystemUpdateCard() {
   return (
     <Card
       title={<span><CloudSyncOutlined style={{ marginRight: 8 }} />系统版本与更新</span>}
-      style={{ ...cardStyle, marginBottom: 16 }}
+      className="u-card" style={{ marginBottom: 16 }}
       styles={{ body: sectionCardBodyStyle }}
     >
       <div style={{ fontSize: "var(--c-font-sm)", color: c.textMuted, marginBottom: 16 }}>

@@ -1,0 +1,130 @@
+/* 用户管理卡片样式 */
+
+.user-manager-card.ant-card {
+  margin-bottom: 16px;
+}
+
+.user-manager__intro {
+  font-size: var(--c-font-sm);
+  color: var(--c-text-muted);
+  margin-bottom: 12px;
+}
+
+.user-manager__stats-row {
+  margin-bottom: 16px;
+}
+
+.user-manager__stat-tile {
+  padding: var(--c-pad-inset, 7px 12px);
+  background: var(--c-hover-bg);
+  border-radius: 6px;
+}
+
+.user-manager__stat-label {
+  font-size: var(--c-font-sm);
+  color: var(--c-text-muted);
+}
+
+.user-manager__stat-value {
+  font-size: var(--c-font-xl);
+  font-weight: 600;
+  color: var(--c-text-primary);
+}
+
+.user-manager__stat-value--active {
+  color: var(--c-down);
+}
+
+.user-manager__stat-value--disabled {
+  color: var(--c-up);
+}
+
+.user-manager__stat-value--disabled-none {
+  color: var(--c-text-muted);
+}
+
+.user-manager__stat-value--admin {
+  color: var(--c-accent, #722ed1);
+}
+
+.user-manager__filter-row {
+  margin-bottom: 14px;
+}
+
+.user-manager__search-icon {
+  color: var(--c-text-muted);
+}
+
+.user-manager__filter-select.ant-select {
+  width: 100%;
+}
+
+.user-manager__user-icon {
+  color: var(--c-text-muted);
+}
+
+.user-manager__username {
+  font-weight: 500;
+}
+
+.user-manager__current-tag.ant-tag {
+  font-size: var(--c-font-xs);
+  padding: 0 4px;
+  line-height: 18px;
+}
+
+.user-manager__current-tag--mobile.ant-tag {
+  margin-left: 6px;
+  font-size: var(--c-font-xs);
+  padding: 0 4px;
+  line-height: 18px;
+}
+
+.user-manager__must-change-btn {
+  color: var(--c-warning);
+}
+
+.user-manager__status-tag {
+  border-color: var(--c-border);
+  background: var(--c-hover-bg);
+}
+
+.user-manager__status-tag--active {
+  color: var(--c-down);
+}
+
+.user-manager__status-tag--disabled {
+  color: var(--c-up);
+}
+
+.user-manager__status-tag--warning {
+  color: var(--c-warning);
+}
+
+.user-manager__modal-key-icon {
+  color: var(--c-primary);
+}
+
+.user-manager__modal-intro {
+  font-size: var(--c-font-sm);
+  color: var(--c-text-muted);
+  margin-bottom: 16px;
+}
+
+.user-manager__modal-space {
+  width: 100%;
+}
+
+.user-manager__modal-label {
+  font-size: var(--c-font-md);
+  color: var(--c-text-primary);
+  margin-right: 8px;
+}
+
+.user-manager__modal-select.ant-select {
+  width: 140px;
+}
+
+.user-manager__modal-url {
+  word-break: break-all;
+}

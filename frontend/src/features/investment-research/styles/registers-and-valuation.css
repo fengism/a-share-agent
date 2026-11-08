@@ -1,0 +1,68 @@
+/* registers-and-valuation —— 自 research-framework.css 第 399–465 行拆出。
+   由同目录 index.css 按固定顺序 @import，顺序不可调整：同特异性规则靠源序决胜负。 */
+.research-risk-register {
+  display: grid;
+  gap: 10px;
+}
+.research-risk-register article {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(150px, 0.6fr);
+  gap: 10px;
+}
+.research-risk-register article header,
+.research-risk-register article > p {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: var(--stock-research-support-size, 12px);
+  line-height: var(--c-leading-relaxed, 1.55);
+}
+.research-risk-register article > div {
+  min-width: 0;
+}
+
+.research-valuation-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius-sm);
+  background: var(--c-hover-bg);
+}
+.research-valuation-heading strong {
+  color: var(--c-text-primary);
+  font-size: var(--c-font-base, 14px);
+}
+.research-valuation-heading p {
+  margin: 4px 0 0;
+  color: var(--c-text-secondary);
+  font-size: var(--stock-research-support-size, 12px);
+  line-height: var(--c-leading-normal);
+}
+.research-scenario-grid article {
+  border-top: 3px solid var(--c-border);
+}
+.research-scenario-grid article[data-scenario="bull"] { border-top-color: var(--c-success); }
+.research-scenario-grid article[data-scenario="base"] { border-top-color: var(--c-accent); }
+.research-scenario-grid article[data-scenario="bear"] { border-top-color: var(--c-warning); }
+.research-scenario-grid article > span {
+  color: var(--c-text-muted);
+  font-size: var(--stock-research-label-size, 11px);
+  font-weight: var(--c-weight-bold);
+}
+.research-scenario-grid article > strong {
+  display: block;
+  margin: 6px 0 4px;
+  font-size: var(--c-font-md, 14px);
+  font-weight: var(--c-weight-bold);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--c-leading-normal);
+}
+.research-scenario-grid article > p {
+  min-height: 2.4em;
+  color: var(--c-text-secondary);
+  font-size: var(--stock-research-support-size, 12px);
+  line-height: var(--c-leading-relaxed, 1.5);
+  margin-bottom: 8px;
+}

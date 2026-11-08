@@ -13,7 +13,7 @@ import type { ColumnsType } from "antd/es/table";
 import { useAdminAuditActions, useLoginAuditLogs } from "../../api/queries";
 import SectionDataState from "../../components/SectionDataState";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
-import { semanticTagStyle, useColors, useStyles } from "../../styles/ui";
+import { useStyles } from "../../styles/ui";
 import SettingsMobileRecordList, { type MobileRecordField } from "./SettingsMobileRecordList";
 import {
   ACTION_FILTERS,
@@ -25,7 +25,6 @@ import {
 import type { AdminAuditActionItem, LoginAuditLogItem } from "../../types/auth";
 
 function LoginAuditSection() {
-  const colors = useColors();
   const isNarrow = useMediaQuery("(max-width: 640px)");
 
   const [page, setPage] = useState(1);
@@ -64,7 +63,7 @@ function LoginAuditSection() {
   const statusTag = (status: string) => {
     const meta = loginStatusMeta(status);
     return (
-      <Tag icon={statusIcon(status)} style={semanticTagStyle(meta.tone)}>
+      <Tag icon={statusIcon(status)} className={`security-audit__status-tag security-audit__status-tag--${meta.tone}`}>
         {meta.label}
       </Tag>
     );
@@ -85,9 +84,9 @@ function LoginAuditSection() {
       width: 140,
       render: (val: string, record) => (
         <Space size={4}>
-          <span style={{ fontWeight: 600, color: colors.textPrimary }}>{val}</span>
+          <span className="security-audit__username">{val}</span>
           {record.user_id && (
-            <Tag style={{ fontSize: "var(--c-font-xs, 11px)", lineHeight: "16px", padding: "0 4px" }}>
+            <Tag className="security-audit__id-tag">
               #{record.user_id}
             </Tag>
           )}
@@ -107,7 +106,7 @@ function LoginAuditSection() {
       key: "ip_address",
       width: 130,
       render: (ip: string) => (
-        <code style={{ fontFamily: "var(--c-font-mono)", fontSize: "var(--c-font-sm)" }}>
+        <code className="security-audit__code">
           {ip || "未知"}
         </code>
       ),
@@ -120,12 +119,12 @@ function LoginAuditSection() {
       render: (ua: string) =>
         ua ? (
           <Tooltip title={ua}>
-            <span style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)", cursor: "pointer" }}>
+            <span className="security-audit__ua-text">
               {ua.length > 50 ? `${ua.slice(0, 50)}...` : ua}
             </span>
           </Tooltip>
         ) : (
-          <span style={{ color: colors.textMuted }}>—</span>
+          <span className="security-audit__text--muted">—</span>
         ),
     },
     {
@@ -146,7 +145,7 @@ function LoginAuditSection() {
       render: (item) => (
         <span>
           {item.username}
-          {item.user_id ? <Tag style={{ marginLeft: 4, fontSize: "var(--c-font-xs, 11px)", lineHeight: "16px", padding: "0 4px" }}>#{item.user_id}</Tag> : null}
+          {item.user_id ? <Tag className="security-audit__id-tag--mobile">#{item.user_id}</Tag> : null}
         </span>
       ),
     },
@@ -154,14 +153,14 @@ function LoginAuditSection() {
     {
       label: "来源 IP",
       render: (item) => (
-        <code style={{ fontFamily: "var(--c-font-mono)", fontSize: "var(--c-font-sm)" }}>{item.ip_address || "未知"}</code>
+        <code className="security-audit__code">{item.ip_address || "未知"}</code>
       ),
     },
     {
       label: "客户端",
       fullWidth: true,
       render: (item) => (
-        <span style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)", wordBreak: "break-all" }}>{item.user_agent || "—"}</span>
+        <span className="security-audit__ua-mobile">{item.user_agent || "—"}</span>
       ),
     },
     { label: "详情", fullWidth: true, render: (item) => item.details || "—" },
@@ -181,24 +180,15 @@ function LoginAuditSection() {
 
   return (
     <>
-      <div style={{ fontSize: "var(--c-font-sm)", color: colors.textMuted, marginBottom: 12 }}>
+      <div className="security-audit__intro">
         实时记录系统所有用户的登录尝试、认证失败、禁用拦截与限流防御事件，便于追踪异常访问与安全合规审计。
       </div>
 
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          flexWrap: "wrap",
-          gap: 10,
-          marginBottom: 12,
-        }}
-      >
+      <div className="security-audit__toolbar">
         <Space wrap>
           <Input
             placeholder="搜索用户名..."
-            prefix={<SearchOutlined style={{ color: colors.textMuted }} />}
+            prefix={<SearchOutlined className="security-audit__search-icon" />}
             value={searchUsername}
             onChange={(e) => {
               setSearchUsername(e.target.value);
@@ -206,7 +196,7 @@ function LoginAuditSection() {
             }}
             allowClear
             size="small"
-            style={{ width: isNarrow ? "100%" : 160 }}
+            className={isNarrow ? "security-audit__search-input--narrow" : "security-audit__search-input"}
           />
           <Select
             size="small"
@@ -217,7 +207,7 @@ function LoginAuditSection() {
             }}
             placeholder="所有认证结果"
             allowClear
-            style={{ width: 140 }}
+            className="security-audit__select--status"
             options={LOGIN_STATUS_FILTERS}
           />
         </Space>
@@ -271,7 +261,6 @@ function LoginAuditSection() {
 }
 
 function AdminActionSection() {
-  const colors = useColors();
   const isNarrow = useMediaQuery("(max-width: 640px)");
 
   const [page, setPage] = useState(1);
@@ -304,9 +293,9 @@ function AdminActionSection() {
       width: 150,
       render: (val: string, record) => (
         <Space size={4}>
-          <span style={{ fontWeight: 600, color: colors.textPrimary }}>{val || "系统"}</span>
+          <span className="security-audit__username">{val || "系统"}</span>
           {record.actor_id ? (
-            <Tag style={{ fontSize: "var(--c-font-xs, 11px)", lineHeight: "16px", padding: "0 4px" }}>
+            <Tag className="security-audit__id-tag">
               #{record.actor_id}
             </Tag>
           ) : null}
@@ -331,11 +320,11 @@ function AdminActionSection() {
           <span>
             {record.target_label}
             {record.target_type ? (
-              <span style={{ color: colors.textMuted, fontSize: "var(--c-font-xs)" }}>（{record.target_type}）</span>
+              <span className="security-audit__target-type">（{record.target_type}）</span>
             ) : null}
           </span>
         ) : (
-          <span style={{ color: colors.textMuted }}>{record.target_id || "—"}</span>
+          <span className="security-audit__text--muted">{record.target_id || "—"}</span>
         ),
     },
     {
@@ -346,10 +335,10 @@ function AdminActionSection() {
       render: (details: string) => {
         const summary = summarizeDetails(details);
         return summary === "—" ? (
-          <span style={{ color: colors.textMuted }}>—</span>
+          <span className="security-audit__text--muted">—</span>
         ) : (
           <Tooltip title={details}>
-            <span style={{ fontSize: "var(--c-font-sm)" }}>{summary}</span>
+            <span className="security-audit__summary">{summary}</span>
           </Tooltip>
         );
       },
@@ -360,7 +349,7 @@ function AdminActionSection() {
       key: "actor_ip",
       width: 130,
       render: (ip: string) => (
-        <code style={{ fontFamily: "var(--c-font-mono)", fontSize: "var(--c-font-sm)" }}>
+        <code className="security-audit__code">
           {ip || "未知"}
         </code>
       ),
@@ -375,7 +364,7 @@ function AdminActionSection() {
       render: (item) => (
         <span>
           {item.actor_username || "系统"}
-          {item.actor_id ? <Tag style={{ marginLeft: 4, fontSize: "var(--c-font-xs, 11px)", lineHeight: "16px", padding: "0 4px" }}>#{item.actor_id}</Tag> : null}
+          {item.actor_id ? <Tag className="security-audit__id-tag--mobile">#{item.actor_id}</Tag> : null}
         </span>
       ),
     },
@@ -386,10 +375,10 @@ function AdminActionSection() {
         item.target_label ? (
           <span>
             {item.target_label}
-            {item.target_type ? <span style={{ color: colors.textMuted, fontSize: "var(--c-font-xs)" }}>（{item.target_type}）</span> : null}
+            {item.target_type ? <span className="security-audit__target-type">（{item.target_type}）</span> : null}
           </span>
         ) : (
-          <span style={{ color: colors.textMuted }}>{item.target_id || "—"}</span>
+          <span className="security-audit__text--muted">{item.target_id || "—"}</span>
         ),
     },
     {
@@ -397,13 +386,13 @@ function AdminActionSection() {
       fullWidth: true,
       render: (item) => {
         const summary = summarizeDetails(item.details);
-        return summary === "—" ? <span style={{ color: colors.textMuted }}>—</span> : <span style={{ fontSize: "var(--c-font-sm)" }}>{summary}</span>;
+        return summary === "—" ? <span className="security-audit__text--muted">—</span> : <span className="security-audit__summary">{summary}</span>;
       },
     },
     {
       label: "来源 IP",
       render: (item) => (
-        <code style={{ fontFamily: "var(--c-font-mono)", fontSize: "var(--c-font-sm)" }}>{item.actor_ip || "未知"}</code>
+        <code className="security-audit__code">{item.actor_ip || "未知"}</code>
       ),
     },
   ];
@@ -422,25 +411,16 @@ function AdminActionSection() {
 
   return (
     <>
-      <div style={{ fontSize: "var(--c-font-sm)", color: colors.textMuted, marginBottom: 12 }}>
+      <div className="security-audit__intro">
         记录管理员对账号、邀请码与全局配置的每一次变更。<strong>只记录改动了哪些字段</strong>，
         不会保存密钥类取值（API Key、密码等）。
       </div>
 
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          flexWrap: "wrap",
-          gap: 10,
-          marginBottom: 12,
-        }}
-      >
+      <div className="security-audit__toolbar">
         <Space wrap>
           <Input
             placeholder="搜索操作者..."
-            prefix={<SearchOutlined style={{ color: colors.textMuted }} />}
+            prefix={<SearchOutlined className="security-audit__search-icon" />}
             value={searchActor}
             onChange={(e) => {
               setSearchActor(e.target.value);
@@ -448,7 +428,7 @@ function AdminActionSection() {
             }}
             allowClear
             size="small"
-            style={{ width: isNarrow ? "100%" : 160 }}
+            className={isNarrow ? "security-audit__search-input--narrow" : "security-audit__search-input"}
           />
           <Select
             size="small"
@@ -459,7 +439,7 @@ function AdminActionSection() {
             }}
             placeholder="所有操作类型"
             allowClear
-            style={{ width: 160 }}
+            className="security-audit__select--action"
             options={ACTION_FILTERS}
           />
         </Space>
@@ -513,13 +493,13 @@ function AdminActionSection() {
 }
 
 export default function SecurityAuditCard() {
-  const { cardStyle, sectionCardBodyStyle } = useStyles();
+  const { sectionCardBodyStyle } = useStyles();
   const [activeTab, setActiveTab] = useState("login");
 
   return (
     <Card
-      title={<span><SafetyCertificateOutlined style={{ marginRight: 8 }} />安全与登录审计日志</span>}
-      style={{ ...cardStyle, marginBottom: 16 }}
+      title={<span><SafetyCertificateOutlined className="security-audit__card-icon" />安全与登录审计日志</span>}
+      className="u-card security-audit-card"
       styles={{ body: sectionCardBodyStyle }}
     >
       <Tabs

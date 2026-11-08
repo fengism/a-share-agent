@@ -63,12 +63,12 @@
 }
 
 @media (max-width: 576px) {
-  .market-fund-flow__metrics .ant-card-body {
-    padding: 10px 12px !important;
+  .market-fund-flow__metrics .ant-card:not(.ant-card-small) > .ant-card-body {
+    padding: 10px 12px;
   }
 
   .market-fund-flow__metric-title {
-    font-size: 11px !important;
+    font-size: 11px;
   }
 
   .market-fund-flow__metrics .ant-statistic-content-value {

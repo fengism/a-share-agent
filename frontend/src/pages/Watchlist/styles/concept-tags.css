@@ -1,0 +1,58 @@
+/* concept-tags —— 自 watchlist.css 第 393–449 行拆出。
+   由同目录 index.css 按固定顺序 @import，顺序不可调整：同特异性规则靠源序决胜负。 */
+.watchlist-page__concept-tags,
+.watchlist-page__alerts {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.watchlist-page__concept-tags .ant-tag,
+.watchlist-page__alerts .ant-tag {
+  max-width: 100%;
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--c-font-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.watchlist-page__concept-tags .ant-tag {
+  color: var(--c-primary);
+  border-color: var(--c-border);
+  background: var(--c-primary-soft);
+}
+
+.watchlist-page__concept-tag {
+  max-width: 100%;
+  height: 22px;
+  padding: 0 7px;
+  overflow: hidden;
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius-sm);
+  color: var(--c-primary);
+  background: var(--c-primary-soft);
+  font-family: var(--c-font-sans);
+  font-size: var(--c-font-xs);
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color .16s ease, background-color .16s ease;
+}
+
+.watchlist-page__concept-tag:hover {
+  border-color: var(--c-primary);
+  background: var(--c-hover-bg);
+}
+
+.watchlist-page__concept-tag:focus-visible {
+  outline: 2px solid var(--c-primary);
+  outline-offset: 1px;
+}
+
+.watchlist-page__empty-value {
+  color: var(--c-text-muted);
+}

@@ -1,0 +1,77 @@
+/* 图表工具栏与 K 线图例：自 StockCharts 内联样式迁出。 */
+
+.stock-kline-ma-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--c-font-xs);
+  font-family: var(--c-font-mono);
+  opacity: 0.9;
+}
+
+.stock-kline-ma-legend__ma5 {
+  color: #faad14;
+}
+
+.stock-kline-ma-legend__ma10 {
+  color: #13c2c2;
+}
+
+.stock-kline-ma-legend__ma20 {
+  color: #722ed1;
+}
+
+.stock-kline-ma-legend__ma60 {
+  color: #52c41a;
+}
+
+.stock-chart-toolbar--intraday {
+  justify-content: space-between;
+}
+
+.stock-chart-toolbar-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: var(--c-font-sm);
+  color: var(--c-text-secondary);
+}
+
+.stock-chart-toolbar-strong {
+  color: var(--c-text-primary);
+  font-family: var(--c-font-mono);
+}
+
+.stock-chart-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.stock-chart-toolbar-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+[data-theme] .stock-chart-chanlun-toggle--tight {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--c-font-sm);
+  cursor: pointer;
+}
+
+[data-theme] .ant-btn.stock-chart-icon-button {
+  color: var(--c-text-secondary);
+}
+
+.stock-macd-panel--fixed {
+  min-height: 436px;
+}
+
+.stock-chart-modal-hint {
+  color: var(--c-text-secondary);
+  font-size: var(--c-font-xs);
+  font-weight: normal;
+}

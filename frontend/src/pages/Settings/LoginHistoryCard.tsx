@@ -20,7 +20,7 @@ const PAGE_SIZE = 10;
  * 只读、只覆盖本人记录（后端按登录态 user_id 过滤），用于发现异常 IP 或撞库痕迹。
  */
 export default function LoginHistoryCard() {
-  const { cardStyle, sectionCardBodyStyle } = useStyles();
+  const { sectionCardBodyStyle } = useStyles();
   const colors = useColors();
   const isNarrow = useMediaQuery("(max-width: 640px)");
 
@@ -145,7 +145,7 @@ export default function LoginHistoryCard() {
           我的登录记录
         </span>
       }
-      style={{ ...cardStyle, marginBottom: 16 }}
+      className="u-card" style={{ marginBottom: 16 }}
       styles={{ body: sectionCardBodyStyle }}
       extra={
         <Button size="small" icon={<ReloadOutlined />} onClick={() => refetch()} loading={isLoading}>

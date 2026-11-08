@@ -11,11 +11,11 @@ const API_MODE_LABELS: Record<LlmApiMode, string> = {
 };
 
 export function ProviderDefaultsCard({ providerDefaults }: { providerDefaults: Record<string, ProviderDefault> }) {
-  const { cardStyle, sectionCardBodyStyle } = useStyles();
+  const { sectionCardBodyStyle } = useStyles();
   const colors = useColors();
 
   return (
-    <Card title="Provider 默认值参考" style={cardStyle} styles={{ body: sectionCardBodyStyle }}>
+    <Card title="Provider 默认值参考" className="u-card" styles={{ body: sectionCardBodyStyle }}>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
         {Object.entries(providerDefaults).map(([name, defaults]) => (
           <div

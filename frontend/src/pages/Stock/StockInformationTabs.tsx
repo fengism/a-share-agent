@@ -5,7 +5,6 @@ import { useInRouterContext } from "react-router-dom";
 import AnnouncementsPanel from "../../features/stock-insights/AnnouncementsPanel";
 import ResearchReportsPanel from "../../features/stock-insights/ResearchReportsPanel";
 import { useUrlSearchParam } from "../../hooks/useUrlSearchParam";
-import { useStyles } from "../../styles/ui";
 import StockRetailCommentsPanel from "./StockRetailCommentsPanel";
 import StockNewsPanel from "./StockNewsPanel";
 import StockSectionTitle from "./StockSectionTitle";
@@ -34,7 +33,6 @@ interface StockInformationTabsViewProps {
 }
 
 function StockInformationTabsView({ code, activeKey, onChange }: StockInformationTabsViewProps) {
-  const { cardStyle } = useStyles();
   const tabs = [
     { key: "bulletins", label: <span className="stock-information-tab"><span aria-hidden="true"><FileTextOutlined /></span>公司公告</span> },
     { key: "reports", label: <span className="stock-information-tab"><span aria-hidden="true"><ReadOutlined /></span>券商研报</span> },
@@ -44,9 +42,8 @@ function StockInformationTabsView({ code, activeKey, onChange }: StockInformatio
 
   return (
     <Card
-      className="stock-section-card stock-information-card"
+      className="stock-section-card stock-information-card u-card"
       title={<StockSectionTitle icon={<ReadOutlined />} title="资讯与研究" description="公告、机构观点、市场动态与散户讨论" />}
-      style={cardStyle}
       styles={{ body: { paddingTop: 0 } }}
     >
       <Tabs

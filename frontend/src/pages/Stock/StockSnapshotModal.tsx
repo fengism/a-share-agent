@@ -10,11 +10,12 @@ import {
 } from "@ant-design/icons";
 import { Button, Modal, Tag, Typography, message } from "antd";
 import { useCopyFeedback } from "../../hooks/useCopyFeedback";
-import { useColors, useTokens } from "../../styles/ui";
+import { useColors } from "../../styles/ui";
 import type { StockBasicInfo } from "../../types/stock";
 import { formatNumberWithSeparators } from "../../utils/format";
 import { formatMarketDateTime, marketDateStamp } from "../../utils/marketTime";
 import type { StockHeaderTapeData } from "./StockHeaderCard";
+import "./styles/snapshot-modal.css";
 
 const { Title, Text } = Typography;
 
@@ -46,7 +47,6 @@ export default function StockSnapshotModal({
   tape,
 }: StockSnapshotModalProps) {
   const c = useColors();
-  const t = useTokens();
   const cardRef = useRef<HTMLDivElement>(null);
   const [isExporting, setIsExporting] = useState(false);
   const { copied, markCopied } = useCopyFeedback(2000);
@@ -109,18 +109,34 @@ export default function StockSnapshotModal({
     }
   };
 
-  const priceColor =
+  const priceCls =
     changePct == null || changePct === 0
-      ? c.textPrimary
+      ? "u-text-primary"
       : changePct > 0
-      ? c.up
-      : c.down;
+      ? "u-text-up"
+      : "u-text-down";
+
+  const highTone =
+    tape?.high != null && tape.prevClose != null && tape.high > tape.prevClose ? "u-text-up" : "";
+  const lowTone =
+    tape?.low != null && tape.prevClose != null && tape.low < tape.prevClose ? "u-text-down" : "";
+
+  const rangePercent =
+    tape?.fiftyTwoWeekLow != null &&
+    tape?.fiftyTwoWeekHigh != null &&
+    tape.fiftyTwoWeekHigh > tape.fiftyTwoWeekLow &&
+    info.current_price != null
+      ? Math.max(0, Math.min(100, ((info.current_price - tape.fiftyTwoWeekLow) / (tape.fiftyTwoWeekHigh - tape.fiftyTwoWeekLow)) * 100))
+      : 0;
+  const rangeFillStyle: React.CSSProperties = {
+    width: `${rangePercent}%`,
+  };
 
   return (
     <Modal
       title={
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <FileImageOutlined style={{ color: c.primary }} />
+        <div className="stock-snapshot__modal-header">
+          <FileImageOutlined className="stock-snapshot__modal-icon" />
           <span>导出个股速览卡片</span>
         </div>
       }
@@ -150,70 +166,39 @@ export default function StockSnapshotModal({
         </Button>,
       ]}
     >
-      <div style={{ maxHeight: "68vh", overflowY: "auto", padding: "8px 4px" }}>
-        <div
-          ref={cardRef}
-          style={{
-            background: c.cardBg,
-            border: `1px solid ${c.border}`,
-            borderRadius: t.radius.lg,
-            padding: "var(--c-pad-card, 16px 18px)",
-            boxShadow: t.shadow.sm,
-            color: c.textPrimary,
-            fontFamily: "var(--c-font-sans)",
-          }}
-        >
+      <div className="stock-snapshot__scroll">
+        <div ref={cardRef} className="stock-snapshot__card">
           {/* Header Branding */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              borderBottom: `1px solid ${c.border}`,
-              paddingBottom: 14,
-              marginBottom: 18,
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <div
-                style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: 6,
-                  background: `linear-gradient(135deg, ${c.primary}, ${c.up})`,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "#fff",
-                }}
-              >
-                <ThunderboltOutlined style={{ fontSize: 16 }} />
+          <div className="stock-snapshot__header">
+            <div className="stock-snapshot__brand">
+              <div className="stock-snapshot__brand-icon">
+                <ThunderboltOutlined />
               </div>
-              <span style={{ fontWeight: "var(--c-weight-bold)", fontSize: 15, letterSpacing: 0.5 }}>
+              <span className="stock-snapshot__brand-text">
                 A-Share Agent · 智能投研
               </span>
             </div>
-            <Text style={{ fontSize: 12, color: c.textSecondary }}>
+            <Text className="stock-snapshot__timestamp">
               {formatMarketDateTime(new Date())}
             </Text>
           </div>
 
           {/* Stock Identity */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+          <div className="stock-snapshot__identity-row">
             <div>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                <span style={{ color: c.primary, fontSize: 18 }}>
+              <div className="stock-snapshot__name-row">
+                <span className="stock-snapshot__market-icon">
                   {isHK ? <GlobalOutlined /> : <BankOutlined />}
                 </span>
-                <Title level={3} style={{ margin: 0, fontWeight: "var(--c-weight-bold)" }}>
+                <Title level={3} className="stock-snapshot__title">
                   {info.name || info.code}
                 </Title>
-                <Tag style={{ fontFamily: "var(--c-font-mono)", fontSize: 14, margin: 0 }}>
+                <Tag className="stock-snapshot__code-tag">
                   {info.code}
                 </Tag>
-                {englishName && <Text type="secondary" style={{ fontSize: 12 }}>{englishName}</Text>}
+                {englishName && <Text type="secondary" className="stock-snapshot__english-name">{englishName}</Text>}
               </div>
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
+              <div className="stock-snapshot__tags-row">
                 {isHK ? (
                   <>
                     <Tag color="blue">港股主板</Tag>
@@ -231,11 +216,11 @@ export default function StockSnapshotModal({
             </div>
 
             {/* Price Quote */}
-            <div style={{ textAlign: "right" }}>
-              <div style={{ fontSize: 28, fontWeight: "var(--c-weight-bold)", fontFamily: "var(--c-font-mono)", color: priceColor, lineHeight: 1.1 }}>
+            <div className="stock-snapshot__price-col">
+              <div className={`stock-snapshot__price ${priceCls}`}>
                 {info.current_price != null ? `${currencySymbol}${info.current_price.toFixed(2)}` : "-"}
               </div>
-              <div style={{ fontSize: 13, color: priceColor, marginTop: 4, fontFamily: "var(--c-font-mono)" }}>
+              <div className={`stock-snapshot__change-row ${priceCls}`}>
                 {changePct != null ? `${changePct > 0 ? "+" : ""}${changePct.toFixed(2)}%` : "-"}
                 {info.turnover_pct != null ? ` · 换手 ${info.turnover_pct.toFixed(2)}%` : ""}
               </div>
@@ -244,42 +229,31 @@ export default function StockSnapshotModal({
 
           {/* Tape & 52-Week Range */}
           {tape && (
-            <div
-              style={{
-                background: c.hoverBg,
-                borderRadius: 8,
-                padding: "var(--c-pad-inset, 7px 12px)",
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(90px, 1fr))",
-                gap: 8,
-                fontSize: 12,
-                marginBottom: 16,
-              }}
-            >
+            <div className="stock-snapshot__tape-grid">
               <div>
-                <span style={{ color: c.textSecondary }}>今开: </span>
-                <strong style={{ fontFamily: "var(--c-font-mono)" }}>{tape.open != null ? formatNumberWithSeparators(tape.open) : "-"}</strong>
+                <span className="stock-snapshot__tape-label">今开: </span>
+                <strong className="stock-snapshot__tape-val">{tape.open != null ? formatNumberWithSeparators(tape.open) : "-"}</strong>
               </div>
               <div>
-                <span style={{ color: c.textSecondary }}>最高: </span>
-                <strong style={{ fontFamily: "var(--c-font-mono)", color: tape.high != null && tape.prevClose != null && tape.high > tape.prevClose ? c.up : undefined }}>
+                <span className="stock-snapshot__tape-label">最高: </span>
+                <strong className={`stock-snapshot__tape-val ${highTone}`}>
                   {tape.high != null ? formatNumberWithSeparators(tape.high) : "-"}
                 </strong>
               </div>
               <div>
-                <span style={{ color: c.textSecondary }}>最低: </span>
-                <strong style={{ fontFamily: "var(--c-font-mono)", color: tape.low != null && tape.prevClose != null && tape.low < tape.prevClose ? c.down : undefined }}>
+                <span className="stock-snapshot__tape-label">最低: </span>
+                <strong className={`stock-snapshot__tape-val ${lowTone}`}>
                   {tape.low != null ? formatNumberWithSeparators(tape.low) : "-"}
                 </strong>
               </div>
               <div>
-                <span style={{ color: c.textSecondary }}>成交额: </span>
-                <strong style={{ fontFamily: "var(--c-font-mono)" }}>{formatLargeAmount(tape.amount)}</strong>
+                <span className="stock-snapshot__tape-label">成交额: </span>
+                <strong className="stock-snapshot__tape-val">{formatLargeAmount(tape.amount)}</strong>
               </div>
               {tape.amplitude != null && (
                 <div>
-                  <span style={{ color: c.textSecondary }}>日振幅: </span>
-                  <strong style={{ fontFamily: "var(--c-font-mono)" }}>{tape.amplitude.toFixed(2)}%</strong>
+                  <span className="stock-snapshot__tape-label">日振幅: </span>
+                  <strong className="stock-snapshot__tape-val">{tape.amplitude.toFixed(2)}%</strong>
                 </div>
               )}
             </div>
@@ -287,45 +261,27 @@ export default function StockSnapshotModal({
 
           {/* 52-Week Range Bar */}
           {tape?.fiftyTwoWeekLow != null && tape?.fiftyTwoWeekHigh != null && tape.fiftyTwoWeekHigh > tape.fiftyTwoWeekLow && (
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                padding: "var(--c-pad-inset, 7px 12px)",
-                background: c.hoverBg,
-                borderRadius: 8,
-                fontSize: 12,
-                marginBottom: 16,
-              }}
-            >
-              <span style={{ color: c.textSecondary }}>52周区间</span>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, maxWidth: 280, margin: "0 14px" }}>
-                <span style={{ fontFamily: "var(--c-font-mono)", fontSize: 11, color: c.textSecondary }}>
+            <div className="stock-snapshot__range-bar">
+              <span className="stock-snapshot__tape-label">52周区间</span>
+              <div className="stock-snapshot__range-middle">
+                <span className="stock-snapshot__range-val">
                   {formatNumberWithSeparators(tape.fiftyTwoWeekLow)}
                 </span>
-                <div style={{ flex: 1, height: 6, background: c.border, borderRadius: 3, position: "relative", overflow: "hidden" }}>
+                <div className="stock-snapshot__range-track">
                   {info.current_price != null && (
                     <div
-                      style={{
-                        position: "absolute",
-                        left: 0,
-                        top: 0,
-                        bottom: 0,
-                        width: `${Math.max(0, Math.min(100, ((info.current_price - tape.fiftyTwoWeekLow) / (tape.fiftyTwoWeekHigh - tape.fiftyTwoWeekLow)) * 100))}%`,
-                        background: c.primary,
-                        borderRadius: 3,
-                      }}
+                      className="stock-snapshot__range-fill"
+                      style={rangeFillStyle}
                     />
                   )}
                 </div>
-                <span style={{ fontFamily: "var(--c-font-mono)", fontSize: 11, color: c.textSecondary }}>
+                <span className="stock-snapshot__range-val">
                   {formatNumberWithSeparators(tape.fiftyTwoWeekHigh)}
                 </span>
               </div>
-              <span style={{ color: c.primary, fontWeight: "var(--c-weight-semibold)", fontSize: 12 }}>
+              <span className="stock-snapshot__range-percent">
                 {info.current_price != null
-                  ? `位阶 ${Math.round(((info.current_price - tape.fiftyTwoWeekLow) / (tape.fiftyTwoWeekHigh - tape.fiftyTwoWeekLow)) * 100)}%`
+                  ? `位阶 ${Math.round(rangePercent)}%`
                   : "-"}
               </span>
             </div>
@@ -333,29 +289,22 @@ export default function StockSnapshotModal({
 
           {/* Core Valuation Metrics */}
           {!isHK && (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(3, 1fr)",
-                gap: 10,
-                marginBottom: 18,
-              }}
-            >
-              <div style={{ padding: "var(--c-pad-inset, 7px 12px)", background: c.hoverBg, borderRadius: 6, textAlign: "center" }}>
-                <div style={{ fontSize: 11, color: c.textSecondary }}>总市值</div>
-                <div style={{ fontSize: 13, fontWeight: 600, marginTop: 2, fontFamily: "var(--c-font-mono)" }}>
+            <div className="stock-snapshot__metrics-grid">
+              <div className="stock-snapshot__metric-card">
+                <div className="stock-snapshot__metric-label">总市值</div>
+                <div className="stock-snapshot__metric-val">
                   {formatLargeAmount(info.market_cap)}
                 </div>
               </div>
-              <div style={{ padding: "var(--c-pad-inset, 7px 12px)", background: c.hoverBg, borderRadius: 6, textAlign: "center" }}>
-                <div style={{ fontSize: 11, color: c.textSecondary }}>市盈率(TTM)</div>
-                <div style={{ fontSize: 13, fontWeight: 600, marginTop: 2, fontFamily: "var(--c-font-mono)" }}>
+              <div className="stock-snapshot__metric-card">
+                <div className="stock-snapshot__metric-label">市盈率(TTM)</div>
+                <div className="stock-snapshot__metric-val">
                   {info.pe_ttm != null ? info.pe_ttm.toFixed(2) : "-"}
                 </div>
               </div>
-              <div style={{ padding: "var(--c-pad-inset, 7px 12px)", background: c.hoverBg, borderRadius: 6, textAlign: "center" }}>
-                <div style={{ fontSize: 11, color: c.textSecondary }}>市净率(PB)</div>
-                <div style={{ fontSize: 13, fontWeight: 600, marginTop: 2, fontFamily: "var(--c-font-mono)" }}>
+              <div className="stock-snapshot__metric-card">
+                <div className="stock-snapshot__metric-label">市净率(PB)</div>
+                <div className="stock-snapshot__metric-val">
                   {info.pb != null ? info.pb.toFixed(2) : "-"}
                 </div>
               </div>
@@ -363,17 +312,7 @@ export default function StockSnapshotModal({
           )}
 
           {/* Footer Disclaimer */}
-          <div
-            style={{
-              borderTop: `1px dashed ${c.border}`,
-              paddingTop: 12,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              fontSize: 11,
-              color: c.textMuted,
-            }}
-          >
+          <div className="stock-snapshot__footer">
             <span>由 A-Share Agent 智能投研引擎生成</span>
             <span>仅供学术研究与量化参考 · 不构成投资建议</span>
           </div>

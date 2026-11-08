@@ -1,6 +1,6 @@
 import { Alert, Card, Descriptions, Statistic, Tag } from "antd";
 import type { QuantBacktestResult } from "../../../api/queries";
-import { useColors, useStyles } from "../../../styles/ui";
+import { useColors } from "../../../styles/ui";
 import { formatNumber, formatPercent } from "./formatters";
 
 interface BacktestMetricsProps {
@@ -19,7 +19,6 @@ export default function BacktestMetrics({
   holdoutValidation,
 }: BacktestMetricsProps) {
   const colors = useColors();
-  const { cardStyle } = useStyles();
   const metricItems = [
     { label: "总收益", value: metrics.total_return, suffix: "%", primary: true, hint: "回测区间累计收益", signed: true },
     { label: "最大回撤", value: metrics.max_drawdown, suffix: "%", primary: true, hint: "净值从峰值到谷值的跌幅", signed: true },
@@ -51,7 +50,7 @@ export default function BacktestMetrics({
               ? label === "最大回撤" || value < 0 ? "negative" : "positive"
               : "neutral";
             return (
-              <Card size="small" style={cardStyle} className={`quant-metric-card quant-metric-card--${tone}`} key={label}>
+              <Card size="small" className={`quant-metric-card quant-metric-card--${tone} u-card`} key={label}>
                 <Statistic
                   title={label}
                   value={value ?? (label === "交易日样本数" ? "未记录" : "—")}
@@ -100,7 +99,7 @@ export default function BacktestMetrics({
         <small>仅描述该回测区间，不代表未来表现</small>
       </div>
 
-      <Card title="回测概览" size="small" style={cardStyle} className="quant-result-card quant-result-overview">
+      <Card title="回测概览" size="small" className="quant-result-card quant-result-overview u-card">
         <Descriptions
           size="small"
           bordered
@@ -138,8 +137,7 @@ export default function BacktestMetrics({
           title="Brinson-Fachler 业绩超额归因分解"
           extra={<Tag color="geekblue">超额来源透视</Tag>}
           size="small"
-          style={cardStyle}
-          className="quant-result-card"
+          className="quant-result-card u-card"
         >
           <div style={{
             display: "flex",
@@ -166,7 +164,7 @@ export default function BacktestMetrics({
             </span>
             <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
               {(metrics.allocation_effect ?? 0) > 0 ? <Tag color="blue">大盘择时正收益</Tag> : (metrics.allocation_effect ?? 0) < -1 ? <Tag color="orange">轻仓错失涨幅</Tag> : null}
-              {(metrics.selection_effect ?? 0) > 0 ? <Tag color="green">选股阿尔法能力显著</Tag> : (metrics.selection_effect ?? 0) < -1 ? <Tag color="volcano">选股跑输基准</Tag> : null}
+              {(metrics.selection_effect ?? 0) > 0 ? <Tag color="cyan">选股阿尔法能力显著</Tag> : (metrics.selection_effect ?? 0) < -1 ? <Tag color="orange">选股跑输基准</Tag> : null}
             </div>
           </div>
           <Descriptions
@@ -226,8 +224,7 @@ export default function BacktestMetrics({
           title="历史极端行情压力测试 (Stress Testing)"
           extra={<Tag color="purple">历史穿透检验</Tag>}
           size="small"
-          style={cardStyle}
-          className="quant-result-card"
+          className="quant-result-card u-card"
         >
           <Descriptions
             size="small"
@@ -253,8 +250,7 @@ export default function BacktestMetrics({
           title="后段样本验证"
           extra={<Tag color="blue">独立资金</Tag>}
           size="small"
-          style={cardStyle}
-          className="quant-result-card quant-holdout-card"
+          className="quant-result-card quant-holdout-card u-card"
         >
           <Descriptions
             size="small"

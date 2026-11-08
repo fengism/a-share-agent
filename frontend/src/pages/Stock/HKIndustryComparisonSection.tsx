@@ -5,7 +5,6 @@ import type { ColumnsType } from "antd/es/table";
 import { Link } from "react-router-dom";
 import { useHKIndustryComparison, type HKIndustryPeerItem } from "../../api/queryHooks/hk";
 import SectionDataState from "../../components/SectionDataState";
-import { useColors, useStyles } from "../../styles/ui";
 import { formatNumberWithSeparators } from "../../utils/format";
 import StockSectionTitle from "./StockSectionTitle";
 
@@ -23,8 +22,6 @@ function calculateMedian(values: number[]): number | null {
 }
 
 export default function HKIndustryComparisonSection({ code }: { code: string }) {
-  const colors = useColors();
-  const { cardStyle } = useStyles();
   const [selectedPeriod, setSelectedPeriod] = useState<string>("");
 
   const query = useHKIndustryComparison(code, selectedPeriod);
@@ -78,15 +75,11 @@ export default function HKIndustryComparisonSection({ code }: { code: string }) 
             <Space orientation="horizontal" size={4}>
               <Link
                 to={`/stock/${itemCode}`}
-                style={{
-                  fontWeight: isCurrent ? 700 : 500,
-                  color: isCurrent ? colors.primary : undefined,
-                  fontFamily: "var(--c-font-mono)",
-                }}
+                className={`hk-industry-comparison__link ${isCurrent ? "hk-industry-comparison__link--current" : ""}`}
               >
                 {itemCode}
               </Link>
-              {isCurrent && <Tag color="blue" style={{ fontSize: 10, marginInlineEnd: 0 }}>本股</Tag>}
+              {isCurrent && <Tag color="blue" className="hk-industry-comparison__current-tag">本股</Tag>}
             </Space>
           );
         },
@@ -99,7 +92,11 @@ export default function HKIndustryComparisonSection({ code }: { code: string }) 
         fixed: "left",
         render: (name: string, record) => {
           const isCurrent = record.code.padStart(5, "0") === normCode;
-          return <span style={{ fontWeight: isCurrent ? 700 : 400 }}>{name}</span>;
+          return (
+            <span className={isCurrent ? "hk-industry-comparison__stock-name--current" : "hk-industry-comparison__stock-name"}>
+              {name}
+            </span>
+          );
         },
       },
       {
@@ -110,8 +107,8 @@ export default function HKIndustryComparisonSection({ code }: { code: string }) 
         align: "right",
         sorter: (a, b) => (a.pe ?? -9999) - (b.pe ?? -9999),
         render: (val: number | null, record) => {
-          if (record.is_pe_loss) return <Text type="danger" style={{ fontSize: 12 }}>亏损</Text>;
-          return <span style={{ fontFamily: "var(--c-font-mono)" }}>{formatVal(val)}</span>;
+          if (record.is_pe_loss) return <Text type="danger" className="hk-industry-comparison__loss-text">亏损</Text>;
+          return <span className="hk-industry-comparison__mono-cell">{formatVal(val)}</span>;
         },
       },
       {
@@ -122,7 +119,7 @@ export default function HKIndustryComparisonSection({ code }: { code: string }) 
         align: "right",
         sorter: (a, b) => (a.pb ?? -9999) - (b.pb ?? -9999),
         render: (val: number | null) => (
-          <span style={{ fontFamily: "var(--c-font-mono)" }}>{formatVal(val)}</span>
+          <span className="hk-industry-comparison__mono-cell">{formatVal(val)}</span>
         ),
       },
       {
@@ -134,7 +131,7 @@ export default function HKIndustryComparisonSection({ code }: { code: string }) 
         sorter: (a, b) => (a.total_assets ?? 0) - (b.total_assets ?? 0),
         defaultSortOrder: "descend",
         render: (val: number | null) => (
-          <span style={{ fontFamily: "var(--c-font-mono)" }}>{formatVal(val)}</span>
+          <span className="hk-industry-comparison__mono-cell">{formatVal(val)}</span>
         ),
       },
       {
@@ -145,7 +142,7 @@ export default function HKIndustryComparisonSection({ code }: { code: string }) 
         align: "right",
         sorter: (a, b) => (a.current_assets ?? 0) - (b.current_assets ?? 0),
         render: (val: number | null) => (
-          <span style={{ fontFamily: "var(--c-font-mono)" }}>{formatVal(val)}</span>
+          <span className="hk-industry-comparison__mono-cell">{formatVal(val)}</span>
         ),
       },
       {
@@ -156,7 +153,7 @@ export default function HKIndustryComparisonSection({ code }: { code: string }) 
         align: "right",
         sorter: (a, b) => (a.total_liabilities ?? 0) - (b.total_liabilities ?? 0),
         render: (val: number | null) => (
-          <span style={{ fontFamily: "var(--c-font-mono)" }}>{formatVal(val)}</span>
+          <span className="hk-industry-comparison__mono-cell">{formatVal(val)}</span>
         ),
       },
       {
@@ -168,7 +165,7 @@ export default function HKIndustryComparisonSection({ code }: { code: string }) 
         sorter: (a, b) => (a.debt_to_assets_ratio ?? 0) - (b.debt_to_assets_ratio ?? 0),
         render: (val: number | null) =>
           val != null ? (
-            <span style={{ fontFamily: "var(--c-font-mono)" }}>{val.toFixed(2)}%</span>
+            <span className="hk-industry-comparison__mono-cell">{val.toFixed(2)}%</span>
           ) : (
             "-"
           ),
@@ -185,11 +182,13 @@ export default function HKIndustryComparisonSection({ code }: { code: string }) 
           const isPos = val > 0;
           return (
             <span
-              style={{
-                fontFamily: "var(--c-font-mono)",
-                color: isPos ? colors.up : val < 0 ? colors.down : undefined,
-                fontWeight: 600,
-              }}
+              className={`hk-industry-comparison__profit-val ${
+                isPos
+                  ? "hk-industry-comparison__profit-val--up"
+                  : val < 0
+                    ? "hk-industry-comparison__profit-val--down"
+                    : ""
+              }`}
             >
               {val > 0 ? `+${formatVal(val)}` : formatVal(val)}
             </span>
@@ -197,13 +196,13 @@ export default function HKIndustryComparisonSection({ code }: { code: string }) 
         },
       },
     ];
-  }, [code, colors]);
+  }, [code]);
 
   const periods = data?.periods ?? [];
 
   return (
     <Card
-      className="stock-section-card"
+      className="stock-section-card u-card"
       title={
         <StockSectionTitle
           icon={<ApartmentOutlined />}
@@ -230,14 +229,13 @@ export default function HKIndustryComparisonSection({ code }: { code: string }) 
               href={data.source_url}
               target="_blank"
               rel="noopener noreferrer"
-              style={{ fontSize: 12, display: "inline-flex", alignItems: "center", gap: 4 }}
+              className="hk-industry-comparison__f10-link"
             >
               同花顺F10 <LinkOutlined />
             </a>
           )}
         </Space>
       }
-      style={cardStyle}
     >
       <SectionDataState
         isLoading={query.isLoading}
@@ -249,52 +247,23 @@ export default function HKIndustryComparisonSection({ code }: { code: string }) 
         minHeight={260}
       >
         {stats && (
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
-              gap: 12,
-              marginBottom: 16,
-            }}
-          >
-            <div
-              style={{
-                padding: "var(--c-pad-inset, 7px 12px)",
-                background: colors.nestedBg,
-                borderRadius: 8,
-                borderLeft: `3px solid ${colors.primary}`,
-              }}
-            >
-              <div style={{ fontSize: 12, color: colors.textSecondary }}>所属行业</div>
+          <div className="hk-industry-comparison__stats-grid">
+            <div className="hk-industry-comparison__stat-box hk-industry-comparison__stat-box--primary">
+              <div className="hk-industry-comparison__stat-label">所属行业</div>
               <div
-                style={{
-                  fontWeight: 600,
-                  fontSize: 13,
-                  marginTop: 2,
-                  color: colors.textPrimary,
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                }}
+                className="hk-industry-comparison__stat-title"
                 title={data?.industry_path}
               >
                 {data?.segment || data?.sub_industry || data?.industry || "港股板块"}
               </div>
             </div>
 
-            <div
-              style={{
-                padding: "var(--c-pad-inset, 7px 12px)",
-                background: colors.nestedBg,
-                borderRadius: 8,
-                borderLeft: `3px solid ${colors.info}`,
-              }}
-            >
-              <div style={{ fontSize: 12, color: colors.textSecondary }}>资产规模排名</div>
-              <div style={{ fontWeight: 600, fontSize: 14, marginTop: 2, color: colors.textPrimary }}>
+            <div className="hk-industry-comparison__stat-box hk-industry-comparison__stat-box--info">
+              <div className="hk-industry-comparison__stat-label">资产规模排名</div>
+              <div className="hk-industry-comparison__stat-val">
                 {stats.assetRank != null ? (
                   <>
-                    第 <span style={{ color: colors.primary }}>{stats.assetRank}</span> / {stats.totalCount} 名
+                    第 <span className="hk-industry-comparison__rank-primary">{stats.assetRank}</span> / {stats.totalCount} 名
                   </>
                 ) : (
                   "-"
@@ -302,19 +271,12 @@ export default function HKIndustryComparisonSection({ code }: { code: string }) 
               </div>
             </div>
 
-            <div
-              style={{
-                padding: "var(--c-pad-inset, 7px 12px)",
-                background: colors.nestedBg,
-                borderRadius: 8,
-                borderLeft: `3px solid ${colors.accent}`,
-              }}
-            >
-              <div style={{ fontSize: 12, color: colors.textSecondary }}>税后利润排名</div>
-              <div style={{ fontWeight: 600, fontSize: 14, marginTop: 2, color: colors.textPrimary }}>
+            <div className="hk-industry-comparison__stat-box hk-industry-comparison__stat-box--accent">
+              <div className="hk-industry-comparison__stat-label">税后利润排名</div>
+              <div className="hk-industry-comparison__stat-val">
                 {stats.profitRank != null ? (
                   <>
-                    第 <span style={{ color: colors.accent }}>{stats.profitRank}</span> / {stats.totalCount} 名
+                    第 <span className="hk-industry-comparison__rank-accent">{stats.profitRank}</span> / {stats.totalCount} 名
                   </>
                 ) : (
                   "-"
@@ -322,46 +284,16 @@ export default function HKIndustryComparisonSection({ code }: { code: string }) 
               </div>
             </div>
 
-            <div
-              style={{
-                padding: "var(--c-pad-inset, 7px 12px)",
-                background: colors.nestedBg,
-                borderRadius: 8,
-                borderLeft: `3px solid ${colors.warning}`,
-              }}
-            >
-              <div style={{ fontSize: 12, color: colors.textSecondary }}>行业 PE 中位数</div>
-              <div
-                style={{
-                  fontWeight: 600,
-                  fontSize: 14,
-                  marginTop: 2,
-                  color: colors.textPrimary,
-                  fontFamily: "var(--c-font-mono)",
-                }}
-              >
+            <div className="hk-industry-comparison__stat-box hk-industry-comparison__stat-box--warning">
+              <div className="hk-industry-comparison__stat-label">行业 PE 中位数</div>
+              <div className="hk-industry-comparison__stat-val hk-industry-comparison__stat-val--mono">
                 {stats.peMedian != null ? formatVal(stats.peMedian) : "-"}
               </div>
             </div>
 
-            <div
-              style={{
-                padding: "var(--c-pad-inset, 7px 12px)",
-                background: colors.nestedBg,
-                borderRadius: 8,
-                borderLeft: `3px solid ${colors.success}`,
-              }}
-            >
-              <div style={{ fontSize: 12, color: colors.textSecondary }}>行业 PB 中位数</div>
-              <div
-                style={{
-                  fontWeight: 600,
-                  fontSize: 14,
-                  marginTop: 2,
-                  color: colors.textPrimary,
-                  fontFamily: "var(--c-font-mono)",
-                }}
-              >
+            <div className="hk-industry-comparison__stat-box hk-industry-comparison__stat-box--success">
+              <div className="hk-industry-comparison__stat-label">行业 PB 中位数</div>
+              <div className="hk-industry-comparison__stat-val hk-industry-comparison__stat-val--mono">
                 {stats.pbMedian != null ? formatVal(stats.pbMedian) : "-"}
               </div>
             </div>
@@ -380,7 +312,7 @@ export default function HKIndustryComparisonSection({ code }: { code: string }) 
             return record.code.padStart(5, "0") === normCode ? "stock-table-row-highlight" : "";
           }}
         />
-        <div style={{ marginTop: 8, fontSize: 12, color: colors.textSecondary }}>
+        <div className="hk-industry-comparison__footnote">
           注：财务与估值对比数据来源于同花顺 F10 行业地位，货币单位已折算为港元 (HKD)。当前报告期：{currentPeriod || "最新"}。
         </div>
       </SectionDataState>

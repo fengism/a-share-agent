@@ -1,0 +1,233 @@
+/* 量化回测结果：顶部核心指标卡片、策略上下文与收益概览。 */
+
+/** Backtest results: core metrics first, details on demand. */
+.quant-results-section {
+  min-width: 0;
+  margin-top: var(--c-space-5);
+  padding-top: var(--c-space-4);
+  border-top: 1px solid var(--c-border);
+  font-variant-numeric: tabular-nums;
+}
+
+[data-theme] .quant-result-card.ant-card,
+[data-theme] .quant-metric-card.ant-card {
+  min-width: 0;
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius-md);
+  background: var(--c-card-bg);
+  box-shadow: none;
+}
+
+.quant-result-card .ant-card-head {
+  min-height: 42px;
+  padding-inline: var(--c-space-3);
+  border-bottom-color: var(--c-border);
+  background: color-mix(in srgb, var(--c-card-bg) 94%, var(--c-nested-bg));
+}
+
+.quant-result-card .ant-card-head-title {
+  padding-block: 9px;
+  color: var(--c-text-primary);
+  font-size: var(--quant-font-section);
+  font-weight: var(--c-weight-bold);
+  letter-spacing: 0.02em;
+}
+
+.quant-result-card .ant-card-extra {
+  padding-block: 6px;
+}
+
+.quant-result-card .ant-card-body {
+  min-width: 0;
+  padding: var(--c-space-3);
+}
+
+.quant-result-card .ant-table,
+.quant-result-card .ant-descriptions,
+.quant-result-card .ant-statistic,
+.quant-result-card .ant-tag {
+  font-variant-numeric: tabular-nums;
+}
+
+.quant-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--c-space-2);
+  margin-bottom: var(--c-space-3);
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+
+.quant-metric-card.ant-card {
+  position: relative;
+  overflow: hidden;
+}
+
+
+.quant-metric-card::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: color-mix(in srgb, var(--c-primary) 65%, var(--c-border));
+  content: "";
+}
+
+.quant-metric-card--positive::before {
+  background: var(--c-up);
+}
+
+.quant-metric-card--negative::before {
+  background: var(--c-down);
+}
+
+.quant-metric-card.ant-card > .ant-card-body {
+  padding: var(--c-space-4);
+}
+
+.quant-metric-card .ant-statistic-title {
+  margin-bottom: 5px;
+  overflow: hidden;
+  color: var(--c-text-muted);
+  font-size: var(--quant-font-caption);
+  font-weight: var(--c-weight-semibold);
+  letter-spacing: 0.04em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quant-metric-card .ant-statistic-content {
+  overflow: hidden;
+  font-size: clamp(var(--c-font-2xl), 2.2vw, var(--c-font-3xl));
+  font-weight: var(--c-weight-bold);
+  line-height: var(--c-leading-tight);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quant-metric-card .ant-statistic-content-suffix {
+  margin-inline-start: 2px;
+  font-size: 0.62em;
+  font-weight: var(--c-weight-semibold);
+}
+
+.quant-result-overview,
+.quant-holdout-card {
+  margin-bottom: var(--c-space-3);
+}
+
+.quant-result-overview .ant-descriptions-view,
+.quant-holdout-card .ant-descriptions-view {
+  border-radius: 0;
+}
+
+.quant-result-overview .ant-descriptions-item-label,
+.quant-holdout-card .ant-descriptions-item-label {
+  color: var(--c-text-muted);
+  font-size: var(--quant-font-caption);
+  font-weight: var(--c-weight-semibold);
+}
+
+.quant-result-overview .ant-descriptions-item-content,
+.quant-holdout-card .ant-descriptions-item-content {
+  overflow-wrap: anywhere;
+  color: var(--c-text-primary);
+  font-size: var(--quant-font-body);
+}
+
+.quant-chart-card {
+  height: 100%;
+}
+
+.quant-chart-card .ant-card-body {
+  overflow: hidden;
+}
+
+.quant-chart-empty {
+  display: flex;
+  min-height: 260px;
+  align-items: center;
+  justify-content: center;
+}
+
+.quant-table-card .ant-card-body {
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.quant-table-card .ant-table-thead > tr > th {
+  color: var(--c-text-muted);
+  font-size: var(--quant-font-caption);
+  font-weight: var(--c-weight-bold);
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.quant-table-card .ant-table-tbody > tr > td {
+  font-size: var(--quant-font-label);
+  white-space: nowrap;
+}
+
+.quant-result-strategy {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  min-width: 0;
+  align-items: center;
+  gap: var(--c-space-3);
+  margin-bottom: var(--c-space-3);
+  padding: 9px var(--c-space-3);
+  border: 1px solid color-mix(in srgb, var(--c-primary) 38%, var(--c-border));
+  border-radius: var(--c-radius-md);
+  background: color-mix(in srgb, var(--c-primary) 5%, var(--c-nested-bg));
+  box-shadow: inset 2px 0 0 var(--c-primary);
+}
+
+.quant-result-strategy strong {
+  color: var(--c-text-primary);
+  font-size: var(--quant-font-body);
+}
+
+.quant-result-strategy span {
+  overflow: hidden;
+  color: var(--c-text-secondary);
+  font-size: var(--quant-font-label);
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quant-result-context {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--c-space-3);
+  margin-bottom: var(--c-space-3);
+  padding: var(--c-space-3);
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius-md);
+  background: color-mix(in srgb, var(--c-card-bg) 92%, var(--c-nested-bg));
+}
+
+.quant-result-context > div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.quant-result-context span,
+.quant-result-context small {
+  color: var(--c-text-secondary);
+  font-size: var(--quant-font-caption);
+}
+
+.quant-result-context strong {
+  overflow: hidden;
+  color: var(--c-text-primary);
+  font-size: var(--quant-font-body);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quant-result-context .ant-tag {
+  margin: 0;
+}

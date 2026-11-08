@@ -1,0 +1,134 @@
+/* 自选股移动端卡片列表（WatchlistCardList）。
+   原先全部写在 TSX 的 style 对象里，这里逐条等价迁移。 */
+
+.watchlist-mobile-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 8px 0;
+}
+
+.watchlist-mobile-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: var(--c-pad-card, 16px 18px);
+  background: var(--c-card-bg);
+  border: 1px solid var(--c-border);
+  border-radius: 8px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.watchlist-mobile-card.is-selected {
+  border-color: var(--c-primary);
+}
+
+.watchlist-mobile-card__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.watchlist-mobile-card__identity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.watchlist-mobile-card__link {
+  display: flex;
+  flex-direction: column;
+}
+
+.watchlist-mobile-card__name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.watchlist-mobile-card__name {
+  font-size: 16px;
+  color: var(--c-text-primary);
+}
+
+.watchlist-mobile-card__tag {
+  margin: 0;
+  font-size: 10px;
+}
+
+.watchlist-mobile-card__code {
+  font-size: 12px;
+  font-family: var(--c-font-mono);
+  color: var(--c-text-muted);
+}
+
+.watchlist-mobile-card__quote {
+  text-align: right;
+}
+
+.watchlist-mobile-card__price {
+  font-size: 16px;
+  font-weight: 700;
+  font-family: var(--c-font-mono);
+  padding: 0 4px;
+  border-radius: 4px;
+  transition: background-color 0.3s ease;
+  color: var(--c-text-primary);
+}
+
+.watchlist-mobile-card__price.is-up {
+  color: var(--c-up);
+}
+
+.watchlist-mobile-card__price.is-down {
+  color: var(--c-down);
+}
+
+.watchlist-mobile-card__change {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.watchlist-mobile-card__metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  background: color-mix(in srgb, var(--c-page-bg) 60%, transparent);
+  border-radius: 6px;
+  font-size: 11px;
+}
+
+.watchlist-mobile-card__mono {
+  font-family: var(--c-font-mono);
+}
+
+.watchlist-mobile-card__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 2px;
+}
+
+.watchlist-mobile-card__concepts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.watchlist-mobile-card__concept {
+  background: var(--c-nested-bg);
+  border: 1px solid var(--c-border);
+  border-radius: 3px;
+  font-size: 10px;
+  padding: 1px 5px;
+  color: var(--c-text-secondary);
+  cursor: pointer;
+}
+
+.watchlist-mobile-card__icon-primary {
+  color: var(--c-primary);
+}

@@ -71,7 +71,7 @@ export default function SkillAgentConfigCard({
   onCheckAvailability,
   hasChanges = false,
 }: SkillAgentConfigCardProps) {
-  const { cardStyle, sectionCardBodyStyle } = useStyles();
+  const { sectionCardBodyStyle } = useStyles();
   const colors = useColors();
   const [view, setView] = useState<CapabilityView>("skills");
   const skillNames = capabilities?.skills.map((skill) => skill.name) ?? [];
@@ -95,7 +95,7 @@ export default function SkillAgentConfigCard({
     <Card
       title={<span><BranchesOutlined style={{ marginRight: 8 }} />账号能力配置</span>}
       extra={hasChanges ? <Tag style={semanticTagStyle("warning")}>未保存</Tag> : null}
-      style={{ ...cardStyle, marginBottom: 16 }}
+      className="u-card" style={{ marginBottom: 16 }}
       styles={{ body: sectionCardBodyStyle }}
     >
       <div style={{ marginBottom: 14, color: colors.textSecondary, lineHeight: "var(--c-leading-relaxed)" }}>

@@ -139,13 +139,7 @@ export function EmptyChatState({ onSelectPrompt }: EmptyChatStateProps) {
 
   return (
     <div
-      style={{
-        textAlign: "center",
-        color: c.textMuted,
-        padding: `${t.space[5]} ${t.space[3]}`,
-        maxWidth: 820,
-        margin: "0 auto",
-      }}
+      className="chat-empty"
     >
       <div
         style={{
@@ -165,8 +159,8 @@ export function EmptyChatState({ onSelectPrompt }: EmptyChatStateProps) {
         <RobotOutlined />
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 6 }}>
-        <Title level={4} style={{ color: c.textPrimary, margin: 0 }}>
+      <div className="chat-empty-title-row">
+        <Title level={4} className="chat-empty-title">
           AI 智能投研与选股工作台
         </Title>
         <Tag style={semanticTagStyle(sessionInfo.color)}>
@@ -175,7 +169,7 @@ export function EmptyChatState({ onSelectPrompt }: EmptyChatStateProps) {
         </Tag>
       </div>
 
-      <Text type="secondary" style={{ display: "block", marginBottom: t.space[4], fontSize: t.font.sm }}>
+      <Text type="secondary" className="chat-empty-subtitle">
         {sessionInfo.desc}。支持自然语言选股、财务三张表体检、技术形态诊断与多标的对比。
       </Text>
 
@@ -204,15 +198,15 @@ export function EmptyChatState({ onSelectPrompt }: EmptyChatStateProps) {
         }}
         className="u-card-interactive"
       >
-        <ThunderboltOutlined style={{ color: c.primary }} />
-        <span style={{ fontSize: t.font.xs, color: c.textPrimary }}>当前时段推荐：</span>
-        <span style={{ fontSize: t.font.xs, color: c.primary, fontWeight: 500 }}>
+        <ThunderboltOutlined className="chat-empty-session-icon" />
+        <span className="chat-empty-session-label">当前时段推荐：</span>
+        <span className="chat-empty-session-prompt">
           {sessionInfo.defaultPrompt}
         </span>
       </div>
 
       {/* 场景分类切换 */}
-      <div style={{ display: "flex", justifyContent: "center", marginBottom: t.space[4] }}>
+      <div className="chat-empty-categories">
         <Segmented
           value={selectedCategory}
           onChange={(val) => setSelectedCategory(String(val))}
@@ -228,13 +222,7 @@ export function EmptyChatState({ onSelectPrompt }: EmptyChatStateProps) {
 
       {/* 灵感卡片网格 */}
       <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
-          gap: t.space[3],
-          textAlign: "left",
-          marginBottom: t.space[5],
-        }}
+        className="chat-empty-grid"
       >
         {filteredItems.map((item) => (
           <div
@@ -248,45 +236,25 @@ export function EmptyChatState({ onSelectPrompt }: EmptyChatStateProps) {
                 onSelectPrompt(item.prompt);
               }
             }}
-            className="u-card-interactive"
-            style={{
-              padding: `${t.space[3]} ${t.space[4]}`,
-              borderRadius: t.radius.lg,
-              border: `1px solid ${c.border}`,
-              background: c.hoverBg,
-              cursor: "pointer",
-              display: "flex",
-              flexDirection: "column",
-              justifyContent: "space-between",
-              gap: 8,
-              transition: "border-color 0.2s ease, transform 0.2s ease",
-            }}
+            className="u-card-interactive chat-empty-card"
           >
             <div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ color: c.primary, fontSize: 16 }}>{item.icon}</span>
-                  <strong style={{ color: c.textPrimary, fontSize: t.font.sm }}>{item.title}</strong>
+              <div className="chat-empty-card-head">
+                <div className="chat-empty-card-title-row">
+                  <span className="chat-empty-card-icon">{item.icon}</span>
+                  <strong className="chat-empty-card-title">{item.title}</strong>
                 </div>
                 <Tag style={{ ...semanticTagStyle(item.tagColor ?? "primary"), fontSize: 11, margin: 0 }}>
                   {item.tag}
                 </Tag>
               </div>
               <div
-                style={{
-                  color: c.textSecondary,
-                  fontSize: t.font.xs,
-                  lineHeight: 1.5,
-                  display: "-webkit-box",
-                  WebkitLineClamp: 2,
-                  WebkitBoxOrient: "vertical",
-                  overflow: "hidden",
-                }}
+                className="chat-empty-prompt"
               >
                 {item.prompt}
               </div>
             </div>
-            <div style={{ fontSize: 11, color: c.textMuted }}>
+            <div className="chat-empty-desc">
               {item.description}
             </div>
           </div>
@@ -295,27 +263,15 @@ export function EmptyChatState({ onSelectPrompt }: EmptyChatStateProps) {
 
       {/* 底部常用提示词 */}
       <div
-        style={{
-          display: "flex",
-          gap: t.space[2],
-          justifyContent: "center",
-          flexWrap: "wrap",
-          alignItems: "center",
-        }}
+        className="chat-empty-samples"
       >
-        <span style={{ fontSize: t.font.xs, color: c.textMuted }}>快捷提示：</span>
+        <span className="u-text-muted u-text-xs">快捷提示：</span>
         {SAMPLE_PROMPTS.map((prompt) => (
           <Button
             key={prompt}
             type="text"
             size="small"
-            style={{
-              background: c.hoverBg,
-              border: `1px solid ${c.border}`,
-              color: c.textSecondary,
-              borderRadius: t.radius.pill,
-              fontSize: t.font.xs,
-            }}
+            className="chat-empty-sample-btn"
             onClick={() => onSelectPrompt(prompt)}
           >
             {prompt}

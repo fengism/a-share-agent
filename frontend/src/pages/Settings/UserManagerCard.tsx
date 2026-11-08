@@ -43,15 +43,14 @@ import {
 import { queryKeys } from "../../api/queryKeys";
 import SectionDataState from "../../components/SectionDataState";
 import { useAuthStore } from "../../store/authStore";
-import { semanticTagStyle, useColors, useStyles } from "../../styles/ui";
+import { useStyles } from "../../styles/ui";
 import type { AdminUserItem } from "../../types/auth";
 
 const { Text } = Typography;
 
 export default function UserManagerCard() {
   const isNarrow = useMediaQuery("(max-width: 767px)");
-  const { cardStyle, sectionCardBodyStyle } = useStyles();
-  const colors = useColors();
+  const { sectionCardBodyStyle } = useStyles();
   const queryClient = useQueryClient();
   const currentUser = useAuthStore((s) => s.user);
 
@@ -231,7 +230,7 @@ export default function UserManagerCard() {
         <Tooltip title={record.must_change_password ? "取消下次改密要求" : "要求该用户下次登录时必须修改密码"}>
           <Button
             size="small"
-            style={record.must_change_password ? { color: colors.warning } : undefined}
+            className={record.must_change_password ? "user-manager__must-change-btn" : undefined}
             onClick={() => handleToggleMustChangePassword(record)}
           >
             {record.must_change_password ? "取消改密" : "要求改密"}
@@ -277,10 +276,10 @@ export default function UserManagerCard() {
       dataIndex: "username",
       render: (name: string, record) => (
         <Space orientation="horizontal" size={4}>
-          <UserOutlined style={{ color: colors.textMuted }} />
-          <span style={{ fontWeight: 500 }}>{name}</span>
+          <UserOutlined className="user-manager__user-icon" />
+          <span className="user-manager__username">{name}</span>
           {record.id === currentUser?.id && (
-            <Tag color="blue" style={{ fontSize: "var(--c-font-xs)", padding: "0 4px", lineHeight: "18px" }}>
+            <Tag color="blue" className="user-manager__current-tag">
               当前账号
             </Tag>
           )}
@@ -306,9 +305,9 @@ export default function UserManagerCard() {
       width: 95,
       render: (isActive: boolean) =>
         isActive ? (
-          <Tag style={semanticTagStyle("down")}>正常</Tag>
+          <Tag className="user-manager__status-tag user-manager__status-tag--active">正常</Tag>
         ) : (
-          <Tag style={semanticTagStyle("up")}>已禁用</Tag>
+          <Tag className="user-manager__status-tag user-manager__status-tag--disabled">已禁用</Tag>
         ),
     },
     {
@@ -317,7 +316,7 @@ export default function UserManagerCard() {
       width: 95,
       render: (mustChange: boolean) =>
         mustChange ? (
-          <Tag style={semanticTagStyle("warning")}>待改密</Tag>
+          <Tag className="user-manager__status-tag user-manager__status-tag--warning">待改密</Tag>
         ) : (
           <Tag>已改密</Tag>
         ),
@@ -336,7 +335,6 @@ export default function UserManagerCard() {
     },
   ];
 
-
   const mobileFields: MobileRecordField<AdminUserItem>[] = [
     {
       label: "用户",
@@ -345,7 +343,7 @@ export default function UserManagerCard() {
         <span>
           {record.username}
           {record.id === currentUser?.id && (
-            <Tag color="blue" style={{ marginLeft: 6, fontSize: "var(--c-font-xs)", padding: "0 4px", lineHeight: "18px" }}>
+            <Tag color="blue" className="user-manager__current-tag--mobile">
               当前账号
             </Tag>
           )}
@@ -367,16 +365,16 @@ export default function UserManagerCard() {
       label: "状态",
       render: (record) =>
         record.is_active ? (
-          <Tag style={semanticTagStyle("down")}>正常</Tag>
+          <Tag className="user-manager__status-tag user-manager__status-tag--active">正常</Tag>
         ) : (
-          <Tag style={semanticTagStyle("up")}>已禁用</Tag>
+          <Tag className="user-manager__status-tag user-manager__status-tag--disabled">已禁用</Tag>
         ),
     },
     {
       label: "改密",
       render: (record) =>
         record.must_change_password ? (
-          <Tag style={semanticTagStyle("warning")}>待改密</Tag>
+          <Tag className="user-manager__status-tag user-manager__status-tag--warning">待改密</Tag>
         ) : (
           <Tag>已改密</Tag>
         ),
@@ -399,43 +397,43 @@ export default function UserManagerCard() {
             刷新
           </Button>
         }
-        style={{ ...cardStyle, marginBottom: 16 }}
+        className="u-card user-manager-card"
         styles={{ body: sectionCardBodyStyle }}
       >
-        <div style={{ fontSize: "var(--c-font-sm)", color: colors.textMuted, marginBottom: 12 }}>
+        <div className="user-manager__intro">
           管理系统所有注册用户、控制账号状态、调整管理员角色分配以及强制注销远程会话。
         </div>
 
         {/* User statistics banner */}
-        <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
+        <Row gutter={[12, 12]} className="user-manager__stats-row">
           <Col xs={12} sm={6}>
-            <div style={{ padding: "var(--c-pad-inset, 7px 12px)", background: colors.hoverBg, borderRadius: 6 }}>
-              <div style={{ fontSize: "var(--c-font-sm)", color: colors.textMuted }}>总用户数</div>
-              <div style={{ fontSize: "var(--c-font-xl)", fontWeight: 600, color: colors.textPrimary }}>
+            <div className="user-manager__stat-tile">
+              <div className="user-manager__stat-label">总用户数</div>
+              <div className="user-manager__stat-value">
                 {stats.total}
               </div>
             </div>
           </Col>
           <Col xs={12} sm={6}>
-            <div style={{ padding: "var(--c-pad-inset, 7px 12px)", background: colors.hoverBg, borderRadius: 6 }}>
-              <div style={{ fontSize: "var(--c-font-sm)", color: colors.textMuted }}>正常运行</div>
-              <div style={{ fontSize: "var(--c-font-xl)", fontWeight: 600, color: colors.down }}>
+            <div className="user-manager__stat-tile">
+              <div className="user-manager__stat-label">正常运行</div>
+              <div className="user-manager__stat-value user-manager__stat-value--active">
                 {stats.active}
               </div>
             </div>
           </Col>
           <Col xs={12} sm={6}>
-            <div style={{ padding: "var(--c-pad-inset, 7px 12px)", background: colors.hoverBg, borderRadius: 6 }}>
-              <div style={{ fontSize: "var(--c-font-sm)", color: colors.textMuted }}>已禁用</div>
-              <div style={{ fontSize: "var(--c-font-xl)", fontWeight: 600, color: stats.disabled > 0 ? colors.up : colors.textMuted }}>
+            <div className="user-manager__stat-tile">
+              <div className="user-manager__stat-label">已禁用</div>
+              <div className={`user-manager__stat-value ${stats.disabled > 0 ? "user-manager__stat-value--disabled" : "user-manager__stat-value--disabled-none"}`}>
                 {stats.disabled}
               </div>
             </div>
           </Col>
           <Col xs={12} sm={6}>
-            <div style={{ padding: "var(--c-pad-inset, 7px 12px)", background: colors.hoverBg, borderRadius: 6 }}>
-              <div style={{ fontSize: "var(--c-font-sm)", color: colors.textMuted }}>管理员</div>
-              <div style={{ fontSize: "var(--c-font-xl)", fontWeight: 600, color: "#722ed1" }}>
+            <div className="user-manager__stat-tile">
+              <div className="user-manager__stat-label">管理员</div>
+              <div className="user-manager__stat-value user-manager__stat-value--admin">
                 {stats.admins}
               </div>
             </div>
@@ -443,11 +441,11 @@ export default function UserManagerCard() {
         </Row>
 
         {/* Filter bar */}
-        <Row gutter={[12, 12]} style={{ marginBottom: 14 }}>
+        <Row gutter={[12, 12]} className="user-manager__filter-row">
           <Col xs={24} sm={10} md={8}>
             <Input
               placeholder="按用户名搜索"
-              prefix={<SearchOutlined style={{ color: colors.textMuted }} />}
+              prefix={<SearchOutlined className="user-manager__search-icon" />}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               allowClear
@@ -456,7 +454,7 @@ export default function UserManagerCard() {
           </Col>
           <Col xs={12} sm={7} md={5}>
             <Select
-              style={{ width: "100%" }}
+              className="user-manager__filter-select"
               value={roleFilter}
               onChange={(val) => setRoleFilter(val)}
               options={[
@@ -469,7 +467,7 @@ export default function UserManagerCard() {
           </Col>
           <Col xs={12} sm={7} md={5}>
             <Select
-              style={{ width: "100%" }}
+              className="user-manager__filter-select"
               value={statusFilter}
               onChange={(val) => setStatusFilter(val)}
               options={[
@@ -515,7 +513,7 @@ export default function UserManagerCard() {
         width="min(520px, calc(100vw - 24px))"
         title={
           <Space>
-            <KeyOutlined style={{ color: colors.primary }} />
+            <KeyOutlined className="user-manager__modal-key-icon" />
             <span>生成重置链接 — {resetTarget?.username}</span>
           </Space>
         }
@@ -541,18 +539,18 @@ export default function UserManagerCard() {
           ),
         ]}
       >
-        <div style={{ fontSize: "var(--c-font-sm)", color: colors.textMuted, marginBottom: 16 }}>
+        <div className="user-manager__modal-intro">
           为用户 <strong>{resetTarget?.username}</strong> 生成一次性密码重置令牌。用户打开链接后可自行重置密码，该操作将即刻强制注销其所有现有登录会话。
         </div>
 
         {!resetResult ? (
-          <Space orientation="vertical" style={{ width: "100%" }} size="middle">
+          <Space orientation="vertical" className="user-manager__modal-space" size="middle">
             <div>
-              <span style={{ fontSize: "var(--c-font-md)", color: colors.textPrimary, marginRight: 8 }}>有效期：</span>
+              <span className="user-manager__modal-label">有效期：</span>
               <Select
                 value={resetHours}
                 onChange={setResetHours}
-                style={{ width: 140 }}
+                className="user-manager__modal-select"
                 options={[
                   { value: 1, label: "1 小时" },
                   { value: 6, label: "6 小时" },
@@ -564,7 +562,7 @@ export default function UserManagerCard() {
             </div>
           </Space>
         ) : (
-          <Space orientation="vertical" style={{ width: "100%" }} size="middle">
+          <Space orientation="vertical" className="user-manager__modal-space" size="middle">
             <Alert
               type="success"
               showIcon
@@ -572,7 +570,7 @@ export default function UserManagerCard() {
               description={`有效至: ${resetResult.expires_at}。链接仅展示一次，请妥善转交给该用户。`}
             />
             <div>
-              <Text copyable={{ text: resetResult.url }} code style={{ wordBreak: "break-all" }}>
+              <Text copyable={{ text: resetResult.url }} code className="user-manager__modal-url">
                 {resetResult.url}
               </Text>
             </div>

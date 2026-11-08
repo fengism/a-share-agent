@@ -3,7 +3,7 @@ import { ClockCircleOutlined, DeleteOutlined, FilterOutlined, FundViewOutlined, 
 import { Button, Card, Checkbox, Input, Popconfirm, Select, Tag, Typography } from "antd";
 import type { QuantBacktestRun } from "../../api/queries";
 import SectionDataState from "../../components/SectionDataState";
-import { useStyles, useColors, semanticTagStyle } from "../../styles/ui";
+import { useColors, semanticTagStyle } from "../../styles/ui";
 import { formatMarketPattern } from "../../utils/marketTime";
 import { QUANT_RUN_STATUS_META, quantStrategyLabel, quantUniverseLabel } from "./quantRun";
 import BacktestRunsComparatorModal from "./BacktestRunsComparatorModal";
@@ -44,7 +44,6 @@ export default function BacktestHistory({
   onRetryRun,
   onDeleteRun,
 }: BacktestHistoryProps) {
-  const { cardStyle } = useStyles();
   const colors = useColors();
   const [keyword, setKeyword] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -88,8 +87,7 @@ export default function BacktestHistory({
     <Card
       title={<span className="quant-history-card-title"><ClockCircleOutlined />历史回测</span>}
       size="small"
-      style={cardStyle}
-      className="quant-history-card"
+      className="quant-history-card u-card"
     >
       <div className="quant-history-toolbar">
         {isFiltersOpen ? <div className="quant-history-filters">

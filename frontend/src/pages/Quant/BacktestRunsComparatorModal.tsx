@@ -12,8 +12,8 @@ import {
 import { Badge, Button, Card, Col, Empty, Modal, Row, Table, Tag, Tooltip, Typography, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import type { QuantBacktestRun } from "../../api/queries";
-import { useColors } from "../../styles/ui";
 import { quantStrategyLabel, quantUniverseLabel } from "./quantRun";
+import "./quant-comparator.css";
 
 const { Text } = Typography;
 
@@ -54,7 +54,6 @@ export default function BacktestRunsComparatorModal({
   onSelectRun,
   onRemoveRun,
 }: BacktestRunsComparatorModalProps) {
-  const colors = useColors();
   const [copied, setCopied] = useState(false);
 
   // 提取有效回测（有指标数据）
@@ -348,7 +347,7 @@ export default function BacktestRunsComparatorModal({
         fixed: "left",
         render: (label: string, row) => (
           <Tooltip title={row.description} placement="topLeft">
-            <span style={{ fontWeight: 600, cursor: "help" }}>{label}</span>
+            <span className="quant-comp-metric-label">{label}</span>
           </Tooltip>
         ),
       },
@@ -358,29 +357,29 @@ export default function BacktestRunsComparatorModal({
       const strategyName = quantStrategyLabel(run.request.strategy ?? { type: "ma_cross" });
       cols.push({
         title: (
-          <div style={{ padding: "4px 0", minWidth: 150 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4 }}>
-              <Text strong ellipsis style={{ maxWidth: 140 }} title={run.name}>
+          <div className="quant-comp-col-header">
+            <div className="quant-comp-col-header-top">
+              <Text strong ellipsis className="quant-comp-run-name" title={run.name}>
                 {run.name}
               </Text>
               {onRemoveRun && validRuns.length > 2 ? (
                 <Button
                   type="text"
                   size="small"
-                  icon={<CloseOutlined style={{ fontSize: 11 }} />}
+                  icon={<CloseOutlined className="quant-comp-icon-11" />}
                   aria-label={`移除对比 ${run.name}`}
                   onClick={() => onRemoveRun(run.id)}
                 />
               ) : null}
             </div>
-            <div style={{ marginTop: 2, display: "flex", gap: 4, flexWrap: "wrap" }}>
-              <Tag style={{ fontSize: 11, padding: "0 4px", margin: 0 }}>{strategyName}</Tag>
+            <div className="quant-comp-tags-row">
+              <Tag className="quant-comp-tag">{strategyName}</Tag>
             </div>
-            <div style={{ marginTop: 6 }}>
+            <div className="quant-comp-action-row">
               <Button
                 type="link"
                 size="small"
-                style={{ padding: 0, fontSize: 12 }}
+                className="quant-comp-btn-link"
                 onClick={() => {
                   onSelectRun(run.id);
                   onClose();
@@ -413,33 +412,33 @@ export default function BacktestRunsComparatorModal({
           }
 
           // 收益相关颜色区分
-          let valueColor: string | undefined;
+          let valueClass: string | undefined;
           if (row.key === "total_return" || row.key === "annualized_return" || row.key === "excess_return") {
             if (raw != null) {
-              valueColor = raw >= 0 ? colors.up : colors.down;
+              valueClass = raw >= 0 ? "u-text-up" : "u-text-down";
             }
           } else if (row.key === "max_drawdown") {
-            valueColor = colors.down;
+            valueClass = "u-text-down";
           }
 
+          const spanClass = [
+            "quant-comp-val",
+            typeof raw === "number" ? "quant-comp-val--mono" : "",
+            isBest ? "quant-comp-val--best" : "",
+            valueClass,
+          ]
+            .filter(Boolean)
+            .join(" ");
+
           return (
-            <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <div className="quant-comp-val-cell">
               {isBest ? (
                 <Badge
-                  count={<CrownOutlined style={{ color: "#faad14", fontSize: 13 }} />}
+                  count={<CrownOutlined className="quant-comp-crown" />}
                   title="该项表现最佳"
                 />
               ) : null}
-              <span
-                style={{
-                  fontFamily: typeof raw === "number" ? "var(--c-font-mono)" : undefined,
-                  fontWeight: isBest ? 700 : 500,
-                  color: valueColor,
-                  background: isBest ? "rgba(250, 173, 20, 0.08)" : undefined,
-                  padding: isBest ? "1px 6px" : undefined,
-                  borderRadius: 4,
-                }}
-              >
+              <span className={spanClass}>
                 {String(val ?? "-")}
               </span>
             </div>
@@ -449,14 +448,14 @@ export default function BacktestRunsComparatorModal({
     });
 
     return cols;
-  }, [validRuns, metricRows, onRemoveRun, onSelectRun, onClose, colors]);
+  }, [validRuns, metricRows, onRemoveRun, onSelectRun, onClose]);
 
   return (
     <Modal
       open={open}
       title={
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <FundViewOutlined style={{ color: colors.primary }} />
+        <div className="quant-comp-modal-title">
+          <FundViewOutlined className="quant-comp-primary-icon" />
           <span>策略回测多维横向对比</span>
           <Tag color="cyan">{validRuns.length} 个回测样本</Tag>
         </div>
@@ -479,25 +478,25 @@ export default function BacktestRunsComparatorModal({
       {validRuns.length < 2 ? (
         <Empty
           description="请在历史记录中至少勾选 2 个已成功完成的回测任务进行横向对比"
-          style={{ padding: "40px 0" }}
+          className="quant-comp-empty"
         />
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 16, width: "100%" }}>
+        <div className="quant-comp-body">
           {/* 胜出亮点看板 */}
           {highlights ? (
-            <div style={{ background: "rgba(0, 0, 0, 0.02)", padding: 12, borderRadius: 8 }}>
+            <div className="quant-comp-highlight-box">
               <Row gutter={[12, 12]}>
                 {highlights.bestReturn ? (
                   <Col xs={24} sm={12} md={6}>
-                    <Card size="small" style={{ borderRadius: 6, borderColor: colors.up }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                        <TrophyOutlined style={{ color: colors.up }} />
-                        <Text strong style={{ fontSize: 12 }}>累计收益冠军</Text>
+                    <Card size="small" className="quant-comp-highlight-card quant-comp-highlight-card--up">
+                      <div className="quant-comp-card-header">
+                        <TrophyOutlined className="quant-comp-icon--up" />
+                        <Text strong className="quant-comp-card-label">累计收益冠军</Text>
                       </div>
-                      <div style={{ fontSize: 18, fontWeight: 700, color: colors.up, fontFamily: "var(--c-font-mono)" }}>
+                      <div className="quant-comp-card-val quant-comp-card-val--up">
                         +{highlights.bestReturn.val.toFixed(1)}%
                       </div>
-                      <Text type="secondary" ellipsis style={{ fontSize: 11, display: "block" }}>
+                      <Text type="secondary" ellipsis className="quant-comp-card-sub">
                         {highlights.bestReturn.run.name}
                       </Text>
                     </Card>
@@ -506,15 +505,15 @@ export default function BacktestRunsComparatorModal({
 
                 {highlights.bestSharpe ? (
                   <Col xs={24} sm={12} md={6}>
-                    <Card size="small" style={{ borderRadius: 6, borderColor: colors.primary }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                        <CrownOutlined style={{ color: colors.primary }} />
-                        <Text strong style={{ fontSize: 12 }}>最优夏普比率</Text>
+                    <Card size="small" className="quant-comp-highlight-card quant-comp-highlight-card--primary">
+                      <div className="quant-comp-card-header">
+                        <CrownOutlined className="quant-comp-icon--primary" />
+                        <Text strong className="quant-comp-card-label">最优夏普比率</Text>
                       </div>
-                      <div style={{ fontSize: 18, fontWeight: 700, color: colors.primary, fontFamily: "var(--c-font-mono)" }}>
+                      <div className="quant-comp-card-val quant-comp-card-val--primary">
                         {highlights.bestSharpe.val.toFixed(2)}
                       </div>
-                      <Text type="secondary" ellipsis style={{ fontSize: 11, display: "block" }}>
+                      <Text type="secondary" ellipsis className="quant-comp-card-sub">
                         {highlights.bestSharpe.run.name}
                       </Text>
                     </Card>
@@ -523,15 +522,15 @@ export default function BacktestRunsComparatorModal({
 
                 {highlights.minDrawdown ? (
                   <Col xs={24} sm={12} md={6}>
-                    <Card size="small" style={{ borderRadius: 6, borderColor: "#52c41a" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                        <SafetyCertificateOutlined style={{ color: "#52c41a" }} />
-                        <Text strong style={{ fontSize: 12 }}>最小最大回撤</Text>
+                    <Card size="small" className="quant-comp-highlight-card quant-comp-highlight-card--green">
+                      <div className="quant-comp-card-header">
+                        <SafetyCertificateOutlined className="quant-comp-icon--green" />
+                        <Text strong className="quant-comp-card-label">最小最大回撤</Text>
                       </div>
-                      <div style={{ fontSize: 18, fontWeight: 700, color: "#52c41a", fontFamily: "var(--c-font-mono)" }}>
+                      <div className="quant-comp-card-val quant-comp-card-val--green">
                         -{highlights.minDrawdown.val.toFixed(1)}%
                       </div>
-                      <Text type="secondary" ellipsis style={{ fontSize: 11, display: "block" }}>
+                      <Text type="secondary" ellipsis className="quant-comp-card-sub">
                         {highlights.minDrawdown.run.name}
                       </Text>
                     </Card>
@@ -540,15 +539,15 @@ export default function BacktestRunsComparatorModal({
 
                 {highlights.bestWinRate ? (
                   <Col xs={24} sm={12} md={6}>
-                    <Card size="small" style={{ borderRadius: 6, borderColor: "#722ed1" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                        <ThunderboltOutlined style={{ color: "#722ed1" }} />
-                        <Text strong style={{ fontSize: 12 }}>最高胜率策略</Text>
+                    <Card size="small" className="quant-comp-highlight-card quant-comp-highlight-card--purple">
+                      <div className="quant-comp-card-header">
+                        <ThunderboltOutlined className="quant-comp-icon--purple" />
+                        <Text strong className="quant-comp-card-label">最高胜率策略</Text>
                       </div>
-                      <div style={{ fontSize: 18, fontWeight: 700, color: "#722ed1", fontFamily: "var(--c-font-mono)" }}>
+                      <div className="quant-comp-card-val quant-comp-card-val--purple">
                         {highlights.bestWinRate.val.toFixed(1)}%
                       </div>
-                      <Text type="secondary" ellipsis style={{ fontSize: 11, display: "block" }}>
+                      <Text type="secondary" ellipsis className="quant-comp-card-sub">
                         {highlights.bestWinRate.run.name}
                       </Text>
                     </Card>

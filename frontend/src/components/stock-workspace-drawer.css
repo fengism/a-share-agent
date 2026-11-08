@@ -1,0 +1,225 @@
+.stock-workspace-drawer .ant-drawer-header {
+  padding: 14px 18px;
+}
+
+.stock-workspace-drawer .ant-drawer-body {
+  display: flex;
+  flex-direction: column;
+  padding: 14px 18px 18px;
+}
+
+.stock-workspace__title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-width: 0;
+}
+
+.stock-workspace__title-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.stock-workspace__name {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--c-text-primary);
+}
+
+.stock-workspace__code-tag {
+  font-size: 13px;
+  font-family: var(--c-font-mono, monospace);
+  font-weight: 600;
+  margin: 0;
+}
+
+.stock-workspace__body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.stock-workspace__stats-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-radius: var(--c-radius-md, 8px);
+  background: var(--c-nested-bg, #f8fafc);
+  border: 1px solid var(--c-border, #e2e8f0);
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.stock-workspace__price-box {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.stock-workspace__price {
+  font-size: 24px;
+  font-weight: 700;
+  font-family: var(--c-font-mono, monospace);
+  color: var(--c-text-primary);
+}
+
+.stock-workspace__metrics {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.stock-workspace__metric-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.stock-workspace__metric-label {
+  font-size: 11px;
+  color: var(--c-text-muted);
+}
+
+.stock-workspace__metric-val {
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--c-font-mono, monospace);
+  color: var(--c-text-primary);
+}
+
+.stock-workspace__chart-switch {
+  margin-left: auto;
+}
+
+.stock-workspace__chart-container {
+  min-height: 380px;
+  border-radius: var(--c-radius-md, 8px);
+  background: var(--c-card-bg);
+}
+
+.stock-workspace__skeleton {
+  padding: 24px;
+}
+
+.stock-workspace__empty {
+  min-height: 380px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── Tab panes ──────────────────────────────────────────────────────── */
+.stock-workspace__pane {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.stock-workspace__pane-note {
+  font-size: var(--c-font-xs);
+  line-height: var(--c-leading-normal);
+}
+
+.stock-workspace-drawer .stock-workspace__body .ant-tabs-nav {
+  margin-bottom: 10px;
+}
+
+.stock-workspace__empty-icon {
+  font-size: 32px;
+  color: var(--c-text-muted);
+}
+
+.stock-workspace__empty {
+  gap: 8px;
+}
+
+/* ── 龙虎榜席位 ─────────────────────────────────────────────────────── */
+.stock-workspace__lhb {
+  padding-top: 10px;
+  border-top: 1px dashed var(--c-border);
+}
+
+.stock-workspace__lhb-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.stock-workspace__lhb-title {
+  font-size: var(--c-font-sm);
+  font-weight: var(--c-weight-semibold);
+  color: var(--c-text-primary);
+}
+
+.stock-workspace__lhb-date {
+  width: 130px;
+}
+
+.stock-workspace__lhb-empty {
+  margin: 12px 0;
+}
+
+.stock-workspace__lhb-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stock-workspace__lhb-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--c-border);
+  font-size: var(--c-font-xs);
+}
+
+.stock-workspace__lhb-row:last-child {
+  border-bottom: 0;
+}
+
+.stock-workspace__lhb-seat {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--c-text-primary);
+}
+
+.stock-workspace__lhb-side {
+  margin: 0;
+  flex: none;
+  font-size: 10px;
+  line-height: 16px;
+  padding: 0 4px;
+}
+
+.stock-workspace__lhb-amount {
+  flex: none;
+  font-weight: var(--c-weight-semibold);
+  color: var(--c-text-primary);
+}
+
+/* ── AI 诊断 ────────────────────────────────────────────────────────── */
+.stock-workspace__ai-desc {
+  margin: 0 0 10px;
+  font-size: var(--c-font-sm);
+  line-height: var(--c-leading-normal);
+  color: var(--c-text-secondary);
+}
+
+.stock-workspace__ai-actions {
+  width: 100%;
+}

@@ -1,0 +1,198 @@
+/* 市场风向标组件：龙头股联动面板、表格排行徽章与响应式规则。 */
+
+[data-theme="light"] .wind-plate-card__action {
+  border-top: 1px solid var(--c-border);
+}
+
+[data-theme="stellar-blue"] .wind-plate-card--selected .wind-plate-card__action {
+  color: var(--c-primary);
+}
+
+[data-theme="light"] .wind-plate-card--selected .wind-plate-card__action {
+  color: var(--c-primary);
+}
+
+.wind-leaders-card.ant-card {
+  overflow: hidden;
+  border-radius: 12px;
+}
+
+[data-theme="stellar-blue"] .wind-leaders-card.ant-card {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--c-card-bg);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="light"] .wind-leaders-card.ant-card {
+  border: 1px solid var(--c-border);
+  background: var(--c-card-bg);
+  box-shadow: 0 1px 3px rgba(44, 34, 20, 0.04);
+}
+
+.wind-leaders-card .ant-card-head {
+  min-height: 66px;
+  border-bottom-color: var(--c-border);
+}
+
+.wind-leaders-card .ant-card-head-title {
+  overflow: visible;
+  white-space: normal;
+}
+
+.wind-leader-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.wind-leader-summary > span {
+  display: grid;
+  gap: 4px;
+  padding: 13px 14px;
+  border: 1px solid var(--c-border);
+  border-radius: 9px;
+  background: var(--c-nested-bg);
+}
+
+.wind-leader-summary small {
+  color: var(--c-text-muted);
+  font-size: var(--c-font-xs);
+}
+
+.wind-leader-summary strong {
+  color: var(--c-text-primary);
+  font-size: var(--c-font-2xl);
+}
+
+.wind-leader-summary .is-up {
+  color: var(--c-up);
+}
+
+.wind-leaders-table .ant-table {
+  border: 1px solid var(--c-border);
+  border-radius: 9px;
+}
+
+.wind-leaders-table .ant-table-thead > tr > th {
+  color: var(--c-text-secondary);
+  font-size: var(--c-font-sm);
+  background: var(--c-nested-bg);
+}
+
+.wind-leaders-table .ant-table-tbody > tr:last-child > td {
+  border-bottom: 0;
+}
+
+.wind-stock-rank {
+  display: inline-grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 8px;
+  color: var(--c-text-secondary);
+  background: var(--c-nested-bg);
+  font-size: var(--c-font-sm);
+  font-weight: var(--c-weight-bold);
+}
+
+.wind-stock-rank--top {
+  color: var(--c-up);
+  background: color-mix(in srgb, var(--c-up) 10%, transparent);
+}
+
+.wind-stock-link {
+  display: inline-grid;
+  gap: 2px;
+}
+
+.wind-stock-link strong {
+  color: var(--c-text-primary);
+  font-size: var(--c-font-base);
+}
+
+.wind-stock-link small,
+.wind-table-muted {
+  color: var(--c-text-muted);
+  font-size: var(--c-font-xs);
+}
+
+@media (max-width: 900px) {
+  .wind-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .wind-hero__focus {
+    border-top: 1px solid var(--c-border);
+    border-left: 0;
+  }
+}
+
+@media (max-width: 575px) {
+  .wind-toolbar {
+    align-items: flex-start;
+  }
+
+  .wind-hero__summary,
+  .wind-hero__focus {
+    padding: 22px 20px;
+  }
+
+  .wind-plate-section {
+    padding: 14px;
+  }
+
+  .wind-plate-grid {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    gap: 10px;
+    padding-bottom: 6px;
+    scrollbar-width: thin;
+  }
+
+  .wind-plate-card {
+    flex: 0 0 240px;
+    scroll-snap-align: start;
+    min-height: 135px;
+    padding: 12px 14px;
+    gap: 8px;
+  }
+
+  .wind-plate-card__catalyst {
+    font-size: var(--c-font-sm);
+    -webkit-line-clamp: 2;
+  }
+
+  .wind-section-heading,
+  .wind-leaders-heading {
+    flex-wrap: wrap;
+    gap: 8px 12px;
+  }
+
+  .wind-section-heading > .ant-space {
+    margin-left: 0;
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .wind-section-heading small,
+  .wind-leaders-heading small {
+    display: none;
+  }
+
+  .wind-leader-summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .wind-leader-summary > span {
+    min-width: 0;
+    padding: 10px 12px;
+  }
+
+  .wind-leader-summary strong {
+    font-size: var(--c-font-lg);
+  }
+}

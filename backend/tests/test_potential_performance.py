@@ -39,14 +39,14 @@ async def test_compute_performance_returns_returns_and_excess(monkeypatch: pytes
     }
     calls = {"bars": 0}
 
-    async def fake_bars(code, start_date, end_date, period, adjust):
+    async def fake_bars(code, start_date, end_date, **kwargs):
         calls["bars"] += 1
         return SimpleNamespace(items=[_bar(day, close) for day, close in zip(dates, stock_closes[code])])
 
     async def fake_index(symbol, period, start_date, end_date):
         return SimpleNamespace(items=[_bar(day, close) for day, close in zip(dates, [100.0, 100.0, 101.0, 102.0, 103.0, 104.0, 105.0])])
 
-    monkeypatch.setattr(performance, "get_historical_bars", fake_bars)
+    monkeypatch.setattr(performance, "fetch_daily_bars", fake_bars)
     monkeypatch.setattr(performance, "get_index_kline", fake_index)
 
     summary = await performance.compute_potential_performance("2026-10-16", 5)
@@ -74,13 +74,13 @@ async def test_compute_performance_reports_insufficient_forward_data(monkeypatch
     monkeypatch.setattr(performance, "_PERFORMANCE_DIR", tmp_path)
     monkeypatch.setattr(performance.repository, "load_potential_result", lambda date: _result())
 
-    async def short_bars(code, start_date, end_date, period, adjust):
+    async def short_bars(code, start_date, end_date, **kwargs):
         return SimpleNamespace(items=[_bar("2026-10-16", 10.0), _bar("2026-10-19", 11.0)])
 
     async def fake_index(symbol, period, start_date, end_date):
         return SimpleNamespace(items=[_bar("2026-10-16", 100.0)])
 
-    monkeypatch.setattr(performance, "get_historical_bars", short_bars)
+    monkeypatch.setattr(performance, "fetch_daily_bars", short_bars)
     monkeypatch.setattr(performance, "get_index_kline", fake_index)
 
     summary = await performance.compute_potential_performance("2026-10-16", 5)

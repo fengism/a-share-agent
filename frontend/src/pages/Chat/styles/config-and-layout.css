@@ -1,0 +1,172 @@
+/* 对话页样式：自定义运行参数面板、双栏会话侧栏布局与移动端抽屉。 */
+
+.chat-custom-config-pane {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+  animation: chatConfigFadeIn 0.2s ease-out;
+}
+
+@keyframes chatConfigFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.chat-agent-selector,
+.chat-skill-selector {
+  display: grid;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--c-border);
+  border-radius: 10px;
+  background: var(--c-nested-bg);
+}
+
+.chat-capability-presets {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--c-border);
+  border-radius: 10px;
+  background: var(--c-card-bg);
+}
+
+.chat-agent-selector-heading,
+.chat-skill-selector-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.chat-agent-selector-status,
+.chat-skill-selector-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  color: var(--c-text-muted);
+  font-size: var(--c-font-xs);
+}
+
+.chat-agent-selector-status > span,
+.chat-skill-selector-status > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.chat-agent-selector-status .ant-tag,
+.chat-skill-selector-status .ant-tag {
+  margin-inline-end: 2px;
+}
+
+/* Chat page two-column layout: sticky session sidebar + flexible main area.
+   Below the 768px mobile breakpoint the sidebar switches to a horizontal
+   touch-scrollable tab bar and stops being sticky so the conversation keeps
+   the full viewport without getting blocked during scrolling. */
+.chat-page-layout {
+  display: flex;
+  gap: var(--c-space-4);
+  align-items: flex-start;
+  max-width: var(--c-container-page);
+  margin: 0 auto;
+  padding: 0 0 var(--c-space-6);
+}
+
+.chat-session-sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+.chat-new-session-btn {
+  width: 100%;
+}
+
+.chat-session-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.chat-session {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 768px) {
+  .chat-page-layout {
+    flex-direction: column;
+    gap: var(--c-space-3);
+    padding: 0 0 var(--c-space-5);
+  }
+
+  .chat-session-sidebar,
+  .chat-page-layout > .chat-session-sidebar {
+    position: static;
+    top: auto;
+    width: 100%;
+    max-height: none;
+    overflow: visible;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 8px 10px;
+    gap: 8px;
+  }
+
+  .chat-new-session-btn {
+    width: auto;
+    flex-shrink: 0;
+  }
+
+  .chat-session-list {
+    flex: 1;
+    display: flex;
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+    gap: 6px;
+    padding: 2px 0;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-x pan-y;
+  }
+
+  .chat-session-list::-webkit-scrollbar {
+    height: 3px;
+  }
+
+  .chat-session-list::-webkit-scrollbar-thumb {
+    background: var(--c-border);
+    border-radius: 3px;
+  }
+
+  .chat-session {
+    flex: 0 0 auto;
+    width: auto;
+    max-width: 160px;
+    min-width: 100px;
+  }
+
+  .chat-capability-presets {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 6px 8px;
+  }
+}

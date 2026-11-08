@@ -1,0 +1,104 @@
+.auth-card {
+  width: 100%;
+  align-self: center;
+  justify-self: end;
+  padding: 38px 36px;
+  background: var(--c-surface-overlay, rgba(17, 24, 39, 0.92));
+  box-shadow: var(--c-card-shadow, 0 24px 80px rgba(2, 6, 23, 0.48));
+  backdrop-filter: blur(18px);
+}
+
+.auth-header {
+  margin-bottom: 28px;
+  text-align: left;
+}
+
+.auth-header__logo {
+  width: 48px;
+  height: 48px;
+  margin-bottom: 20px;
+  border-radius: 14px;
+  font-size: var(--c-font-2xl);
+}
+
+.auth-header h1 {
+  margin: 0;
+  color: var(--c-text-primary, #f2f4f7);
+  font-size: var(--c-font-3xl);
+  line-height: var(--c-leading-tight);
+  letter-spacing: -0.02em;
+}
+
+.auth-header__description {
+  margin-top: 7px;
+  color: var(--c-text-secondary, #9ca3af);
+  font-size: var(--c-font-md);
+  line-height: var(--c-leading-relaxed);
+}
+
+.auth-form .ant-form-item-label > label,
+.auth-field-label-row label {
+  color: var(--c-text-secondary, #9ca3af);
+  font-size: var(--c-font-md);
+  font-weight: var(--c-weight-medium);
+}
+
+.auth-form .ant-input-affix-wrapper,
+.auth-form .ant-input,
+.auth-form .ant-btn {
+  min-height: 44px;
+}
+
+.auth-form .ant-input-affix-wrapper:focus,
+.auth-form .ant-input-affix-wrapper-focused {
+  box-shadow: 0 0 0 3px var(--c-focus-ring, rgba(111, 99, 217, 0.34));
+}
+
+.auth-field-label-row {
+  display: flex;
+  min-height: 32px;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.auth-field-label-row a,
+.auth-footer a {
+  font-size: var(--c-font-md);
+}
+
+.auth-form-item--paired {
+  margin-top: -1px;
+}
+
+.auth-form__submit {
+  margin-top: 4px;
+  margin-bottom: 10px;
+}
+
+.auth-form__submit .ant-btn {
+  font-weight: var(--c-weight-semibold);
+  box-shadow: 0 8px 22px var(--c-focus-ring, rgba(111, 99, 217, 0.34));
+}
+
+.auth-primary-action {
+  min-height: 44px;
+  font-weight: var(--c-weight-semibold);
+}
+
+.auth-footer {
+  color: var(--c-text-secondary, #9ca3af);
+  font-size: var(--c-font-md);
+  text-align: center;
+}
+
+.auth-footer--spaced {
+  margin-top: 16px;
+}
+
+.auth-footer .ant-btn-link {
+  height: auto;
+  padding: 0;
+  color: var(--c-text-secondary, #9ca3af);
+  font-size: var(--c-font-md);
+}

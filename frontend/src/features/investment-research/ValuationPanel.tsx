@@ -4,6 +4,7 @@ import type { ColumnsType } from "antd/es/table";
 import { useValuationDetail } from "../../api/queries";
 import ResponsiveMetricGrid from "../../components/ResponsiveMetricGrid";
 import SectionDataState from "../../components/SectionDataState";
+import SectionHeader from "../../components/SectionHeader";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import type {
   DCFValuationResult,
@@ -11,7 +12,7 @@ import type {
   StockValuationPeer,
   ValuationMethodResult,
 } from "../../types/stock";
-import { useColors, useStyles, useTokens, semanticTagStyle } from "../../theme/hooks";
+import { useStyles, useTokens, semanticTagStyle } from "../../theme/hooks";
 import type { SemanticTagColor } from "../../theme/hooks";
 import "./valuation-panel.css";
 
@@ -40,18 +41,18 @@ function formatPercent(value: number | null | undefined) {
   return `${value > 0 ? "+" : ""}${value.toFixed(2)}%`;
 }
 
-function percentileTag(value: number | null | undefined, tagStyle: React.CSSProperties) {
+function percentileTag(value: number | null | undefined) {
   if (value == null) return <Text type="secondary">-</Text>;
-  if (value < 30) return <Tag style={{ ...tagStyle, ...semanticTagStyle("down") }}>偏低 {value.toFixed(1)}%</Tag>;
-  if (value <= 70) return <Tag style={{ ...tagStyle, ...semanticTagStyle("warning") }}>中位 {value.toFixed(1)}%</Tag>;
-  return <Tag style={{ ...tagStyle, ...semanticTagStyle("up") }}>偏高 {value.toFixed(1)}%</Tag>;
+  if (value < 30) return <Tag style={semanticTagStyle("down")}>偏低 {value.toFixed(1)}%</Tag>;
+  if (value <= 70) return <Tag style={semanticTagStyle("warning")}>中位 {value.toFixed(1)}%</Tag>;
+  return <Tag style={semanticTagStyle("up")}>偏高 {value.toFixed(1)}%</Tag>;
 }
 
-function valuationViewTag(value: string | null | undefined, tagStyle: React.CSSProperties) {
+function valuationViewTag(value: string | null | undefined) {
   if (!value) return <Text type="secondary">-</Text>;
   const tone: SemanticTagColor =
     value === "低估" ? "down" : value === "高估" ? "up" : value === "分歧较大" || value === "参考性有限" ? "warning" : "info";
-  return <Tag style={{ ...tagStyle, ...semanticTagStyle(tone) }}>{value}</Tag>;
+  return <Tag style={semanticTagStyle(tone)}>{value}</Tag>;
 }
 
 function formatPriceRange(value: number[] | null | undefined) {
@@ -134,10 +135,9 @@ function renderMethodCard(title: string, item: ValuationMethodResult | DCFValuat
 }
 
 export default function ValuationPanel({ code }: Props) {
-  const c = useColors();
   const t = useTokens();
   const isNarrow = useMediaQuery("(max-width: 768px)");
-  const { cardStyle, sectionHeaderStyle, tagStyle, sectionCardBodyStyle, metricTileStyle, metricValueEmphasisStyle } = useStyles();
+  const { tagStyle, sectionCardBodyStyle, metricTileStyle, metricValueEmphasisStyle } = useStyles();
   const { data: detail, isLoading, error, refetch } = useValuationDetail(code);
   const dcf = detail?.fair_values.dcf as DCFValuationResult | undefined;
 
@@ -183,78 +183,78 @@ export default function ValuationPanel({ code }: Props) {
           width: 150,
           render: (_: unknown, record: InstitutionForecast) => (
             <div>
-              <Tag style={{ ...tagStyle, marginBottom: t.space[1] }}>{forecastMetricLabel(record.metric)}</Tag>
-              <div style={{ color: c.textMuted, fontSize: t.font.xs }}>{record.year}</div>
+              <Tag style={tagStyle}>{forecastMetricLabel(record.metric)}</Tag>
+              <div className="valuation-table-sub">{record.year}</div>
             </div>
           ),
         },
         {
-          title: <span style={{ color: c.accent }}>均值</span>,
+          title: <span className="valuation-table-head--plain-accent">均值</span>,
           dataIndex: "mean_value",
           key: "mean_value",
           width: 88,
           align: "right",
-          render: (value: number | null) => <span style={{ fontSize: t.font.md, fontWeight: Number(t.weight.semibold), color: c.accent }}>{formatTableNumber(value)}</span>,
+          render: (value: number | null) => <span className="valuation-table-cell--accent">{formatTableNumber(value)}</span>,
         },
       ];
     }
 
     return [
       {
-        title: <span style={{ fontSize: t.font.sm, fontWeight: Number(t.weight.bold), color: c.textSecondary }}>指标</span>,
+        title: <span className="valuation-table-head">指标</span>,
         dataIndex: "metric",
         key: "metric",
         render: (value: string) => <Tag style={tagStyle}>{forecastMetricLabel(value)}</Tag>,
       },
       {
-        title: <span style={{ fontSize: t.font.sm, fontWeight: Number(t.weight.bold), color: c.textSecondary }}>年度</span>,
+        title: <span className="valuation-table-head">年度</span>,
         dataIndex: "year",
         key: "year",
-        render: (value: string) => <span style={{ fontSize: t.font.sm, color: c.textPrimary }}>{value}</span>,
+        render: (value: string) => <span className="valuation-table-cell--primary">{value}</span>,
       },
       {
-        title: <span style={{ fontSize: t.font.sm, fontWeight: Number(t.weight.bold), color: c.textSecondary }}>机构数</span>,
+        title: <span className="valuation-table-head">机构数</span>,
         dataIndex: "institution_count",
         key: "institution_count",
         align: "right",
-        render: (value: number | null) => <span style={{ fontSize: t.font.sm, color: c.primary }}>{value ?? "-"}</span>,
+        render: (value: number | null) => <span className="valuation-table-cell--brand">{value ?? "-"}</span>,
       },
       {
-        title: <span style={{ fontSize: t.font.sm, fontWeight: Number(t.weight.bold), color: c.textSecondary }}>最小值</span>,
+        title: <span className="valuation-table-head">最小值</span>,
         dataIndex: "min_value",
         key: "min_value",
         align: "right",
-        render: (value: number | null) => <span style={{ fontSize: t.font.sm, color: c.textSecondary }}>{formatTableNumber(value)}</span>,
+        render: (value: number | null) => <span className="valuation-table-cell">{formatTableNumber(value)}</span>,
       },
       {
-        title: <span style={{ fontSize: t.font.sm, fontWeight: Number(t.weight.bold), color: c.accent }}>均值</span>,
+        title: <span className="valuation-table-head--accent">均值</span>,
         dataIndex: "mean_value",
         key: "mean_value",
         align: "right",
-        render: (value: number | null) => <span style={{ fontSize: t.font.md, fontWeight: Number(t.weight.semibold), color: c.accent }}>{formatTableNumber(value)}</span>,
+        render: (value: number | null) => <span className="valuation-table-cell--accent">{formatTableNumber(value)}</span>,
       },
       {
-        title: <span style={{ fontSize: t.font.sm, fontWeight: Number(t.weight.bold), color: c.textSecondary }}>最大值</span>,
+        title: <span className="valuation-table-head">最大值</span>,
         dataIndex: "max_value",
         key: "max_value",
         align: "right",
-        render: (value: number | null) => <span style={{ fontSize: t.font.sm, color: c.textSecondary }}>{formatTableNumber(value)}</span>,
+        render: (value: number | null) => <span className="valuation-table-cell">{formatTableNumber(value)}</span>,
       },
       {
-        title: <span style={{ fontSize: t.font.sm, fontWeight: Number(t.weight.bold), color: c.textSecondary }}>行业均值</span>,
+        title: <span className="valuation-table-head">行业均值</span>,
         dataIndex: "industry_avg",
         key: "industry_avg",
         align: "right",
-        render: (value: number | null) => <span style={{ fontSize: t.font.sm, color: c.textSecondary }}>{formatTableNumber(value)}</span>,
+        render: (value: number | null) => <span className="valuation-table-cell">{formatTableNumber(value)}</span>,
       },
       {
-        title: <span style={{ fontSize: t.font.sm, fontWeight: Number(t.weight.bold), color: c.textSecondary }}>单位</span>,
+        title: <span className="valuation-table-head">单位</span>,
         dataIndex: "unit",
         key: "unit",
-        render: (value: string | null) => <span style={{ fontSize: t.font.sm, color: c.textSecondary }}>{value ?? "-"}</span>,
+        render: (value: string | null) => <span className="valuation-table-cell">{value ?? "-"}</span>,
       },
     ];
-  }, [c, isNarrow, tagStyle, t]);
+  }, [isNarrow, tagStyle]);
 
   const peerColumns: ColumnsType<StockValuationPeer> = useMemo(() => {
     if (isNarrow) {
@@ -265,8 +265,8 @@ export default function ValuationPanel({ code }: Props) {
           width: 150,
           render: (_: unknown, record: StockValuationPeer) => (
             <div>
-              <div style={{ color: c.textPrimary, fontSize: t.font.sm, fontWeight: Number(t.weight.semibold) }}>{record.name}</div>
-              <div style={{ color: c.textMuted, fontSize: t.font.xs }}>{record.code}</div>
+              <div className="valuation-peer-name">{record.name}</div>
+              <div className="valuation-table-sub">{record.code}</div>
             </div>
           ),
         },
@@ -276,37 +276,37 @@ export default function ValuationPanel({ code }: Props) {
           key: "pe_ttm",
           width: 92,
           align: "right",
-          render: (value: number | null) => <span style={{ fontSize: t.font.sm, color: c.textSecondary }}>{formatTableNumber(value)}</span>,
+          render: (value: number | null) => <span className="valuation-table-cell">{formatTableNumber(value)}</span>,
         },
       ];
     }
 
     return [
-      { title: <span style={{ fontSize: t.font.sm, fontWeight: Number(t.weight.bold), color: c.textSecondary }}>名称</span>, dataIndex: "name", key: "name", render: (value: string) => <span style={{ fontSize: t.font.sm, color: c.textSecondary }}>{value}</span> },
-      { title: <span style={{ fontSize: t.font.sm, fontWeight: Number(t.weight.bold), color: c.textSecondary }}>代码</span>, dataIndex: "code", key: "code", render: (value: string) => <span style={{ fontSize: t.font.sm, color: c.textSecondary }}>{value}</span> },
+      { title: <span className="valuation-table-head">名称</span>, dataIndex: "name", key: "name", render: (value: string) => <span className="valuation-table-cell">{value}</span> },
+      { title: <span className="valuation-table-head">代码</span>, dataIndex: "code", key: "code", render: (value: string) => <span className="valuation-table-cell">{value}</span> },
       {
-        title: <span style={{ fontSize: t.font.sm, fontWeight: Number(t.weight.bold), color: c.textSecondary }}>PE(TTM)</span>,
+        title: <span className="valuation-table-head">PE(TTM)</span>,
         dataIndex: "pe_ttm",
         key: "pe_ttm",
         align: "right",
-        render: (value: number | null) => <span style={{ fontSize: t.font.sm, color: c.textSecondary }}>{formatTableNumber(value)}</span>,
+        render: (value: number | null) => <span className="valuation-table-cell">{formatTableNumber(value)}</span>,
       },
       {
-        title: <span style={{ fontSize: t.font.sm, fontWeight: Number(t.weight.bold), color: c.textSecondary }}>PB</span>,
+        title: <span className="valuation-table-head">PB</span>,
         dataIndex: "pb",
         key: "pb",
         align: "right",
-        render: (value: number | null) => <span style={{ fontSize: t.font.sm, color: c.textSecondary }}>{formatTableNumber(value)}</span>,
+        render: (value: number | null) => <span className="valuation-table-cell">{formatTableNumber(value)}</span>,
       },
       {
-        title: <span style={{ fontSize: t.font.sm, fontWeight: Number(t.weight.bold), color: c.textSecondary }}>PS(TTM)</span>,
+        title: <span className="valuation-table-head">PS(TTM)</span>,
         dataIndex: "ps_ttm",
         key: "ps_ttm",
         align: "right",
-        render: (value: number | null) => <span style={{ fontSize: t.font.sm, color: c.textSecondary }}>{formatTableNumber(value)}</span>,
+        render: (value: number | null) => <span className="valuation-table-cell">{formatTableNumber(value)}</span>,
       },
     ];
-  }, [c, isNarrow, t]);
+  }, [isNarrow]);
 
   const renderForecastExpandedRow = useCallback((record: InstitutionForecast) => (
     <ResponsiveMetricGrid
@@ -338,83 +338,82 @@ export default function ValuationPanel({ code }: Props) {
       skeletonRows={7}
       minHeight={320}
     >
-      <div className="valuation-panel" style={{ display: "grid", gap: t.space[4] }}>
+      <div className="valuation-panel">
       <Card
         size="small"
-        className="valuation-snapshot-card"
+        className="valuation-snapshot-card u-card"
         title="当前估值快照"
-        style={{ ...cardStyle, borderTop: `3px solid ${c.primary}55` }}
       >
           <section className="valuation-snapshot-grid" aria-label="当前估值快照">
             <div style={metricTileStyle}>
-              <div style={{ color: c.textSecondary, fontSize: t.font.sm, marginBottom: t.space[1] }}>PE(TTM)</div>
+              <div className="valuation-metric-label--spaced">PE(TTM)</div>
               <div style={metricValueEmphasisStyle}>{detail?.multiples.pe_ttm?.toFixed(2) ?? "-"}</div>
-              <div style={{ marginTop: t.space[2] }}>{percentileTag(detail?.percentiles.pe_3y, { ...tagStyle, margin: 0 })}</div>
+              <div className="valuation-block-gap">{percentileTag(detail?.percentiles.pe_3y)}</div>
             </div>
             <div style={metricTileStyle}>
-              <div style={{ color: c.textSecondary, fontSize: t.font.sm, marginBottom: t.space[1] }}>PB</div>
+              <div className="valuation-metric-label--spaced">PB</div>
               <div style={metricValueEmphasisStyle}>{detail?.multiples.pb?.toFixed(2) ?? "-"}</div>
-              <div style={{ marginTop: t.space[2] }}>{percentileTag(detail?.percentiles.pb_3y, { ...tagStyle, margin: 0 })}</div>
+              <div className="valuation-block-gap">{percentileTag(detail?.percentiles.pb_3y)}</div>
             </div>
             <div style={metricTileStyle}>
-              <div style={{ color: c.textSecondary, fontSize: t.font.sm, marginBottom: t.space[1] }}>PS(TTM)</div>
+              <div className="valuation-metric-label--spaced">PS(TTM)</div>
               <div style={metricValueEmphasisStyle}>{detail?.multiples.ps_ttm?.toFixed(2) ?? "-"}</div>
-              <div style={{ marginTop: t.space[2] }}>{percentileTag(detail?.percentiles.ps_3y, { ...tagStyle, margin: 0 })}</div>
+              <div className="valuation-block-gap">{percentileTag(detail?.percentiles.ps_3y)}</div>
             </div>
             <div style={metricTileStyle}>
-              <div style={{ color: c.textSecondary, fontSize: t.font.sm, marginBottom: t.space[1] }}>PEG</div>
+              <div className="valuation-metric-label--spaced">PEG</div>
               <div style={metricValueEmphasisStyle}>{detail?.multiples.peg?.toFixed(2) ?? "-"}</div>
-              <div style={{ marginTop: t.space[2], color: c.textSecondary, fontSize: t.font.sm }}>成长匹配度</div>
+              <div className="valuation-growth-label">成长匹配度</div>
             </div>
             <div style={metricTileStyle}>
-              <div style={{ color: c.textSecondary, fontSize: t.font.sm, marginBottom: t.space[1] }}>股票画像</div>
-              <div style={{ ...metricValueEmphasisStyle, fontSize: t.font.xl }}>{detail?.profile?.label ?? "-"}</div>
-              <div style={{ marginTop: t.space[2] }}>{valuationViewTag(detail?.valuation_view, { ...tagStyle, margin: 0 })}</div>
+              <div className="valuation-metric-label--spaced">股票画像</div>
+              <div className="valuation-metric-value--lg">{detail?.profile?.label ?? "-"}</div>
+              <div className="valuation-block-gap">{valuationViewTag(detail?.valuation_view)}</div>
             </div>
           </section>
       </Card>
 
-      <Card size="small" title="动态估值结论" style={{ ...cardStyle, marginBottom: t.space[4] }} styles={{ body: { ...sectionCardBodyStyle, padding: `${t.space[4]} ${t.space[5]}` } }}>
+      <Card size="small" title="动态估值结论" className="valuation-panel-card" styles={{ body: { ...sectionCardBodyStyle, padding: `${t.space[4]} ${t.space[5]}` } }}>
         <Row gutter={[t.space[4], t.space[4]]}>
           <Col xs={24} md={8}>
             <div style={metricTileStyle}>
-              <div style={{ color: c.textSecondary, fontSize: t.font.sm, marginBottom: t.space[1] }}>合理估值区间</div>
-              <div style={{ ...metricValueEmphasisStyle, fontSize: t.font.xl }}>{formatPriceRange(detail?.fair_value_range)}</div>
+              <div className="valuation-metric-label--spaced">合理估值区间</div>
+              <div className="valuation-metric-value--lg">{formatPriceRange(detail?.fair_value_range)}</div>
             </div>
           </Col>
           <Col xs={24} md={8}>
             <div style={metricTileStyle}>
-              <div style={{ color: c.textSecondary, fontSize: t.font.sm, marginBottom: t.space[1] }}>加权中枢</div>
-              <div style={{ ...metricValueEmphasisStyle, fontSize: t.font.xl }}>{detail?.blended_fair_value != null ? `¥${detail.blended_fair_value.toFixed(2)}` : "-"}</div>
+              <div className="valuation-metric-label--spaced">加权中枢</div>
+              <div className="valuation-metric-value--lg">{detail?.blended_fair_value != null ? `¥${detail.blended_fair_value.toFixed(2)}` : "-"}</div>
             </div>
           </Col>
           <Col xs={24} md={8}>
             <div style={metricTileStyle}>
-              <div style={{ color: c.textSecondary, fontSize: t.font.sm, marginBottom: t.space[1] }}>方法权重</div>
-              <div style={{ display: "flex", gap: t.space[2], justifyContent: "center", flexWrap: "wrap" }}>
+              <div className="valuation-metric-label--spaced">方法权重</div>
+              <div className="valuation-weights-row">
                 {Object.entries(detail?.method_weights ?? {}).map(([method, weight]) => (
-                  <Tag key={method} style={{ ...tagStyle, marginBottom: 0 }}>{method.toUpperCase()} {formatWeight(weight)}</Tag>
+                  <Tag key={method} style={tagStyle}>{method.toUpperCase()} {formatWeight(weight)}</Tag>
                 ))}
               </div>
             </div>
           </Col>
         </Row>
         {detail?.valuation_summary && (
-          <Paragraph style={{ margin: `${t.space[4]} 0 0`, color: c.textSecondary }}>{detail.valuation_summary}</Paragraph>
+          <Paragraph className="valuation-summary-desc">{detail.valuation_summary}</Paragraph>
         )}
         {detail?.data_quality && (
-          <div style={{ borderTop: `1px solid ${c.border}`, marginTop: t.space[4], paddingTop: t.space[4] }}>
-            <div style={{ display: "flex", alignItems: "center", gap: t.space[2], flexWrap: "wrap" }}>
-              <Text strong style={{ color: c.textPrimary }}>数据质量</Text>
-              <Tag style={{ ...tagStyle, ...semanticTagStyle(qualityGradeTone(detail.data_quality.grade)), margin: 0 }}>
+          <div className="valuation-quality-box">
+            <div className="valuation-quality-row">
+              <Text strong className="u-text-primary">数据质量</Text>
+              <Tag style={semanticTagStyle(qualityGradeTone(detail.data_quality.grade))}>
                 {qualityGradeLabel(detail.data_quality.grade)} · {formatConfidence(detail.data_quality.score)}
               </Tag>
-              <Tag style={{ ...tagStyle, margin: 0 }}>盈利口径 {sourceLabel(detail.data_quality.ttm_source)}</Tag>
-              <Tag style={{ ...tagStyle, margin: 0 }}>现金流 {sourceLabel(detail.data_quality.cashflow_source)}</Tag>
-              <Tag style={{ ...tagStyle, margin: 0 }}>同行可信度 {formatConfidence(detail.data_quality.peer_confidence)}</Tag>
+              <Tag style={tagStyle}>盈利口径 {sourceLabel(detail.data_quality.ttm_source)}</Tag>
+              <Tag style={tagStyle}>现金流 {sourceLabel(detail.data_quality.cashflow_source)}</Tag>
+              <Tag style={tagStyle}>同行可信度 {formatConfidence(detail.data_quality.peer_confidence)}</Tag>
             </div>
             {detail.data_quality.limitations.map((limitation) => (
-              <Paragraph key={limitation} style={{ margin: `${t.space[2]} 0 0`, color: c.textSecondary }}>
+              <Paragraph key={limitation} className="valuation-note-item">
                 {limitation}
               </Paragraph>
             ))}
@@ -422,11 +421,8 @@ export default function ValuationPanel({ code }: Props) {
         )}
       </Card>
 
-      <div style={sectionHeaderStyle}>
-        <Text strong style={{ color: c.textPrimary, fontSize: t.font.md }}>估值方法对比</Text>
-        <Text type="secondary" style={{ fontSize: t.font.sm }}>PE / PB / PS / PEG / DCF</Text>
-      </div>
-      <Card size="small" title="五种估值结果" style={{ ...cardStyle, marginBottom: t.space[4] }} styles={{ body: { ...sectionCardBodyStyle, padding: `${t.space[4]} ${t.space[5]}` } }}>
+      <SectionHeader title="估值方法对比" subtitle="PE / PB / PS / PEG / DCF" />
+      <Card size="small" title="五种估值结果" className="valuation-panel-card" styles={{ body: { ...sectionCardBodyStyle, padding: `${t.space[4]} ${t.space[5]}` } }}>
         <div className="valuation-method-grid">
           {renderMethodCard("PE 估值法", detail?.fair_values.pe as ValuationMethodResult | undefined)}
           {renderMethodCard("PB 估值法", detail?.fair_values.pb as ValuationMethodResult | undefined)}
@@ -438,22 +434,19 @@ export default function ValuationPanel({ code }: Props) {
 
       {dcf?.available && (
         <>
-          <div style={sectionHeaderStyle}>
-            <Text strong style={{ color: c.textPrimary, fontSize: t.font.md }}>DCF 情景分析</Text>
-            <Text type="secondary" style={{ fontSize: t.font.sm }}>{dcf.fcfe_source ?? "现金流折现"}</Text>
-          </div>
-          <Card size="small" title="情景、敏感性与市场隐含预期" style={{ ...cardStyle, marginBottom: t.space[4] }} styles={{ body: sectionCardBodyStyle }}>
+          <SectionHeader title="DCF 情景分析" subtitle={dcf.fcfe_source ?? "现金流折现"} />
+          <Card size="small" title="情景、敏感性与市场隐含预期" className="valuation-panel-card" styles={{ body: sectionCardBodyStyle }}>
             <Row gutter={[t.space[3], t.space[3]]}>
               {dcf.scenarios.map((scenario) => (
                 <Col xs={24} md={8} key={scenario.name}>
                   <div style={metricTileStyle}>
-                    <Text strong style={{ color: c.textPrimary }}>{scenario.label}</Text>
-                    <div style={{ ...metricValueEmphasisStyle, margin: `${t.space[1]} 0` }}>¥{scenario.per_share_value.toFixed(2)}</div>
+                    <Text strong className="u-text-primary">{scenario.label}</Text>
+                    <div className="valuation-scenario-value">¥{scenario.per_share_value.toFixed(2)}</div>
                     <Text type="secondary">
                       增长 {formatRate(scenario.growth_rate)} · 折现 {formatRate(scenario.discount_rate)} · 永续 {formatRate(scenario.terminal_growth_rate)}
                     </Text>
-                    <div style={{ marginTop: t.space[2] }}>
-                      <Tag style={{ ...tagStyle, ...semanticTagStyle(scenario.upside_pct != null && scenario.upside_pct >= 0 ? "down" : "up"), margin: 0 }}>
+                    <div className="valuation-block-gap">
+                      <Tag style={semanticTagStyle(scenario.upside_pct != null && scenario.upside_pct >= 0 ? "down" : "up")}>
                         相对现价 {formatPercent(scenario.upside_pct)}
                       </Tag>
                     </div>
@@ -462,53 +455,50 @@ export default function ValuationPanel({ code }: Props) {
               ))}
             </Row>
             {sensitivityTable.rows.length > 0 && (
-              <div style={{ marginTop: t.space[4] }}>
-                <Text strong style={{ color: c.textPrimary }}>每股价值敏感性</Text>
+              <div className="valuation-sensitivity-box">
+                <Text strong className="u-text-primary">每股价值敏感性</Text>
                 <Table<SensitivityRow>
                   dataSource={sensitivityTable.rows}
                   columns={sensitivityTable.columns}
                   size="small"
                   pagination={false}
-                  style={{ marginTop: t.space[2] }}
+                  className="valuation-block-gap"
                   scroll={isNarrow ? { x: "max-content" } : undefined}
                 />
               </div>
             )}
-            <div style={{ borderTop: `1px solid ${c.border}`, marginTop: t.space[4], paddingTop: t.space[3] }}>
-              <Text strong style={{ color: c.textPrimary }}>反向 DCF</Text>
+            <div className="valuation-reverse-dcf-box">
+              <Text strong className="u-text-primary">反向 DCF</Text>
               {dcf.reverse_dcf.available ? (
-                <Text style={{ marginLeft: t.space[2], color: c.textSecondary }}>
+                <Text className="valuation-inline-desc">
                   当前价格隐含未来五年初始增长率 {formatRate(dcf.reverse_dcf.implied_growth_rate)}
                 </Text>
               ) : (
-                <Text style={{ marginLeft: t.space[2] }} type="secondary">{dcf.reverse_dcf.reason ?? "暂不可用"}</Text>
+                <Text className="valuation-inline-desc" type="secondary">{dcf.reverse_dcf.reason ?? "暂不可用"}</Text>
               )}
             </div>
           </Card>
         </>
       )}
 
-      <div style={sectionHeaderStyle}>
-        <Text strong style={{ color: c.textPrimary, fontSize: t.font.md }}>财务基础与关键假设</Text>
-        <Text type="secondary" style={{ fontSize: t.font.sm }}>估值参数参考</Text>
-      </div>
-      <Card size="small" title="关键假设与财务基础" style={{ ...cardStyle, marginBottom: t.space[4] }} styles={{ body: { ...sectionCardBodyStyle, padding: `${t.space[4]} ${t.space[5]}` } }}>
+      <SectionHeader title="财务基础与关键假设" subtitle="估值参数参考" />
+      <Card size="small" title="关键假设与财务基础" className="valuation-panel-card" styles={{ body: { ...sectionCardBodyStyle, padding: `${t.space[4]} ${t.space[5]}` } }}>
         <Row gutter={[t.space[4], t.space[4]]}>
-          <Col xs={24} md={6}><div style={metricTileStyle}><div style={{ color: c.textSecondary, fontSize: t.font.sm }}>营收</div><div style={{ fontSize: t.font.xl, fontWeight: Number(t.weight.semibold) }}>{formatAmount(detail?.fundamentals.revenue)}</div></div></Col>
-          <Col xs={24} md={6}><div style={metricTileStyle}><div style={{ color: c.textSecondary, fontSize: t.font.sm }}>净利润</div><div style={{ fontSize: t.font.xl, fontWeight: Number(t.weight.semibold) }}>{formatAmount(detail?.fundamentals.net_profit)}</div></div></Col>
-          <Col xs={24} md={6}><div style={metricTileStyle}><div style={{ color: c.textSecondary, fontSize: t.font.sm }}>股东权益</div><div style={{ fontSize: t.font.xl, fontWeight: Number(t.weight.semibold) }}>{formatAmount(detail?.fundamentals.shareholders_equity)}</div></div></Col>
-          <Col xs={24} md={6}><div style={metricTileStyle}><div style={{ color: c.textSecondary, fontSize: t.font.sm }}>经营现金流</div><div style={{ fontSize: t.font.xl, fontWeight: Number(t.weight.semibold) }}>{formatAmount(detail?.fundamentals.operating_cashflow)}</div></div></Col>
+          <Col xs={24} md={6}><div style={metricTileStyle}><div className="valuation-metric-label">营收</div><div className="valuation-fundamental-value">{formatAmount(detail?.fundamentals.revenue)}</div></div></Col>
+          <Col xs={24} md={6}><div style={metricTileStyle}><div className="valuation-metric-label">净利润</div><div className="valuation-fundamental-value">{formatAmount(detail?.fundamentals.net_profit)}</div></div></Col>
+          <Col xs={24} md={6}><div style={metricTileStyle}><div className="valuation-metric-label">股东权益</div><div className="valuation-fundamental-value">{formatAmount(detail?.fundamentals.shareholders_equity)}</div></div></Col>
+          <Col xs={24} md={6}><div style={metricTileStyle}><div className="valuation-metric-label">经营现金流</div><div className="valuation-fundamental-value">{formatAmount(detail?.fundamentals.operating_cashflow)}</div></div></Col>
         </Row>
-        <Row gutter={[t.space[4], t.space[4]]} style={{ marginTop: t.space[4] }}>
-          <Col xs={24} md={6}><div style={metricTileStyle}><div style={{ color: c.textSecondary, fontSize: t.font.sm }}>资本开支</div><div style={{ fontSize: t.font.xl, fontWeight: Number(t.weight.semibold) }}>{formatAmount(detail?.fundamentals.capital_expenditure)}</div></div></Col>
-          <Col xs={24} md={6}><div style={metricTileStyle}><div style={{ color: c.textSecondary, fontSize: t.font.sm }}>营收同比</div><div style={{ fontSize: t.font.xl, fontWeight: Number(t.weight.semibold) }}>{formatPercent(detail?.fundamentals.revenue_yoy)}</div></div></Col>
-          <Col xs={24} md={6}><div style={metricTileStyle}><div style={{ color: c.textSecondary, fontSize: t.font.sm }}>净利润同比</div><div style={{ fontSize: t.font.xl, fontWeight: Number(t.weight.semibold) }}>{formatPercent(detail?.fundamentals.net_profit_yoy)}</div></div></Col>
-          <Col xs={24} md={6}><div style={metricTileStyle}><div style={{ color: c.textSecondary, fontSize: t.font.sm }}>扣非净利润同比</div><div style={{ fontSize: t.font.xl, fontWeight: Number(t.weight.semibold) }}>{formatPercent(detail?.fundamentals.non_net_profit_yoy)}</div></div></Col>
+        <Row gutter={[t.space[4], t.space[4]]} className="valuation-fundamental-row-spaced">
+          <Col xs={24} md={6}><div style={metricTileStyle}><div className="valuation-metric-label">资本开支</div><div className="valuation-fundamental-value">{formatAmount(detail?.fundamentals.capital_expenditure)}</div></div></Col>
+          <Col xs={24} md={6}><div style={metricTileStyle}><div className="valuation-metric-label">营收同比</div><div className="valuation-fundamental-value">{formatPercent(detail?.fundamentals.revenue_yoy)}</div></div></Col>
+          <Col xs={24} md={6}><div style={metricTileStyle}><div className="valuation-metric-label">净利润同比</div><div className="valuation-fundamental-value">{formatPercent(detail?.fundamentals.net_profit_yoy)}</div></div></Col>
+          <Col xs={24} md={6}><div style={metricTileStyle}><div className="valuation-metric-label">扣非净利润同比</div><div className="valuation-fundamental-value">{formatPercent(detail?.fundamentals.non_net_profit_yoy)}</div></div></Col>
         </Row>
         {detail?.notes?.length ? (
-          <div style={{ marginTop: t.space[4] }}>
+          <div className="valuation-notes-box">
             {detail.notes.map((note) => (
-              <Paragraph key={note} style={{ marginBottom: t.space[2], color: c.textSecondary }}>{note}</Paragraph>
+              <Paragraph key={note} className="valuation-note-item">{note}</Paragraph>
             ))}
           </div>
         ) : null}
@@ -516,14 +506,11 @@ export default function ValuationPanel({ code }: Props) {
 
       {detail?.institution_forecasts && detail.institution_forecasts.length > 0 && (
         <>
-          <div style={sectionHeaderStyle}>
-            <Text strong style={{ color: c.textPrimary, fontSize: t.font.md }}>机构一致预期</Text>
-            <Text type="secondary" style={{ fontSize: t.font.sm }}>EPS / 净利润预测</Text>
-          </div>
+          <SectionHeader title="机构一致预期" subtitle="EPS / 净利润预测" />
           <Card
             size="small"
             title="机构一致预期"
-            style={{ ...cardStyle, marginBottom: t.space[4] }}
+            className="valuation-panel-card"
             styles={{ body: { padding: isNarrow ? `${t.space[2]}` : `${t.space[2]} ${t.space[4]}` } }}
           >
             <Table<InstitutionForecast>
@@ -543,14 +530,11 @@ export default function ValuationPanel({ code }: Props) {
         </>
       )}
 
-      <div style={sectionHeaderStyle}>
-        <Text strong style={{ color: c.textPrimary, fontSize: t.font.md }}>同行对比</Text>
-        <Text type="secondary" style={{ fontSize: t.font.sm }}>同业倍数参考</Text>
-      </div>
+      <SectionHeader title="同行对比" subtitle="同业倍数参考" />
       <Card
         size="small"
         title="同行对比"
-        style={cardStyle}
+        className="u-card"
         styles={{ body: { padding: isNarrow ? `${t.space[2]}` : `${t.space[2]} ${t.space[4]}` } }}
       >
         <ResponsiveMetricGrid

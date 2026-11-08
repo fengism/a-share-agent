@@ -1,0 +1,289 @@
+/* Twitter 流：布局、移动端切换、作者标签筛选、分析视图与 Markdown
+   自 feed.css 第 561–847 行拆出。
+   由同目录 index.css 按固定顺序 @import，顺序不可调整：同特异性规则靠源序决胜负。 */
+.feed-state {
+  padding: 24px 12px;
+  border-top: 1px solid var(--c-text-primary);
+  border-bottom: 1px solid var(--c-text-primary);
+}
+
+.twitter-feed-layout {
+  position: relative;
+}
+
+.twitter-mobile-nav {
+  display: none;
+  order: -2;
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+@media (max-width: 900px) {
+  .twitter-mobile-nav {
+    display: block;
+  }
+
+  .twitter-feed-layout .feed-rail {
+    order: 0;
+  }
+
+  .twitter-feed-layout[data-mobile-tab="tweets"] .feed-rail {
+    display: none !important;
+  }
+
+  .twitter-feed-layout[data-mobile-tab="analysis"] .feed-main-column {
+    display: none !important;
+  }
+}
+
+.twitter-analysis-scroll {
+  overflow-y: auto;
+  max-height: calc(100vh - 200px);
+}
+
+@media (max-width: 900px) {
+  .twitter-analysis-scroll {
+    max-height: none;
+    overflow: visible;
+  }
+}
+
+.feed-twitter-author {
+  display: inline-flex;
+  align-items: center;
+  font-weight: 600;
+  color: var(--c-text-primary);
+  background: var(--c-surface-subtle, rgba(128, 128, 128, 0.08));
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: var(--c-font-xs);
+  letter-spacing: -0.01em;
+}
+
+.twitter-author-pills {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+  padding: 8px 10px;
+  background: var(--c-surface-subtle, rgba(128, 128, 128, 0.04));
+  border-radius: var(--c-radius-sm, 6px);
+}
+
+.twitter-pills-label {
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--c-font-xs);
+  color: var(--c-text-muted);
+  font-weight: 500;
+  margin-right: 2px;
+}
+
+.twitter-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border: 1px solid var(--c-border);
+  border-radius: 999px;
+  background: var(--c-card-bg, #fff);
+  color: var(--c-text-secondary);
+  font-size: var(--c-font-xs);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.twitter-pill:hover {
+  color: var(--c-primary);
+  border-color: var(--c-primary);
+}
+
+.twitter-pill.is-active {
+  background: var(--c-primary);
+  color: #fff;
+  border-color: var(--c-primary);
+  font-weight: 500;
+  box-shadow: 0 2px 4px rgba(24, 144, 255, 0.2);
+}
+
+.twitter-ref-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: var(--c-nested-bg, rgba(128, 128, 128, 0.06));
+  border: 1px solid var(--c-border);
+  color: var(--c-primary);
+  font-size: var(--c-font-xs);
+  text-decoration: none;
+  transition: all 0.15s ease;
+}
+
+.twitter-ref-pill:hover {
+  background: var(--c-primary-light, rgba(24, 144, 255, 0.1));
+  border-color: var(--c-primary);
+}
+
+.twitter-analysis-references-title {
+  display: block;
+  font-size: 11px;
+  color: var(--c-text-muted);
+  margin-bottom: 4px;
+}
+
+.twitter-analysis-controls {
+  display: grid;
+  gap: 6px;
+  padding: 10px 0;
+  color: var(--c-text-muted);
+  border-bottom: 1px solid var(--c-border);
+  font-size: var(--c-font-xs);
+  font-weight: var(--c-weight-semibold);
+}
+
+.twitter-analysis-controls .ant-select { width: 100%; }
+
+.twitter-analysis-controls .ant-btn { justify-self: start; }
+
+.twitter-analysis-meta {
+  display: grid;
+  gap: 3px;
+  padding: 10px 0 8px;
+  color: var(--c-text-muted);
+  border-bottom: 1px solid var(--c-border);
+  font-size: var(--c-font-xs);
+}
+
+.twitter-analysis-structured {
+  color: var(--c-text-secondary);
+  font-size: var(--c-font-md);
+  line-height: var(--c-leading-relaxed);
+}
+
+.twitter-analysis-overview {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--c-border);
+}
+
+.twitter-analysis-overview > div {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--c-text-muted);
+  font-size: var(--c-font-xs);
+}
+
+.twitter-analysis-overview p,
+.twitter-analysis-view p { margin: 8px 0 0; }
+
+.twitter-analysis-section { margin-top: 14px; }
+
+.twitter-analysis-section h3 {
+  margin: 0 0 7px;
+  padding-bottom: 6px;
+  color: var(--c-text-primary);
+  border-bottom: 1px solid var(--c-border);
+  font-family: var(--c-font-sans);
+  font-size: var(--c-font-base);
+}
+
+.twitter-analysis-view {
+  padding: 9px 0;
+  border-bottom: 1px solid var(--c-border);
+}
+
+.twitter-analysis-view-meta {
+  display: flex;
+  gap: 10px;
+  color: var(--c-text-muted);
+  font-size: var(--c-font-xs);
+}
+
+.twitter-analysis-references {
+  display: grid;
+  gap: 4px;
+  margin-top: 7px;
+}
+
+.twitter-analysis-references a {
+  color: var(--c-primary);
+  font-size: var(--c-font-xs);
+  overflow-wrap: anywhere;
+}
+
+.twitter-analysis-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.twitter-analysis-section ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.twitter-analysis-markdown {
+  color: var(--c-text-secondary);
+  font-size: var(--c-font-md);
+  line-height: var(--c-leading-relaxed);
+  overflow-wrap: anywhere;
+}
+
+.twitter-analysis-markdown h1,
+.twitter-analysis-markdown h2,
+.twitter-analysis-markdown h3 {
+  margin: 16px 0 7px;
+  color: var(--c-text-primary);
+  font-family: var(--c-font-sans);
+  line-height: var(--c-leading-tight);
+}
+
+.twitter-analysis-markdown h1 { font-size: var(--c-font-xl); }
+.twitter-analysis-markdown h2 { font-size: var(--c-font-base); }
+.twitter-analysis-markdown h3 { font-size: var(--c-font-base); }
+
+.twitter-analysis-markdown p,
+.twitter-analysis-markdown ul,
+.twitter-analysis-markdown ol,
+.twitter-analysis-markdown blockquote { margin: 7px 0 10px; }
+
+.twitter-analysis-markdown ul,
+.twitter-analysis-markdown ol { padding-left: 20px; }
+
+.twitter-analysis-markdown blockquote {
+  padding-left: 10px;
+  border-left: 3px solid var(--c-primary);
+}
+
+.twitter-analysis-markdown a { color: var(--c-primary); }
+
+.twitter-analysis-table-wrap {
+  width: 100%;
+  margin: 10px 0;
+  overflow-x: auto;
+}
+
+.twitter-analysis-table-wrap table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+}
+
+.twitter-analysis-markdown th,
+.twitter-analysis-markdown td {
+  padding: 5px 7px;
+  border: 1px solid var(--c-border);
+  text-align: left;
+  vertical-align: top;
+}
+
+@media (min-width: 901px) and (max-width: 1199px) {
+  .feed-layout {
+    grid-template-columns: minmax(0, 1fr) 300px;
+    gap: 18px;
+    padding-inline: var(--c-space-5);
+  }
+
+  .feed-rail { padding-left: 14px; }
+}

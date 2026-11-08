@@ -1,0 +1,133 @@
+/* 分时图 HUD / 图例 / 绘图区容器。
+   原先写在 TSX 的 style 对象里，这里逐条等价迁移；颜色统一走主题 CSS 变量。 */
+
+.intraday-chart__hud-shell {
+  min-height: 32px;
+  flex-wrap: wrap;
+  row-gap: 4px;
+  column-gap: 8px;
+  flex-shrink: 0;
+  padding: 4px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--c-text-secondary);
+  background-color: var(--c-nested-bg);
+  border-bottom: 1px solid var(--c-border);
+  font-family: var(--c-font-mono);
+  user-select: none;
+}
+
+.intraday-chart__hud-stats {
+  display: flex;
+  align-items: center;
+  gap: 4px 8px;
+  flex-wrap: wrap;
+  flex: 1 1 auto;
+  min-width: 0;
+  line-height: 1.4;
+}
+
+.intraday-chart__legend-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  flex: 0 0 auto;
+}
+
+.intraday-chart__legend-item {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.intraday-chart__legend-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--c-primary);
+}
+
+.intraday-chart__legend-dash {
+  width: 6px;
+  height: 2px;
+  background: var(--c-accent);
+}
+
+.intraday-chart__legend-prev {
+  width: 6px;
+  height: 1px;
+  border-top: 1px dashed var(--c-text-muted);
+}
+
+.intraday-chart__legend-vol {
+  width: 6px;
+  height: 6px;
+  border-radius: 1px;
+  background: var(--c-up);
+  opacity: 0.8;
+}
+
+.intraday-chart__nowrap {
+  white-space: nowrap;
+}
+
+.intraday-chart__plot {
+  position: relative;
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+}
+
+.intraday-chart__canvas {
+  width: 100%;
+  height: 100%;
+  background-color: var(--c-card-bg);
+}
+
+.intraday-chart__volume-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  overflow: hidden;
+  flex-wrap: nowrap;
+}
+
+.intraday-chart__volume-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--c-text-secondary);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.intraday-chart__volume-stat {
+  font-size: 11px;
+  color: var(--c-text-muted);
+  white-space: nowrap;
+}
+
+.intraday-chart__separator-unit {
+  font-size: 10px;
+  color: var(--c-text-muted);
+  opacity: 0.75;
+}
+
+.intraday-chart__drag-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.intraday-chart__drag-handle {
+  width: 22px;
+  height: 3px;
+  border-radius: 2px;
+  background-color: var(--c-border);
+  opacity: 0.8;
+}

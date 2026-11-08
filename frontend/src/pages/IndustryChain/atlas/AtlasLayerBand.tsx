@@ -27,10 +27,6 @@ export function AtlasLayerBand({
       <div
         className="atlas-layer__heading"
         style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          padding: isMobile ? "8px 12px" : "10px 16px",
           borderBottom: `1px solid ${colors.border}`,
           background: `linear-gradient(90deg, ${accent}14, transparent)`,
         }}
@@ -97,18 +93,6 @@ export function AtlasLayerBand({
                   className="atlas-company-chip"
                   title={company.note || company.name}
                   onClick={() => onCompanyClick(company.code)}
-                  style={{
-                    border: `1px solid ${colors.border}`,
-                    background: colors.cardBg,
-                    borderRadius: 8,
-                    padding: "4px 9px",
-                    fontSize: "var(--c-font-sm)",
-                    color: colors.textPrimary,
-                    cursor: "pointer",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 6,
-                  }}
                 >
                   <span className="atlas-company-chip__name">{company.name}</span>
                   <span

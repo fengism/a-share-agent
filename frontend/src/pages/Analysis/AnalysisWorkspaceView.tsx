@@ -32,7 +32,7 @@ import AnalysisStateSection from "./AnalysisStateSection";
 import { buildAnalysisMarkdown } from "./analysisMarkdown";
 import type { AnalysisReportPageState } from "./useAnalysisReportPage";
 import { marketDateStamp } from "../../utils/marketTime";
-import "./analysis-workspace.css";
+import "./workspace/index.css";
 
 type MessageApi = ReturnType<typeof message.useMessage>[0];
 
@@ -216,7 +216,6 @@ export default function AnalysisWorkspaceView({
                   <Button size="small" type="primary" onClick={showLatest}>返回最新分析</Button>
                 </div>
               )}
-              style={{ marginBottom: 16 }}
             />
           )}
           <AnalysisDataStatus pageData={pageData} result={displayResult} />

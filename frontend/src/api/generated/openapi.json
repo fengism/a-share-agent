@@ -21464,6 +21464,13 @@
             ],
             "title": "Median Change Pct"
           },
+          "top_picks": {
+            "items": {
+              "$ref": "#/components/schemas/PotentialStockItem"
+            },
+            "title": "Top Picks",
+            "type": "array"
+          },
           "universe_size": {
             "default": 0,
             "title": "Universe Size",
@@ -21671,6 +21678,27 @@
             ],
             "title": "Message"
           },
+          "negative_count": {
+            "default": 0,
+            "title": "Negative Count",
+            "type": "integer"
+          },
+          "positive_count": {
+            "default": 0,
+            "title": "Positive Count",
+            "type": "integer"
+          },
+          "profit_loss_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profit Loss Ratio"
+          },
           "win_rate": {
             "anyOf": [
               {
@@ -21765,6 +21793,16 @@
               }
             ],
             "title": "Amount"
+          },
+          "category": {
+            "default": "pioneer",
+            "title": "Category",
+            "type": "string"
+          },
+          "category_label": {
+            "default": "趋势先锋",
+            "title": "Category Label",
+            "type": "string"
           },
           "change_pct": {
             "anyOf": [

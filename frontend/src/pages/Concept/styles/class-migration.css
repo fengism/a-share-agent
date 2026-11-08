@@ -1,0 +1,53 @@
+/* 概念页：自 index.tsx 内联样式迁出的类 */
+
+[data-theme] .concept-page__heading.ant-typography {
+  margin: 0;
+  color: var(--c-text-primary);
+}
+
+.concept-icon-warning {
+  color: var(--c-warning);
+}
+
+.concept-icon-warning--sm {
+  color: var(--c-warning);
+  font-size: 11px;
+}
+
+.concept-icon-muted {
+  color: var(--c-text-muted);
+}
+
+.concept-suggest-row {
+  margin: 12px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.concept-muted-13 {
+  font-size: 13px;
+  color: var(--c-text-muted);
+}
+
+.concept-card-full-height {
+  height: 100%;
+}
+
+.concept-autocomplete-option {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.concept-autocomplete-option-metrics {
+  display: inline-flex;
+  gap: 10px;
+  align-items: baseline;
+}
+
+[data-theme] .concept-tag--flat.ant-tag {
+  margin-inline-end: 0;
+}

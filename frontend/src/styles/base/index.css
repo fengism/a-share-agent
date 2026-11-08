@@ -1,0 +1,19 @@
+/* 全局样式入口。
+   原 2637 行 base.css 按关注点拆为下列文件；@import 顺序与原文件行序一致，
+   不可重排：同特异性规则靠源序决胜负。改动请先读各分片头部注释。 */
+
+@import "./reset.css";
+@import "./a11y.css";
+@import "./app-header.css";
+@import "./app-sidebar.css";
+@import "./app-shell-sidebar-and-user.css";
+@import "./app-shell-chrome.css";
+@import "./dashboard.css";
+@import "./dashboard-widgets.css";
+@import "./analysis-lists.css";
+@import "./interaction-utilities.css";
+@import "./responsive-helpers.css";
+@import "./utilities.css";
+@import "./utilities-ext.css";
+@import "./mobile-overrides.css";
+@import "./atlas-and-charts.css";

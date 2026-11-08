@@ -1,7 +1,7 @@
 /** Backtest status, summaries, and history. */
-.quant-run-status {
+.quant-run-status.ant-alert {
   margin: 0;
-  border-radius: var(--c-radius-md) !important;
+  border-radius: var(--c-radius-md);
 }
 
 .quant-run-summary-card .ant-card-head,

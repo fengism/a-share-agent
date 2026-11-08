@@ -1,5 +1,6 @@
 import { useCallback } from "react";
-import { MenuOutlined } from "@ant-design/icons";
+import { MenuOutlined, RobotOutlined } from "@ant-design/icons";
+import { Tooltip } from "antd";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../store/authStore";
 import { useColors, useTokens } from "../styles/ui";
@@ -55,6 +56,17 @@ export default function AppHeader({ isMobile, themeKey, onMobileNavOpen }: AppHe
       <div className="app-command-header__search">
         <DeferredAppHeaderSearch isMobile={isMobile} />
       </div>
+
+      <Tooltip title="AI 投研助手 (/chat)">
+        <button
+          type="button"
+          aria-label="AI 投研助手"
+          className="app-header-ai-button"
+          onClick={() => navigate("/chat")}
+        >
+          <RobotOutlined />
+        </button>
+      </Tooltip>
 
       <GlobalTaskIndicator compact={isMobile} />
       {!isMobile && <KeyboardShortcutsModal />}

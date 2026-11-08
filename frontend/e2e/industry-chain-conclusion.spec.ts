@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./base";
 
 const user = {
   id: 7,
@@ -277,8 +277,7 @@ for (const width of [1440, 390]) {
 }
 
 for (const width of [1440, 390]) {
-  test(`hides internal evidence references throughout the report at ${width}px`, async ({ page }) => {
-    await mockIndustryChainPage(page);
+  test(`hides internal evidence references throughout the report at ${width}px`, async ({ page }) => {    await mockIndustryChainPage(page);
     await page.route(/\/api\/industry-chain\/.*\/archive\//, route => route.fulfill({ json: {
       ...result,
       summary: "核心结论（证据 ev_report）",
@@ -300,3 +299,52 @@ for (const width of [1440, 390]) {
     await page.screenshot({path:`/tmp/industry-no-ev-${width}.png`});
   });
 }
+
+test("knowledge atlas renders chains and keeps migrated styles", async ({ page }) => {
+  await mockIndustryChainPage(page);
+  await page.route(/\/api\/industry-chain\/atlas\/chains$/, route => route.fulfill({ json: {
+    categories: ["AI算力", "半导体"],
+    total_chains: 2,
+    total_companies: 4,
+    chains: [
+      {
+        slug: "ai-compute", name: "AI算力", category: "AI算力",
+        summary: "覆盖计算芯片、服务器、集群网络与算力运营。",
+        source: "builtin", aliases: ["AI基础设施"], tags: ["算力"],
+        segment_count: 3, company_count: 3,
+      },
+      {
+        slug: "semiconductor", name: "半导体设备", category: "半导体",
+        summary: "晶圆制造设备与关键零部件国产化。",
+        source: "user", aliases: [], tags: ["设备"],
+        segment_count: 2, company_count: 1,
+      },
+    ],
+  } }));
+  await page.route(/\/api\/industry-chain\/atlas\/graph/, route => route.fulfill({ json: {
+    nodes: [],
+    edges: [],
+    summary: { total_nodes: 0, total_edges: 0, total_chains: 2, categories: ["AI算力", "半导体"] },
+    chain_index: {},
+  } }));
+
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto("/industry-chain");
+  await page.getByRole("tab", { name: "知识库图谱" }).click();
+
+  await expect(page.getByText("2 条产业链 · 4 家核心公司")).toBeVisible();
+  const cards = page.locator(".atlas-chain-card");
+  await expect(cards).toHaveCount(2);
+  await expect(cards.first()).toContainText("AI算力");
+  await expect(cards.first()).toContainText("覆盖计算芯片、服务器、集群网络与算力运营。");
+
+  const summary = cards.first().locator(".atlas-chain-card__summary");
+  await expect(summary).toHaveCSS("font-size", "13px");
+  await expect(summary).toHaveCSS("color", "rgb(156, 163, 175)");
+  await expect(cards.first().locator(".atlas-chain-card__stats")).toHaveCSS("font-size", "12px");
+
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(cards).toHaveCount(2);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+});

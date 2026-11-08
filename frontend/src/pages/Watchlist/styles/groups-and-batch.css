@@ -1,0 +1,101 @@
+/* groups-and-batch —— 自 watchlist.css 第 450–549 行拆出。
+   由同目录 index.css 按固定顺序 @import，顺序不可调整：同特异性规则靠源序决胜负。 */
+.watchlist-page__groups {
+  display: grid;
+}
+
+.watchlist-page__group + .watchlist-page__group {
+  border-top: 1px solid var(--c-border);
+}
+
+.watchlist-page__group-header {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: var(--c-space-2);
+  padding: 12px var(--c-space-4);
+  border: 0;
+  color: var(--c-text-primary);
+  background: var(--c-nested-bg);
+  font-family: var(--c-font-sans);
+  font-size: var(--c-font-base);
+  font-weight: var(--c-weight-semibold);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color .16s ease;
+}
+
+.watchlist-page__group-header:hover {
+  background: var(--c-hover-bg);
+}
+
+.watchlist-page__group-header:focus-visible {
+  position: relative;
+  z-index: 1;
+  outline-offset: -2px;
+}
+
+.watchlist-page__group-caret {
+  display: inline-flex;
+  flex: none;
+  color: var(--c-text-muted);
+  font-size: var(--c-font-xs);
+}
+
+.watchlist-page__group-name {
+  overflow: hidden;
+  color: var(--c-text-primary);
+  font-size: var(--c-font-base);
+  font-weight: var(--c-weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.watchlist-page__group-breadth {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+  margin-left: var(--c-space-2);
+  font-size: var(--c-font-xs);
+  font-weight: var(--c-weight-medium);
+  font-variant-numeric: tabular-nums;
+}
+
+.watchlist-page__group-breadth .is-up {
+  color: var(--c-up);
+}
+
+.watchlist-page__group-breadth .is-down {
+  color: var(--c-down);
+}
+
+.watchlist-page__group-breadth .is-flat {
+  color: var(--c-text-muted);
+}
+
+.watchlist-page__group-count {
+  flex: none;
+  margin-left: auto;
+  padding: 2px 8px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius-pill);
+  color: var(--c-primary);
+  background: var(--c-primary-soft);
+  font-size: var(--c-font-xs);
+  font-weight: var(--c-weight-medium);
+  white-space: nowrap;
+}
+
+.watchlist-page__batch-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 6px 12px;
+  margin-bottom: 8px;
+  background-color: var(--c-nested-bg);
+  border-radius: var(--c-radius-sm, 6px);
+  border: 1px solid var(--c-border);
+}

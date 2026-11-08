@@ -1,0 +1,87 @@
+/* Industry Rank Tab Styles */
+
+.industry-rank__stock-cell {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.industry-rank__stock-link {
+  display: inline-flex;
+}
+
+.industry-rank__stock-name {
+  font-weight: var(--c-weight-medium);
+}
+
+.industry-rank__stock-code {
+  color: var(--c-text-secondary);
+  font-size: var(--c-font-xs);
+  font-family: var(--c-font-mono);
+}
+
+.industry-rank__num--up {
+  color: var(--c-up);
+}
+
+.industry-rank__num--down {
+  color: var(--c-down);
+}
+
+[data-theme] .industry-rank__tag--up {
+  color: var(--c-up);
+}
+
+.industry-rank__detail-meta {
+  margin-bottom: var(--c-space-3);
+  color: var(--c-text-secondary);
+}
+
+.industry-rank__industry-cell {
+  display: flex;
+  align-items: center;
+  gap: var(--c-space-2);
+}
+
+.industry-rank__industry-name {
+  min-width: 0;
+  color: var(--c-text-primary);
+  font-weight: var(--c-weight-semibold);
+}
+
+.industry-rank__card {
+  padding: 0;
+  border-radius: var(--c-radius-md);
+  box-shadow: var(--c-shadow-xs);
+}
+
+.industry-rank__card-header {
+  padding: var(--c-space-3) var(--c-space-4);
+  border-bottom: 1px solid var(--c-border);
+}
+
+.industry-rank__header-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--c-space-2);
+  flex-wrap: wrap;
+}
+
+.industry-rank__header-icon {
+  color: var(--c-primary);
+}
+
+.industry-rank__header-title {
+  color: var(--c-text-primary);
+  font-weight: var(--c-weight-medium);
+}
+
+.industry-rank__header-subtitle {
+  color: var(--c-text-secondary);
+  font-size: var(--c-font-sm);
+}
+
+[data-theme] .industry-rank__table-transparent {
+  background: transparent;
+}

@@ -66,7 +66,7 @@
 
 .pdf-exporting .ant-card {
   box-shadow: none !important;
-  border-color: var(--c-border) !important;
+  border-color: var(--c-border);
   background: var(--c-card-bg) !important;
 }
 

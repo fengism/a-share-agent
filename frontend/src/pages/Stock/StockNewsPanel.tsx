@@ -3,7 +3,7 @@ import { SearchOutlined } from "@ant-design/icons";
 import { Button, Card, Input, Space, Tag, Typography } from "antd";
 import { useCategorizedStockNews } from "../../api/queries";
 import SectionDataState from "../../components/SectionDataState";
-import { useColors, useStyles } from "../../styles/ui";
+import { useColors } from "../../styles/ui";
 import type { StockNews } from "../../types/stock";
 
 const { Text } = Typography;
@@ -89,7 +89,6 @@ function NewsList({ items, keyword, onClear }: { items: StockNews[]; keyword: st
 
 export default function StockNewsPanel({ code }: { code: string }) {
   const query = useCategorizedStockNews(code);
-  const { cardStyle } = useStyles();
   const [keyword, setKeyword] = useState("");
   const [activeTag, setActiveTag] = useState("全部");
 
@@ -174,10 +173,10 @@ export default function StockNewsPanel({ code }: { code: string }) {
         />
       </div>
       <div className="stock-news-grid">
-        <Card title={clsTitle} style={cardStyle} size="small" extra={<Text type="secondary">快讯</Text>}>
+        <Card title={clsTitle} className="u-card" size="small" extra={<Text type="secondary">快讯</Text>}>
           <NewsList items={filteredCls} keyword={keyword} onClear={() => handleTagClick("全部")} />
         </Card>
-        <Card title={eastmoneyTitle} style={cardStyle} size="small" extra={<Text type="secondary">资讯</Text>}>
+        <Card title={eastmoneyTitle} className="u-card" size="small" extra={<Text type="secondary">资讯</Text>}>
           <NewsList items={filteredEastmoney} keyword={keyword} onClear={() => handleTagClick("全部")} />
         </Card>
       </div>

@@ -1,0 +1,97 @@
+/* 大宗商品页：自 CommoditiesTab 内联样式迁出 */
+
+.commodity-name {
+  font-weight: 600;
+}
+
+.commodity-symbol {
+  font-size: 12px;
+  color: var(--c-text-secondary);
+}
+
+[data-theme] .commodity-contract-tag.ant-tag {
+  font-size: 11px;
+}
+
+.commodity-price {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.commodity-unit {
+  font-size: 11px;
+  color: var(--c-text-secondary);
+  margin-left: 4px;
+}
+
+.commodity-range {
+  font-size: 12px;
+  color: var(--c-text-secondary);
+}
+
+[data-theme] .commodity-chain-tag.ant-tag {
+  font-size: 12px;
+  border-radius: 3px;
+}
+
+.commodity-desc {
+  font-size: 12px;
+  color: var(--c-text-secondary);
+}
+
+.commodity-barometer-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.commodity-kpi-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.commodity-kpi-label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+[data-theme] .commodity-role-tag.ant-tag {
+  font-size: 11px;
+  margin: 0;
+}
+
+.commodity-kpi-values {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-top: 6px;
+}
+
+.commodity-kpi-unit {
+  font-size: 11px;
+  color: var(--c-text-muted);
+}
+
+.commodity-kpi-empty {
+  color: var(--c-text-muted);
+  font-size: 12px;
+}
+
+.commodity-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.commodity-search {
+  width: 100%;
+  max-width: 300px;
+}
+
+[data-theme] .commodity-search-icon {
+  color: var(--c-text-secondary);
+}

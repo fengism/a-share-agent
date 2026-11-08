@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import "./section-toolbar.css";
+import styles from "./SectionToolbar.module.css";
 
 interface SectionToolbarProps {
   /** 左侧信息区：更新时间、数据日期、状态标签等 */
@@ -16,9 +16,9 @@ interface SectionToolbarProps {
  */
 export default function SectionToolbar({ meta, actions, ariaLabel }: SectionToolbarProps) {
   return (
-    <div className="section-toolbar" role="group" aria-label={ariaLabel}>
-      {meta ? <div className="section-toolbar__meta">{meta}</div> : null}
-      {actions ? <div className="section-toolbar__actions">{actions}</div> : null}
+    <div className={styles.root} role="group" aria-label={ariaLabel}>
+      {meta ? <div className={styles.meta}>{meta}</div> : null}
+      {actions ? <div className={styles.actions}>{actions}</div> : null}
     </div>
   );
 }

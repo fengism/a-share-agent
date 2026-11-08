@@ -1,0 +1,227 @@
+/* 支撑区间卡与里程碑时间轴
+   自 national-team.css 第 1449–1673 行拆出。
+   由同目录 index.css 按固定顺序 @import，顺序不可调整：同特异性规则靠源序决胜负。 */
+/* ── Support zones card ─────────────────────────────────────────────── */
+.national-team-support-zones__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.national-team-support-zones__title-text {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.national-team-support-zones__title-sub {
+  font-size: 11px;
+}
+
+.national-team-support-zones__zone {
+  padding: var(--c-pad-inset, 7px 12px);
+  border-radius: 8px;
+  border: 1px solid var(--c-border);
+  background: var(--c-bg-subtle, rgba(128, 128, 128, 0.04));
+}
+
+.national-team-support-zones__zone-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.national-team-support-zones__zone-name {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.national-team-support-zones__price-tag {
+  margin: 0;
+  font-size: 11px;
+}
+
+.national-team-support-zones__cost-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+
+.national-team-support-zones__cost-label {
+  font-size: 11px;
+  color: var(--c-text-secondary);
+}
+
+.national-team-support-zones__cost-value {
+  font-size: 14px;
+  font-family: var(--c-font-mono);
+  color: var(--c-text-primary);
+}
+
+.national-team-support-zones__buffer {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.national-team-support-zones__buffer.is-up {
+  color: var(--c-up);
+}
+
+.national-team-support-zones__buffer.is-down {
+  color: var(--c-down);
+}
+
+.national-team-support-zones__bars {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.national-team-support-zones__bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+}
+
+.national-team-support-zones__range {
+  width: 68px;
+  flex-shrink: 0;
+  font-family: var(--c-font-mono);
+  color: var(--c-text-secondary);
+}
+
+.national-team-support-zones__track {
+  flex: 1;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--c-border);
+}
+
+.national-team-support-zones__fill {
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #1677ff88, #1677ff);
+}
+
+.national-team-support-zones__share {
+  width: 44px;
+  flex-shrink: 0;
+  text-align: right;
+  font-family: var(--c-font-mono);
+  color: var(--c-text-secondary);
+}
+
+.national-team-support-zones__flow {
+  width: 55px;
+  flex-shrink: 0;
+  text-align: right;
+  font-family: var(--c-font-mono);
+  color: var(--c-text-primary);
+}
+
+/* ── Milestone timeline ─────────────────────────────────────────────── */
+.national-team-milestone__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.national-team-milestone__head--expanded {
+  margin-bottom: 8px;
+}
+
+.national-team-milestone__head-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.national-team-milestone__icon {
+  font-size: 14px;
+  color: var(--c-primary);
+}
+
+.national-team-milestone__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--c-text-primary);
+}
+
+.national-team-milestone__subtitle {
+  font-size: 11px;
+}
+
+.national-team-milestone__toggle {
+  height: auto;
+  padding: 0 4px;
+  font-size: 12px;
+}
+
+.national-team-milestone__caret {
+  margin-left: 2px;
+  font-size: 10px;
+}
+
+.national-team-milestone-list {
+  margin-top: 8px;
+}
+
+.national-team-milestone__item {
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--c-border);
+  background: var(--c-bg-subtle, rgba(128, 128, 128, 0.04));
+}
+
+.national-team-milestone__item-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.national-team-milestone__date {
+  font-family: var(--c-font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--c-text-secondary);
+}
+
+.national-team-milestone__type-tag {
+  margin: 0;
+  padding: 0 4px;
+  font-size: 10px;
+  line-height: 16px;
+}
+
+.national-team-milestone__item-title {
+  margin-bottom: 2px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--c-text-primary);
+}
+
+.national-team-milestone__desc {
+  display: block;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.national-team-milestone__points {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.national-team-milestone__point-tag {
+  margin: 0;
+  padding: 0 4px;
+  font-size: 10px;
+  line-height: 16px;
+}

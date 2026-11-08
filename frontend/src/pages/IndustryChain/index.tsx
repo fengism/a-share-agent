@@ -53,7 +53,7 @@ const FALLBACK_HOT_INDUSTRIES = [
 
 export default function IndustryChain() {
   const colors = useColors();
-  const { pageContainerStyle, cardStyle } = useStyles();
+  const { pageContainerStyle } = useStyles();
   const isMobile = useMediaQuery("(max-width: 768px)");
   const { name: urlName } = useParams();
   const navigate = useNavigate();
@@ -297,7 +297,7 @@ export default function IndustryChain() {
               label: "AI 分析",
               children: (
                 <>
-                  <div style={{ ...cardStyle, padding: isMobile ? "12px 14px" : "16px 20px", marginBottom: isMobile ? 12 : 20 }}>
+                  <div className="u-card" style={{ padding: isMobile ? "12px 14px" : "16px 20px", marginBottom: isMobile ? 12 : 20 }}>
                     <IndustrySearchPanel
                       value={inputValue}
                       activeName={activeName}
@@ -334,7 +334,7 @@ export default function IndustryChain() {
                     />
                   )}
                   {!displayedResult && !isActiveRouteRun && !isCurrentRouteStopped && !error && !isLatestLoading && (
-                    <div style={{ ...cardStyle, padding: isMobile ? "32px 16px" : 60, textAlign: "center" }}>
+                    <div className="u-card" style={{ padding: isMobile ? "32px 16px" : 60, textAlign: "center" }}>
                       <ApartmentOutlined style={{ fontSize: isMobile ? 36 : 48, color: colors.textMuted, marginBottom: 16 }} />
                       <div style={{ color: colors.textMuted, fontSize: "var(--c-font-base)" }}>输入产业关键词，开始 AI 产业链分析</div>
                     </div>

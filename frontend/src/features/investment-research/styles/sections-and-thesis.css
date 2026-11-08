@@ -1,0 +1,52 @@
+/* sections-and-thesis —— 自 research-framework.css 第 198–248 行拆出。
+   由同目录 index.css 按固定顺序 @import，顺序不可调整：同特异性规则靠源序决胜负。 */
+.research-section {
+  display: grid;
+  gap: 14px;
+  padding: 18px 20px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius-md);
+  background: var(--c-card-bg);
+}
+
+.research-section__header {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--c-border);
+}
+.research-section__header > span {
+  display: grid;
+  width: 28px;
+  height: 22px;
+  place-items: center;
+  border: 1px solid var(--c-primary);
+  border-radius: var(--c-radius-sm);
+  color: var(--c-primary);
+  background: var(--c-hover-bg);
+  font-size: 11px;
+  font-weight: var(--c-weight-bold);
+}
+
+.research-hero-thesis {
+  display: grid;
+  gap: 6px;
+  padding: 12px 16px;
+  border: 1px solid var(--c-border);
+  border-left: 3px solid var(--c-primary);
+  border-radius: var(--c-radius-sm);
+  background: var(--c-hover-bg);
+}
+.research-hero-thesis span {
+  color: var(--c-text-muted);
+  font-size: var(--stock-research-label-size, 11px);
+  font-weight: var(--c-weight-medium);
+  line-height: var(--c-leading-normal);
+}
+.research-hero-thesis strong {
+  font-size: var(--c-font-base, 14px);
+  font-weight: var(--c-weight-semibold);
+  line-height: var(--c-leading-relaxed, 1.6);
+}

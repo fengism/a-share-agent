@@ -1,0 +1,134 @@
+/* 全球宏观利率与汇率资产定价大盘 (Global Rates Tab) */
+.global-rates-val--us {
+  color: #1677ff;
+  font-weight: 600;
+}
+
+.global-rates-val--cn {
+  color: #fa541c;
+  font-weight: 600;
+}
+
+.global-rates-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.global-rates-suffix {
+  font-size: 13px;
+  margin-left: 4px;
+}
+
+.global-rates-card-hint {
+  font-size: 12px;
+  color: var(--c-text-secondary);
+  margin-top: 4px;
+}
+
+.global-rates-icon--us {
+  color: #1677ff;
+  margin-right: 6px;
+}
+
+.global-rates-icon--oil {
+  color: #fa541c;
+  margin-right: 6px;
+}
+
+.global-rates-icon--purple {
+  color: #722ed1;
+  margin-right: 6px;
+}
+
+.global-rates-header-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.global-rates-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+
+.global-rates-card-title {
+  font-size: var(--c-font-base);
+  font-weight: 600;
+}
+
+.global-rates-wti-row {
+  font-size: 12px;
+  color: var(--c-text-secondary);
+  margin-top: 4px;
+  display: flex;
+  justify-content: space-between;
+}
+
+.global-rates-wti-val {
+  font-weight: 500;
+}
+
+.global-rates-search-icon {
+  color: var(--c-text-muted);
+}
+
+.global-rates-chart-empty--380 {
+  height: 380px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--c-text-muted);
+}
+
+.global-rates-chart-empty--260 {
+  height: 260px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--c-text-muted);
+}
+
+.global-rates-policy-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.global-rates-policy-item {
+  padding: var(--c-pad-inset, 7px 12px);
+  background: var(--c-nested-bg);
+  border-radius: 6px;
+  border-left: 3px solid var(--c-primary);
+}
+
+.global-rates-policy-item--lpr1 {
+  border-left-color: var(--c-primary);
+}
+
+.global-rates-policy-item--lpr5 {
+  border-left-color: var(--c-accent, #13c2c2);
+}
+
+.global-rates-policy-item--fed {
+  border-left-color: #722ed1;
+}
+
+.global-rates-policy-label {
+  font-size: 12px;
+  color: var(--c-text-secondary);
+}
+
+.global-rates-policy-value {
+  font-size: 16px;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.global-rates-search-input.ant-input-affix-wrapper {
+  width: 220px;
+}

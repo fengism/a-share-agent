@@ -353,7 +353,7 @@ export default function StockProfileTab() {
       render: (code: string) => {
         const raw = code.split(".")[0];
         return (
-          <Link to={`/stock/${raw}`} style={{ fontWeight: 600, fontFamily: "var(--c-font-mono)" }}>
+          <Link to={`/stock/${raw}`} className="stock-profile-code-link">
             {code}
           </Link>
         );
@@ -367,7 +367,7 @@ export default function StockProfileTab() {
       render: (name: string, record) => {
         const raw = record.stock_code.split(".")[0];
         return (
-          <Link to={`/stock/${raw}`} style={{ color: "inherit", fontWeight: 500 }}>
+          <Link to={`/stock/${raw}`} className="stock-profile-name-link">
             {name || "—"}
           </Link>
         );
@@ -391,7 +391,7 @@ export default function StockProfileTab() {
       width: 110,
       sorter: true,
       render: (date?: string | null) => (
-        <span style={{ fontSize: 13, color: date ? "inherit" : "var(--c-text-muted)" }}>
+        <span className={`stock-profile-meta${date ? "" : " stock-profile-text-muted"}`}>
           {date || "—"}
         </span>
       ),
@@ -413,7 +413,7 @@ export default function StockProfileTab() {
       ellipsis: true,
       render: (business: string, record) => {
         if (!business) {
-          return <Tag color="default" style={{ color: "var(--c-text-muted)" }}>待补充</Tag>;
+          return <Tag color="default" className="stock-profile-tag--muted">待补充</Tag>;
         }
         return (
           <Tooltip title={business} placement="topLeft">
@@ -436,7 +436,7 @@ export default function StockProfileTab() {
       render: (_, r) => {
         const parts = [r.province || r.city, r.legal_repr].filter(Boolean);
         return parts.length > 0 ? (
-          <Text style={{ fontSize: 12 }}>{parts.join(" · ")}</Text>
+          <Text className="stock-profile-text-sm">{parts.join(" · ")}</Text>
         ) : (
           <Text type="secondary">—</Text>
         );
@@ -514,7 +514,7 @@ export default function StockProfileTab() {
                 suffix="只"
                 loading={isSummaryLoading}
               />
-              <div style={{ marginTop: 6, fontSize: 12, color: "var(--c-text-muted)" }}>
+              <div className="stock-profile-hint">
                 A股 {summary?.market_group_counts?.A || 0} · 港股 {summary?.market_group_counts?.HK || 0}
               </div>
             </Card>
@@ -528,7 +528,7 @@ export default function StockProfileTab() {
                 suffix={`/ ${totalStocks}`}
                 loading={isSummaryLoading}
               />
-              <Progress percent={businessPercent} size="small" strokeColor="#52c41a" style={{ marginTop: 6 }} />
+              <Progress percent={businessPercent} size="small" strokeColor="#1890ff" className="stock-profile-progress" />
             </Card>
           </Col>
           <Col xs={12} sm={12} md={6}>
@@ -540,15 +540,15 @@ export default function StockProfileTab() {
                 suffix={`/ ${totalStocks}`}
                 loading={isSummaryLoading}
               />
-              <Progress percent={listingPercent} size="small" strokeColor="#1890ff" style={{ marginTop: 6 }} />
+              <Progress percent={listingPercent} size="small" strokeColor="#1890ff" className="stock-profile-progress" />
             </Card>
           </Col>
           <Col xs={12} sm={12} md={6}>
             <Card size="small">
-              <div style={{ fontSize: 13, color: "var(--c-text-muted)", marginBottom: 6 }}>主要板块分布</div>
+              <div className="stock-profile-section-label">主要板块分布</div>
               <Space wrap size={[4, 4]}>
                 {Object.entries(summary?.board_counts || {}).slice(0, 5).map(([board, cnt]) => (
-                  <Tag key={board} color={boardTagColor(board)} style={{ margin: 0 }}>
+                  <Tag key={board} color={boardTagColor(board)} className="stock-profile-tag--flush">
                     {board}: {cnt}
                   </Tag>
                 ))}
@@ -570,7 +570,7 @@ export default function StockProfileTab() {
             onChange={(e) => setSearchInput(e.target.value)}
             onPressEnter={handleSearch}
             allowClear
-            style={{ width: 220 }}
+            className="stock-profile-width-220"
           />
           <Button onClick={handleSearch}>搜索</Button>
 
@@ -578,14 +578,14 @@ export default function StockProfileTab() {
             value={filters.market_group}
             onChange={(val) => setFilters((prev) => ({ ...prev, market_group: val, page: 1 }))}
             options={MARKET_OPTIONS}
-            style={{ width: 110 }}
+            className="stock-profile-width-110"
           />
 
           <Select
             value={filters.board}
             onChange={(val) => setFilters((prev) => ({ ...prev, board: val, page: 1 }))}
             options={BOARD_OPTIONS}
-            style={{ width: 130 }}
+            className="stock-profile-width-130"
           />
 
           <Select
@@ -598,7 +598,7 @@ export default function StockProfileTab() {
               }))
             }
             options={BUSINESS_OPTIONS}
-            style={{ width: 130 }}
+            className="stock-profile-width-130"
           />
         </div>
 
@@ -677,7 +677,7 @@ export default function StockProfileTab() {
           activeRecord ? (
             <Space>
               <span>{activeRecord.stock_name}</span>
-              <span style={{ fontFamily: "var(--c-font-mono)", color: "var(--c-text-muted)" }}>
+              <span className="stock-profile-mono-muted">
                 ({activeRecord.stock_code})
               </span>
               <Tag color={boardTagColor(activeRecord.board)}>{activeRecord.board || "主板"}</Tag>
@@ -728,15 +728,15 @@ export default function StockProfileTab() {
               </div>
               <Descriptions size="small" column={1} className="stock-profile-detail-desc" bordered>
                 <Descriptions.Item label="主营业务">
-                  <Paragraph style={{ margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
+                  <Paragraph className="stock-profile-para stock-profile-para--wrap">
                     {activeRecord.main_business || "待补充"}
                   </Paragraph>
                 </Descriptions.Item>
                 <Descriptions.Item label="主要产品">
-                  <Paragraph style={{ margin: 0, wordBreak: "break-all" }}>{activeRecord.products || "—"}</Paragraph>
+                  <Paragraph className="stock-profile-para">{activeRecord.products || "—"}</Paragraph>
                 </Descriptions.Item>
                 <Descriptions.Item label="经营范围">
-                  <Paragraph style={{ margin: 0, whiteSpace: "pre-wrap", fontSize: 12, wordBreak: "break-all" }}>
+                  <Paragraph className="stock-profile-para stock-profile-para--wrap stock-profile-para--xs">
                     {activeRecord.business_scope || "—"}
                   </Paragraph>
                 </Descriptions.Item>
@@ -766,7 +766,7 @@ export default function StockProfileTab() {
                       href={activeRecord.website.startsWith("http") ? activeRecord.website : `https://${activeRecord.website}`}
                       target="_blank"
                       rel="noreferrer"
-                      style={{ wordBreak: "break-all" }}
+                      className="stock-profile-break-all"
                     >
                       {activeRecord.website}
                     </a>
@@ -781,8 +781,8 @@ export default function StockProfileTab() {
             {activeRecord.company_intro && (
               <div className="stock-profile-drawer__section">
                 <div className="stock-profile-drawer__title">公司简介</div>
-                <Card size="small" style={{ background: "var(--c-nested-bg)" }}>
-                  <Paragraph style={{ margin: 0, fontSize: 13, lineHeight: 1.6, wordBreak: "break-all" }}>
+                <Card size="small" className="stock-profile-subcard">
+                  <Paragraph className="stock-profile-para stock-profile-para--sm">
                     {activeRecord.company_intro}
                   </Paragraph>
                 </Card>
@@ -791,9 +791,9 @@ export default function StockProfileTab() {
 
             {/* Section 5: 元数据 */}
             <div className="stock-profile-drawer__section">
-              <div style={{ fontSize: 12, color: "var(--c-text-muted)", marginTop: 12 }}>
+              <div className="stock-profile-hint stock-profile-hint--top">
                 数据来源: {activeRecord.source} · 更新时间: {activeRecord.updated_at}
-                {activeRecord.is_manual_override && <Tag color="warning" style={{ marginLeft: 8 }}>手工修改</Tag>}
+                {activeRecord.is_manual_override && <Tag color="warning" className="stock-profile-tag--offset">手工修改</Tag>}
               </div>
             </div>
           </div>
@@ -934,7 +934,7 @@ export default function StockProfileTab() {
           </Button>,
         ]}
       >
-        <Space vertical style={{ width: "100%" }} size="middle">
+        <Space vertical className="stock-profile-full" size="middle">
           <Upload {...importUploadProps}>
             <Button icon={<ImportOutlined />}>选择 CSV / Excel 文件</Button>
           </Upload>

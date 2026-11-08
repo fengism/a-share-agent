@@ -152,22 +152,16 @@ export default function NationalTeamConcentrationCard({
       className="national-team-concentration-card"
       size="small"
       data-testid="national-team-concentration-card"
-      style={{
-        borderRadius: 8,
-        border: "1px solid var(--c-border)",
-        background: "var(--c-bg-card)",
-        marginBottom: 12,
-      }}
       title={
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+        <div className="national-team-concentration__head">
           <Space size={8} align="center">
-            <FundProjectionScreenOutlined style={{ color: colors.primary }} />
-            <span style={{ fontWeight: 600, fontSize: 14 }}>资金集中度与主力持续建仓动向</span>
-            <Tag color={concentration.tagColor} style={{ fontSize: 10, lineHeight: "16px", padding: "0 4px" }}>
+            <FundProjectionScreenOutlined className="national-team-concentration__title-icon" />
+            <span className="national-team-concentration__title">资金集中度与主力持续建仓动向</span>
+            <Tag color={concentration.tagColor} className="national-team-concentration__tag">
               {concentration.tag}
             </Tag>
           </Space>
-          <Text type="secondary" style={{ fontSize: 11 }}>
+          <Text type="secondary" className="national-team-concentration__subtitle">
             样本池 {etfs.length} 只 ETF · 截至 {asOfDate || "最新"}
           </Text>
         </div>
@@ -176,18 +170,18 @@ export default function NationalTeamConcentrationCard({
       <Row gutter={[16, 16]}>
         {/* 左侧：CR3 与 CR5 集中度 */}
         <Col xs={24} md={10}>
-          <div style={{ padding: "10px 12px", borderRadius: 8, background: "var(--c-bg-layout)", height: "100%" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+          <div className="national-team-concentration__panel">
+            <div className="national-team-concentration__panel-head">
               <Space size={6}>
-                <FireOutlined style={{ color: colors.up }} />
-                <Text strong style={{ fontSize: 13 }}>头部主力聚集度 (CR3 / CR5)</Text>
+                <FireOutlined className="national-team-concentration__icon-up" />
+                <Text strong className="national-team-concentration__panel-title">头部主力聚集度 (CR3 / CR5)</Text>
               </Space>
               <Tooltip title="统计全市场当日获正向估算净申购的 ETF 中，净买入前 3 大及前 5 大 ETF 所占的资金比重。比例越高表明主力资金越集中于少数超级龙头宽基。">
-                <InfoCircleOutlined style={{ color: colors.textSecondary, fontSize: 12, cursor: "pointer" }} />
+                <InfoCircleOutlined className="national-team-concentration__info-icon" />
               </Tooltip>
             </div>
 
-            <Row gutter={[10, 10]} style={{ marginBottom: 12 }}>
+            <Row gutter={[10, 10]} className="national-team-concentration__cr-row">
               <Col span={12}>
                 <Statistic
                   title="CR3 资金集中度"
@@ -199,9 +193,9 @@ export default function NationalTeamConcentrationCard({
                   size="small"
                   showInfo={false}
                   strokeColor={concentration.cr3 >= 70 ? colors.up : colors.primary}
-                  style={{ margin: "4px 0" }}
+                  className="national-team-concentration__progress"
                 />
-                <Text type="secondary" style={{ fontSize: 10 }}>前 3 只 ETF 净流入贡献比</Text>
+                <Text type="secondary" className="national-team-concentration__hint">前 3 只 ETF 净流入贡献比</Text>
               </Col>
               <Col span={12}>
                 <Statistic
@@ -214,37 +208,28 @@ export default function NationalTeamConcentrationCard({
                   size="small"
                   showInfo={false}
                   strokeColor={colors.primary}
-                  style={{ margin: "4px 0" }}
+                  className="national-team-concentration__progress"
                 />
-                <Text type="secondary" style={{ fontSize: 10 }}>前 5 只 ETF 净流入贡献比</Text>
+                <Text type="secondary" className="national-team-concentration__hint">前 5 只 ETF 净流入贡献比</Text>
               </Col>
             </Row>
 
             {concentration.top3Etfs.length > 0 && (
-              <div style={{ borderTop: "1px dashed var(--c-border)", paddingTop: 8 }}>
-                <Text type="secondary" style={{ fontSize: 11, marginBottom: 4, display: "block" }}>
+              <div className="national-team-concentration__top-list-wrap">
+                <Text type="secondary" className="national-team-concentration__top-label">
                   今日净申购领跑旗舰 ETF：
                 </Text>
-                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <div className="national-team-concentration__top-list">
                   {concentration.top3Etfs.map((item, idx) => (
-                    <div
-                      key={item.code}
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        fontSize: 11,
-                        padding: "2px 0",
-                      }}
-                    >
+                    <div key={item.code} className="national-team-concentration__top-row">
                       <Space size={6}>
-                        <Tag color={idx === 0 ? "red" : idx === 1 ? "gold" : "blue"} style={{ margin: 0, fontSize: 10, padding: "0 4px", lineHeight: "14px" }}>
+                        <Tag color={idx === 0 ? "orange" : idx === 1 ? "gold" : "blue"} className="national-team-concentration__rank-tag">
                           No.{idx + 1}
                         </Tag>
-                        <span style={{ fontWeight: 600 }}>{item.name}</span>
-                        <span style={{ fontFamily: "var(--c-font-mono)", color: colors.textSecondary }}>({item.code})</span>
+                        <span className="national-team-concentration__item-name">{item.name}</span>
+                        <span className="national-team-concentration__item-code">({item.code})</span>
                       </Space>
-                      <span style={{ fontFamily: "var(--c-font-mono)", fontWeight: 700, color: colors.up }}>
+                      <span className="national-team-concentration__flow is-up">
                         {formatSignedFlow(item.latest_estimated_net_flow_100m, "亿元")}
                       </span>
                     </div>
@@ -257,16 +242,16 @@ export default function NationalTeamConcentrationCard({
 
         {/* 右侧：连续流入/流出天数与近 20 日胜率 */}
         <Col xs={24} md={14}>
-          <div style={{ padding: "10px 12px", borderRadius: 8, background: "var(--c-bg-layout)", height: "100%" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+          <div className="national-team-concentration__panel">
+            <div className="national-team-concentration__panel-head">
               <Space size={6}>
-                <ThunderboltOutlined style={{ color: "#faad14" }} />
-                <Text strong style={{ fontSize: 13 }}>各宽基连续净申赎趋势与近 20 日流入率</Text>
+                <ThunderboltOutlined className="national-team-concentration__icon-warning" />
+                <Text strong className="national-team-concentration__panel-title">各宽基连续净申赎趋势与近 20 日流入率</Text>
               </Space>
-              <Text type="secondary" style={{ fontSize: 11 }}>识别主力持续建仓方向</Text>
+              <Text type="secondary" className="national-team-concentration__panel-title-sub">识别主力持续建仓方向</Text>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))", gap: 8 }}>
+            <div className="national-team-concentration__streak-grid">
               {indexStreaks.slice(0, 6).map((item) => {
                 const isInflow = item.streakType === "inflow";
                 const isOutflow = item.streakType === "outflow";
@@ -277,30 +262,22 @@ export default function NationalTeamConcentrationCard({
                   : "今日中性平稳";
 
                 return (
-                  <div
-                    key={item.name}
-                    style={{
-                      padding: "6px 8px",
-                      borderRadius: 6,
-                      background: "var(--c-bg-card)",
-                      border: "1px solid var(--c-border)",
-                    }}
-                  >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                      <span style={{ fontWeight: 600, fontSize: 12 }}>{item.name}</span>
+                  <div key={item.name} className="national-team-concentration__streak-item">
+                    <div className="national-team-concentration__streak-head">
+                      <span className="national-team-concentration__streak-name">{item.name}</span>
                       <Tag
                         color={isInflow ? (item.streak >= 3 ? "red" : "volcano") : isOutflow ? "green" : "default"}
-                        style={{ margin: 0, fontSize: 10, lineHeight: "14px", padding: "0 4px" }}
+                        className="national-team-concentration__streak-tag"
                       >
                         {isInflow ? `连增 ${item.streak} 天` : isOutflow ? `连减 ${item.streak} 天` : "中性"}
                       </Tag>
                     </div>
-                    <div style={{ fontSize: 11, color: isInflow ? colors.up : isOutflow ? colors.down : colors.textSecondary, marginBottom: 2 }}>
+                    <div className={`national-team-concentration__streak-text ${isInflow ? "is-up" : isOutflow ? "is-down" : "is-neutral"}`}>
                       {streakText}
                     </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 10, color: colors.textSecondary }}>
+                    <div className="national-team-concentration__streak-footer">
                       <span>近20日流入率</span>
-                      <span style={{ fontFamily: "var(--c-font-mono)", fontWeight: 600 }}>{item.winRate}%</span>
+                      <span className="national-team-concentration__streak-value">{item.winRate}%</span>
                     </div>
                   </div>
                 );

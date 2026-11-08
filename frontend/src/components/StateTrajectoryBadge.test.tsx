@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import StateTrajectoryBadge, { deriveTrajectory } from "./StateTrajectoryBadge";
+import StateTrajectoryBadge from "./StateTrajectoryBadge";
+import { deriveTrajectory } from "./stateTrajectory";
 
 describe("StateTrajectoryBadge", () => {
   it("derives trajectory from signalTypes accurately", () => {

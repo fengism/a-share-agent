@@ -1,0 +1,102 @@
+/* toolbar-and-filters —— 自 watchlist.css 第 125–225 行拆出。
+   由同目录 index.css 按固定顺序 @import，顺序不可调整：同特异性规则靠源序决胜负。 */
+.watchlist-page__toolbar-card {
+  margin-bottom: var(--c-space-4);
+}
+
+.watchlist-page__toolbar-card > .ant-card-body {
+  padding: var(--c-space-4);
+}
+
+.watchlist-page__toolbar {
+  display: grid;
+  grid-template-columns: minmax(230px, 1.15fr) minmax(230px, 1fr) minmax(190px, auto);
+  align-items: end;
+  gap: var(--c-space-3);
+}
+
+.watchlist-page__add,
+.watchlist-page__filter,
+.watchlist-page__view-control,
+.watchlist-page__market-filter,
+.watchlist-page__sort-control {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+}
+
+.watchlist-page__add .ant-select,
+.watchlist-page__filter .ant-input-affix-wrapper,
+.watchlist-page__sort-control .ant-select {
+  width: 100%;
+}
+
+.watchlist-page__view-control .ant-segmented {
+  width: 100%;
+}
+
+.watchlist-page__view-control .ant-segmented-group {
+  display: grid;
+  grid-template-columns: minmax(72px, 1fr) minmax(108px, 1.35fr);
+}
+
+.watchlist-page__filter-bar {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  align-items: end;
+  gap: var(--c-space-3);
+  padding-top: var(--c-space-3);
+  border-top: 1px solid var(--c-border);
+}
+
+.watchlist-page__market-filter {
+  overflow: hidden;
+}
+
+.watchlist-page__market-filter .ant-segmented {
+  max-width: 100%;
+}
+
+.watchlist-page__market-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.watchlist-page__market-count {
+  min-width: 18px;
+  padding-inline: 5px;
+  border-radius: var(--c-radius-pill);
+  color: var(--c-text-muted);
+  background: color-mix(in srgb, var(--c-text-muted) 10%, transparent);
+  font-size: var(--c-font-xs);
+  font-variant-numeric: tabular-nums;
+  line-height: 18px;
+  text-align: center;
+}
+
+.watchlist-page__market-filter .ant-segmented-item-selected .watchlist-page__market-count {
+  color: var(--c-primary);
+  background: var(--c-primary-soft);
+}
+
+.watchlist-page__sort-control .ant-space-compact {
+  width: 100%;
+}
+
+.watchlist-page__sort-control .ant-btn {
+  flex: none;
+}
+
+.watchlist-page__field-label {
+  color: var(--c-text-secondary);
+  font-size: var(--c-font-sm);
+  font-weight: var(--c-weight-semibold);
+}
+
+.watchlist-page__search-option {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--c-space-4);
+}

@@ -3,7 +3,7 @@ import { Alert, Card, Empty, Select, Space, Spin, Tag } from "antd";
 import { useKlineData } from "../../../api/queries";
 import LazyKlineChart from "../../../charts/LazyKlineChart";
 import { useMediaQuery } from "../../../hooks/useMediaQuery";
-import { semanticTagStyle, useStyles } from "../../../styles/ui";
+import { semanticTagStyle } from "../../../styles/ui";
 import type { QuantBacktestResult } from "../../../api/queries";
 import type { KlineItem } from "../../../types/stock";
 import { buildBacktestTradeMarkers, resolveBacktestDateRange, resolveBacktestTradeCodes } from "./backtestTradeMarkers";
@@ -16,7 +16,6 @@ interface BacktestTradeKlineProps {
 }
 
 export default function BacktestTradeKline({ codes, equityCurve, trades, marketSnapshots = [] }: BacktestTradeKlineProps) {
-  const { cardStyle } = useStyles();
   const isNarrow = useMediaQuery("(max-width: 768px)");
   const tradeCodes = useMemo(() => resolveBacktestTradeCodes(codes, trades), [codes, trades]);
   const [selectedCode, setSelectedCode] = useState(tradeCodes[0] || "");
@@ -77,9 +76,8 @@ export default function BacktestTradeKline({ codes, equityCurve, trades, marketS
   return (
     <Card
       title="个股 K 线与买卖点"
-      size="small"
-      style={{ ...cardStyle, marginBottom: 16 }}
-      className="quant-result-card quant-chart-card"
+      size="small" style={{ marginBottom: 16 }}
+      className="quant-result-card quant-chart-card u-card"
       extra={tradeCodes.length ? (
         <Space size={8} wrap>
           <Select

@@ -1,0 +1,269 @@
+/* 板块标题与支撑度雷达/因子条（原 §5）
+   自 national-team.css 第 404–638 行拆出。
+   由同目录 index.css 按固定顺序 @import，顺序不可调整：同特异性规则靠源序决胜负。 */
+/* ── 5. Section Headings ─────────────────────────────────────────────────── */
+.national-team-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 2px;
+}
+
+.national-team-section-heading__left {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.national-team-section-heading__title.ant-typography {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.national-team-section-heading__desc.ant-typography {
+  font-size: 12px;
+  color: var(--c-text-muted);
+}
+
+.national-team-section-heading__tag {
+  margin: 0;
+  font-size: 11px;
+  border-radius: 4px;
+}
+
+.national-team-section-heading__controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.national-team-stacked-flow-card,
+.national-team-support-radar-card,
+.national-team-milestone-card,
+.national-team-support-zones-card {
+  border-radius: 10px;
+  border: 1px solid var(--c-border);
+  background: var(--c-card-bg);
+  box-shadow: var(--c-shadow-xs, 0 1px 3px rgba(0, 0, 0, 0.04));
+}
+
+.national-team-factor-item {
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--c-bg-subtle, rgba(128, 128, 128, 0.04));
+  border: 1px solid var(--c-border);
+}
+
+.national-team-quick-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding: 6px 12px;
+  background: var(--c-bg-subtle, rgba(128, 128, 128, 0.04));
+  border-radius: 8px;
+  border: 1px solid var(--c-border);
+}
+
+.national-team-quick-nav__label {
+  font-size: 12px;
+  color: var(--c-text-secondary);
+  font-weight: 500;
+}
+
+.national-team-quick-nav .ant-btn {
+  font-size: 12px;
+}
+
+.national-team-quick-nav__toggle {
+  padding: 0;
+}
+
+.national-team-quick-nav__toggle-icon {
+  font-size: 10px;
+  margin-left: 2px;
+}
+
+.national-team-support-radar__head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.national-team-support-radar__score {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+  border-radius: 50%;
+}
+
+.national-team-support-radar__score.is-strong {
+  color: #1677ff;
+  background: rgba(22, 119, 255, 0.12);
+  border: 2px solid #1677ff;
+  box-shadow: 0 0 12px rgba(22, 119, 255, 0.12);
+}
+
+.national-team-support-radar__score.is-active {
+  color: #fa8c16;
+  background: rgba(250, 140, 22, 0.12);
+  border: 2px solid #fa8c16;
+  box-shadow: 0 0 12px rgba(250, 140, 22, 0.12);
+}
+
+.national-team-support-radar__score.is-moderate {
+  color: #13c2c2;
+  background: rgba(19, 194, 194, 0.12);
+  border: 2px solid #13c2c2;
+  box-shadow: 0 0 12px rgba(19, 194, 194, 0.12);
+}
+
+.national-team-support-radar__score.is-neutral {
+  color: var(--c-text-primary);
+  background: rgba(100, 116, 139, 0.12);
+  border: 2px solid #94a3b8;
+  box-shadow: 0 0 12px rgba(100, 116, 139, 0.12);
+}
+
+.national-team-support-radar__score-value {
+  font-size: 20px;
+  font-weight: 700;
+  font-family: var(--c-font-mono);
+  line-height: 1;
+}
+
+.national-team-support-radar__score-label {
+  margin-top: 2px;
+  font-size: 9px;
+  color: var(--c-text-secondary);
+}
+
+.national-team-support-radar__title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.national-team-support-radar__title-text {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--c-text-primary);
+}
+
+.national-team-support-radar__label-tag {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.national-team-support-radar__confidence-tag {
+  margin: 0;
+  padding: 0 4px;
+  font-size: 10px;
+  line-height: 16px;
+}
+
+.national-team-support-radar__desc {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.national-team-factor-item__head {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 3px;
+  font-size: 11px;
+}
+
+.national-team-factor-item__label {
+  color: var(--c-text-secondary);
+}
+
+.national-team-factor-item__value {
+  font-family: var(--c-font-mono);
+  font-weight: 600;
+}
+
+.national-team-factor-item__track {
+  height: 4px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--c-border);
+}
+
+.national-team-factor-item__fill {
+  height: 100%;
+  border-radius: 2px;
+}
+
+.national-team-factor-item__fill.is-primary {
+  background: var(--c-primary);
+}
+
+.national-team-factor-item__fill.is-info {
+  background: #13c2c2;
+}
+
+.national-team-factor-item__fill.is-warning {
+  background: #faad14;
+}
+
+.national-team-support-radar__sparkline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--c-border);
+  font-size: 11px;
+  color: var(--c-text-secondary);
+}
+
+.national-team-support-radar__sparkline-label,
+.national-team-support-radar__sparkline-delta,
+.national-team-support-radar__backtest-item,
+.national-team-support-radar__backtest-note {
+  white-space: nowrap;
+}
+
+.national-team-support-radar__sparkline-svg {
+  overflow: visible;
+  flex-shrink: 0;
+}
+
+.national-team-support-radar__sparkline-delta,
+.national-team-support-radar__backtest-item {
+  font-family: var(--c-font-mono);
+}
+
+.national-team-support-radar__backtest {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--c-text-secondary);
+}
+
+.national-team-support-radar__backtest-samples,
+.national-team-support-radar__backtest-note {
+  opacity: 0.7;
+}
+
+.national-team-support-radar__info-icon {
+  font-size: 12px;
+}

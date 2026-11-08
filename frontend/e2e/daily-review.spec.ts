@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./base";
 
 const user = { id: 7, username: "review-tester", is_admin: false, must_change_password: false };
 

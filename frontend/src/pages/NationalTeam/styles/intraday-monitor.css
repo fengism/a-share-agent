@@ -1,0 +1,122 @@
+/* 盘中量能观测与分时监控 (Intraday Monitor) */
+.national-team-intraday-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.national-team-intraday-header-card .ant-card-body {
+  padding: 10px 14px;
+}
+
+.national-team-intraday__header-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.national-team-intraday__compass-icon {
+  color: var(--c-primary);
+  font-size: 16px;
+}
+
+.national-team-intraday__title {
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--c-text-primary);
+}
+
+.national-team-intraday__tag.ant-tag {
+  margin: 0;
+  font-size: 11px;
+}
+
+.national-team-intraday__subtitle {
+  font-size: 12px;
+  color: var(--c-text-secondary);
+}
+
+.national-team-intraday__subtitle .anticon {
+  margin-right: 4px;
+}
+
+.national-team-intraday__card-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.national-team-intraday__card-title-text {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.national-team-intraday__card-extra {
+  font-size: 11px;
+  color: var(--c-text-secondary);
+}
+
+.national-team-intraday__chart-wrapper {
+  height: 280px;
+}
+
+.national-team-intraday__chart-wrapper--sm {
+  height: 250px;
+}
+
+.national-team-intraday__flex-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.national-team-intraday__flex-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.national-team-intraday__chart-flex {
+  height: 280px;
+  flex: 1;
+}
+
+.national-team-intraday__search-input.ant-input-affix-wrapper {
+  width: 130px;
+  font-size: 11px;
+}
+
+.national-team-intraday__search-icon {
+  color: var(--c-text-secondary);
+  font-size: 11px;
+}
+
+.national-team-intraday__export-btn.ant-btn {
+  font-size: 11px;
+  height: 24px;
+  padding: 0 6px;
+}
+
+.national-team-intraday__link-btn.ant-btn {
+  padding: 0;
+  height: auto;
+  font-weight: 600;
+}
+
+.national-team-intraday__stock-name {
+  font-weight: 500;
+}
+
+.national-team-intraday__action-btn.ant-btn {
+  padding: 0 4px;
+  font-size: 11px;
+}
+
+.national-team-intraday__sub-tag.ant-tag {
+  font-size: 10px;
+  margin: 0;
+}

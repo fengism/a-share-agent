@@ -20,6 +20,8 @@ export interface PotentialStockItem {
   sector_strength: number | null;
   risk_flags: string[];
   reason: string;
+  category: string;
+  category_label: string;
 }
 
 export interface PotentialDailyResult {
@@ -36,6 +38,7 @@ export interface PotentialDailyResult {
   limit_down_count: number;
   median_change_pct: number | null;
   hot_themes: string[];
+  top_picks: PotentialStockItem[];
   items: PotentialStockItem[];
 }
 
@@ -68,6 +71,9 @@ export interface PotentialPerformanceSummary {
   median_return_pct: number | null;
   average_excess_pct: number | null;
   benchmark_return_pct: number | null;
+  profit_loss_ratio: number | null;
+  positive_count: number;
+  negative_count: number;
   message: string | null;
   items: PotentialPerformanceItem[];
 }

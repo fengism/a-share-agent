@@ -23,6 +23,9 @@ import { downloadCsv } from "../utils/csv";
 import LazyChart from "./LazyChart";
 import { DEFAULT_INTRADAY_OBSERVATION } from "../data/defaultIntradayObservation";
 
+const CHART_STYLE_280: React.CSSProperties = { width: "100%", height: 280 };
+const CHART_STYLE_250: React.CSSProperties = { width: "100%", height: 250 };
+
 export interface NationalTeamIntradayMonitorProps {
   intraday?: NationalTeamIntradayObservation;
   asOfDate?: string | null;
@@ -75,7 +78,16 @@ export default function NationalTeamIntradayMonitor({
 
     const times = minute.times;
     const bars = minute.bars;
-    const closes = minute.closes;
+    const rawCloses = minute.closes;
+    const preClose = minute.pre_close;
+
+    // 自适应校验：若 closes 点位与 pre_close 存在严重量纲割裂（例如 closes 在 11 附近而 pre_close 在 3700 附近），
+    // 将 closes 按基准比率重缩放到昨收指数基准，避免 yAxis 跨度被拉大到几千导致分时折线贴底被压成一条横线看不见
+    let closes = rawCloses;
+    if (preClose > 100 && rawCloses && rawCloses.length > 0 && rawCloses[0] > 0 && rawCloses[0] < 50) {
+      const base = rawCloses[0];
+      closes = rawCloses.map((c) => Number((preClose * (c / base)).toFixed(2)));
+    }
 
     return {
       animationDuration: 300,
@@ -611,8 +623,7 @@ export default function NationalTeamIntradayMonitor({
         <Button
           type="link"
           size="small"
-          style={{ padding: 0, height: "auto", fontWeight: 600 }}
-          className="financial-num"
+          className="financial-num national-team-intraday__link-btn"
           onClick={() => onSelectStock?.({ code: record.code, name: record.name })}
           title={`点击查看 ${record.name} 行情分时`}
         >
@@ -627,7 +638,7 @@ export default function NationalTeamIntradayMonitor({
       ellipsis: true,
       render: (val: string, record: NationalTeamIntradayItem) => (
         <span
-          style={{ fontWeight: 500, cursor: onSelectStock ? "pointer" : "default" }}
+          className={`national-team-intraday__stock-name ${onSelectStock ? "u-cursor-pointer" : ""}`}
           onClick={() => onSelectStock?.({ code: record.code, name: record.name })}
         >
           {val}
@@ -649,9 +660,9 @@ export default function NationalTeamIntradayMonitor({
       align: "right",
       width: 85,
       render: (val: number) => {
-        const color = val > 0 ? colors.up : val < 0 ? colors.down : colors.textSecondary;
+        const textCls = val > 0 ? "u-text-up" : val < 0 ? "u-text-down" : "u-text-muted";
         return (
-          <span className="financial-num" style={{ color, fontWeight: 600 }}>
+          <span className={`financial-num u-text-semibold ${textCls}`}>
             {val > 0 ? "+" : ""}{val.toFixed(2)}%
           </span>
         );
@@ -664,7 +675,7 @@ export default function NationalTeamIntradayMonitor({
       align: "right",
       width: 105,
       render: (val: number) => (
-        <span className="financial-num" style={{ fontWeight: 600, color: colors.primary }}>
+        <span className="financial-num u-text-semibold u-text-primary">
           {val.toFixed(1)} 亿
         </span>
       ),
@@ -681,7 +692,7 @@ export default function NationalTeamIntradayMonitor({
                 type="link"
                 size="small"
                 icon={<ThunderboltOutlined />}
-                style={{ padding: "0 4px", fontSize: 11 }}
+                className="national-team-intraday__action-btn"
                 onClick={() => onSelectStock({ code: record.code, name: record.name })}
                 title={`查看 ${record.name} 分时K线`}
               >
@@ -694,24 +705,23 @@ export default function NationalTeamIntradayMonitor({
   ];
 
   return (
-    <div className="national-team-intraday-section" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+    <div className="national-team-intraday-section">
       {/* 顶部指示标 */}
       <Card
         size="small"
         className="national-team-intraday-header-card"
-        styles={{ body: { padding: "10px 14px" } }}
       >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+        <div className="national-team-intraday__header-bar">
           <Space size={8} align="center">
-            <CompassOutlined style={{ color: colors.primary, fontSize: 16 }} />
-            <span style={{ fontWeight: 700, fontSize: 15, color: colors.textPrimary }}>盘中分钟量能观测与放量信号对比</span>
-            <Tag color="blue" style={{ margin: 0, fontSize: 11, fontWeight: 600 }}>分钟级实盘对齐</Tag>
-            <Tag color="cyan" style={{ margin: 0, fontSize: 11 }}>20只重点ETF池</Tag>
+            <CompassOutlined className="national-team-intraday__compass-icon" />
+            <span className="national-team-intraday__title">盘中分钟量能观测与放量信号对比</span>
+            <Tag color="blue" className="national-team-intraday__tag u-text-semibold">分钟级实盘对齐</Tag>
+            <Tag color="cyan" className="national-team-intraday__tag">20只重点ETF池</Tag>
           </Space>
           <Space size={10} align="center">
-            <span style={{ fontSize: 12, color: colors.textSecondary }}>
-              <ClockCircleOutlined style={{ marginRight: 4 }} />
-              业务观测日：<strong style={{ color: colors.textPrimary }}>{date}</strong>
+            <span className="national-team-intraday__subtitle">
+              <ClockCircleOutlined />
+              业务观测日：<strong className="u-text-primary">{date}</strong>
             </span>
           </Space>
         </div>
@@ -723,20 +733,20 @@ export default function NationalTeamIntradayMonitor({
           <Card
             size="small"
             title={
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <StockOutlined style={{ color: colors.primary }} />
-                <span style={{ fontWeight: 600, fontSize: 13 }}>重点宽基 ETF 分钟成交脉冲与上证走势</span>
+              <div className="national-team-intraday__card-title">
+                <StockOutlined className="u-text-primary" />
+                <span className="national-team-intraday__card-title-text">重点宽基 ETF 分钟成交脉冲与上证走势</span>
               </div>
             }
-            extra={<span style={{ fontSize: 11, color: colors.textSecondary }}>双轴联动 · 1分钟聚合</span>}
+            extra={<span className="national-team-intraday__card-extra">双轴联动 · 1分钟聚合</span>}
           >
-            <div style={{ height: 280 }}>
+            <div className="national-team-intraday__chart-wrapper">
               <LazyChart height={280}>
                 <ReactECharts
                   echarts={echarts}
                   data-testid="national-team-intraday-minute-chart"
                   option={minuteOption}
-                  style={{ height: "100%", width: "100%" }}
+                  style={CHART_STYLE_280}
                   opts={{ renderer: "canvas" }}
                   notMerge
                 />
@@ -749,20 +759,20 @@ export default function NationalTeamIntradayMonitor({
           <Card
             size="small"
             title={
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <LineChartOutlined style={{ color: colors.warning }} />
-                <span style={{ fontWeight: 600, fontSize: 13 }}>全天分钟累计成交额进度对比</span>
+              <div className="national-team-intraday__card-title">
+                <LineChartOutlined className="u-text-warning" />
+                <span className="national-team-intraday__card-title-text">全天分钟累计成交额进度对比</span>
               </div>
             }
-            extra={<span style={{ fontSize: 11, color: colors.textSecondary }}>今日 vs 昨日 vs 20日均值</span>}
+            extra={<span className="national-team-intraday__card-extra">今日 vs 昨日 vs 20日均值</span>}
           >
-            <div style={{ height: 280 }}>
+            <div className="national-team-intraday__chart-wrapper">
               <LazyChart height={280}>
                 <ReactECharts
                   echarts={echarts}
                   data-testid="national-team-intraday-cum-chart"
                   option={cumOption}
-                  style={{ height: "100%", width: "100%" }}
+                  style={CHART_STYLE_280}
                   opts={{ renderer: "canvas" }}
                   notMerge
                 />
@@ -777,11 +787,11 @@ export default function NationalTeamIntradayMonitor({
         <Col xs={24} lg={13}>
           <Card
             size="small"
-            style={{ height: "100%", display: "flex", flexDirection: "column" }}
+            className="national-team-intraday__flex-card"
             styles={{ body: { padding: "10px 12px", flex: 1, display: "flex", flexDirection: "column" } }}
             title={
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-                <span style={{ fontWeight: 600, fontSize: 13 }}>放量护盘日典型分钟特征对照基准</span>
+              <div className="national-team-intraday__flex-header">
+                <span className="national-team-intraday__card-title-text">放量护盘日典型分钟特征对照基准</span>
                 <Space size={6} wrap>
                   <Segmented
                     size="small"
@@ -809,13 +819,13 @@ export default function NationalTeamIntradayMonitor({
               </div>
             }
           >
-            <div style={{ height: 280, flex: 1 }}>
+            <div className="national-team-intraday__chart-flex">
               <LazyChart height={280}>
                 <ReactECharts
                   echarts={echarts}
                   data-testid="national-team-intraday-typical-chart"
                   option={typicalOption}
-                  style={{ height: "100%", width: "100%" }}
+                  style={CHART_STYLE_280}
                   opts={{ renderer: "canvas" }}
                   notMerge
                 />
@@ -828,26 +838,26 @@ export default function NationalTeamIntradayMonitor({
           <Card
             data-testid="national-team-intraday-rank-card"
             size="small"
-            style={{ height: "100%", display: "flex", flexDirection: "column" }}
+            className="national-team-intraday__flex-card"
             title={
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 6 }}>
-                <span style={{ fontWeight: 600, fontSize: 13 }}>20 大重点 ETF 当日成交额排行</span>
+              <div className="national-team-intraday__flex-header">
+                <span className="national-team-intraday__card-title-text">20 大重点 ETF 当日成交额排行</span>
                 <Space size={6} wrap>
                   <Input
                     size="small"
                     placeholder="搜索代码/名称..."
-                    prefix={<SearchOutlined style={{ color: colors.textSecondary, fontSize: 11 }} />}
+                    prefix={<SearchOutlined className="national-team-intraday__search-icon" />}
                     value={rankSearchText}
                     onChange={(e) => setRankSearchText(e.target.value)}
                     allowClear
-                    style={{ width: 130, fontSize: 11 }}
+                    className="national-team-intraday__search-input"
                     data-testid="intraday-rank-search-input"
                   />
                   <Button
                     size="small"
                     icon={<DownloadOutlined />}
                     onClick={handleExportRankCsv}
-                    style={{ fontSize: 11, height: 24, padding: "0 6px" }}
+                    className="national-team-intraday__export-btn"
                   >
                     导出 CSV
                   </Button>
@@ -873,17 +883,17 @@ export default function NationalTeamIntradayMonitor({
         <Card
           size="small"
           title={
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+            <div className="national-team-intraday__flex-header">
               <Space size={6}>
-                <RiseOutlined style={{ color: colors.up }} />
-                <span style={{ fontWeight: 600, fontSize: 13 }}>
+                <RiseOutlined className="u-text-up" />
+                <span className="national-team-intraday__card-title-text">
                   历史百亿级放量护盘日 vs 近期成交直方对照
                 </span>
-                <Tag color="volcano" style={{ fontSize: 10, margin: 0 }}>
+                <Tag color="gold" className="national-team-intraday__sub-tag">
                   单日净申购 &gt; 100 亿元阈值标定
                 </Tag>
               </Space>
-              <span style={{ fontSize: 11, color: colors.textSecondary }}>
+              <span className="national-team-intraday__card-extra">
                 蓝柱 = 历史百亿放量日，黄柱 = 近期交易日 · 支持缩放拖拽
               </span>
             </div>
@@ -893,33 +903,33 @@ export default function NationalTeamIntradayMonitor({
             <div className="national-team-volume-signal-pills">
               <div className="national-team-pill-item">
                 <span className="national-team-pill-item__label">历史百亿护盘日</span>
-                <span className="national-team-pill-item__value" style={{ color: colors.primary }}>{volumeStats.supCount} 天</span>
+                <span className="national-team-pill-item__value u-text-primary">{volumeStats.supCount} 天</span>
               </div>
               <div className="national-team-pill-item">
                 <span className="national-team-pill-item__label">近期对比交易日</span>
-                <span className="national-team-pill-item__value" style={{ color: colors.warning }}>{volumeStats.recCount} 天</span>
+                <span className="national-team-pill-item__value u-text-warning">{volumeStats.recCount} 天</span>
               </div>
               <div className="national-team-pill-item">
                 <span className="national-team-pill-item__label">护盘日均成交额</span>
-                <span className="national-team-pill-item__value" style={{ color: colors.primary }}>{volumeStats.supAvgAmt} 亿元</span>
+                <span className="national-team-pill-item__value u-text-primary">{volumeStats.supAvgAmt} 亿元</span>
               </div>
               <div className="national-team-pill-item">
                 <span className="national-team-pill-item__label">近期日均成交额</span>
-                <span className="national-team-pill-item__value" style={{ color: colors.textSecondary }}>{volumeStats.recAvgAmt} 亿元</span>
+                <span className="national-team-pill-item__value u-text-muted">{volumeStats.recAvgAmt} 亿元</span>
               </div>
               <div className="national-team-pill-item national-team-pill-item--highlight">
                 <span className="national-team-pill-item__label">救市脉冲放大倍数</span>
-                <span className="national-team-pill-item__value" style={{ color: colors.up }}>{volumeStats.multiple}x 放量中枢</span>
+                <span className="national-team-pill-item__value u-text-up">{volumeStats.multiple}x 放量中枢</span>
               </div>
             </div>
           )}
-          <div style={{ height: 250 }}>
+          <div className="national-team-intraday__chart-wrapper--sm">
             <LazyChart height={250}>
               <ReactECharts
                 echarts={echarts}
                 data-testid="national-team-intraday-signal-chart"
                 option={volumeSignalOption}
-                style={{ height: "100%", width: "100%" }}
+                style={CHART_STYLE_250}
                 opts={{ renderer: "canvas" }}
                 notMerge
               />

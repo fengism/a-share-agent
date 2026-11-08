@@ -155,3 +155,106 @@
     font-size: 12px;
   }
 }
+
+/* 个股资料表格/抽屉：自 StockProfileTab 内联样式迁出 */
+
+.stock-profile-code-link {
+  font-weight: 600;
+  font-family: var(--c-font-mono);
+}
+
+.stock-profile-name-link {
+  color: inherit;
+  font-weight: 500;
+}
+
+.stock-profile-meta {
+  font-size: 13px;
+}
+
+.stock-profile-text-muted {
+  color: var(--c-text-muted);
+}
+
+[data-theme] .stock-profile-tag--muted.ant-tag {
+  color: var(--c-text-muted);
+}
+
+[data-theme] .stock-profile-text-sm.ant-typography {
+  font-size: 12px;
+}
+
+.stock-profile-hint {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--c-text-muted);
+}
+
+.stock-profile-hint--top {
+  margin-top: 12px;
+}
+
+.stock-profile-section-label {
+  font-size: 13px;
+  color: var(--c-text-muted);
+  margin-bottom: 6px;
+}
+
+[data-theme] .stock-profile-tag--flush.ant-tag {
+  margin: 0;
+}
+
+.stock-profile-width-220 {
+  width: 220px;
+}
+
+.stock-profile-width-130 {
+  width: 130px;
+}
+
+.stock-profile-width-110 {
+  width: 110px;
+}
+
+.stock-profile-mono-muted {
+  font-family: var(--c-font-mono);
+  color: var(--c-text-muted);
+}
+
+[data-theme] .stock-profile-para.ant-typography {
+  margin: 0;
+  word-break: break-all;
+}
+
+[data-theme] .stock-profile-para--wrap.ant-typography {
+  white-space: pre-wrap;
+}
+
+[data-theme] .stock-profile-para--xs.ant-typography {
+  font-size: 12px;
+}
+
+[data-theme] .stock-profile-para--sm.ant-typography {
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.stock-profile-break-all {
+  word-break: break-all;
+}
+
+[data-theme] .ant-card.stock-profile-subcard {
+  background: var(--c-nested-bg);
+}
+
+[data-theme] .stock-profile-tag--offset.ant-tag {
+  margin-left: 8px;
+}
+
+.stock-profile-full {
+  width: 100%;
+}
+
+.stock-profile-progress {
+  margin-top: 6px;
+}

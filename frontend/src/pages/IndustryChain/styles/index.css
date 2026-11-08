@@ -1,0 +1,14 @@
+/* industry-report.css 的入口。
+   原文件 1872 行按关注点拆分；@import 顺序与原文件行序一致，不可重排。 */
+
+@import "./header.css";
+@import "./structural-helpers.css";
+@import "./conclusion.css";
+@import "./sections.css";
+@import "./responsive.css";
+@import "./markdown.css";
+@import "./atlas.css";
+@import "./atlas-workspace.css";
+@import "./panels.css";
+@import "./decision-research.css";
+@import "./report-push-and-charts.css";

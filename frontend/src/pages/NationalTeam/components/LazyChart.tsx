@@ -34,7 +34,11 @@ export default function LazyChart({ height, placeholderClassName, children }: La
   return (
     <div
       ref={containerRef}
-      style={{ minHeight: placeholderClassName ? undefined : height, width: "100%" }}
+      style={{
+        height: placeholderClassName ? undefined : height,
+        minHeight: placeholderClassName ? undefined : height,
+        width: "100%",
+      }}
     >
       {shouldRender ? (
         children

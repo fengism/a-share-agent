@@ -69,7 +69,7 @@ export function DataSourcesSettingsSection({
   return (
     <section aria-labelledby="data-source-settings-title">
       <h3 id="data-source-settings-title" style={sectionTitleStyle}>数据源管理</h3>
-      <p style={{ color: "var(--c-text-muted)", marginTop: -4, marginBottom: 12 }}>
+      <p className="settings-hint settings-hint--tight">
         配置系统获取市场行情、财务指标、宏观经济与新闻资讯的数据输入源。问财为个人专属配置，其余为全局系统共享数据源。
       </p>
       <SettingsSectionDirectory items={directoryItems} ariaLabel="数据源管理目录" />
@@ -93,7 +93,7 @@ export function DataSourcesSettingsSection({
             <h4 className="settings-group__title">行情与舆情数据</h4>
             <p className="settings-group__hint">宏观经济、舆情抓取、搜索增强与备用行情源，全局共享。</p>
             <Row gutter={[16, 16]}>
-              <Col xs={24} lg={12} style={{ display: "flex" }}>
+              <Col xs={24} lg={12} className="settings-col-flex">
                 <FredConfigCard
                   stretch
                   {...cardProps}
@@ -102,7 +102,7 @@ export function DataSourcesSettingsSection({
                   onReset={() => cards.reset("fred")}
                 />
               </Col>
-              <Col xs={24} lg={12} style={{ display: "flex" }}>
+              <Col xs={24} lg={12} className="settings-col-flex">
                 <TwitterConfigCard
                   stretch
                   {...cardProps}
@@ -111,7 +111,7 @@ export function DataSourcesSettingsSection({
                   onReset={() => cards.reset("twitter")}
                 />
               </Col>
-              <Col xs={24} lg={12} style={{ display: "flex" }}>
+              <Col xs={24} lg={12} className="settings-col-flex">
                 <AnySearchConfigCard
                   stretch
                   {...cardProps}
@@ -121,7 +121,7 @@ export function DataSourcesSettingsSection({
                   onReset={() => cards.reset("anysearch")}
                 />
               </Col>
-              <Col xs={24} lg={12} style={{ display: "flex" }}>
+              <Col xs={24} lg={12} className="settings-col-flex">
                 <DataSourceCredentialsCard
                   stretch
                   {...cardProps}
@@ -131,7 +131,7 @@ export function DataSourcesSettingsSection({
                   onReset={() => cards.reset("fuyao")}
                 />
               </Col>
-              <Col xs={24} style={{ display: "flex" }}>
+              <Col xs={24} className="settings-col-flex">
                 <DataSourceCookiesCard
                   stretch
                   {...cardProps}
@@ -147,7 +147,7 @@ export function DataSourcesSettingsSection({
             <h4 className="settings-group__title">网络与限流</h4>
             <p className="settings-group__hint">出站代理与东财接口限流，避免触发数据源风控。</p>
             <Row gutter={[16, 16]}>
-              <Col xs={24} lg={12} style={{ display: "flex" }}>
+              <Col xs={24} lg={12} className="settings-col-flex">
                 <EastmoneyProxyConfigCard
                   stretch
                   {...cardProps}
@@ -162,7 +162,7 @@ export function DataSourcesSettingsSection({
                   tdxTestResult={tdxProxyTestResult}
                 />
               </Col>
-              <Col xs={24} style={{ display: "flex" }}>
+              <Col xs={24} className="settings-col-flex">
                 <EastmoneyRateLimitConfigCard
                   stretch
                   {...cardProps}
@@ -201,11 +201,11 @@ export function AdminSettingsSection({
   return (
     <section aria-labelledby="admin-settings-title">
       <h3 id="admin-settings-title" style={sectionTitleStyle}>管理员工具</h3>
-      <p style={{ color: "var(--c-text-muted)", marginTop: -4, marginBottom: 16 }}>
+      <p className="settings-hint settings-hint--top">
         面向系统管理员的高级功能：涵盖系统运维策略、自动化机器人调度与全局用户权限治理。
       </p>
 
-      <div style={{ marginBottom: 20 }}>
+      <div className="settings-block-gap">
         <Segmented
           className="settings-admin-tabs"
           value={activeTab}
@@ -220,13 +220,7 @@ export function AdminSettingsSection({
                   <DatabaseOutlined /> "系统运维与数据维护"
                   {opsDirty && (
                     <span
-                      style={{
-                        display: "inline-block",
-                        width: 6,
-                        height: 6,
-                        borderRadius: "50%",
-                        backgroundColor: "var(--c-warning, #faad14)",
-                      }}
+                      className="settings-warning-dot"
                       title="存在未保存的修改"
                     />
                   )}
@@ -240,13 +234,7 @@ export function AdminSettingsSection({
                   <RobotOutlined /> "自动化与推送机器人"
                   {cards.dirty.bot && (
                     <span
-                      style={{
-                        display: "inline-block",
-                        width: 6,
-                        height: 6,
-                        borderRadius: "50%",
-                        backgroundColor: "var(--c-warning, #faad14)",
-                      }}
+                      className="settings-warning-dot"
                       title="存在未保存的修改"
                     />
                   )}
@@ -267,8 +255,8 @@ export function AdminSettingsSection({
 
       {/* 模块一：系统运维与数据维护 */}
       {activeTab === "ops" && (
-        <div style={{ marginBottom: 24 }}>
-          <p style={{ color: "var(--c-text-muted)", marginTop: 0, marginBottom: 16 }}>
+        <div className="settings-block-gap-lg">
+          <p className="settings-hint settings-hint--block">
             常驻后台定时任务开关、数据库在线备份策略（基础库与大库独立周期/极速压缩）、10 年日线数据维护与 AI 思考耗时预算。
           </p>
           <ScheduledTasksConfigCard
@@ -309,8 +297,8 @@ export function AdminSettingsSection({
 
       {/* 模块二：自动化与推送机器人 */}
       {activeTab === "bot" && (
-        <div style={{ marginBottom: 24 }}>
-          <p style={{ color: "var(--c-text-muted)", marginTop: 0, marginBottom: 16 }}>
+        <div className="settings-block-gap-lg">
+          <p className="settings-hint settings-hint--block">
             飞书群聊交互机器人接入、盘后复盘自动推送规则与后台任务处理队列监控。
           </p>
           <BotConfigCard
@@ -327,8 +315,8 @@ export function AdminSettingsSection({
 
       {/* 模块三：用户权限与安全审计 */}
       {activeTab === "user" && (
-        <div style={{ marginBottom: 24 }}>
-          <p style={{ color: "var(--c-text-muted)", marginTop: 0, marginBottom: 16 }}>
+        <div className="settings-block-gap-lg">
+          <p className="settings-hint settings-hint--block">
             系统注册账号管理、邀请码发放、安全操作审计与敏感凭证一键重置。
           </p>
           <UserManagerCard />

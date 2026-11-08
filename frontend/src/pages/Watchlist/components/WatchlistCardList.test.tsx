@@ -108,7 +108,8 @@ describe("WatchlistCardList", () => {
     );
 
     const priceEl = screen.getByTestId("watchlist-card-price");
-    expect(priceEl.className).toBe("");
+    expect(priceEl).toHaveClass("watchlist-mobile-card__price");
+    expect(priceEl.className).not.toContain("tick-flash");
 
     const updatedItem = { ...mockItem, current_price: 1525.0 };
     act(() => {
@@ -126,6 +127,6 @@ describe("WatchlistCardList", () => {
       );
     });
 
-    expect(priceEl.className).toBe("tick-flash-up");
+    expect(priceEl).toHaveClass("tick-flash-up");
   });
 });

@@ -1,0 +1,120 @@
+/* 知识图谱卡片与公司芯片
+   自 industry-report.css 第 1499–1582 行拆出。
+   由同目录 index.css 按固定顺序 @import，顺序不可调整：同特异性规则靠源序决胜负。 */
+.industry-markdown pre code {
+  padding: 0;
+  background: transparent;
+}
+
+.atlas-chain-card {
+  min-width: 0;
+  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.atlas-chain-card:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--c-primary) 45%, var(--c-border)) !important;
+  box-shadow: 0 6px 20px color-mix(in srgb, var(--c-primary) 12%, transparent);
+}
+
+.atlas-company-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 4px 9px;
+  border: 1px solid var(--c-border);
+  border-radius: 8px;
+  background: var(--c-card-bg);
+  color: var(--c-text-primary);
+  font-size: var(--c-font-sm);
+  cursor: pointer;
+  white-space: normal;
+  transition: all 0.15s ease;
+}
+
+.atlas-chain-card__name {
+  color: var(--c-text-primary);
+  font-size: var(--c-font-lg);
+}
+
+.atlas-detail__heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.atlas-detail__name {
+  color: var(--c-text-primary);
+  font-size: var(--c-font-xl);
+}
+
+.atlas-layer__heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+}
+
+.atlas-chain-card__heading,
+.atlas-chain-card__name,
+.atlas-chain-card__summary,
+.atlas-chain-card__stats,
+.atlas-detail__heading,
+.atlas-detail__name,
+.atlas-detail__summary,
+.atlas-driver-chip,
+.atlas-layer__heading,
+.atlas-layer__name,
+.atlas-segment,
+.atlas-segment__heading,
+.atlas-segment__name,
+.atlas-company-chip__name {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.atlas-chain-card__heading,
+.atlas-chain-card__stats {
+  flex-wrap: wrap;
+}
+
+.atlas-chain-card__name,
+.atlas-chain-card__summary,
+.atlas-detail__name,
+.atlas-detail__summary,
+.atlas-driver-chip,
+.atlas-layer__name,
+.atlas-segment__name,
+.atlas-company-chip__name {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.atlas-chain-card__name,
+.atlas-detail__name,
+.atlas-layer__name,
+.atlas-segment__name,
+.atlas-company-chip__name {
+  flex: 1 1 auto;
+}
+
+.atlas-driver-chip {
+  height: auto;
+}
+
+.atlas-layer__count,
+.atlas-company-chip__code {
+  flex: none;
+  white-space: nowrap;
+}
+
+.atlas-company-chip:hover {
+  transform: translateY(-1px);
+  border-color: var(--c-primary);
+  color: var(--c-primary);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--c-primary) 15%, transparent);
+}

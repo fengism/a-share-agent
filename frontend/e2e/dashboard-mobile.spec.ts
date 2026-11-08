@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./base";
 
 const user = { id: 7, username: "researcher", is_admin: false, must_change_password: false };
 
@@ -55,6 +55,23 @@ for (const width of [360, 390, 414]) {
     await expect(page.getByRole("region", { name: "首页中间内容" })).toBeVisible();
     await expect(page.getByText("风口板块0", { exact: true })).toBeVisible();
     await expect(page.getByText("人形机器人", { exact: true })).toBeVisible();
+
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+    expect(await overflowingElements(page)).toEqual([]);
+  });
+}
+
+// 三栏 Command Center 在桌面宽度同样不得横向溢出（左栏为 sticky 独立滚动区，
+// 内容超宽时应当内部滚动而不是把整页撑出屏幕）。
+for (const width of [1280, 1512, 1920]) {
+  test(`keeps the three-column dashboard within ${width}px`, async ({ page }) => {
+    await mockDashboard(page);
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/");
+
+    await expect(page.getByRole("region", { name: "首页市场状态与国家队" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "首页中间内容" })).toBeVisible();
+    await expect(page.getByRole("complementary", { name: "首页热榜与自选栏" })).toBeVisible();
 
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
     expect(await overflowingElements(page)).toEqual([]);

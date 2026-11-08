@@ -1,0 +1,10 @@
+/* macro-page.css 的入口。
+   原文件 968 行按关注点拆分；@import 顺序与原文件行序一致，不可重排。 */
+
+@import "./page-header.css";
+@import "./indicator-cards.css";
+@import "./insight-banner.css";
+@import "./sge-gold.css";
+@import "./compass.css";
+@import "./global-rates.css";
+@import "./commodities.css";
