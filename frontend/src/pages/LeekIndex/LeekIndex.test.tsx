@@ -5,9 +5,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import LeekIndexPage from "./index";
 import * as sentimentHooks from "../../api/queryHooks/sentiment";
 import * as csvUtils from "../NationalTeam/utils/csv";
+import * as mediaQueryHooks from "../../hooks/useMediaQuery";
 
 vi.mock("echarts-for-react/lib/core", () => ({
-  default: ({ option, ...rest }: any) => (
+  default: ({ option }: any) => (
     <div data-testid="leek-quadrant-chart" data-title={option?.title?.text} />
   ),
 }));
@@ -72,6 +73,8 @@ describe("LeekIndexPage", () => {
       defaultOptions: { queries: { retry: false } },
     });
     vi.clearAllMocks();
+
+    vi.spyOn(mediaQueryHooks, "useMediaQuery").mockReturnValue(false);
 
     vi.spyOn(sentimentHooks, "useLeekIndexOverview").mockReturnValue({
       data: mockOverview,
@@ -175,5 +178,35 @@ describe("LeekIndexPage", () => {
 
     expect(screen.getByText("银行")).toBeInTheDocument();
     expect(screen.queryByText("电子")).not.toBeInTheDocument();
+  });
+
+  it("opens drawer automatically when industry URL param is provided", () => {
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/leek-index?industry=电子"]}>
+          <LeekIndexPage />
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+
+    expect(screen.getByText(/散户博弈与韭菜指数详情/)).toBeInTheDocument();
+  });
+
+  it("renders mobile card stream when on narrow viewport", () => {
+    vi.spyOn(mediaQueryHooks, "useMediaQuery").mockReturnValue(true);
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <LeekIndexPage />
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+
+    expect(screen.getByText("#1")).toBeInTheDocument();
+    expect(screen.getByText("#2")).toBeInTheDocument();
+    // 点击移动端卡片，抽屉弹出
+    fireEvent.click(screen.getByText("#1"));
+    expect(screen.getByText(/散户博弈与韭菜指数详情/)).toBeInTheDocument();
   });
 });

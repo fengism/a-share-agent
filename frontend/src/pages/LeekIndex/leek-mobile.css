@@ -1,0 +1,126 @@
+/* 移动端卡片流与因子胶囊样式 */
+.leek-factor-tooltip {
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.leek-factor-pills {
+  display: inline-flex;
+  gap: 3px;
+  cursor: pointer;
+}
+
+.leek-pill {
+  font-size: 11px;
+  font-family: var(--font-mono, monospace);
+  padding: 1px 4px;
+  border-radius: 3px;
+  line-height: 1.2;
+}
+
+.leek-pill--flow {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+}
+
+.leek-pill--guba {
+  background: rgba(245, 158, 11, 0.12);
+  color: #d97706;
+}
+
+.leek-pill--crowd {
+  background: rgba(59, 130, 246, 0.12);
+  color: #2563eb;
+}
+
+.leek-pill--trap {
+  background: rgba(139, 92, 246, 0.12);
+  color: #7c3aed;
+}
+
+/* 移动端卡片列表流 */
+.leek-mobile-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.leek-mobile-card {
+  background: var(--c-bg-card, #ffffff);
+  border: 1px solid var(--c-border, #e2e8f0);
+  border-radius: 8px;
+  padding: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.leek-mobile-card:active {
+  background: var(--c-bg-hover, #f1f5f9);
+}
+
+.leek-mobile-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.leek-mobile-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.leek-mobile-rank {
+  font-size: 12px;
+  color: var(--c-text-muted, #94a3b8);
+  font-family: var(--font-mono, monospace);
+}
+
+.leek-mobile-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--c-text-primary, #1e293b);
+}
+
+.leek-mobile-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.leek-mobile-score-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.leek-mobile-label {
+  font-size: 12px;
+  color: var(--c-text-secondary, #64748b);
+  white-space: nowrap;
+}
+
+.leek-mobile-flow-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--c-text-secondary, #64748b);
+  background: var(--c-bg-elevated, #f8fafc);
+  padding: 6px 10px;
+  border-radius: 4px;
+}
+
+.leek-mobile-stocks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.leek-mobile-stock-badge {
+  font-size: 11px;
+  padding: 2px 6px;
+  background: var(--c-bg-subtle, #f1f5f9);
+  border-radius: 4px;
+  color: var(--c-text-secondary, #475569);
+}
