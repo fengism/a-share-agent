@@ -49,6 +49,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         tdxhub_bestip_refresh=background_tasks.refresh_tdxhub_best_ip,
         macro_analysis_prewarm=background_tasks.refresh_macro_analysis_periodic,
         daily_review_prewarm=background_tasks.refresh_daily_review_periodic,
+        industry_leek_index_refresh=background_tasks.refresh_leek_index_periodic,
         stock_valuation_snapshot_refresh=background_tasks.refresh_stock_valuation_snapshots,
         bot_job_worker=job_workers.run_bot_job_worker,
         quant_strategy_reload=quant_strategy_reload,

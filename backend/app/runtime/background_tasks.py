@@ -521,3 +521,21 @@ async def refresh_daily_review_periodic() -> None:
         interval_seconds=DAILY_REVIEW_PREWARM_INTERVAL_SECONDS,
         leader_election=True,
     )
+
+
+async def refresh_leek_index_periodic() -> None:
+    """收盘后将行业韭菜指数主动归档一次（仅 leader 执行）。"""
+    from app.modules.sentiment.service import get_leek_index_service
+
+    async def iteration() -> None:
+        service = get_leek_index_service()
+        await service.get_overview(force_refresh=True)
+
+    await task_scheduler.run_periodic(
+        name="industry_leek_index_refresh",
+        coro_factory=iteration,
+        interval_seconds=600,
+        leader_election=True,
+        retry_base_seconds=60,
+    )
+

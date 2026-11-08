@@ -15,6 +15,7 @@ export interface AppRouteComponents {
   Dashboard: React.ComponentType;
   Watchlist: React.ComponentType;
   Market: React.ComponentType;
+  LeekIndex: React.ComponentType;
   NationalTeam: React.ComponentType;
   TradingCalendar: React.ComponentType;
   Screener: React.ComponentType;
@@ -47,7 +48,7 @@ export interface AppRouteComponents {
  */
 export function buildAppRoutes(components: AppRouteComponents): RouteObject[] {
   const {
-    AppLayout, EarthScope, Dashboard, Watchlist, Market, NationalTeam, TradingCalendar,
+    AppLayout, EarthScope, Dashboard, Watchlist, Market, LeekIndex, NationalTeam, TradingCalendar,
     Screener, Analysis, Concept, Stock, AnalysisEntry, DailyReview, Potential, Chat,
     Settings, Feed, IndustryChain, Macro, Portfolio, Quant, Capabilities, MasterData,
     Login, Register, ResetPassword, ForceChangePassword,
@@ -71,6 +72,7 @@ export function buildAppRoutes(components: AppRouteComponents): RouteObject[] {
             { path: "/", element: <ErrorBoundary><Dashboard /></ErrorBoundary> },
             { path: "/watchlist", element: <ErrorBoundary><Watchlist /></ErrorBoundary> },
             { path: "/market", element: <ErrorBoundary><Market /></ErrorBoundary> },
+            { path: "/leek-index", element: <ErrorBoundary><LeekIndex /></ErrorBoundary> },
             { path: "/national-team", element: <ErrorBoundary><NationalTeam /></ErrorBoundary> },
             { path: "/hk-market", element: <Navigate to="/market?market=hk" replace /> },
             { path: "/trading-calendar", element: <ErrorBoundary><TradingCalendar /></ErrorBoundary> },

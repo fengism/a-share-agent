@@ -5515,6 +5515,58 @@
         "title": "CreateInviteRequest",
         "type": "object"
       },
+      "CrowdedStockItem": {
+        "description": "散户跟风最集中的核心股票",
+        "properties": {
+          "change_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Pct"
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "rank": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rank"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "required": [
+          "code",
+          "name"
+        ],
+        "title": "CrowdedStockItem",
+        "type": "object"
+      },
       "CrudeOilData": {
         "properties": {
           "brent": {
@@ -11978,6 +12030,80 @@
         "title": "IndustryHierarchyResponse",
         "type": "object"
       },
+      "IndustryLeekItem": {
+        "description": "单个行业的韭菜指数详细特征",
+        "properties": {
+          "change_pct": {
+            "default": 0.0,
+            "description": "行业当日涨跌幅 %",
+            "title": "Change Pct",
+            "type": "number"
+          },
+          "crowded_stocks": {
+            "description": "该行业人气最高/跟风最集中的代表股票",
+            "items": {
+              "$ref": "#/components/schemas/CrowdedStockItem"
+            },
+            "title": "Crowded Stocks",
+            "type": "array"
+          },
+          "industry_name": {
+            "description": "申万一级行业名称",
+            "title": "Industry Name",
+            "type": "string"
+          },
+          "leek_score": {
+            "description": "综合韭菜指数 (0-100，越高越狂热/接盘)",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Leek Score",
+            "type": "number"
+          },
+          "main_net": {
+            "default": 0.0,
+            "description": "主力净买入额 (元)",
+            "title": "Main Net",
+            "type": "number"
+          },
+          "retail_net": {
+            "default": 0.0,
+            "description": "散户/小单净买入额 (元)",
+            "title": "Retail Net",
+            "type": "number"
+          },
+          "risk_level": {
+            "description": "风险等级：safe(出清)/normal(均衡)/fever(过热)/extreme(见顶接盘)",
+            "enum": [
+              "safe",
+              "normal",
+              "fever",
+              "extreme"
+            ],
+            "title": "Risk Level",
+            "type": "string"
+          },
+          "sub_scores": {
+            "$ref": "#/components/schemas/LeekSubScores",
+            "description": "分维度得分"
+          },
+          "warning_signals": {
+            "description": "预警信号特征列表",
+            "items": {
+              "type": "string"
+            },
+            "title": "Warning Signals",
+            "type": "array"
+          }
+        },
+        "required": [
+          "industry_name",
+          "leek_score",
+          "risk_level",
+          "sub_scores"
+        ],
+        "title": "IndustryLeekItem",
+        "type": "object"
+      },
       "IndustryListResponse": {
         "properties": {
           "items": {
@@ -13169,6 +13295,140 @@
           "amount"
         ],
         "title": "KlineItem",
+        "type": "object"
+      },
+      "LeekHistoryPoint": {
+        "description": "单日历史数据点",
+        "properties": {
+          "date": {
+            "title": "Date",
+            "type": "string"
+          },
+          "industry_change_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Industry Change Pct"
+          },
+          "risk_level": {
+            "enum": [
+              "safe",
+              "normal",
+              "fever",
+              "extreme"
+            ],
+            "title": "Risk Level",
+            "type": "string"
+          },
+          "score": {
+            "title": "Score",
+            "type": "number"
+          },
+          "sub_scores": {
+            "$ref": "#/components/schemas/LeekSubScores"
+          }
+        },
+        "required": [
+          "date",
+          "score",
+          "risk_level",
+          "sub_scores"
+        ],
+        "title": "LeekHistoryPoint",
+        "type": "object"
+      },
+      "LeekIndexHistoryResponse": {
+        "description": "单个行业的历史时序响应",
+        "properties": {
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/LeekHistoryPoint"
+            },
+            "title": "History",
+            "type": "array"
+          },
+          "industry_name": {
+            "title": "Industry Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "industry_name",
+          "history"
+        ],
+        "title": "LeekIndexHistoryResponse",
+        "type": "object"
+      },
+      "LeekIndexOverviewResponse": {
+        "description": "全行业韭菜指数总览响应",
+        "properties": {
+          "industries": {
+            "description": "行业列表（默认按韭菜指数从高到低排序）",
+            "items": {
+              "$ref": "#/components/schemas/IndustryLeekItem"
+            },
+            "title": "Industries",
+            "type": "array"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/MarketLeekSummary",
+            "description": "全市场汇总"
+          },
+          "trade_date": {
+            "description": "数据日期 (YYYY-MM-DD)",
+            "title": "Trade Date",
+            "type": "string"
+          },
+          "updated_at": {
+            "description": "更新时间戳",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "trade_date",
+          "updated_at",
+          "summary"
+        ],
+        "title": "LeekIndexOverviewResponse",
+        "type": "object"
+      },
+      "LeekSubScores": {
+        "description": "四个维度的子项评分 (0 - 100)",
+        "properties": {
+          "crowd": {
+            "description": "成交与交易拥挤度",
+            "title": "Crowd",
+            "type": "number"
+          },
+          "flow": {
+            "description": "资金背离度（主力出货/散户接盘剪刀差）",
+            "title": "Flow",
+            "type": "number"
+          },
+          "guba": {
+            "description": "股吧散户热度与新晋关注度",
+            "title": "Guba",
+            "type": "number"
+          },
+          "trap": {
+            "description": "高位滞涨与套牢盘风险",
+            "title": "Trap",
+            "type": "number"
+          }
+        },
+        "required": [
+          "flow",
+          "guba",
+          "crowd",
+          "trap"
+        ],
+        "title": "LeekSubScores",
         "type": "object"
       },
       "LivenessResponse": {
@@ -15382,6 +15642,45 @@
           "indices"
         ],
         "title": "MarketIndices",
+        "type": "object"
+      },
+      "MarketLeekSummary": {
+        "description": "全市场散户情绪整体画像",
+        "properties": {
+          "extreme_count": {
+            "default": 0,
+            "description": "极度接盘区行业数 (score >= 75)",
+            "title": "Extreme Count",
+            "type": "integer"
+          },
+          "fever_count": {
+            "default": 0,
+            "description": "过热区行业数 (60 <= score < 75)",
+            "title": "Fever Count",
+            "type": "integer"
+          },
+          "market_sentiment_label": {
+            "description": "市场整体散户心理状态描述",
+            "title": "Market Sentiment Label",
+            "type": "string"
+          },
+          "median_score": {
+            "description": "全市场行业韭菜指数中位数",
+            "title": "Median Score",
+            "type": "number"
+          },
+          "safe_count": {
+            "default": 0,
+            "description": "筹码出清/冷门区行业数 (score <= 35)",
+            "title": "Safe Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "median_score",
+          "market_sentiment_label"
+        ],
+        "title": "MarketLeekSummary",
         "type": "object"
       },
       "MarketLimitHistoryItem": {
@@ -42724,6 +43023,155 @@
         "summary": "Apply Screener Strategy",
         "tags": [
           "screener"
+        ]
+      }
+    },
+    "/api/sentiment/leek-index/overview": {
+      "get": {
+        "description": "返回 31 个申万一级行业的散户狂热度、资金剪刀差与套牢风险评分 (0-100)。",
+        "operationId": "get_leek_index_overview_api_sentiment_leek_index_overview_get",
+        "parameters": [
+          {
+            "description": "是否强制重新计算并忽略缓存",
+            "in": "query",
+            "name": "force_refresh",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "是否强制重新计算并忽略缓存",
+              "title": "Force Refresh",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LeekIndexOverviewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "获取全市场申万一级行业韭菜指数总览",
+        "tags": [
+          "sentiment"
+        ]
+      }
+    },
+    "/api/sentiment/leek-index/refresh": {
+      "post": {
+        "operationId": "refresh_leek_index_api_sentiment_leek_index_refresh_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LeekIndexOverviewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "手动触发全市场韭菜指数刷新与持久化归档",
+        "tags": [
+          "sentiment"
+        ]
+      }
+    },
+    "/api/sentiment/leek-index/{industry_name}/history": {
+      "get": {
+        "description": "用于前端绘制行业走势与散户韭菜指数双轴对照图。",
+        "operationId": "get_industry_leek_history_api_sentiment_leek_index__industry_name__history_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "industry_name",
+            "required": true,
+            "schema": {
+              "title": "Industry Name",
+              "type": "string"
+            }
+          },
+          {
+            "description": "历史天数",
+            "in": "query",
+            "name": "days",
+            "required": false,
+            "schema": {
+              "default": 30,
+              "description": "历史天数",
+              "maximum": 180,
+              "minimum": 5,
+              "title": "Days",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LeekIndexHistoryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "获取指定行业的历史韭菜指数时序",
+        "tags": [
+          "sentiment"
         ]
       }
     },

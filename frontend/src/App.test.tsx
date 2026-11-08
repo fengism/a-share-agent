@@ -21,6 +21,7 @@ const components = {
   Dashboard: stub("首页内容"),
   Watchlist: stub("自选内容"),
   Market: stub("市场内容"),
+  LeekIndex: stub("韭菜指数内容"),
   NationalTeam: stub("国家队内容"),
   TradingCalendar: stub("交易日历内容"),
   Screener: stub("选股内容"),

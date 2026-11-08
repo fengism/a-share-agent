@@ -3692,6 +3692,63 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/sentiment/leek-index/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 获取全市场申万一级行业韭菜指数总览
+         * @description 返回 31 个申万一级行业的散户狂热度、资金剪刀差与套牢风险评分 (0-100)。
+         */
+        get: operations["get_leek_index_overview_api_sentiment_leek_index_overview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sentiment/leek-index/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 手动触发全市场韭菜指数刷新与持久化归档 */
+        post: operations["refresh_leek_index_api_sentiment_leek_index_refresh_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sentiment/leek-index/{industry_name}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 获取指定行业的历史韭菜指数时序
+         * @description 用于前端绘制行业走势与散户韭菜指数双轴对照图。
+         */
+        get: operations["get_industry_leek_history_api_sentiment_leek_index__industry_name__history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/stock-concept/concepts": {
         parameters: {
             query?: never;
@@ -6534,6 +6591,22 @@ export interface components {
         CreateInviteRequest: {
             /** Expires In Days */
             expires_in_days?: number | null;
+        };
+        /**
+         * CrowdedStockItem
+         * @description 散户跟风最集中的核心股票
+         */
+        CrowdedStockItem: {
+            /** Change Pct */
+            change_pct?: number | null;
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
+            /** Rank */
+            rank?: number | null;
+            /** Reason */
+            reason?: string | null;
         };
         /** CrudeOilData */
         CrudeOilData: {
@@ -9518,6 +9591,58 @@ export interface components {
             /** Level3 */
             level3: string[];
         };
+        /**
+         * IndustryLeekItem
+         * @description 单个行业的韭菜指数详细特征
+         */
+        IndustryLeekItem: {
+            /**
+             * Change Pct
+             * @description 行业当日涨跌幅 %
+             * @default 0
+             */
+            change_pct: number;
+            /**
+             * Crowded Stocks
+             * @description 该行业人气最高/跟风最集中的代表股票
+             */
+            crowded_stocks?: components["schemas"]["CrowdedStockItem"][];
+            /**
+             * Industry Name
+             * @description 申万一级行业名称
+             */
+            industry_name: string;
+            /**
+             * Leek Score
+             * @description 综合韭菜指数 (0-100，越高越狂热/接盘)
+             */
+            leek_score: number;
+            /**
+             * Main Net
+             * @description 主力净买入额 (元)
+             * @default 0
+             */
+            main_net: number;
+            /**
+             * Retail Net
+             * @description 散户/小单净买入额 (元)
+             * @default 0
+             */
+            retail_net: number;
+            /**
+             * Risk Level
+             * @description 风险等级：safe(出清)/normal(均衡)/fever(过热)/extreme(见顶接盘)
+             * @enum {string}
+             */
+            risk_level: "safe" | "normal" | "fever" | "extreme";
+            /** @description 分维度得分 */
+            sub_scores: components["schemas"]["LeekSubScores"];
+            /**
+             * Warning Signals
+             * @description 预警信号特征列表
+             */
+            warning_signals?: string[];
+        };
         /** IndustryListResponse */
         IndustryListResponse: {
             /** Items */
@@ -10009,6 +10134,83 @@ export interface components {
             turnover_pct?: number | null;
             /** Volume */
             volume: number;
+        };
+        /**
+         * LeekHistoryPoint
+         * @description 单日历史数据点
+         */
+        LeekHistoryPoint: {
+            /** Date */
+            date: string;
+            /** Industry Change Pct */
+            industry_change_pct?: number | null;
+            /**
+             * Risk Level
+             * @enum {string}
+             */
+            risk_level: "safe" | "normal" | "fever" | "extreme";
+            /** Score */
+            score: number;
+            sub_scores: components["schemas"]["LeekSubScores"];
+        };
+        /**
+         * LeekIndexHistoryResponse
+         * @description 单个行业的历史时序响应
+         */
+        LeekIndexHistoryResponse: {
+            /** History */
+            history: components["schemas"]["LeekHistoryPoint"][];
+            /** Industry Name */
+            industry_name: string;
+        };
+        /**
+         * LeekIndexOverviewResponse
+         * @description 全行业韭菜指数总览响应
+         */
+        LeekIndexOverviewResponse: {
+            /**
+             * Industries
+             * @description 行业列表（默认按韭菜指数从高到低排序）
+             */
+            industries?: components["schemas"]["IndustryLeekItem"][];
+            /** @description 全市场汇总 */
+            summary: components["schemas"]["MarketLeekSummary"];
+            /**
+             * Trade Date
+             * @description 数据日期 (YYYY-MM-DD)
+             */
+            trade_date: string;
+            /**
+             * Updated At
+             * @description 更新时间戳
+             */
+            updated_at: string;
+        };
+        /**
+         * LeekSubScores
+         * @description 四个维度的子项评分 (0 - 100)
+         */
+        LeekSubScores: {
+            /**
+             * Crowd
+             * @description 成交与交易拥挤度
+             */
+            crowd: number;
+            /**
+             * Flow
+             * @description 资金背离度（主力出货/散户接盘剪刀差）
+             */
+            flow: number;
+            /**
+             * Guba
+             * @description 股吧散户热度与新晋关注度
+             */
+            guba: number;
+            /**
+             * Trap
+             * @description 高位滞涨与套牢盘风险
+             */
+            trap: number;
         };
         /** LivenessResponse */
         LivenessResponse: {
@@ -11055,6 +11257,40 @@ export interface components {
              * @default 0
              */
             total_amount: number;
+        };
+        /**
+         * MarketLeekSummary
+         * @description 全市场散户情绪整体画像
+         */
+        MarketLeekSummary: {
+            /**
+             * Extreme Count
+             * @description 极度接盘区行业数 (score >= 75)
+             * @default 0
+             */
+            extreme_count: number;
+            /**
+             * Fever Count
+             * @description 过热区行业数 (60 <= score < 75)
+             * @default 0
+             */
+            fever_count: number;
+            /**
+             * Market Sentiment Label
+             * @description 市场整体散户心理状态描述
+             */
+            market_sentiment_label: string;
+            /**
+             * Median Score
+             * @description 全市场行业韭菜指数中位数
+             */
+            median_score: number;
+            /**
+             * Safe Count
+             * @description 筹码出清/冷门区行业数 (score <= 35)
+             * @default 0
+             */
+            safe_count: number;
         };
         /** MarketLimitHistoryItem */
         MarketLimitHistoryItem: {
@@ -23962,6 +24198,101 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ScreenerStrategyResult"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_leek_index_overview_api_sentiment_leek_index_overview_get: {
+        parameters: {
+            query?: {
+                /** @description 是否强制重新计算并忽略缓存 */
+                force_refresh?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeekIndexOverviewResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    refresh_leek_index_api_sentiment_leek_index_refresh_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeekIndexOverviewResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_industry_leek_history_api_sentiment_leek_index__industry_name__history_get: {
+        parameters: {
+            query?: {
+                /** @description 历史天数 */
+                days?: number;
+            };
+            header?: never;
+            path: {
+                industry_name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeekIndexHistoryResponse"];
                 };
             };
             /** @description 统一错误响应 */

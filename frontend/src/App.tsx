@@ -23,6 +23,7 @@ const EarthScope = lazy(pageLoaders.earthscope);
 const Dashboard = lazy(pageLoaders.dashboard);
 const Watchlist = lazy(pageLoaders.watchlist);
 const Market = lazy(pageLoaders.market);
+const LeekIndex = lazy(pageLoaders.leekIndex);
 const NationalTeam = lazy(pageLoaders.nationalTeam);
 const TradingCalendar = lazy(pageLoaders.tradingCalendar);
 const Screener = lazy(pageLoaders.screener);
@@ -196,6 +197,7 @@ const router = createAppRouter({
   Dashboard,
   Watchlist,
   Market,
+  LeekIndex,
   NationalTeam,
   TradingCalendar,
   Screener,

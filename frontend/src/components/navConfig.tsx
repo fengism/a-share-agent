@@ -13,6 +13,7 @@ import {
   FileSearchOutlined,
   FileTextOutlined,
   FilterOutlined,
+  FireOutlined,
   FundOutlined,
   GlobalOutlined,
   HomeOutlined,
@@ -70,6 +71,7 @@ export const NAV_GROUPS: NavGroupConfig[] = [
     label: "市场洞察",
     icon: <CompassOutlined />,
     items: [
+      { key: "/leek-index", icon: <FireOutlined />, label: "韭菜指数", match: (p) => p.startsWith("/leek-index") },
       { key: "/national-team", icon: <BankOutlined />, label: "国家队", match: (p) => p.startsWith("/national-team") },
       { key: "/macro", icon: <GlobalOutlined />, label: "宏观", match: (p) => p.startsWith("/macro") },
       {
