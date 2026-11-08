@@ -153,6 +153,10 @@ cd frontend && npx playwright install chromium  # 前端 E2E 与 README 配图�
   `!important` 去覆盖它——同一份外观定义两遍、互相打架。现在统一用 `.u-card` /
   `.u-card-soft`（与旧 `cardStyle` 逐声明等价的 CSS 变量实现）。内联样式只能用
   `!important` 覆盖，靠提高选择器特异性或 `@layer` 都无效，所以别再把外观写回 JS。
+- **token 值已带单位时不要再拼单位**。`t.space[3]` 的值是 `"12px"`，写
+  `${t.space[3]}px` 会得到非法的 `12pxpx`；浏览器静默丢弃该声明（padding 变 0），
+  单测和构建都不会报错。迁移这类内联样式时，先算一遍实际生效值，再决定新类是
+  「等价迁移」还是「顺手修复」；是修复就要在验证里明确列为预期视觉变更。
 - **不要机械删除 `!important`**，先判断它属于哪一类（三类处理方式完全不同）：
   ① **压制 JS 内联样式** —— 把外观改回 CSS 类后即可删除（如 `cardStyle` → `.u-card`）；
   ② **压制页面自身意图** —— 例如页面想给某张卡片加渐变，全局规则用 `!important` 强行
