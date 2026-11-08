@@ -21,6 +21,7 @@ import {
   WarningOutlined,
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
+import StockWorkspaceDrawer from "../../components/StockWorkspaceDrawer";
 import {
   useLeekIndexOverview,
   useIndustryLeekHistory,
@@ -52,6 +53,7 @@ export default function LeekIndexPage() {
   const [filterLevel, setFilterLevel] = useState<string>("all");
   const [searchKw, setSearchKw] = useState<string>("");
   const [selectedIndustry, setSelectedIndustry] = useState<IndustryLeekItem | null>(null);
+  const [previewStock, setPreviewStock] = useState<{ code: string; name: string } | null>(null);
 
   const { data, isLoading, isFetching } = useLeekIndexOverview();
   const refreshMutation = useRefreshLeekIndex();
@@ -182,10 +184,10 @@ export default function LeekIndexPage() {
         return (
           <div>
             {record.crowded_stocks.map((stock) => (
-              <Tooltip key={stock.code} title={`${stock.name} (${stock.code}) · ${stock.reason || ""}`}>
+              <Tooltip key={stock.code} title={`${stock.name} (${stock.code}) · 点击快速查看行情 · ${stock.reason || ""}`}>
                 <Tag
                   className="leek-crowded-tag"
-                  onClick={() => navigate(`/analysis/${stock.code}`)}
+                  onClick={() => setPreviewStock({ code: stock.code, name: stock.name })}
                 >
                   {stock.name}
                 </Tag>
@@ -381,13 +383,22 @@ export default function LeekIndexPage() {
                           </span>
                         )}
                       </div>
-                      <Button
-                        type="link"
-                        size="small"
-                        onClick={() => navigate(`/analysis/${stock.code}`)}
-                      >
-                        深度分析 &gt;
-                      </Button>
+                      <Space size="small">
+                        <Button
+                          type="link"
+                          size="small"
+                          onClick={() => setPreviewStock({ code: stock.code, name: stock.name })}
+                        >
+                          看盘 &gt;
+                        </Button>
+                        <Button
+                          type="link"
+                          size="small"
+                          onClick={() => navigate(`/analysis/${stock.code}`)}
+                        >
+                          深度分析 &gt;
+                        </Button>
+                      </Space>
                     </div>
                   ))}
                 </div>
@@ -414,6 +425,15 @@ export default function LeekIndexPage() {
           </div>
         )}
       </Drawer>
+
+      {previewStock ? (
+        <StockWorkspaceDrawer
+          open={Boolean(previewStock)}
+          code={previewStock.code}
+          name={previewStock.name}
+          onClose={() => setPreviewStock(null)}
+        />
+      ) : null}
     </div>
   );
 }
