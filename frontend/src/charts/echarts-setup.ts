@@ -6,7 +6,7 @@
  */
 
 import * as echarts from "echarts/core";
-import { BarChart, CandlestickChart, GraphChart, HeatmapChart, LineChart } from "echarts/charts";
+import { BarChart, CandlestickChart, GraphChart, HeatmapChart, LineChart, ScatterChart } from "echarts/charts";
 import {
   TitleComponent,
   TooltipComponent,
@@ -27,6 +27,7 @@ echarts.use([
   GraphChart,
   HeatmapChart,
   LineChart,
+  ScatterChart,
   // Components
   TitleComponent,
   TooltipComponent,

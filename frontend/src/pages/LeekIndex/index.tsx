@@ -11,6 +11,7 @@ import {
   Table,
   Tag,
   Tooltip,
+  message,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import {
@@ -19,6 +20,10 @@ import {
   SearchOutlined,
   InfoCircleOutlined,
   WarningOutlined,
+  DownloadOutlined,
+  DotChartOutlined,
+  DownOutlined,
+  UpOutlined,
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import StockWorkspaceDrawer from "../../components/StockWorkspaceDrawer";
@@ -28,7 +33,11 @@ import {
   useRefreshLeekIndex,
   type IndustryLeekItem,
 } from "../../api/queryHooks/sentiment";
+import { useUrlSearchParam } from "../../hooks/useUrlSearchParam";
+import { downloadCsv } from "../NationalTeam/utils/csv";
+import { LeekQuadrantChart } from "./LeekQuadrantChart";
 import "./leek-index.css";
+import "./leek-drawer.css";
 
 const RISK_BADGES = {
   extreme: { color: "red", label: "🔥 极度接盘", desc: "散户高位狂热追高，主力坚决出货，极易见顶" },
@@ -48,10 +57,24 @@ function formatAmount(val: number): string {
   return `${val.toFixed(0)} 元`;
 }
 
+function getScoreColorClass(score: number): string {
+  if (score >= 75) return "leek-score-num--extreme";
+  if (score >= 60) return "leek-score-num--fever";
+  if (score >= 35) return "leek-score-num--normal";
+  return "leek-score-num--safe";
+}
+
 export default function LeekIndexPage() {
   const navigate = useNavigate();
-  const [filterLevel, setFilterLevel] = useState<string>("all");
-  const [searchKw, setSearchKw] = useState<string>("");
+  const [filterLevel, setFilterLevel] = useUrlSearchParam<string>("level", "all", {
+    allowedValues: ["all", "extreme", "fever", "normal", "safe"],
+  });
+  const [quickPreset, setQuickPreset] = useUrlSearchParam<string>("preset", "all", {
+    allowedValues: ["all", "top_risk", "bargain", "smart_inflow"],
+  });
+  const [searchKw, setSearchKw] = useUrlSearchParam<string>("q", "", { replace: true });
+  const [showQuadrant, setShowQuadrant] = useState<boolean>(true);
+
   const [selectedIndustry, setSelectedIndustry] = useState<IndustryLeekItem | null>(null);
   const [previewStock, setPreviewStock] = useState<{ code: string; name: string } | null>(null);
 
@@ -66,14 +89,70 @@ export default function LeekIndexPage() {
   const filteredIndustries = useMemo(() => {
     if (!data?.industries) return [];
     return data.industries.filter((item) => {
+      // 快捷预设过滤器
+      if (quickPreset === "top_risk" && !(item.leek_score >= 70 && item.change_pct >= 0)) {
+        return false;
+      }
+      if (quickPreset === "bargain" && !(item.leek_score <= 40 && item.change_pct <= 0)) {
+        return false;
+      }
+      if (quickPreset === "smart_inflow" && !(item.main_net > 0 && item.retail_net < 0)) {
+        return false;
+      }
+
       const matchLevel = filterLevel === "all" || item.risk_level === filterLevel;
       const matchKw =
         !searchKw.trim() ||
         item.industry_name.includes(searchKw.trim()) ||
-        item.crowded_stocks.some((s) => s.name.includes(searchKw.trim()) || s.code.includes(searchKw.trim()));
+        item.crowded_stocks.some((s) => s.name.includes(searchKw.trim()) || s.code.includes(searchKw.trim())) ||
+        (item.sub_industries && item.sub_industries.some((sub) => sub.name.includes(searchKw.trim())));
       return matchLevel && matchKw;
     });
-  }, [data?.industries, filterLevel, searchKw]);
+  }, [data?.industries, filterLevel, searchKw, quickPreset]);
+
+  const handleExportCsv = () => {
+    if (!filteredIndustries || filteredIndustries.length === 0) {
+      message.warning("当前无数据可导出");
+      return;
+    }
+    const headers = [
+      "排名",
+      "申万一级行业",
+      "韭菜指数",
+      "风险等级",
+      "当日涨跌幅(%)",
+      "主力净流入(元)",
+      "散户净买入(元)",
+      "主力净流入(描述)",
+      "散户净买入(描述)",
+      "资金流背离分",
+      "东财股吧舆论分",
+      "成交拥挤度分",
+      "滞涨套牢分",
+      "跟风热门标的",
+      "预警信号",
+    ];
+    const rows = filteredIndustries.map((item, idx) => [
+      idx + 1,
+      item.industry_name,
+      item.leek_score.toFixed(1),
+      RISK_BADGES[item.risk_level as keyof typeof RISK_BADGES]?.label || item.risk_level,
+      item.change_pct.toFixed(2),
+      item.main_net,
+      item.retail_net,
+      formatAmount(item.main_net),
+      formatAmount(item.retail_net),
+      item.sub_scores.flow.toFixed(1),
+      item.sub_scores.guba.toFixed(1),
+      item.sub_scores.crowd.toFixed(1),
+      item.sub_scores.trap.toFixed(1),
+      item.crowded_stocks.map((s) => `${s.name}(${s.code})`).join("; "),
+      item.warning_signals.join("; "),
+    ]);
+    const filename = `A股行业韭菜指数_${data?.trade_date || "today"}.csv`;
+    downloadCsv(filename, [headers, ...rows]);
+    message.success(`已导出 ${filteredIndustries.length} 条行业韭菜指数数据`);
+  };
 
   const columns: ColumnsType<IndustryLeekItem> = [
     {
@@ -110,7 +189,7 @@ export default function LeekIndexPage() {
         else if (score >= 35) strokeColor = "#3b82f6";
         return (
           <div className="leek-score-cell">
-            <span className="leek-score-num" style={{ color: strokeColor }}>
+            <span className={`leek-score-num ${getScoreColorClass(score)}`}>
               {score.toFixed(1)}
             </span>
             <Progress
@@ -266,30 +345,96 @@ export default function LeekIndexPage() {
         </div>
       </div>
 
+      {/* 四象限矩阵可视化板块 */}
+      <div className="leek-quadrant-section">
+        <div className="leek-quadrant-header">
+          <div className="leek-quadrant-title">
+            <DotChartOutlined />
+            <span>行业博弈四象限矩阵</span>
+            <span className="leek-quadrant-desc">
+              （涨跌幅 vs 资金剪刀差 · 气泡大小与颜色反映韭菜指数）
+            </span>
+          </div>
+          <Button
+            size="small"
+            type="text"
+            icon={showQuadrant ? <UpOutlined /> : <DownOutlined />}
+            onClick={() => setShowQuadrant((prev) => !prev)}
+          >
+            {showQuadrant ? "收起矩阵" : "展开矩阵"}
+          </Button>
+        </div>
+        {showQuadrant && (
+          <LeekQuadrantChart
+            industries={filteredIndustries}
+            onSelectIndustry={(ind) => setSelectedIndustry(ind)}
+          />
+        )}
+      </div>
+
       {/* 行业表格 */}
       <div className="leek-table-card">
         <div className="leek-table-toolbar">
-          <Radio.Group
-            value={filterLevel}
-            onChange={(e) => setFilterLevel(e.target.value)}
-            size="small"
-          >
-            <Radio.Button value="all">全部行业 (31)</Radio.Button>
-            <Radio.Button value="extreme">🔥 极度接盘</Radio.Button>
-            <Radio.Button value="fever">⚠️ 过热追高</Radio.Button>
-            <Radio.Button value="normal">⚖️ 筹码均衡</Radio.Button>
-            <Radio.Button value="safe">💎 筹码出清</Radio.Button>
-          </Radio.Group>
+          <div className="leek-table-filters-row">
+            <Radio.Group
+              value={filterLevel}
+              onChange={(e) => setFilterLevel(e.target.value)}
+              size="small"
+            >
+              <Radio.Button value="all">全部 (31)</Radio.Button>
+              <Radio.Button value="extreme">🔥 极度接盘</Radio.Button>
+              <Radio.Button value="fever">⚠️ 过热追高</Radio.Button>
+              <Radio.Button value="normal">⚖️ 筹码均衡</Radio.Button>
+              <Radio.Button value="safe">💎 筹码出清</Radio.Button>
+            </Radio.Group>
 
-          <Input
-            placeholder="搜索行业或热门跟风股票..."
-            prefix={<SearchOutlined />}
-            className="leek-table-search-input"
-            size="small"
-            value={searchKw}
-            onChange={(e) => setSearchKw(e.target.value)}
-            allowClear
-          />
+            <Space size={6} className="leek-quick-presets">
+              <span className="leek-preset-label">快捷预设:</span>
+              <Tag.CheckableTag
+                checked={quickPreset === "all"}
+                onChange={() => setQuickPreset("all")}
+              >
+                默认全部
+              </Tag.CheckableTag>
+              <Tag.CheckableTag
+                checked={quickPreset === "top_risk"}
+                onChange={(checked) => setQuickPreset(checked ? "top_risk" : "all")}
+              >
+                🔥 见顶预警(&gt;70且上涨)
+              </Tag.CheckableTag>
+              <Tag.CheckableTag
+                checked={quickPreset === "bargain"}
+                onChange={(checked) => setQuickPreset(checked ? "bargain" : "all")}
+              >
+                💎 黄金坑探底(&lt;40且下跌)
+              </Tag.CheckableTag>
+              <Tag.CheckableTag
+                checked={quickPreset === "smart_inflow"}
+                onChange={(checked) => setQuickPreset(checked ? "smart_inflow" : "all")}
+              >
+                🚀 主力拉升散户下车
+              </Tag.CheckableTag>
+            </Space>
+          </div>
+
+          <Space className="leek-table-actions">
+            <Input
+              placeholder="搜索一级/二级行业或热门股票..."
+              prefix={<SearchOutlined />}
+              className="leek-table-search-input"
+              size="small"
+              value={searchKw}
+              onChange={(e) => setSearchKw(e.target.value)}
+              allowClear
+            />
+            <Button
+              icon={<DownloadOutlined />}
+              size="small"
+              onClick={handleExportCsv}
+            >
+              导出 CSV
+            </Button>
+          </Space>
         </div>
 
         <Table
@@ -299,6 +444,42 @@ export default function LeekIndexPage() {
           loading={isLoading}
           pagination={false}
           size="middle"
+          expandable={{
+            expandedRowRender: (record) => {
+              if (!record.sub_industries || record.sub_industries.length === 0) {
+                return <div className="leek-sub-table-empty">暂无二级行业资金明细</div>;
+              }
+              return (
+                <div className="leek-sub-table-wrap">
+                  <div className="leek-sub-table-header">
+                    <span>申万二级行业 ({record.sub_industries.length}个)</span>
+                    <span className="leek-sub-table-header-tip">点击一级行业行即可在右侧查看历史曲线与详细分析</span>
+                  </div>
+                  <div className="leek-sub-grid">
+                    {record.sub_industries.map((sub) => (
+                      <div key={sub.name} className="leek-sub-card">
+                        <div className="leek-sub-card-top">
+                          <strong className="leek-sub-card-name">{sub.name}</strong>
+                          <span className={`leek-diff-val ${sub.change_pct >= 0 ? "leek-diff-val--inflow" : "leek-diff-val--outflow"}`}>
+                            {sub.change_pct >= 0 ? "+" : ""}{sub.change_pct.toFixed(2)}%
+                          </span>
+                        </div>
+                        <div className="leek-sub-card-bottom">
+                          <span className="leek-sub-card-score">
+                            指数: <strong>{sub.leek_score.toFixed(1)}</strong>
+                          </span>
+                          <span className="leek-sub-card-flow">
+                            主力: {formatAmount(sub.main_net)} / 散户: {formatAmount(sub.retail_net)}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            },
+            rowExpandable: (record) => Boolean(record.sub_industries && record.sub_industries.length > 0),
+          }}
         />
       </div>
 

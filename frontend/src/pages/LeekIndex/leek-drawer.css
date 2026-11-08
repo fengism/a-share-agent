@@ -1,0 +1,124 @@
+/* 抽屉与详情样式 */
+.leek-drawer-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.leek-factor-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.leek-factor-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+}
+
+.leek-warning-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.leek-warning-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #d97706;
+}
+
+.leek-crowded-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.leek-crowded-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 8px;
+  background: var(--c-bg-elevated, #f8fafc);
+  border-radius: 4px;
+}
+
+.leek-crowded-reason {
+  font-size: 12px;
+  color: var(--c-text-muted, #94a3b8);
+  margin-left: 8px;
+}
+
+.leek-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.leek-history-loading {
+  padding: 12px;
+  text-align: center;
+  color: var(--c-text-muted, #94a3b8);
+}
+
+.leek-history-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  padding: 4px 8px;
+  border-bottom: 1px dashed var(--c-border, #e2e8f0);
+}
+
+.leek-history-score {
+  font-weight: 600;
+}
+
+.leek-sub-ind-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.leek-sub-ind-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  background: var(--c-bg-elevated, #f8fafc);
+  border-radius: 4px;
+}
+
+.leek-sub-ind-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.leek-sub-ind-name {
+  font-size: 13px;
+}
+
+.leek-sub-ind-pct {
+  font-size: 12px;
+  color: var(--c-text-secondary, #64748b);
+}
+
+.leek-sub-ind-scores {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+}
+
+.leek-sub-ind-score strong {
+  color: #fa541c;
+}
+
+.leek-sub-ind-flow {
+  color: var(--c-text-muted, #94a3b8);
+  font-size: 11px;
+}

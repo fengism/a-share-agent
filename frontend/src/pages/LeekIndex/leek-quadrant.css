@@ -1,0 +1,37 @@
+/* 四象限博弈矩阵样式 */
+.leek-quadrant-section {
+  background: var(--c-bg-card, #ffffff);
+  border: 1px solid var(--c-border, #e2e8f0);
+  border-radius: 8px;
+  padding: 14px 16px;
+}
+
+.leek-quadrant-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.leek-quadrant-title {
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.leek-quadrant-desc {
+  font-size: 12px;
+  font-weight: normal;
+  color: var(--c-text-muted, #94a3b8);
+  margin-left: 6px;
+}
+
+.leek-quadrant-chart-card {
+  width: 100%;
+}
+
+.leek-quadrant-empty {
+  padding: 32px 0;
+}
