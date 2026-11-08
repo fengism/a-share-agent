@@ -15,6 +15,14 @@ export interface CrowdedStockItem {
   reason?: string;
 }
 
+export interface SubIndustryLeekItem {
+  name: string;
+  leek_score: number;
+  change_pct: number;
+  main_net: number;
+  retail_net: number;
+}
+
 export interface IndustryLeekItem {
   industry_name: string;
   leek_score: number;
@@ -25,6 +33,7 @@ export interface IndustryLeekItem {
   retail_net: number;
   crowded_stocks: CrowdedStockItem[];
   warning_signals: string[];
+  sub_industries?: SubIndustryLeekItem[];
 }
 
 export interface MarketLeekSummary {

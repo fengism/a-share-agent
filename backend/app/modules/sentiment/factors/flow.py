@@ -24,22 +24,25 @@ def _get_level2_to_level1_mapping() -> Dict[str, str]:
     return l2_to_l1
 
 
-async def calculate_industry_fund_flow_factors() -> Tuple[Dict[str, float], Dict[str, Dict[str, float]]]:
+async def calculate_industry_fund_flow_factors() -> Tuple[
+    Dict[str, float],
+    Dict[str, Dict[str, float]],
+    Dict[str, List[Dict[str, float]]],
+]:
     """
-    抓取行业资金流，聚合成 31 个申万一级行业的资金剪刀差评分。
+    抓取行业资金流，聚合成 31 个申万一级行业的资金剪刀差评分及下属二级行业明细。
     返回:
-        (flow_scores, industry_raw_flows)
-        其中 flow_scores 介于 0 - 100（越高代表散户接盘越严重，主力出逃越凶猛）。
-        industry_raw_flows 包含 main_net, small_net, change_pct 等。
+        (flow_scores, industry_raw_flows, level2_details)
     """
     l2_to_l1 = _get_level2_to_level1_mapping()
     industry_raw_flows: Dict[str, Dict[str, float]] = {}
+    level2_details: Dict[str, List[Dict[str, float]]] = {}
 
     try:
         raw_flows = await call_industry_data("industry_fund_flow")
     except Exception as exc:
         logger.warning("获取行业资金流数据失败: %s", exc)
-        return {}, {}
+        return {}, {}, {}
 
     for item in raw_flows:
         name = item.get("industry_name", "")
@@ -48,6 +51,10 @@ async def calculate_industry_fund_flow_factors() -> Tuple[Dict[str, float], Dict
         if not level1:
             continue
 
+        m_net = float(item.get("main_net", 0.0))
+        s_net = float(item.get("small_net", 0.0))
+        chg = float(item.get("change_pct", 0.0))
+
         if level1 not in industry_raw_flows:
             industry_raw_flows[level1] = {
                 "main_net": 0.0,
@@ -55,12 +62,22 @@ async def calculate_industry_fund_flow_factors() -> Tuple[Dict[str, float], Dict
                 "change_pct_sum": 0.0,
                 "count": 0.0,
             }
+            level2_details[level1] = []
 
         acc = industry_raw_flows[level1]
-        acc["main_net"] += float(item.get("main_net", 0.0))
-        acc["small_net"] += float(item.get("small_net", 0.0))
-        acc["change_pct_sum"] += float(item.get("change_pct", 0.0))
+        acc["main_net"] += m_net
+        acc["small_net"] += s_net
+        acc["change_pct_sum"] += chg
         acc["count"] += 1.0
+
+        # 记录二级行业特征
+        level2_details[level1].append({
+            "name": name,
+            "main_net": m_net,
+            "retail_net": s_net,
+            "change_pct": chg,
+            "diff": s_net - m_net,
+        })
 
     # 计算均值与剪刀差得分
     flow_scores: Dict[str, float] = {}
@@ -78,7 +95,7 @@ async def calculate_industry_fund_flow_factors() -> Tuple[Dict[str, float], Dict
         divergences[ind] = diff
 
     if not divergences:
-        return {}, industry_raw_flows
+        return {}, industry_raw_flows, level2_details
 
     # 时序/截面标准化：按当前所有申万行业的剪刀差排名与极值映射到 10 - 90
     min_diff = min(divergences.values())
@@ -100,4 +117,4 @@ async def calculate_industry_fund_flow_factors() -> Tuple[Dict[str, float], Dict
 
         flow_scores[ind] = round(min(100.0, max(0.0, normalized)), 1)
 
-    return flow_scores, industry_raw_flows
+    return flow_scores, industry_raw_flows, level2_details

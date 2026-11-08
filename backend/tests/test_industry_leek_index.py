@@ -51,6 +51,10 @@ async def test_leek_index_service_compute_and_history(tmp_path, monkeypatch):
                 "电子": {"main_net": -100.0, "small_net": 120.0, "change_pct": 1.2},
                 "食品饮料": {"main_net": 80.0, "small_net": -50.0, "change_pct": -0.8},
             },
+            {
+                "电子": [{"name": "半导体", "main_net": -50.0, "retail_net": 60.0, "change_pct": 1.5, "diff": 110.0}],
+                "食品饮料": [],
+            },
         )
 
     monkeypatch.setattr(s_mod, "calculate_industry_fund_flow_factors", mock_flows)

@@ -368,6 +368,31 @@ export default function LeekIndexPage() {
               </Card>
             )}
 
+            {selectedIndustry.sub_industries && selectedIndustry.sub_industries.length > 0 && (
+              <Card size="small" title="申万二级细分行业分布与风险">
+                <div className="leek-sub-ind-list">
+                  {selectedIndustry.sub_industries.map((sub) => (
+                    <div key={sub.name} className="leek-sub-ind-item">
+                      <div className="leek-sub-ind-meta">
+                        <strong className="leek-sub-ind-name">{sub.name}</strong>
+                        <span className="leek-sub-ind-pct">
+                          {sub.change_pct >= 0 ? "+" : ""}{sub.change_pct.toFixed(2)}%
+                        </span>
+                      </div>
+                      <div className="leek-sub-ind-scores">
+                        <span className="leek-sub-ind-score">
+                          指数: <strong>{sub.leek_score.toFixed(1)}</strong>
+                        </span>
+                        <span className="leek-sub-ind-flow">
+                          主力: {formatAmount(sub.main_net)} / 散户: {formatAmount(sub.retail_net)}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            )}
+
             <Card size="small" title="散户集中跟风标的">
               {selectedIndustry.crowded_stocks.length === 0 ? (
                 <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无显著散户聚焦标的" />

@@ -26,6 +26,15 @@ class CrowdedStockItem(BaseModel):
     reason: Optional[str] = None
 
 
+class SubIndustryLeekItem(BaseModel):
+    """二级细分行业韭菜指数特征"""
+    name: str = Field(..., description="二级行业名称，如 半导体、元件、消费电子")
+    leek_score: float = Field(..., description="二级行业韭菜指数 (0-100)")
+    change_pct: float = Field(default=0.0, description="二级行业涨跌幅 %")
+    main_net: float = Field(default=0.0, description="主力净买入 (元)")
+    retail_net: float = Field(default=0.0, description="散户净买入 (元)")
+
+
 class IndustryLeekItem(BaseModel):
     """单个行业的韭菜指数详细特征"""
     industry_name: str = Field(..., description="申万一级行业名称")
@@ -37,6 +46,7 @@ class IndustryLeekItem(BaseModel):
     retail_net: float = Field(default=0.0, description="散户/小单净买入额 (元)")
     crowded_stocks: List[CrowdedStockItem] = Field(default_factory=list, description="该行业人气最高/跟风最集中的代表股票")
     warning_signals: List[str] = Field(default_factory=list, description="预警信号特征列表")
+    sub_industries: List[SubIndustryLeekItem] = Field(default_factory=list, description="下属申万二级细分行业分布")
 
 
 class MarketLeekSummary(BaseModel):

@@ -24,6 +24,7 @@ from app.modules.sentiment.schemas import (
     LeekSubScores,
     MarketLeekSummary,
     RiskLevel,
+    SubIndustryLeekItem,
 )
 
 
@@ -113,7 +114,7 @@ class LeekIndexService:
         flow_task = calculate_industry_fund_flow_factors()
         guba_task = asyncio.to_thread(calculate_guba_sentiment_factors)
 
-        (flow_scores, raw_flows), (guba_scores, crowded_stocks) = await asyncio.gather(flow_task, guba_task)
+        (flow_scores, raw_flows, level2_details), (guba_scores, crowded_stocks) = await asyncio.gather(flow_task, guba_task)
 
         # 计算拥挤度与滞涨风险
         crowd_scores, trap_scores, warning_signals = calculate_crowd_and_trap_factors(raw_flows, guba_scores)
@@ -142,6 +143,24 @@ class LeekIndexService:
                 risk_level = "normal"
 
             raw_ind_flow = raw_flows.get(ind, {})
+
+            # 格式化下属二级细分行业分布并估算二级行业韭菜指数
+            sub_items: List[SubIndustryLeekItem] = []
+            for l2 in level2_details.get(ind, []):
+                # 以一级行业得分为基线，按二级行业资金剪刀差微调
+                l2_diff = l2.get("diff", 0.0)
+                l2_score = round(max(5.0, min(95.0, final_score + (10.0 if l2_diff > 0 else -10.0))), 1)
+                sub_items.append(
+                    SubIndustryLeekItem(
+                        name=l2["name"],
+                        leek_score=l2_score,
+                        change_pct=round(l2.get("change_pct", 0.0), 2),
+                        main_net=l2.get("main_net", 0.0),
+                        retail_net=l2.get("retail_net", 0.0),
+                    )
+                )
+            sub_items.sort(key=lambda x: x.leek_score, reverse=True)
+
             items.append(
                 IndustryLeekItem(
                     industry_name=ind,
@@ -158,6 +177,7 @@ class LeekIndexService:
                     retail_net=raw_ind_flow.get("small_net", 0.0),
                     crowded_stocks=crowded_stocks.get(ind, []),
                     warning_signals=warning_signals.get(ind, []),
+                    sub_industries=sub_items,
                 )
             )
 

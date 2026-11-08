@@ -263,3 +263,49 @@
 .leek-history-score {
   font-weight: 600;
 }
+
+.leek-sub-ind-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.leek-sub-ind-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  background: var(--c-bg-elevated, #f8fafc);
+  border-radius: 4px;
+}
+
+.leek-sub-ind-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.leek-sub-ind-name {
+  font-size: 13px;
+}
+
+.leek-sub-ind-pct {
+  font-size: 12px;
+  color: var(--c-text-secondary, #64748b);
+}
+
+.leek-sub-ind-scores {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+}
+
+.leek-sub-ind-score strong {
+  color: #fa541c;
+}
+
+.leek-sub-ind-flow {
+  color: var(--c-text-muted, #94a3b8);
+  font-size: 11px;
+}
