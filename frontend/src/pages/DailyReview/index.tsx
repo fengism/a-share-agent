@@ -394,7 +394,7 @@ export default function DailyReviewPage() {
                     className={`daily-review-history__btn ${item.date === date ? "is-active" : ""}`}
                   >
                     <span className="daily-review-history__title">{item.title}</span>
-                    <Text type="secondary">{item.date}</Text>
+                    <Text type="secondary" className="daily-review-history__time">{item.date}</Text>
                   </button>
                   {item.can_delete ? (
                     <Popconfirm
