@@ -299,6 +299,11 @@
   margin-top: var(--c-space-4);
 }
 
+.potential-history-card .ant-card-head-title {
+  color: var(--c-text-primary);
+  font-weight: 600;
+}
+
 .potential-grid {
   display: grid;
   gap: var(--c-space-3);
