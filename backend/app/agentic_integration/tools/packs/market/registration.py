@@ -317,52 +317,7 @@ def register_market_tools(target_registry=None):
 
 async def _get_industry_leek_index(industry_name: str = "") -> Any:
     """获取全行业或特定行业的韭菜指数及风险画像。"""
-    from app.modules.sentiment.service import get_leek_index_service
-    service = get_leek_index_service()
-    overview = await service.get_overview()
-
-    if industry_name:
-        ind = next((i for i in overview.industries if industry_name in i.industry_name), None)
-        if ind:
-            return {
-                "date": overview.trade_date,
-                "industry_name": ind.industry_name,
-                "leek_score": ind.leek_score,
-                "risk_level": ind.risk_level,
-                "sub_scores": ind.sub_scores.model_dump(),
-                "main_net_yuan": ind.main_net,
-                "retail_net_yuan": ind.retail_net,
-                "change_pct": ind.change_pct,
-                "crowded_stocks": [s.model_dump() for s in ind.crowded_stocks],
-                "sub_industries": [s.model_dump() for s in ind.sub_industries],
-            }
-        return {"error": f"未找到行业: {industry_name}", "available_sample": [i.industry_name for i in overview.industries[:5]]}
-
-    return {
-        "date": overview.trade_date,
-        "summary": overview.summary.model_dump(),
-        "top_extreme_leek_industries": [
-            {
-                "industry": i.industry_name,
-                "score": i.leek_score,
-                "level": i.risk_level,
-                "main_net_100m": round(i.main_net / 1e8, 2),
-                "retail_net_100m": round(i.retail_net / 1e8, 2),
-                "crowded_stocks": [s.name for s in i.crowded_stocks],
-            }
-            for i in overview.industries[:5]
-        ],
-        "top_safe_bargain_industries": [
-            {
-                "industry": i.industry_name,
-                "score": i.leek_score,
-                "level": i.risk_level,
-                "main_net_100m": round(i.main_net / 1e8, 2),
-                "retail_net_100m": round(i.retail_net / 1e8, 2),
-            }
-            for i in reversed(overview.industries[-3:])
-        ],
-    }
+    return await get_application_tool_handlers().get_industry_leek_index(industry_name=industry_name)
 
 
 async def _get_commodity_spot_prices(symbol: str = "") -> Any:

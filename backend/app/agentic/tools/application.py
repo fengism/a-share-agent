@@ -22,6 +22,7 @@ class ApplicationToolHandlers:
     get_macro_data: AsyncHandler
     get_market_mainline: AsyncHandler
     get_market_overview: AsyncHandler
+    get_industry_leek_index: AsyncHandler
     get_industry_rankings: AsyncHandler
     get_sector_stocks_history: AsyncHandler
     get_stock_financial: AsyncHandler
