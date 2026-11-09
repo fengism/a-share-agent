@@ -29,7 +29,12 @@ export default function WorkflowWorkspace({
     if (!isCompact) setHistoryOpen(false);
   }, [isCompact]);
 
-  const renderedTitle = <span className="workflow-workspace__card-title">{historyTitle}</span>;
+  const renderedTitle = (
+    <span className="workflow-workspace__card-title" style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+      <HistoryOutlined style={{ color: "var(--c-primary)" }} />
+      <span>{historyTitle}</span>
+    </span>
+  );
 
   return (
     <>
