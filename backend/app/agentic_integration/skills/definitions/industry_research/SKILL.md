@@ -6,6 +6,7 @@ triggers:
 - 行业热度、成分股或相关研报
 - 大宗商品与工业品现货价格
 - 海关进出口与出海产业链量价数据
+- 行业散户情绪、韭菜指数与见顶风险预警
 activation_keywords:
 - 行业
 - 板块
@@ -20,12 +21,15 @@ activation_keywords:
 - 汽车出海
 - 锂电出海
 - 光伏出海
+- 韭菜指数
+- 散户情绪
 tools:
 - sector_analysis
 - get_hot_rank
 - iwencai_search
 - get_commodity_spot_prices
 - get_customs_trade_data
+- get_industry_leek_index
 core_tools:
 - sector_analysis
 - get_hot_rank
@@ -42,6 +46,7 @@ examples:
 ## Rules
 
 - 行业或产业链综合分析用 sector_analysis；仅看热度排名用 get_hot_rank。
+- 行业散户情绪、资金背离与见顶风险预警用 get_industry_leek_index。
 - 大宗商品及重要工业品现货/期货价格用 get_commodity_spot_prices。
 - 海关月度进出口总况及重点商品（汽车、锂电、光伏、芯片、家电、机械）出海数据用 get_customs_trade_data。
 - 仅查研报、公告或新闻时用 iwencai_search。

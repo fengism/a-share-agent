@@ -5,12 +5,11 @@ from __future__ import annotations
 import asyncio
 import logging
 import statistics
-from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
 from app.configuration.paths import DATA_DIR
-from app.financial_data.market.trading_session import SHANGHAI_TIMEZONE
+from app.domain.timezones import market_now, market_today
 from app.infrastructure.persistence.json_storage import atomic_write_text
 from app.modules.industry_classification.public import hierarchy
 from app.modules.sentiment.factors.crowd import calculate_crowd_and_trap_factors
@@ -29,7 +28,7 @@ from app.modules.sentiment.schemas import (
 
 
 def _get_today_str() -> str:
-    return datetime.now(SHANGHAI_TIMEZONE).strftime("%Y-%m-%d")
+    return market_today().strftime("%Y-%m-%d")
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +57,7 @@ class LeekIndexService:
 
     async def get_overview(self, force_refresh: bool = False) -> LeekIndexOverviewResponse:
         """获取全市场申万一级行业韭菜指数概览。"""
-        now = datetime.now()
+        now = market_now()
         now_ts = now.timestamp()
         today_str = _get_today_str()
 
@@ -74,9 +73,9 @@ class LeekIndexService:
             return persisted
 
         # 3. 实时计算
-        t0 = datetime.now()
+        t0 = market_now()
         overview = await self._compute_overview(today_str)
-        duration_ms = round((datetime.now() - t0).total_seconds() * 1000, 1)
+        duration_ms = round((market_now() - t0).total_seconds() * 1000, 1)
 
         self._cached_overview = overview
         self._cache_time = now_ts
@@ -225,7 +224,7 @@ class LeekIndexService:
 
         return LeekIndexOverviewResponse(
             trade_date=today_str,
-            updated_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            updated_at=market_now().strftime("%Y-%m-%d %H:%M:%S"),
             summary=MarketLeekSummary(
                 median_score=median_score,
                 extreme_count=extreme_cnt,
@@ -250,7 +249,8 @@ class LeekIndexService:
             return None
         try:
             return LeekIndexOverviewResponse.model_validate_json(path.read_text(encoding="utf-8"))
-        except Exception:
+        except Exception as exc:
+            logger.warning("解析持久化韭菜指数文件 %s 失败: %s", path, exc)
             return None
 
     def _list_persisted_dates(self, limit: int = 30) -> List[str]:
