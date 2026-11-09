@@ -310,7 +310,10 @@ export default function LimitHistoryPanel() {
         minHeight={420}
         skeletonRows={10}
       >
-        <Card title={`${categoryLabel}明细`} style={{ borderRadius: t.radius.md, boxShadow: t.shadow.xs }}>
+        <Card
+          title={<span className="ladder-card-title">{categoryLabel}明细</span>}
+          className="u-card"
+        >
           <Table<MarketLimitHistoryItem>
             rowKey="code"
             columns={columns}

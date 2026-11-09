@@ -661,7 +661,11 @@ export default function LeekIndexPage() {
         {selectedIndustry && (
           <div className="leek-drawer-body">
             {/* 历史走势双轴复盘图 */}
-            <Card size="small" title="历史博弈走势双轴复盘 (近 30 个交易日)">
+            <Card
+              size="small"
+              title={<span className="leek-drawer-card-title">历史博弈走势双轴复盘 (近 30 个交易日)</span>}
+              className="u-card"
+            >
               {historyQuery.isLoading ? (
                 <div className="leek-history-loading">加载历史时序中...</div>
               ) : (

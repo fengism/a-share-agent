@@ -342,3 +342,8 @@
   color: #059669;
   border: 1px solid rgba(5, 150, 105, 0.25);
 }
+
+.leek-drawer-card-title {
+  color: var(--c-text-primary);
+  font-weight: 600;
+}

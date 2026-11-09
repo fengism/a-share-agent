@@ -28,3 +28,8 @@
 .u-mr-6 {
   margin-right: 6px;
 }
+
+.workflow-workspace__card-title {
+  color: var(--c-text-primary);
+  font-weight: var(--c-weight-semibold, 600);
+}

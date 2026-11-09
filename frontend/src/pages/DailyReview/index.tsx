@@ -88,6 +88,7 @@ import {
   type ReviewSectionDescriptor,
 } from "./reviewView";
 import "./daily-review.css";
+import "./daily-review-history.css";
 
 function formatDate(value: dayjs.Dayjs | null) {
   return value?.format("YYYY-MM-DD") ?? "";

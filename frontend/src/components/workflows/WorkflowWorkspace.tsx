@@ -29,6 +29,8 @@ export default function WorkflowWorkspace({
     if (!isCompact) setHistoryOpen(false);
   }, [isCompact]);
 
+  const renderedTitle = <span className="workflow-workspace__card-title">{historyTitle}</span>;
+
   return (
     <>
       {isCompact ? (
@@ -48,7 +50,7 @@ export default function WorkflowWorkspace({
           <Col lg={6}>
             <div style={{ position: "sticky", top: 24 }}>
               <Card
-                title={historyTitle}
+                title={renderedTitle}
                 className="u-card"
                 styles={{ body: { maxHeight: "calc(100vh - 180px)", overflowY: "auto" } }}
               >
@@ -59,7 +61,7 @@ export default function WorkflowWorkspace({
         ) : null}
       </Row>
       <Drawer
-        title={historyTitle}
+        title={renderedTitle}
         placement="right"
         open={isCompact && historyOpen}
         onClose={() => setHistoryOpen(false)}
