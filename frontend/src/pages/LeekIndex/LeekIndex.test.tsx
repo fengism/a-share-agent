@@ -209,4 +209,64 @@ describe("LeekIndexPage", () => {
     fireEvent.click(screen.getByText("#1"));
     expect(screen.getByText(/散户博弈与韭菜指数详情/)).toBeInTheDocument();
   });
+
+  it("renders macro cockpit and filters by clicking risk tier", () => {
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <LeekIndexPage />
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+
+    // 验证宏观驾驶舱关键元素
+    expect(screen.getByText("31 行业风险梯队全景分布")).toBeInTheDocument();
+    expect(screen.getByText("全市场博弈总敞口")).toBeInTheDocument();
+    expect(screen.getByText("45.0")).toBeInTheDocument();
+    expect(screen.getByText("全市场中位分 / 100")).toBeInTheDocument();
+
+    // 点击梯队图例进行筛选（例如点击 🔥 极度接盘）
+    const extremeTierBtns = screen.getAllByText("🔥 极度接盘");
+    fireEvent.click(extremeTierBtns[0]);
+
+    expect(screen.getByText("电子")).toBeInTheDocument();
+    expect(screen.queryByText("银行")).not.toBeInTheDocument();
+  });
+
+  it("renders dual-axis history chart when industry drawer is opened", () => {
+    vi.spyOn(sentimentHooks, "useIndustryLeekHistory").mockReturnValue({
+      data: {
+        industry_name: "电子",
+        history: [
+          {
+            date: "2026-11-07",
+            score: 82.0,
+            risk_level: "extreme",
+            sub_scores: { flow: 85, guba: 90, crowd: 70, trap: 80 },
+            industry_change_pct: 1.2,
+          },
+          {
+            date: "2026-11-08",
+            score: 86.5,
+            risk_level: "extreme",
+            sub_scores: { flow: 90, guba: 100, crowd: 70, trap: 85 },
+            industry_change_pct: 1.5,
+          },
+        ],
+      },
+      isLoading: false,
+    } as unknown as ReturnType<typeof sentimentHooks.useIndustryLeekHistory>);
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/leek-index?industry=电子"]}>
+          <LeekIndexPage />
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+
+    expect(screen.getByText("历史博弈走势双轴复盘 (近 30 个交易日)")).toBeInTheDocument();
+    expect(screen.getByText(/近 2 日冲顶\(>75分\)频次/)).toBeInTheDocument();
+    expect(screen.getByText("2 次")).toBeInTheDocument();
+  });
 });

@@ -42,69 +42,6 @@
   color: var(--c-text-secondary, #64748b);
 }
 
-.leek-summary-banner {
-  background: var(--c-bg-card, #ffffff);
-  border: 1px solid var(--c-border, #e2e8f0);
-  border-radius: 8px;
-  padding: 16px 20px;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 20px;
-  align-items: center;
-}
-
-.leek-summary-metric {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.leek-summary-metric__label {
-  font-size: 13px;
-  color: var(--c-text-secondary, #64748b);
-}
-
-.leek-summary-metric__val {
-  font-size: 24px;
-  font-weight: 700;
-  font-family: var(--font-mono, monospace);
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-}
-
-.leek-summary-metric__val--blue {
-  color: #3b82f6;
-}
-
-.leek-summary-metric__val--red {
-  color: #ef4444;
-}
-
-.leek-summary-metric__val--orange {
-  color: #f59e0b;
-}
-
-.leek-summary-metric__val--green {
-  color: #10b981;
-}
-
-.leek-summary-metric__unit {
-  font-size: 13px;
-  font-weight: normal;
-  color: var(--c-text-secondary, #64748b);
-}
-
-.leek-summary-sentiment-text {
-  font-size: 13px;
-  color: var(--c-text-secondary, #475569);
-  line-height: 1.5;
-  background: var(--c-bg-elevated, #f8fafc);
-  padding: 10px 14px;
-  border-radius: 6px;
-  border-left: 3px solid #3b82f6;
-  grid-column: 1 / -1;
-}
 
 .leek-table-card {
   background: var(--c-bg-card, #ffffff);
@@ -286,4 +223,122 @@
 .leek-sub-card-flow {
   color: var(--c-text-muted, #94a3b8);
   font-size: 10px;
+}
+
+/* 资金背离镜像柱 (Mirrored Flow Bar) */
+.leek-mirrored-flow-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+
+.leek-mirrored-flow-svg-wrap {
+  width: 100%;
+  height: 8px;
+  background: var(--c-bg-elevated, #f1f5f9);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.leek-mirrored-flow-svg {
+  width: 100%;
+  height: 8px;
+  display: block;
+}
+
+.leek-mirrored-labels {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  font-family: var(--font-mono, monospace);
+}
+
+.leek-mirrored-label-main {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.leek-mirrored-label-retail {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* 四维因子迷你胶囊 */
+.leek-factor-pills {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.leek-pill {
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-family: var(--font-mono, monospace);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.leek-pill--extreme {
+  background: rgba(220, 38, 38, 0.12);
+  color: #dc2626;
+}
+
+.leek-pill--fever {
+  background: rgba(245, 158, 11, 0.12);
+  color: #d97706;
+}
+
+.leek-pill--normal {
+  background: rgba(59, 130, 246, 0.12);
+  color: #2563eb;
+}
+
+.leek-pill--safe {
+  background: rgba(5, 150, 105, 0.12);
+  color: #059669;
+}
+
+.leek-factor-tooltip {
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* 风险标签 */
+.leek-risk-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.leek-risk-badge--extreme {
+  background: rgba(220, 38, 38, 0.1);
+  color: #dc2626;
+  border: 1px solid rgba(220, 38, 38, 0.25);
+}
+
+.leek-risk-badge--fever {
+  background: rgba(245, 158, 11, 0.1);
+  color: #d97706;
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+.leek-risk-badge--normal {
+  background: rgba(59, 130, 246, 0.1);
+  color: #2563eb;
+  border: 1px solid rgba(59, 130, 246, 0.25);
+}
+
+.leek-risk-badge--safe {
+  background: rgba(5, 150, 105, 0.1);
+  color: #059669;
+  border: 1px solid rgba(5, 150, 105, 0.25);
 }

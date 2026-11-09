@@ -1,0 +1,366 @@
+/* 宏观量化驾驶舱 (LeekMacroCockpit) 样式 */
+.leek-cockpit-panel {
+  background: var(--c-bg-card, #ffffff);
+  border: 1px solid var(--c-border, #e2e8f0);
+  border-radius: 10px;
+  padding: 18px 20px;
+  display: grid;
+  grid-template-columns: 210px 1fr 240px;
+  gap: 20px;
+  align-items: stretch;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+/* 仪表盘列 */
+.leek-cockpit-col-gauge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-right: 1px solid var(--c-border, #e2e8f0);
+  padding-right: 16px;
+  position: relative;
+}
+
+.leek-gauge-wrap {
+  position: relative;
+  width: 140px;
+  height: 85px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+}
+
+.leek-gauge-svg {
+  width: 140px;
+  height: 85px;
+  overflow: visible;
+}
+
+.leek-gauge-track {
+  fill: none;
+  stroke: var(--c-bg-elevated, #e2e8f0);
+  stroke-width: 10;
+  stroke-linecap: round;
+}
+
+.leek-gauge-progress {
+  fill: none;
+  stroke-width: 10;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.6s ease, stroke 0.4s ease;
+}
+
+.leek-gauge-progress--extreme {
+  stroke: #dc2626;
+}
+
+.leek-gauge-progress--fever {
+  stroke: #f59e0b;
+}
+
+.leek-gauge-progress--normal {
+  stroke: #3b82f6;
+}
+
+.leek-gauge-progress--safe {
+  stroke: #059669;
+}
+
+.leek-gauge-center {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.leek-gauge-score {
+  font-size: 26px;
+  font-weight: 800;
+  font-family: var(--font-mono, monospace);
+  line-height: 1;
+  color: var(--c-text-primary, #0f172a);
+}
+
+.leek-gauge-unit {
+  font-size: 11px;
+  color: var(--c-text-muted, #94a3b8);
+  margin-top: 2px;
+}
+
+.leek-gauge-badge {
+  margin-top: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: 12px;
+  letter-spacing: 0.5px;
+}
+
+.leek-gauge-badge--extreme {
+  background: rgba(220, 38, 38, 0.12);
+  color: #dc2626;
+}
+
+.leek-gauge-badge--fever {
+  background: rgba(245, 158, 11, 0.12);
+  color: #d97706;
+}
+
+.leek-gauge-badge--normal {
+  background: rgba(59, 130, 246, 0.12);
+  color: #2563eb;
+}
+
+.leek-gauge-badge--safe {
+  background: rgba(5, 150, 105, 0.12);
+  color: #059669;
+}
+
+.leek-gauge-ticks {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-size: 10px;
+  color: var(--c-text-muted, #94a3b8);
+}
+
+/* 中间梯队分布与 AI 诊断列 */
+.leek-cockpit-col-distribution {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.leek-cockpit-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.leek-cockpit-col-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--c-text-secondary, #475569);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.leek-cockpit-col-subtitle {
+  font-size: 11px;
+  color: var(--c-text-muted, #94a3b8);
+}
+
+.leek-tier-bar-wrap {
+  width: 100%;
+  height: 12px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--c-bg-elevated, #f1f5f9);
+}
+
+.leek-tier-bar-svg {
+  width: 100%;
+  height: 12px;
+  display: block;
+}
+
+.tier-bar-rect--extreme {
+  fill: #dc2626;
+}
+
+.tier-bar-rect--fever {
+  fill: #f59e0b;
+}
+
+.tier-bar-rect--normal {
+  fill: #3b82f6;
+}
+
+.tier-bar-rect--safe {
+  fill: #059669;
+}
+
+.leek-tier-legend {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.leek-tier-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 3px 6px;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+
+.leek-tier-item:hover {
+  background: var(--c-bg-elevated, #f1f5f9);
+}
+
+.leek-tier-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.leek-tier-dot--extreme {
+  background: #dc2626;
+}
+
+.leek-tier-dot--fever {
+  background: #f59e0b;
+}
+
+.leek-tier-dot--normal {
+  background: #3b82f6;
+}
+
+.leek-tier-dot--safe {
+  background: #059669;
+}
+
+.leek-tier-name {
+  color: var(--c-text-secondary, #64748b);
+}
+
+.leek-tier-count {
+  font-weight: 700;
+  font-family: var(--font-mono, monospace);
+  color: var(--c-text-primary, #1e293b);
+}
+
+.leek-tier-pct {
+  font-size: 10px;
+  color: var(--c-text-muted, #94a3b8);
+}
+
+/* AI 量化操盘风向 */
+.leek-cockpit-commentary {
+  background: var(--c-bg-elevated, #f8fafc);
+  border: 1px solid var(--c-border, #e2e8f0);
+  border-left: 3px solid #3b82f6;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--c-text-secondary, #334155);
+}
+
+.leek-cockpit-commentary__title {
+  font-weight: 700;
+  color: var(--c-text-primary, #0f172a);
+  margin-right: 4px;
+}
+
+.leek-cockpit-commentary__highlight--risk {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+.leek-cockpit-commentary__highlight--safe {
+  color: #059669;
+  font-weight: 600;
+}
+
+/* 右侧总对冲敞口 */
+.leek-cockpit-col-hedging {
+  border-left: 1px solid var(--c-border, #e2e8f0);
+  padding-left: 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.leek-hedging-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 4px 0;
+}
+
+.leek-hedging-label {
+  font-size: 12px;
+  color: var(--c-text-secondary, #64748b);
+}
+
+.leek-hedging-val {
+  font-family: var(--font-mono, monospace);
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.leek-hedging-total-card {
+  margin-top: 4px;
+  padding: 8px 10px;
+  background: var(--c-bg-elevated, #f8fafc);
+  border-radius: 6px;
+  border: 1px solid var(--c-border, #e2e8f0);
+}
+
+.leek-hedging-total-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  color: var(--c-text-secondary, #64748b);
+  margin-bottom: 2px;
+}
+
+.leek-hedging-total-val {
+  font-size: 16px;
+  font-weight: 800;
+  font-family: var(--font-mono, monospace);
+  color: var(--c-text-primary, #0f172a);
+}
+
+.leek-hedging-tag {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.leek-hedging-tag--divergent {
+  background: rgba(220, 38, 38, 0.1);
+  color: #dc2626;
+}
+
+.leek-hedging-tag--convergent {
+  background: rgba(5, 150, 105, 0.1);
+  color: #059669;
+}
+
+@media (max-width: 992px) {
+  .leek-cockpit-panel {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .leek-cockpit-col-gauge {
+    border-right: none;
+    border-bottom: 1px solid var(--c-border, #e2e8f0);
+    padding-right: 0;
+    padding-bottom: 14px;
+  }
+  .leek-cockpit-col-hedging {
+    border-left: none;
+    border-top: 1px solid var(--c-border, #e2e8f0);
+    padding-left: 0;
+    padding-top: 14px;
+  }
+}

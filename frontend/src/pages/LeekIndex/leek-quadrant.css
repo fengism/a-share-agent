@@ -32,6 +32,11 @@
   width: 100%;
 }
 
+.leek-quadrant-echarts {
+  height: 320px;
+  width: 100%;
+}
+
 .leek-quadrant-empty {
   padding: 32px 0;
 }

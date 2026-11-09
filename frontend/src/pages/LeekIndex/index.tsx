@@ -36,34 +36,33 @@ import {
 import { useUrlSearchParam } from "../../hooks/useUrlSearchParam";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { downloadCsv } from "../../utils/csv";
+import { LeekMacroCockpit } from "./LeekMacroCockpit";
 import { LeekQuadrantChart } from "./LeekQuadrantChart";
+import { LeekDualAxisChart } from "./LeekDualAxisChart";
+import { formatAmount, formatSignedAmount } from "./utils";
 import "./leek-index.css";
 import "./leek-drawer.css";
 import "./leek-mobile.css";
 
 const RISK_BADGES = {
-  extreme: { color: "red", label: "🔥 极度接盘", desc: "散户高位狂热追高，主力坚决出货，极易见顶" },
-  fever: { color: "orange", label: "⚠️ 散户过热", desc: "跟风炒作加速，筹码趋向分散" },
-  normal: { color: "blue", label: "⚖️ 筹码均衡", desc: "多空博弈平稳，主力散户参与度正常" },
-  safe: { color: "green", label: "💎 筹码出清", desc: "散户割肉离场、无人问津，常为左侧黄金坑" },
+  extreme: { level: "extreme", label: "🔥 极度接盘", desc: "散户高位狂热追高，主力坚决出货，极易见顶" },
+  fever: { level: "fever", label: "⚠️ 散户过热", desc: "跟风炒作加速，筹码趋向分散" },
+  normal: { level: "normal", label: "⚖️ 筹码均衡", desc: "多空博弈平稳，主力散户参与度正常" },
+  safe: { level: "safe", label: "💎 筹码出清", desc: "散户割肉离场、无人问津，常为左侧黄金坑" },
 };
-
-function formatAmount(val: number): string {
-  const abs = Math.abs(val);
-  if (abs >= 1e8) {
-    return `${(val / 1e8).toFixed(1)} 亿`;
-  }
-  if (abs >= 1e4) {
-    return `${(val / 1e4).toFixed(0)} 万`;
-  }
-  return `${val.toFixed(0)} 元`;
-}
 
 function getScoreColorClass(score: number): string {
   if (score >= 75) return "leek-score-num--extreme";
   if (score >= 60) return "leek-score-num--fever";
   if (score >= 35) return "leek-score-num--normal";
   return "leek-score-num--safe";
+}
+
+function getScoreTier(score: number): "extreme" | "fever" | "normal" | "safe" {
+  if (score >= 75) return "extreme";
+  if (score >= 60) return "fever";
+  if (score >= 35) return "normal";
+  return "safe";
 }
 
 export default function LeekIndexPage() {
@@ -90,6 +89,19 @@ export default function LeekIndexPage() {
     selectedIndustry?.industry_name ?? "",
     30
   );
+
+  // 计算用于资金背离镜像柱的最大规模
+  const maxFlowScale = useMemo(() => {
+    if (!data?.industries || data.industries.length === 0) return 1e8;
+    let maxVal = 1e8;
+    for (const item of data.industries) {
+      const m = Math.abs(item.main_net);
+      const r = Math.abs(item.retail_net);
+      if (m > maxVal) maxVal = m;
+      if (r > maxVal) maxVal = r;
+    }
+    return maxVal;
+  }, [data?.industries]);
 
   // URL 深度直达：根据 industry 参数自动打开对应行业抽屉
   useEffect(() => {
@@ -178,14 +190,15 @@ export default function LeekIndexPage() {
     {
       title: "排名",
       key: "rank",
-      width: 65,
+      width: 58,
       align: "center",
-      render: (_, __, idx) => <span className="font-mono text-secondary">{idx + 1}</span>,
+      render: (_, __, idx) => <span className="font-mono text-secondary">#{idx + 1}</span>,
     },
     {
       title: "申万一级行业",
       dataIndex: "industry_name",
       key: "industry_name",
+      width: 120,
       render: (name: string, record) => (
         <Button
           type="link"
@@ -201,10 +214,10 @@ export default function LeekIndexPage() {
       dataIndex: "leek_score",
       key: "leek_score",
       sorter: (a, b) => a.leek_score - b.leek_score,
-      width: 200,
+      width: 175,
       render: (score: number) => {
-        let strokeColor = "#10b981";
-        if (score >= 75) strokeColor = "#ef4444";
+        let strokeColor = "#059669";
+        if (score >= 75) strokeColor = "#dc2626";
         else if (score >= 60) strokeColor = "#f59e0b";
         else if (score >= 35) strokeColor = "#3b82f6";
         return (
@@ -226,23 +239,32 @@ export default function LeekIndexPage() {
     {
       title: "四维因子透视",
       key: "factors",
-      width: 175,
+      width: 185,
       render: (_, record) => (
         <Tooltip
           title={
             <div className="leek-factor-tooltip">
-              <div>资金剪刀差: <strong>{record.sub_scores.flow.toFixed(1)}</strong></div>
-              <div>东财股吧热度: <strong>{record.sub_scores.guba.toFixed(1)}</strong></div>
-              <div>成交拥挤度: <strong>{record.sub_scores.crowd.toFixed(1)}</strong></div>
-              <div>滞涨套牢盘: <strong>{record.sub_scores.trap.toFixed(1)}</strong></div>
+              <div>📊 <strong>四维因子量化学术透视</strong></div>
+              <div>• 资金流背离分 (流): <strong>{record.sub_scores.flow.toFixed(1)}</strong> (主力抛售 vs 散户承接)</div>
+              <div>• 股吧舆论聚集 (吧): <strong>{record.sub_scores.guba.toFixed(1)}</strong> (散户情绪共振与发帖激增)</div>
+              <div>• 交易拥挤度 (挤): <strong>{record.sub_scores.crowd.toFixed(1)}</strong> (全市场成交占比与超额换手)</div>
+              <div>• 滞涨套牢盘 (套): <strong>{record.sub_scores.trap.toFixed(1)}</strong> (高换手滞涨与沉淀筹码压力)</div>
             </div>
           }
         >
           <div className="leek-factor-pills">
-            <span className="leek-pill leek-pill--flow">流 {record.sub_scores.flow.toFixed(0)}</span>
-            <span className="leek-pill leek-pill--guba">吧 {record.sub_scores.guba.toFixed(0)}</span>
-            <span className="leek-pill leek-pill--crowd">挤 {record.sub_scores.crowd.toFixed(0)}</span>
-            <span className="leek-pill leek-pill--trap">套 {record.sub_scores.trap.toFixed(0)}</span>
+            <span className={`leek-pill leek-pill--${getScoreTier(record.sub_scores.flow)}`}>
+              流 {record.sub_scores.flow.toFixed(0)}
+            </span>
+            <span className={`leek-pill leek-pill--${getScoreTier(record.sub_scores.guba)}`}>
+              吧 {record.sub_scores.guba.toFixed(0)}
+            </span>
+            <span className={`leek-pill leek-pill--${getScoreTier(record.sub_scores.crowd)}`}>
+              挤 {record.sub_scores.crowd.toFixed(0)}
+            </span>
+            <span className={`leek-pill leek-pill--${getScoreTier(record.sub_scores.trap)}`}>
+              套 {record.sub_scores.trap.toFixed(0)}
+            </span>
           </div>
         </Tooltip>
       ),
@@ -251,11 +273,14 @@ export default function LeekIndexPage() {
       title: "风险状态",
       dataIndex: "risk_level",
       key: "risk_level",
+      width: 110,
       render: (level: keyof typeof RISK_BADGES) => {
         const badge = RISK_BADGES[level] || RISK_BADGES.normal;
         return (
           <Tooltip title={badge.desc}>
-            <Tag color={badge.color}>{badge.label}</Tag>
+            <span className={`leek-risk-badge leek-risk-badge--${badge.level}`}>
+              {badge.label}
+            </span>
           </Tooltip>
         );
       },
@@ -265,6 +290,7 @@ export default function LeekIndexPage() {
       dataIndex: "change_pct",
       key: "change_pct",
       sorter: (a, b) => a.change_pct - b.change_pct,
+      width: 95,
       render: (pct: number) => (
         <span
           className={`leek-change-val ${
@@ -276,26 +302,59 @@ export default function LeekIndexPage() {
       ),
     },
     {
-      title: "主力净流入",
-      dataIndex: "main_net",
-      key: "main_net",
-      sorter: (a, b) => a.main_net - b.main_net,
-      render: (v: number) => (
-        <span className={`leek-diff-val ${v >= 0 ? "leek-diff-val--inflow" : "leek-diff-val--outflow"}`}>
-          {formatAmount(v)}
-        </span>
-      ),
-    },
-    {
-      title: "散户小单净买入",
-      dataIndex: "retail_net",
-      key: "retail_net",
-      sorter: (a, b) => a.retail_net - b.retail_net,
-      render: (v: number) => (
-        <span className={`leek-diff-val ${v >= 0 ? "leek-diff-val--inflow" : "leek-diff-val--outflow"}`}>
-          {formatAmount(v)}
-        </span>
-      ),
+      title: "主力 vs 散户资金流向 (镜像背离柱)",
+      key: "flow_mirrored",
+      sorter: (a, b) => (a.retail_net - a.main_net) - (b.retail_net - b.main_net),
+      width: 250,
+      render: (_, record) => {
+        const mainRatio = Math.min(1, Math.abs(record.main_net) / maxFlowScale);
+        const retailRatio = Math.min(1, Math.abs(record.retail_net) / maxFlowScale);
+
+        // 主力条：负数（流出）向左延展（绿），正数（流入）向右延展（红）
+        const mainWidth = Math.max(2, mainRatio * 46);
+        const mainX = record.main_net < 0 ? 50 - mainWidth : 50;
+        const mainFill = record.main_net >= 0 ? "#ef4444" : "#10b981";
+
+        // 散户条：正数（买入）向右延展（红），负数（流出）向左延展（绿）
+        const retailWidth = Math.max(2, retailRatio * 46);
+        const retailX = record.retail_net >= 0 ? 50 : 50 - retailWidth;
+        const retailFill = record.retail_net >= 0 ? "#ef4444" : "#10b981";
+
+        return (
+          <Tooltip
+            title={`主力净额: ${formatSignedAmount(record.main_net)} · 散户净额: ${formatSignedAmount(record.retail_net)} · 剪刀差: ${formatSignedAmount(record.retail_net - record.main_net)}`}
+          >
+            <div className="leek-mirrored-flow-cell">
+              <div className="leek-mirrored-flow-svg-wrap">
+                <svg className="leek-mirrored-flow-svg" viewBox="0 0 100 8">
+                  {/* 中轴分割虚线 */}
+                  <line x1="50" y1="0" x2="50" y2="8" stroke="rgba(148, 163, 184, 0.6)" strokeWidth="1" />
+                  {/* 主力流向柱 */}
+                  <rect x={mainX} y="1" width={mainWidth} height="6" rx="2" fill={mainFill} opacity="0.85" />
+                  {/* 散户流向柱 */}
+                  <rect x={retailX} y="1" width={retailWidth} height="6" rx="2" fill={retailFill} opacity="0.85" />
+                </svg>
+              </div>
+              <div className="leek-mirrored-labels">
+                <span
+                  className={`leek-mirrored-label-main ${
+                    record.main_net >= 0 ? "leek-diff-val--inflow" : "leek-diff-val--outflow"
+                  }`}
+                >
+                  主力 {formatSignedAmount(record.main_net)}
+                </span>
+                <span
+                  className={`leek-mirrored-label-retail ${
+                    record.retail_net >= 0 ? "leek-diff-val--inflow" : "leek-diff-val--outflow"
+                  }`}
+                >
+                  散户 {formatSignedAmount(record.retail_net)}
+                </span>
+              </div>
+            </div>
+          </Tooltip>
+        );
+      },
     },
     {
       title: "散户跟风/人气龙头",
@@ -324,7 +383,7 @@ export default function LeekIndexPage() {
 
   return (
     <div className="leek-index-page">
-      {/* 顶部标题区 */}
+      {/* 顶部标题栏 */}
       <div className="leek-index-header">
         <div className="leek-index-header__title-group">
           <h2 className="leek-index-header__title">
@@ -350,46 +409,16 @@ export default function LeekIndexPage() {
         </Space>
       </div>
 
-      {/* 市场散户整体情绪诊断横幅 */}
-      <div className="leek-summary-banner">
-        <div className="leek-summary-metric">
-          <div className="leek-summary-metric__label">全市场韭菜指数中位数</div>
-          <div className="leek-summary-metric__val leek-summary-metric__val--blue">
-            {data?.summary.median_score?.toFixed(1) || "-"}
-            <span className="leek-summary-metric__unit">/ 100</span>
-          </div>
-        </div>
+      {/* 模块 1：宏观量化驾驶舱 (Macro Cockpit) */}
+      {data?.summary && (
+        <LeekMacroCockpit
+          summary={data.summary}
+          industries={data.industries || []}
+          onSelectRiskTier={(level) => setFilterLevel(level)}
+        />
+      )}
 
-        <div className="leek-summary-metric">
-          <div className="leek-summary-metric__label">🔥 极度接盘区行业</div>
-          <div className="leek-summary-metric__val leek-summary-metric__val--red">
-            {data?.summary.extreme_count ?? 0}
-            <span className="leek-summary-metric__unit">个</span>
-          </div>
-        </div>
-
-        <div className="leek-summary-metric">
-          <div className="leek-summary-metric__label">⚠️ 散户过热追高行业</div>
-          <div className="leek-summary-metric__val leek-summary-metric__val--orange">
-            {data?.summary.fever_count ?? 0}
-            <span className="leek-summary-metric__unit">个</span>
-          </div>
-        </div>
-
-        <div className="leek-summary-metric">
-          <div className="leek-summary-metric__label">💎 筹码出清/冷门行业</div>
-          <div className="leek-summary-metric__val leek-summary-metric__val--green">
-            {data?.summary.safe_count ?? 0}
-            <span className="leek-summary-metric__unit">个</span>
-          </div>
-        </div>
-
-        <div className="leek-summary-sentiment-text">
-          <strong>情绪诊断：</strong> {data?.summary.market_sentiment_label || "正在计算全市场散户情绪特征..."}
-        </div>
-      </div>
-
-      {/* 四象限矩阵可视化板块 */}
+      {/* 模块 2：行业博弈四象限矩阵 2.0 */}
       <div className="leek-quadrant-section">
         <div className="leek-quadrant-header">
           <div className="leek-quadrant-title">
@@ -411,12 +440,13 @@ export default function LeekIndexPage() {
         {showQuadrant && (
           <LeekQuadrantChart
             industries={filteredIndustries}
+            selectedIndustryName={selectedIndustry?.industry_name}
             onSelectIndustry={(ind) => handleSelectIndustry(ind)}
           />
         )}
       </div>
 
-      {/* 行业表格或移动端卡片流 */}
+      {/* 模块 3：高密度量化行情表 */}
       <div className="leek-table-card">
         <div className="leek-table-toolbar">
           <div className="leek-table-filters-row">
@@ -496,9 +526,9 @@ export default function LeekIndexPage() {
                     <div className="leek-mobile-card-title">
                       <span className="leek-mobile-rank">#{idx + 1}</span>
                       <span className="leek-mobile-name">{item.industry_name}</span>
-                      <Tag color={RISK_BADGES[item.risk_level as keyof typeof RISK_BADGES]?.color}>
-                        {RISK_BADGES[item.risk_level as keyof typeof RISK_BADGES]?.label}
-                      </Tag>
+                      <span className={`leek-risk-badge leek-risk-badge--${item.risk_level}`}>
+                        {RISK_BADGES[item.risk_level as keyof typeof RISK_BADGES]?.label || item.risk_level}
+                      </span>
                     </div>
                     <span
                       className={`leek-change-val ${
@@ -523,12 +553,12 @@ export default function LeekIndexPage() {
                         percent={item.leek_score}
                         strokeColor={
                           item.leek_score >= 75
-                            ? "#ef4444"
+                            ? "#dc2626"
                             : item.leek_score >= 60
                             ? "#f59e0b"
                             : item.leek_score >= 35
                             ? "#3b82f6"
-                            : "#10b981"
+                            : "#059669"
                         }
                         showInfo={false}
                         size="small"
@@ -540,13 +570,13 @@ export default function LeekIndexPage() {
                       <span>
                         主力:{" "}
                         <strong className={item.main_net >= 0 ? "leek-diff-val--inflow" : "leek-diff-val--outflow"}>
-                          {formatAmount(item.main_net)}
+                          {formatSignedAmount(item.main_net)}
                         </strong>
                       </span>
                       <span>
                         散户:{" "}
                         <strong className={item.retail_net >= 0 ? "leek-diff-val--inflow" : "leek-diff-val--outflow"}>
-                          {formatAmount(item.retail_net)}
+                          {formatSignedAmount(item.retail_net)}
                         </strong>
                       </span>
                     </div>
@@ -581,8 +611,8 @@ export default function LeekIndexPage() {
                 return (
                   <div className="leek-sub-table-wrap">
                     <div className="leek-sub-table-header">
-                      <span>申万二级行业 ({record.sub_industries.length}个)</span>
-                      <span className="leek-sub-table-header-tip">点击一级行业行即可在右侧查看历史曲线与详细分析</span>
+                      <span>申万二级细分行业 ({record.sub_industries.length}个)</span>
+                      <span className="leek-sub-table-header-tip">点击一级行业行即可在右侧查看历史走势与深度双轴复盘</span>
                     </div>
                     <div className="leek-sub-grid">
                       {record.sub_industries.map((sub) => (
@@ -613,7 +643,7 @@ export default function LeekIndexPage() {
         )}
       </div>
 
-      {/* 选中行业详情与历史时序抽屉 */}
+      {/* 模块 4：选中行业详情与历史双轴复盘抽屉 */}
       <Drawer
         title={
           selectedIndustry ? (
@@ -630,6 +660,18 @@ export default function LeekIndexPage() {
       >
         {selectedIndustry && (
           <div className="leek-drawer-body">
+            {/* 历史走势双轴复盘图 */}
+            <Card size="small" title="历史博弈走势双轴复盘 (近 30 个交易日)">
+              {historyQuery.isLoading ? (
+                <div className="leek-history-loading">加载历史时序中...</div>
+              ) : (
+                <LeekDualAxisChart
+                  industryName={selectedIndustry.industry_name}
+                  history={historyQuery.data?.history || []}
+                />
+              )}
+            </Card>
+
             <Card size="small" title="四维度因子得分分解">
               <div className="leek-factor-list">
                 <div>
@@ -637,7 +679,7 @@ export default function LeekIndexPage() {
                     <span>资金流背离（主力跑/散户买剪刀差）</span>
                     <strong>{selectedIndustry.sub_scores.flow.toFixed(1)}</strong>
                   </div>
-                  <Progress percent={selectedIndustry.sub_scores.flow} strokeColor="#ef4444" size="small" />
+                  <Progress percent={selectedIndustry.sub_scores.flow} strokeColor="#dc2626" size="small" />
                 </div>
 
                 <div>
@@ -735,24 +777,6 @@ export default function LeekIndexPage() {
                           深度分析 &gt;
                         </Button>
                       </Space>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </Card>
-
-            <Card size="small" title="历史归档走势记录">
-              {historyQuery.isLoading ? (
-                <div className="leek-history-loading">加载历史时序中...</div>
-              ) : !historyQuery.data?.history.length ? (
-                <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无历史归档数据" />
-              ) : (
-                <div className="leek-history-list">
-                  {historyQuery.data.history.map((pt) => (
-                    <div key={pt.date} className="leek-history-item">
-                      <span className="font-mono">{pt.date}</span>
-                      <span className="leek-history-score">韭菜指数: {pt.score.toFixed(1)}</span>
-                      <span>涨跌: {pt.industry_change_pct != null ? `${pt.industry_change_pct}%` : "-"}</span>
                     </div>
                   ))}
                 </div>
