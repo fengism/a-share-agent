@@ -48,8 +48,8 @@
 }
 
 [data-theme] .responsive-section-nav__tabs.ant-tabs .ant-tabs-tab.ant-tabs-tab-active {
-  color: var(--c-primary);
-  background: rgba(37, 99, 235, 0.12);
+  color: var(--c-text-primary);
+  background: var(--c-active-bg);
 }
 
 [data-theme="light"] .responsive-section-nav__tabs.ant-tabs .ant-tabs-tab.ant-tabs-tab-active {
