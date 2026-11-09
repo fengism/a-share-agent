@@ -4,16 +4,16 @@ import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import LeekIndexPage from "./index";
 import * as sentimentHooks from "../../api/queryHooks/sentiment";
-import * as csvUtils from "../NationalTeam/utils/csv";
+import * as csvUtils from "../../utils/csv";
 import * as mediaQueryHooks from "../../hooks/useMediaQuery";
 
 vi.mock("echarts-for-react/lib/core", () => ({
-  default: ({ option }: any) => (
+  default: ({ option }: { option?: { title?: { text?: string } } }) => (
     <div data-testid="leek-quadrant-chart" data-title={option?.title?.text} />
   ),
 }));
 
-vi.mock("../NationalTeam/utils/csv", () => ({
+vi.mock("../../utils/csv", () => ({
   downloadCsv: vi.fn(),
 }));
 
@@ -151,7 +151,7 @@ describe("LeekIndexPage", () => {
     fireEvent.click(exportBtn);
 
     expect(csvUtils.downloadCsv).toHaveBeenCalledTimes(1);
-    const [filename, rows] = (csvUtils.downloadCsv as any).mock.calls[0];
+    const [filename, rows] = vi.mocked(csvUtils.downloadCsv).mock.calls[0];
     expect(filename).toContain("A股行业韭菜指数_2026-11-08.csv");
     expect(rows.length).toBe(3); // header + 2 items
   });

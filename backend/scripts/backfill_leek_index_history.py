@@ -10,10 +10,9 @@ import logging
 import math
 import random
 from datetime import date, timedelta
-from pathlib import Path
 
 from app.financial_data.market.trading_session import get_market_date_on_or_before
-from app.modules.sentiment.service import get_leek_index_service, DATA_DIR
+from app.modules.sentiment.service import DATA_DIR, get_leek_index_service
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("backfill_leek_index")

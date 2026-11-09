@@ -35,7 +35,7 @@ import {
 } from "../../api/queryHooks/sentiment";
 import { useUrlSearchParam } from "../../hooks/useUrlSearchParam";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
-import { downloadCsv } from "../NationalTeam/utils/csv";
+import { downloadCsv } from "../../utils/csv";
 import { LeekQuadrantChart } from "./LeekQuadrantChart";
 import "./leek-index.css";
 import "./leek-drawer.css";

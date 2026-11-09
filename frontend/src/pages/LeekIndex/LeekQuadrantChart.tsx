@@ -37,7 +37,7 @@ export const LeekQuadrantChart: React.FC<Props> = ({ industries, onSelectIndustr
       },
       tooltip: {
         trigger: "item",
-        formatter: (params: any) => {
+        formatter: (params: { value: [number, number, number, string, number, number] }) => {
           const [pct, diff, score, name, main, retail] = params.value;
           return `
             <div style="font-size:12px;line-height:1.6;">
@@ -84,14 +84,14 @@ export const LeekQuadrantChart: React.FC<Props> = ({ industries, onSelectIndustr
       series: [
         {
           type: "scatter",
-          symbolSize: (val: any) => {
+          symbolSize: (val: [number, number, number, string, number, number]) => {
             const score = val[2];
             return Math.max(16, Math.min(36, score * 0.38));
           },
           data,
           label: {
             show: true,
-            formatter: (param: any) => param.value[3],
+            formatter: (param: { value: [number, number, number, string, number, number] }) => param.value[3],
             position: "top",
             fontSize: 10,
             color: "var(--c-text-secondary, #64748b)",
@@ -122,7 +122,7 @@ export const LeekQuadrantChart: React.FC<Props> = ({ industries, onSelectIndustr
         style={{ height: 290, width: "100%" }}
         notMerge
         onEvents={{
-          click: (params: any) => {
+          click: (params: { componentType?: string; value?: [number, number, number, string, number, number] }) => {
             if (params.componentType === "series" && params.value) {
               const name = params.value[3];
               const ind = industries.find((i) => i.industry_name === name);

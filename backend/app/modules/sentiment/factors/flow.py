@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Dict, Tuple
 
 from app.financial_data.industry.research import call_industry_data
 from app.modules.industry_classification.public import a_share_all_levels_mapping
@@ -11,7 +10,7 @@ from app.modules.industry_classification.public import a_share_all_levels_mappin
 logger = logging.getLogger(__name__)
 
 
-def _get_level2_to_level1_mapping() -> Dict[str, str]:
+def _get_level2_to_level1_mapping() -> dict[str, str]:
     mapping = a_share_all_levels_mapping()
     l2_to_l1 = {
         item["level2"]: item["level1"]
@@ -24,10 +23,10 @@ def _get_level2_to_level1_mapping() -> Dict[str, str]:
     return l2_to_l1
 
 
-async def calculate_industry_fund_flow_factors() -> Tuple[
-    Dict[str, float],
-    Dict[str, Dict[str, float]],
-    Dict[str, List[Dict[str, float]]],
+async def calculate_industry_fund_flow_factors() -> tuple[
+    dict[str, float],
+    dict[str, dict[str, float]],
+    dict[str, list[dict[str, float]]],
 ]:
     """
     抓取行业资金流，聚合成 31 个申万一级行业的资金剪刀差评分及下属二级行业明细。
@@ -35,8 +34,8 @@ async def calculate_industry_fund_flow_factors() -> Tuple[
         (flow_scores, industry_raw_flows, level2_details)
     """
     l2_to_l1 = _get_level2_to_level1_mapping()
-    industry_raw_flows: Dict[str, Dict[str, float]] = {}
-    level2_details: Dict[str, List[Dict[str, float]]] = {}
+    industry_raw_flows: dict[str, dict[str, float]] = {}
+    level2_details: dict[str, list[dict[str, float]]] = {}
 
     try:
         raw_flows = await call_industry_data("industry_fund_flow")
@@ -80,8 +79,8 @@ async def calculate_industry_fund_flow_factors() -> Tuple[
         })
 
     # 计算均值与剪刀差得分
-    flow_scores: Dict[str, float] = {}
-    divergences: Dict[str, float] = {}
+    flow_scores: dict[str, float] = {}
+    divergences: dict[str, float] = {}
 
     for ind, data in industry_raw_flows.items():
         if data["count"] > 0:
